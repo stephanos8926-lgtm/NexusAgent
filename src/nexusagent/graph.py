@@ -22,22 +22,18 @@ async def push_error_to_nats(error: str):
         pass
 
 def research_node(state: AgentState):
-    # Perform research
-    query = "How to fix the issue in the code"
-    web_res = search_web(query)
-    doc_res = search_local_docs(query)
-    
     state["research_done"] = True
     state["loop_count"] = 0
     return state
 
 def dummy_node(state: AgentState):
+    # This node simply increments the loop count to simulate work/looping
     state["loop_count"] = state.get("loop_count", 0) + 1
     
-    if state["loop_count"] > 8 and state.get("research_done", False):
+    # Check for terminal failure (post-research retry exhaustion)
+    if state.get("research_done", False) and state.get("loop_count", 0) > 4:
         asyncio.run(push_error_to_nats("Terminal failure after research"))
-        return "terminal_failure"
-        
+        return {"code": "terminal_failure"}
     return state
 
 def create_graph(db_path: str):
@@ -50,11 +46,19 @@ def create_graph(db_path: str):
     workflow.add_node("dummy", dummy_node)
     workflow.add_node("research", research_node)
     
+    # Start -> Dummy
     workflow.add_edge(START, "dummy")
+    
+    # Conditional edge from Dummy:
+    # 1. If loop_count > 4 and research not done -> Research
+    # 2. If loop_count <= 4 -> Dummy
+    # 3. Else (loop_count > 4 and research_done) -> END
     workflow.add_conditional_edges(
         "dummy",
-        lambda x: "research" if x.get("loop_count", 0) > 4 and not x.get("research_done", False) else END,
-        {"research": "research", END: END}
+        lambda x: "research" if x.get("loop_count", 0) > 4 and not x.get("research_done", False) 
+                  else "dummy" if x.get("loop_count", 0) <= 4 
+                  else END,
+        {"research": "research", "dummy": "dummy", END: END}
     )
     workflow.add_edge("research", "dummy")
     
