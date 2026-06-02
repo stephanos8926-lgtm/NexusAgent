@@ -9,6 +9,7 @@ dependencies = [
     "langgraph-checkpoint",
     "deepagents",
     "nats-py",
+    "pyyaml",
 ]
 
 [build-system]

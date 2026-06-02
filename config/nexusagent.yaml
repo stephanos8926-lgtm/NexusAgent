@@ -1,0 +1,7 @@
+server:
+  nats_url: "nats://localhost:4222"
+  db_path: "nexus.db"
+client:
+  tui_colors: "monokai"
+loop_threshold: 4
+post_research_retries: 4
