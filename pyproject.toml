@@ -10,6 +10,7 @@ dependencies = [
     "deepagents",
     "nats-py",
     "pyyaml",
+    "patch-ng",
 ]
 
 [build-system]
