@@ -540,6 +540,7 @@ source = { editable = "." }
 dependencies = [
     { name = "deepagents" },
     { name = "langgraph" },
+    { name = "langgraph-checkpoint" },
     { name = "nats-py" },
 ]
 
@@ -547,6 +548,7 @@ dependencies = [
 requires-dist = [
     { name = "deepagents" },
     { name = "langgraph" },
+    { name = "langgraph-checkpoint" },
     { name = "nats-py" },
 ]
 
