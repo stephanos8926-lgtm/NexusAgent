@@ -1,0 +1,17 @@
+{
+  "session_id": "session-nexusagent-20260602T124851Z_255195-78194",
+  "schema_version": 2,
+  "summary": "Recent session context: user: we are going to write a new project called NexusAgent. tell me, do you have web search abilities",
+  "objective": null,
+  "task_summary": null,
+  "spec_summary": null,
+  "evaluation_summary": null,
+  "constraints": [],
+  "grounded_facts": [],
+  "touched_files": [],
+  "open_questions": [],
+  "verification_todo": [],
+  "delegation_notes": [],
+  "history_artifact_path": null,
+  "generated_at": "2026-06-02T12:49:45.169427369+00:00"
+}
