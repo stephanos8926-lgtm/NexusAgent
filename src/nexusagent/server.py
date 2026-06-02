@@ -1,16 +1,14 @@
 import asyncio
 import nats
 import sys
-import yaml
 from pathlib import Path
 from nexusagent.graph import create_graph
+from nexusagent.config import load_config
 
 async def run_server_async():
     print("Starting server...", file=sys.stderr, flush=True)
     
-    config_path = Path(__file__).parent.parent.parent / "config" / "nexusagent.yaml"
-    with open(config_path, "r") as f:
-        config = yaml.safe_load(f)
+    config = load_config()
         
     prompt_path = Path(__file__).parent.parent.parent / "config" / "system_prompt.txt"
     with open(prompt_path, "r") as f:
