@@ -19,4 +19,5 @@ build-backend = "setuptools.build_meta"
 where = ["src"]
 
 [project.scripts]
-nexus = "nexusagent.cli:run_cli"
+nexus-server = "nexusagent.server:run_server"
+nexus-client = "nexusagent.cli:main"

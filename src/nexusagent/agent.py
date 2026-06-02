@@ -1,11 +1,13 @@
 # src/nexusagent/agent.py
+import os
 from typing import Any
 from deepagents import create_deep_agent
 
 class Agent:
     def __init__(self, *args: Any, **kwargs: Any) -> None:
-        # Note: In a production scenario, the model should be configurable
-        self._inner = create_deep_agent(model="claude-3-5-sonnet")
+        # Defaults to gemini-3.1-flash-lite if AGENT_MODEL is not set
+        model_name = os.getenv("AGENT_MODEL", "gemini-3.1-flash-lite")
+        self._inner = create_deep_agent(model=model_name)
     
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
         return self._inner.invoke(*args, **kwargs)
