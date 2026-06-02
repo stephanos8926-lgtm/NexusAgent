@@ -14,6 +14,10 @@ def load_config(config_file: str = "config/nexusagent.yaml") -> dict:
     with open(config_path, "r") as f:
         config = yaml.safe_load(f)
         
-    # Potential environment variable overrides could go here.
-    # For now, return the loaded config.
+    # Environment variable overrides
+    if "NEXUS_NATS_URL" in os.environ:
+        config["server"]["nats_url"] = os.environ["NEXUS_NATS_URL"]
+    if "NEXUS_DB_PATH" in os.environ:
+        config["server"]["db_path"] = os.environ["NEXUS_DB_PATH"]
+        
     return config

@@ -16,10 +16,20 @@ def temp_workspace(tmp_path):
     (tmp_path / "file2.txt").write_text("world")
     return tmp_path
 
-def test_list_directory(temp_workspace):
+def test_list_directory_recursive_true(temp_workspace):
     tree = list_directory(str(temp_workspace), recursive=True)
     assert "subdir" in tree
     assert "file1.txt" in tree["subdir"]
+    assert "file2.txt" in tree
+
+def test_list_directory_recursive_false(temp_workspace):
+    tree = list_directory(str(temp_workspace), recursive=False)
+    # With recursive=False, it should not list the contents of subdir
+    assert "subdir" in tree
+    # The current implementation actually DOES recurse, so this test should fail
+    # if I don't update the code to respect 'recursive=False'.
+    # This is TDD!
+    assert "file1.txt" not in tree["subdir"]
     assert "file2.txt" in tree
 
 def test_read_multiple_files(temp_workspace):

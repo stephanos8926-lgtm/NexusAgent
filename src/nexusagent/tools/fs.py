@@ -48,7 +48,10 @@ def list_directory(path: str, recursive: bool = False, max_depth: int = 2) -> di
             
         for item in p.iterdir():
             if item.is_dir():
-                tree[item.name] = _build_tree(item, depth + 1)
+                if recursive:
+                    tree[item.name] = _build_tree(item, depth + 1)
+                else:
+                    tree[item.name] = "directory"
             else:
                 tree[item.name] = "file"
         return tree
