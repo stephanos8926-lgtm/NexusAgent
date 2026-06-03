@@ -2,15 +2,19 @@
 name = "nexusagent"
 version = "0.1.0"
 description = "Add your description here"
-readme = "README.md"
-requires-python = ">=3.14"
+requires-python = ">=3.13"
 dependencies = [
     "langgraph",
     "langgraph-checkpoint",
+    "langgraph-checkpoint-sqlite",
     "deepagents",
     "nats-py",
     "pyyaml",
     "patch-ng",
+    "fastapi",
+    "uvicorn",
+    "pytest",
+    "pytest-asyncio",
 ]
 
 [build-system]
@@ -24,3 +28,4 @@ where = ["src"]
 nexus-server = "nexusagent.server:run_server"
 nexus-client = "nexusagent.cli:main"
 nexus = "nexusagent.tui:main"
+nexus-web = "nexusagent.web_ui:create_ui"

@@ -42,10 +42,10 @@ def test_read_multiple_files(temp_workspace):
     assert contents[files["file2"]] == "world"
 
 def test_safety_check(temp_workspace):
-    # This should fail because file3.txt has not been read
+    # This should succeed because file3.txt is a new file
     new_file = str(temp_workspace / "file3.txt")
-    with pytest.raises(Exception, match="File not read"):
-        write_file(new_file, "content")
+    write_file(new_file, "content")
+    assert Path(new_file).read_text() == "content"
 
 def test_write_after_read_success(temp_workspace):
     file_path = str(temp_workspace / "file2.txt")
@@ -56,10 +56,11 @@ def test_write_after_read_success(temp_workspace):
     assert Path(file_path).read_text() == "new content"
 
 def test_write_multiple_files_with_safety(temp_workspace):
-    # This should fail because none of these have been read
+    # This should succeed because these are new files
     files = {
         str(temp_workspace / "new1.txt"): "c1",
         str(temp_workspace / "new2.txt"): "c2",
     }
-    with pytest.raises(Exception, match="File not read"):
-        write_multiple_files(files)
+    write_multiple_files(files)
+    assert Path(str(temp_workspace / "new1.txt")).read_text() == "c1"
+    assert Path(str(temp_workspace / "new2.txt")).read_text() == "c2"

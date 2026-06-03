@@ -31,7 +31,7 @@ def dummy_node(state: AgentState):
     state["loop_count"] = state.get("loop_count", 0) + 1
     
     # Check for terminal failure (post-research retry exhaustion)
-    if state.get("research_done", False) and state.get("loop_count", 0) > 4:
+    if state.get("research_done", False) and state.get("loop_count", 0) > 6:
         asyncio.run(push_error_to_nats("Terminal failure after research"))
         return {"code": "terminal_failure"}
     return state

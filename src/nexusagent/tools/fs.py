@@ -25,8 +25,8 @@ def write_file(path: str, content: str) -> str:
     """Writes content to a file with a safety check."""
     p = Path(path).resolve()
     
-    # Safety check: path must have been read
-    if str(p) not in _read_files:
+    # Safety check: path must have been read, or file must not exist
+    if p.exists() and str(p) not in _read_files:
         raise Exception(f"File not read: {path}")
         
     p.parent.mkdir(parents=True, exist_ok=True)

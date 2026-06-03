@@ -1,15 +1,20 @@
-# Task Plan: Setup NexusAgent Python Project
+# NexusAgent Task Plan
 
-## Goal
-Initialize a new Python project named 'NexusAgent' using `uv` as the package manager within the existing workspace directory.
+## Phase 1: Completed - Initial Implementation
+- [x] Initial Project Setup
+- [x] NATS/LangGraph Orchestrator
+- [x] Basic Coding Tools & Safety
 
-## Phases
-1. [x] **Research & Planning**: Skill activation, verified `uv` installation.
-2. [x] **Project Initialization**: Initialize `uv` project.
-3. [x] **Structure Setup**: Create initial project directories (src, tests).
-4. [x] **Git Initialization**: Initialize git repository.
-5. [x] **Verification**: Ensure project structure is sound.
+## Phase 2: Completed - Production-Grade Design (Design Specification)
+- [x] Brainstorming Refactor Requirements (Config, Auth, TUI/Web UI)
+- [x] Finalizing Secure Key Management Design
+- [x] Writing Specification: `docs/superpowers/specs/2026-06-02-nexusagent-production-refactor-design.md`
 
-## Status
-- **Current Phase**: 5
-- **Overall Status**: Complete
+## Phase 3: Next - Production-Grade Implementation
+- [ ] Implement Centralized Config Management
+- [ ] Implement Auth Module (Secret Wizard & Keystore)
+- [ ] Refactor Backend to FastAPI + NATS Worker
+- [ ] Implement SDK Interface
+- [ ] Implement Web UI (Gradio)
+- [ ] Implement TUI Client
+- [ ] Final Testing & Systemd Registration
