@@ -15,6 +15,9 @@ dependencies = [
     "uvicorn",
     "pytest",
     "pytest-asyncio",
+    "ruff",
+    "mypy",
+    "pydantic",
 ]
 
 [build-system]
@@ -29,3 +32,13 @@ nexus-server = "nexusagent.server:run_server"
 nexus-client = "nexusagent.cli:main"
 nexus = "nexusagent.tui:main"
 nexus-web = "nexusagent.web_ui:create_ui"
+[tool.ruff]
+select = ["E", "F", "I"]
+line-length = 88
+
+[tool.mypy]
+python_version = "3.14"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+ignore_missing_imports = true

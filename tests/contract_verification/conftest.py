@@ -1,7 +1,9 @@
-import pytest
 from unittest.mock import MagicMock
+
+import pytest
+
 from nexusagent.sdk import NexusSDK
-from nexusagent.models import ResultSchema
+
 
 @pytest.fixture
 def mock_sdk():

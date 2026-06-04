@@ -1,5 +1,5 @@
-import pytest
-from nexusagent.config import load_config, ConfigSchema
+from nexusagent.config import load_config
+
 
 def test_load_config_success(tmp_path):
     # Mocking yaml file

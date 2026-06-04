@@ -1,7 +1,7 @@
-import pytest
 import os
-import sqlite3
+
 from nexusagent.graph import create_graph
+
 
 def test_graph_creation():
     db_path = "test.db"

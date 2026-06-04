@@ -1,5 +1,5 @@
-import os
 import subprocess
+
 
 # Note: Assumes EXA_API_KEY is available in the environment
 def search_web(query: str) -> str:

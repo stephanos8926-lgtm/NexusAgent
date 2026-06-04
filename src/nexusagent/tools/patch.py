@@ -1,5 +1,7 @@
-import patch_ng
 from pathlib import Path
+
+import patch_ng
+
 
 def apply_patch(path: str, diff: str) -> str:
     """Applies a unified diff patch to a file."""

@@ -1,5 +1,3 @@
-import pytest
-from nexusagent.sdk import NexusSDK
 
 def test_mock_sdk_fixture(mock_sdk):
     assert mock_sdk is not None

@@ -1,11 +1,13 @@
-import pytest
-import sys
 import os
+import sys
+
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../src')))
 
-from nexusagent.tools.patch import apply_patch
-import tempfile
 import os
+import tempfile
+
+from nexusagent.tools.patch import apply_patch
+
 
 def test_apply_patch():
     with tempfile.NamedTemporaryFile(mode='w+', delete=False) as tmp:

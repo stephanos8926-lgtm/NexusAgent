@@ -1,8 +1,8 @@
 import unittest
-from unittest.mock import MagicMock
+import uuid
 from dataclasses import dataclass
 from typing import Optional
-import uuid
+
 
 @dataclass
 class TaskSchema:

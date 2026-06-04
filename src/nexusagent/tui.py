@@ -1,12 +1,15 @@
-from textual.app import App, ComposeResult
-from textual.widgets import Header, Footer, Input, Log, Static, Button, ModalScreen
-from textual.containers import Vertical
-from nexusagent.sdk import NexusSDK
-from nexusagent.models import TaskSchema
 import uuid
 
+from textual.app import App, ComposeResult
+from textual.containers import Vertical
+from textual.widgets import Button, Footer, Header, Input, Log, ModalScreen, Static
+
+from nexusagent.models import TaskSchema
+from nexusagent.sdk import NexusSDK
+
+
 class ErrorModal(ModalScreen):
-    def __init__(self, error_message):
+    def __init__(self, error_message: str) -> None:
         super().__init__()
         self.error_message = error_message
 
@@ -43,16 +46,16 @@ class NexusApp(App):
             task_id = str(uuid.uuid4())[:8]
             task = TaskSchema(id=task_id, description=event.value)
 
-            result = self.sdk.submit_task(task)
-
-            if result.success:
-                self.log_widget.write(f"Task {task_id} submitted: {event.value}")
-            else:
-                self.push_screen(ErrorModal(result.error))
+            try:
+                # The SDK submit_task is an async method
+                submitted_id = await self.sdk.submit_task(task.model_dump())
+                self.log_widget.write(f"Task {submitted_id} submitted: {event.value}")
+            except Exception as e:
+                self.push_screen(ErrorModal(str(e)))
 
             event.input.value = ""
 
-def main():
+def main() -> None:
     app = NexusApp()
     app.run()
 

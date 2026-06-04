@@ -1,9 +1,12 @@
 # src/nexusagent/agent.py
 import os
 from typing import Any
+
 from deepagents import create_deep_agent
+
 from nexusagent.tools.fs import read_file, write_file
 from nexusagent.tools.shell import run_shell
+
 
 class Agent:
     def __init__(self, *args: Any, **kwargs: Any) -> None:

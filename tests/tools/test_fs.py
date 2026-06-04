@@ -1,7 +1,9 @@
 # tests/tools/test_fs.py
-from nexusagent.tools.fs import read_file, write_file
-import tempfile
 import os
+import tempfile
+
+from nexusagent.tools.fs import read_file, write_file
+
 
 def test_fs_tools():
     with tempfile.NamedTemporaryFile(mode='w+', delete=False) as tmp:

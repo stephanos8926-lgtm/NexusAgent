@@ -1,5 +1,6 @@
 import subprocess
 
+
 def run_shell(command: str) -> str:
     """Executes a shell command."""
     try:

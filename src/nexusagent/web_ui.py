@@ -1,8 +1,9 @@
-import gradio as gr
-from nexusagent.sdk import NexusSDK
-from nexusagent.models import TaskSchema
 import uuid
-import time
+
+import gradio as gr
+
+from nexusagent.models import TaskSchema
+from nexusagent.sdk import NexusSDK
 
 # Aesthetic Constants (Industrial/Utilitarian Direction)
 THEME_COLOR = "#FF4B2B"  # Industrial Orange-Red
@@ -37,7 +38,7 @@ def create_ui():
         .status-badge {{ font-size: 0.8em; padding: 2px 5px; border: 1px solid {TEXT_COLOR}; }}
     """) as demo:
 
-        gr.Markdown(f"""
+        gr.Markdown("""
         # ⚡ NEXUSAGENT CONTROL CENTER
         **System Status:** `ONLINE` | **Protocol:** `CONTRACT-FIRST`
         """)

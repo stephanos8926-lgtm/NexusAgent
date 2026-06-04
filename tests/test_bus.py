@@ -1,6 +1,8 @@
+
 import pytest
-import asyncio
+
 from nexusagent.bus import AgentBus
+
 
 # Mocking connection for test
 @pytest.mark.asyncio

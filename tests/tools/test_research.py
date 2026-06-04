@@ -1,6 +1,8 @@
+
 import pytest
-from nexusagent.tools.research import search_web, search_local_docs
-import os
+
+from nexusagent.tools.research import search_local_docs, search_web
+
 
 # Assuming EXA_API_KEY is set in environment for testing
 @pytest.mark.skipif("not os.environ.get('EXA_API_KEY')", reason="EXA_API_KEY not set")

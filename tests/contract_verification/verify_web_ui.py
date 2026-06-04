@@ -1,7 +1,9 @@
 import unittest
 from unittest.mock import MagicMock
-from nexusagent.web_ui import handle_submit
+
 from nexusagent.models import ResultSchema as TaskResponse
+from nexusagent.web_ui import handle_submit
+
 
 class TestWebUIContract(unittest.TestCase):
     def setUp(self):

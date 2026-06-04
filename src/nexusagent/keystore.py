@@ -1,7 +1,9 @@
 import json
 import os
 from pathlib import Path
+
 from cryptography.fernet import Fernet
+
 
 class Keystore:
     def __init__(self, path: str = ".nexus_keystore"):
