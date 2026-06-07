@@ -4,6 +4,7 @@ from typing import Any
 
 from deepagents import create_deep_agent
 
+# Import tool modules (this populates the function definitions)
 from nexusagent.tools.fs import (
     read_file,
     read_multiple_files,
@@ -11,8 +12,6 @@ from nexusagent.tools.fs import (
     write_multiple_files,
     edit_file,
     list_directory,
-    get_read_files,
-    reset_read_tracking,
 )
 from nexusagent.tools.shell import run_shell, run_shell_streaming
 from nexusagent.tools.git import (
@@ -29,18 +28,55 @@ from nexusagent.tools.git import (
 )
 from nexusagent.tools.test_runner import run_tests, run_single_test
 from nexusagent.tools.code_search import search_code, find_symbol, find_references
-from nexusagent.tools.research import search_web, search_local_docs
 from nexusagent.tools.patch import apply_patch
+from nexusagent.tools.research import search_web, search_local_docs
+
+# Import discovery tools (tool_search, unlock_tool)
+from nexusagent.tools.discovery import (
+    tool_search,
+    unlock_tool,
+    auto_correct,
+    validate_tool_call,
+    get_available_tools,
+)
+
+# Import and run registration (populates the tool registry)
+import nexusagent.tools.register_all  # noqa: F401 — side effect: registers all tools
 
 
-# All tools available to the agent
+# Build tool lists for the agent
+# These are the tools that get passed to the LLM as available function calls
+
+# Minimal tool set — agents start with these and discover others via tool_search
+MINIMAL_TOOLS = [
+    # Discovery (always available)
+    tool_search,
+    unlock_tool,
+    auto_correct,
+    get_available_tools,
+    # Basic FS (always available)
+    read_file,
+    write_file,
+    list_directory,
+    # Basic shell (always available)
+    run_shell,
+    run_tests,
+]
+
+# Full tool set — all tools available
 ALL_TOOLS = [
+    # Discovery
+    tool_search,
+    unlock_tool,
+    auto_correct,
     # File system
     read_file,
     read_multiple_files,
     write_file,
+    write_multiple_files,
     edit_file,
     list_directory,
+    apply_patch,
     # Shell
     run_shell,
     run_shell_streaming,
@@ -65,20 +101,96 @@ ALL_TOOLS = [
     # Research
     search_web,
     search_local_docs,
-    # Patch
-    apply_patch,
 ]
+
+# Role-based tool manifests
+ROLE_TOOLS = {
+    "minimal": MINIMAL_TOOLS,
+    "reader": [
+        tool_search, unlock_tool, auto_correct,
+        read_file, read_multiple_files, list_directory,
+        search_code, find_symbol, find_references,
+    ],
+    "writer": [
+        tool_search, unlock_tool, auto_correct,
+        read_file, write_file, edit_file, list_directory,
+    ],
+    "coder": [
+        tool_search, unlock_tool, auto_correct,
+        read_file, read_multiple_files, write_file, write_multiple_files,
+        edit_file, list_directory, apply_patch,
+        run_shell, run_shell_streaming,
+        git_status, git_diff, git_log, git_stash_push,
+        search_code, find_symbol, find_references,
+        run_tests,
+    ],
+    "tester": [
+        tool_search, unlock_tool, auto_correct,
+        read_file, list_directory, run_shell,
+        run_tests, run_single_test,
+        search_code, find_symbol, find_references,
+        git_status, git_diff,
+        edit_file, write_file,
+    ],
+    "reviewer": [
+        tool_search, unlock_tool, auto_correct,
+        read_file, read_multiple_files, list_directory,
+        search_code, find_symbol, find_references,
+        git_status, git_diff, git_log, git_show,
+        run_tests,
+    ],
+    "debugger": [
+        tool_search, unlock_tool, auto_correct,
+        read_file, list_directory, run_shell, run_shell_streaming,
+        edit_file, write_file,
+        run_tests, run_single_test,
+        search_code, find_symbol, find_references,
+        git_status, git_diff, git_stash_push,
+    ],
+    "researcher": [
+        tool_search, unlock_tool, auto_correct,
+        read_file, list_directory, search_code,
+        search_web, search_local_docs,
+        find_symbol, find_references,
+        run_shell,
+    ],
+    "full": ALL_TOOLS,
+}
 
 
 class Agent:
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        # Defaults to gemini-3.1-flash-lite if AGENT_MODEL is not set
+    """
+    NexusAgent — an LLM-powered agent with tool discovery and auto-correction.
+    
+    Supports role-based tool manifests and progressive tool discovery.
+    Agents start with a minimal tool set and can unlock additional tools via tool_search().
+    """
+    
+    def __init__(self, role: str = "full", *args: Any, **kwargs: Any) -> None:
+        """
+        Initialize the agent.
+        
+        Args:
+            role: Tool access level. One of: minimal, reader, writer, coder,
+                  tester, reviewer, debugger, researcher, full.
+                  "minimal" starts with only tool_search + basic FS + shell.
+                  "full" gets all tools.
+        """
         model_name = os.getenv("AGENT_MODEL", "gemini-3.1-flash-lite")
+        
+        # Get tools for this role
+        tools = ROLE_TOOLS.get(role, ALL_TOOLS)
+        
         self._inner = create_deep_agent(
             model=model_name,
-            tools=ALL_TOOLS,
+            tools=tools,
         )
-
+        self._role = role
+    
+    @property
+    def role(self) -> str:
+        return self._role
+    
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
         return self._inner.invoke(*args, **kwargs)
 
@@ -92,10 +204,12 @@ def run_agent_task(state: dict) -> dict:
     """
     task_desc = state.get("task", "unknown")
     task_id = state.get("id", "unknown")
-
-    # Try to use the real agent, fall back to stub if dependencies missing
+    
+    # Get role from state (default: full)
+    role = state.get("role", "full")
+    
     try:
-        agent = Agent()
+        agent = Agent(role=role)
         result = agent.invoke(state)
         return {"result": result}
     except Exception as e:
