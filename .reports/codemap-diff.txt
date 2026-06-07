@@ -1,0 +1,17 @@
+Codemap Update Report
+Generated: 2026-06-05 12:30
+
+Files Created:
+- codemaps/architecture.md
+- codemaps/backend.md
+- codemaps/frontend.md
+- codemaps/data.md
+
+Change Summary:
+- Initial generation of architecture codemaps.
+- Documented Production Core transition.
+- Mapped FastAPI endpoints and NATS JetStream flow.
+- Defined TUI and Web UI hierarchies.
+- Detailed Pydantic data schemas for Task and Result.
+
+Total change: 100% (Initial Version)

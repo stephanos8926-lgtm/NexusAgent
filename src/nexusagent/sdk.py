@@ -30,8 +30,8 @@ class NexusSDK:
         """
         await self.connect()
         
-        # Assign ID if not provided
-        task_id = task_data.get("id", str(uuid.uuid4()))
+        # Assign ID if not provided, remove from data to avoid duplicate
+        task_id = task_data.pop("id", str(uuid.uuid4()))
         task = TaskSchema(id=task_id, **task_data)
         
         logger.info(f"Submitting task {task_id}: {task.description}")

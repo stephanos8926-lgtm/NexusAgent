@@ -1,0 +1,16 @@
+[Unit]
+Description=NexusAgent Production Orchestrator
+After=network.target nats.service
+
+[Service]
+User=sysop
+WorkingDirectory=/home/sysop/Workspaces/NexusAgent
+Environment="PYTHONPATH=/home/sysop/Workspaces/NexusAgent/src"
+ExecStart=/usr/bin/python3 /home/sysop/Workspaces/NexusAgent/main.py server
+Restart=always
+RestartSec=5
+StandardOutput=append:/home/sysop/Workspaces/NexusAgent/server.log
+StandardError=append:/home/sysop/Workspaces/NexusAgent/server.log
+
+[Install]
+WantedBy=multi-user.target

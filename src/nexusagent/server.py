@@ -106,12 +106,13 @@ async def get_task_status(task_id: str):
 @app.get("/tasks/{task_id}/result")
 async def get_task_result(task_id: str):
     """
-    Retrieve the result of a task (blocks until completion or timeout).
+    Retrieve the result of a task.
+    Returns 404 if result is not yet available.
     """
     result = await sdk.get_result(task_id)
-    if not result:
-        raise HTTPException(status_code=404, detail="Result not found or timed out.")
-    return result
+    if result:
+        return result
+    raise HTTPException(status_code=404, detail="Result not found or timed out.")
 
 @app.get("/health")
 async def health_check():

@@ -1,0 +1,22 @@
+# EditorConfig is awesome: https://EditorConfig.org
+
+# top-most EditorConfig file
+root = true
+
+# Unix-style newlines with a newline ending every file
+[*]
+indent_style = space
+indent_size = 4
+end_of_line = lf
+charset = utf-8
+trim_trailing_whitespace = true
+insert_final_newline = true
+
+# Matches multiple files with brace expansion language
+# Set default charset
+[*.{js,jsx,ts,tsx,css,scss,html,json,yml,yaml,md}]
+indent_size = 2
+
+# Make tabs vs spaces explicit for certain filetypes
+[*.{py}]
+indent_size = 4
