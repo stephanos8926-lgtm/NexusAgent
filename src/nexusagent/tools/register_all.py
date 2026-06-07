@@ -8,7 +8,7 @@ Import this module once at startup to populate the registry.
 from nexusagent.tools.registry import register_tool
 
 # Import discovery tools
-from nexusagent.tools.discovery import tool_search, unlock_tool, auto_correct, get_available_tools
+from nexusagent.tools.registry import tool_search, auto_correct
 
 # ═══════════════════════════════════════════════════════════════════════
 # Discovery Tools (register first so they're available in the registry)
@@ -16,30 +16,34 @@ from nexusagent.tools.discovery import tool_search, unlock_tool, auto_correct, g
 
 register_tool(
     name="tool_search",
-    description="Search the tool registry by name or use case. Find tools when you need them.",
+    description=(
+        "Search for tools available to you. "
+        "Only shows tools your policy allows. "
+        "Call with no args to list all available tools."
+    ),
     parameters={
-        "query": "Tool name or use case description (empty = list all)",
+        "query": "Tool name or use case (empty = list all available)",
         "exact": "If True, match exact name only",
         "category": "Filter by category (fs, git, test, search, shell, web)",
         "max_results": "Maximum results (default: 5)",
     },
-    example='tool_search("run tests")  # By use case\ntool_search("read_file", exact=True)  # By name',
+    example=(
+        'tool_search()                              # List all available tools\n'
+        'tool_search("run tests")                   # Search by use case\n'
+        'tool_search("read_file", exact=True       # Get specific tool details\n'
+        'tool_search(category="git")               # List git tools'
+    ),
     category="core",
     returns="Tool description, parameters, and example.",
 )(tool_search)
 
 register_tool(
-    name="unlock_tool",
-    description="Unlock a tool for the current session. Use after tool_search() to add a tool to your active set.",
-    parameters={"tool_name": "Name of the tool to unlock"},
-    example='unlock_tool("git_commit")',
-    category="core",
-    returns="Success message with tool info.",
-)(unlock_tool)
-
-register_tool(
     name="auto_correct",
-    description="Validate a tool call and get corrections if wrong. Checks tool name and parameters.",
+    description=(
+        "Validate a tool call before executing. "
+        "Checks tool name, policy access, and parameters. "
+        "Returns corrections if anything is wrong."
+    ),
     parameters={
         "tool_name": "Name of the tool",
         "kwargs": "Optional dict of parameters to validate",
@@ -48,15 +52,6 @@ register_tool(
     category="core",
     returns="Correction message or validation confirmation.",
 )(auto_correct)
-
-register_tool(
-    name="get_available_tools",
-    description="List all tools currently available to this agent (base manifest + unlocked tools).",
-    parameters={"base_scope": "Base manifest scope (default: 'minimal')"},
-    example='get_available_tools()',
-    category="core",
-    returns="Formatted list of available tools.",
-)(get_available_tools)
 
 # ═══════════════════════════════════════════════════════════════════════
 # File System Tools
