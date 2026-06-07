@@ -1,12 +1,11 @@
-import os
 import logging
+import os
 import subprocess
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
 
-def _search_exa(query: str) -> Optional[str]:
+def _search_exa(query: str) -> str | None:
     """Search using Exa API."""
     api_key = os.environ.get("EXA_API_KEY")
     if not api_key:
@@ -15,6 +14,7 @@ def _search_exa(query: str) -> Optional[str]:
 
     try:
         from exa_py import Exa  # type: ignore[import-untyped]
+
         client = Exa(api_key=api_key)
         response = client.search_and_contents(query, num_results=3, text=True)
         results = response.results
@@ -32,7 +32,7 @@ def _search_exa(query: str) -> Optional[str]:
         return None
 
 
-def _search_tavily(query: str) -> Optional[str]:
+def _search_tavily(query: str) -> str | None:
     """Search using Tavily API as fallback."""
     api_key = os.environ.get("TAVILY_API_KEY")
     if not api_key:
@@ -41,6 +41,7 @@ def _search_tavily(query: str) -> Optional[str]:
 
     try:
         from tavily import TavilyClient  # type: ignore[import-untyped]
+
         client = TavilyClient(api_key=api_key)
         response = client.search(query, max_results=3)
         results = response.get("results", [])
@@ -48,7 +49,9 @@ def _search_tavily(query: str) -> Optional[str]:
             return f"No results for: {query}"
         parts = []
         for r in results:
-            parts.append(f"Title: {r.get('title', 'N/A')}\nURL: {r.get('url', 'N/A')}\n{r.get('content', '')[:500]}")
+            parts.append(
+                f"Title: {r.get('title', 'N/A')}\nURL: {r.get('url', 'N/A')}\n{r.get('content', '')[:500]}"
+            )
         return "\n\n".join(parts)
     except ImportError:
         logger.debug("tavily not installed")
@@ -91,7 +94,9 @@ def search_local_docs(query: str) -> str:
     try:
         result = subprocess.run(
             ["npx", "ctx7@latest", "docs", "query", query],
-            capture_output=True, text=True, check=True
+            capture_output=True,
+            text=True,
+            check=True,
         )
         return result.stdout
     except subprocess.CalledProcessError as e:

@@ -1,4 +1,3 @@
-
 import pytest
 
 from nexusagent.tools.research import search_local_docs, search_web
@@ -10,6 +9,7 @@ def test_search_web():
     result = search_web("What is LangGraph?")
     assert result is not None
     assert len(result) > 0
+
 
 def test_search_local_docs():
     # Assuming ctx7 is installed and available

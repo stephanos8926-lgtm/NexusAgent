@@ -1,7 +1,6 @@
 import unittest
 import uuid
 from dataclasses import dataclass
-from typing import Optional
 
 
 @dataclass
@@ -9,11 +8,13 @@ class TaskSchema:
     id: str
     description: str
 
+
 @dataclass
 class TaskResponse:
     success: bool
-    data: Optional[str] = None
-    error: Optional[str] = None
+    data: str | None = None
+    error: str | None = None
+
 
 class MockSDK:
     def submit_task(self, task):
@@ -24,6 +25,7 @@ class MockSDK:
         if len(task.description) > 1000:
             return TaskResponse(success=False, error="Description too long")
         return TaskResponse(success=True, data="Chaos Success")
+
 
 def ui_handle_submit(text, sdk):
     if text is None:
@@ -37,6 +39,7 @@ def ui_handle_submit(text, sdk):
         return f"[{task_id}] {result.data}", "ACTIVE"
     else:
         return f"Critical Failure: {result.error}", "ERROR"
+
 
 class TestChaosContract(unittest.TestCase):
     def setUp(self):
@@ -59,6 +62,7 @@ class TestChaosContract(unittest.TestCase):
         with self.assertRaises(ValueError):
             ui_handle_submit(None, self.sdk)
         print("✓ None Input Handled (as expected exception)")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -24,29 +24,31 @@ Architecture:
         1. Discovery: tool_search() only shows in-scope tools
         2. Execution: each tool checks policy before running
         3. Auto-correction: wrong name/params get helpful hints
-    
+
     Usage:
         # User-spawned agent (permissive — auto-unlock on use)
         agent = Agent(role="coder", policy="permissive")
-        
+
         # Sub-agent (restricted — enforced boundaries, can unlock within role)
         sub = Agent(role="tester", policy="restricted")
-        
+
         # Sandboxed sub-agent (strict — locked to role manifest)
         sandbox = Agent(role="reviewer", policy="strict")
 """
 
-from dataclasses import dataclass
-from typing import Any, Callable, Optional
 import difflib
 import threading
-
+from collections.abc import Callable
+from dataclasses import dataclass
+from typing import Any
 
 # ─── Tool Info ──────────────────────────────────────────────────────────
+
 
 @dataclass
 class ToolInfo:
     """Metadata for a registered tool."""
+
     name: str
     func: Callable
     description: str
@@ -87,17 +89,24 @@ def register_tool(
     requires: str = "",
 ) -> Callable:
     """Decorator to register a tool in the global registry."""
+
     def decorator(func: Callable) -> Callable:
         _REGISTRY[name] = ToolInfo(
-            name=name, func=func, description=description,
-            parameters=parameters, example=example, category=category,
-            returns=returns, requires=requires,
+            name=name,
+            func=func,
+            description=description,
+            parameters=parameters,
+            example=example,
+            category=category,
+            returns=returns,
+            requires=requires,
         )
         return func
+
     return decorator
 
 
-def get_tool_info(name: str) -> Optional[ToolInfo]:
+def get_tool_info(name: str) -> ToolInfo | None:
     return _REGISTRY.get(name)
 
 
@@ -159,73 +168,115 @@ ROLE_MANIFESTS = {
     "minimal": {
         "tool_search",
     },
-
     # Reader: can read and search, but not modify
     "reader": {
         "tool_search",
-        "read_file", "read_multiple_files", "list_directory",
-        "search_code", "find_symbol", "find_references",
-        "search_web", "search_local_docs",
+        "read_file",
+        "read_multiple_files",
+        "list_directory",
+        "search_code",
+        "find_symbol",
+        "find_references",
+        "search_web",
+        "search_local_docs",
     },
-
     # Writer: can read and write, but no git/test
     "writer": {
         "tool_search",
-        "read_file", "write_file", "edit_file", "list_directory",
+        "read_file",
+        "write_file",
+        "edit_file",
+        "list_directory",
     },
-
     # Coder: full dev tooling
     "coder": {
         "tool_search",
-        "read_file", "read_multiple_files", "write_file", "write_multiple_files",
-        "edit_file", "list_directory",
-        "run_shell", "run_shell_streaming",
-        "git_status", "git_diff", "git_log", "git_branch", "git_show",
-        "git_stash_push", "git_stash_pop", "git_stash_list",
-        "git_commit", "git_checkout_branch",
-        "search_code", "find_symbol", "find_references",
-        "run_tests", "run_single_test",
+        "read_file",
+        "read_multiple_files",
+        "write_file",
+        "write_multiple_files",
+        "edit_file",
+        "list_directory",
+        "run_shell",
+        "run_shell_streaming",
+        "git_status",
+        "git_diff",
+        "git_log",
+        "git_branch",
+        "git_show",
+        "git_stash_push",
+        "git_stash_pop",
+        "git_stash_list",
+        "git_commit",
+        "git_checkout_branch",
+        "search_code",
+        "find_symbol",
+        "find_references",
+        "run_tests",
+        "run_single_test",
         "apply_patch",
     },
-
     # Tester: focused on test execution and test-related edits
     "tester": {
         "tool_search",
-        "read_file", "list_directory", "run_shell",
-        "run_tests", "run_single_test",
-        "search_code", "find_symbol", "find_references",
-        "git_status", "git_diff",
-        "edit_file", "write_file",
+        "read_file",
+        "list_directory",
+        "run_shell",
+        "run_tests",
+        "run_single_test",
+        "search_code",
+        "find_symbol",
+        "find_references",
+        "git_status",
+        "git_diff",
+        "edit_file",
+        "write_file",
     },
-
     # Reviewer: read, search, git history — no mutations
     "reviewer": {
         "tool_search",
-        "read_file", "read_multiple_files", "list_directory",
-        "search_code", "find_symbol", "find_references",
-        "git_status", "git_diff", "git_log", "git_show",
+        "read_file",
+        "read_multiple_files",
+        "list_directory",
+        "search_code",
+        "find_symbol",
+        "find_references",
+        "git_status",
+        "git_diff",
+        "git_log",
+        "git_show",
         "run_tests",
     },
-
     # Debugger: read, edit, test, shell — focused on fixing
     "debugger": {
         "tool_search",
-        "read_file", "list_directory", "run_shell", "run_shell_streaming",
-        "edit_file", "write_file",
-        "run_tests", "run_single_test",
-        "search_code", "find_symbol", "find_references",
-        "git_status", "git_diff", "git_stash_push",
+        "read_file",
+        "list_directory",
+        "run_shell",
+        "run_shell_streaming",
+        "edit_file",
+        "write_file",
+        "run_tests",
+        "run_single_test",
+        "search_code",
+        "find_symbol",
+        "find_references",
+        "git_status",
+        "git_diff",
+        "git_stash_push",
     },
-
     # Researcher: search and read, no mutations
     "researcher": {
         "tool_search",
-        "read_file", "list_directory", "search_code",
-        "search_web", "search_local_docs",
-        "find_symbol", "find_references",
+        "read_file",
+        "list_directory",
+        "search_code",
+        "search_web",
+        "search_local_docs",
+        "find_symbol",
+        "find_references",
         "run_shell",
     },
-
     # Full access
     "full": frozenset(),  # Sentinel — resolved to all registered tools
 }
@@ -240,10 +291,11 @@ def get_manifest(role: str) -> set[str]:
 
 # ─── Policy Enforcement ────────────────────────────────────────────────
 
+
 def _is_tool_allowed(tool_name: str) -> tuple[bool, str]:
     """
     Check if a tool call is allowed under the current policy.
-    
+
     Returns:
         (allowed: bool, reason: str)
     """
@@ -298,36 +350,39 @@ def _is_tool_allowed(tool_name: str) -> tuple[bool, str]:
 def require_policy(tool_name: str) -> None:
     """
     Decorator helper: enforce policy before executing a tool.
-    
+
     Usage in tool implementation:
         @require_policy("read_file")
         def read_file(path, offset=1, limit=None):
             ...
-    
+
     Or call at the top of a tool function:
         def some_tool(...):
             require_policy("some_tool")
             ...
     """
+
     def decorator(func: Callable) -> Callable:
         def wrapper(*args, **kwargs):
             allowed, reason = _is_tool_allowed(tool_name)
             if not allowed:
                 return f"ACCESS DENIED: {reason}"
             return func(*args, **kwargs)
+
         wrapper.__name__ = func.__name__
         wrapper.__doc__ = func.__doc__
         return wrapper
+
     return decorator
 
 
-def check_tool_access(tool_name: str) -> Optional[str]:
+def check_tool_access(tool_name: str) -> str | None:
     """
     Check if the current policy allows a tool call.
-    
+
     Returns:
         None if allowed, or an error string if denied.
-    
+
     Usage at the top of tool functions:
         error = check_tool_access("read_file")
         if error:
@@ -341,27 +396,28 @@ def check_tool_access(tool_name: str) -> Optional[str]:
 
 # ─── Tool Search (Policy-Aware) ─────────────────────────────────────────
 
+
 def tool_search(
     query: str = "",
     exact: bool = False,
-    category: Optional[str] = None,
+    category: str | None = None,
     max_results: int = 5,
 ) -> str:
     """
     Search for tools available to the current agent.
-    
+
     IMPORTANT: Only returns tools that the current policy allows.
     The agent never sees tools outside its scope.
-    
+
     Args:
         query: Tool name or use case. Empty string lists all available tools.
         exact: If True, match exact tool name only.
         category: Filter by category (fs, git, test, search, shell, web, core).
         max_results: Maximum results to return.
-    
+
     Returns:
         Formatted search results with descriptions, params, and examples.
-    
+
     Examples:
         tool_search()                                    # List all available tools
         tool_search("run tests")                         # Search by use case
@@ -440,7 +496,7 @@ def _exact_search(query: str, available: dict[str, ToolInfo]) -> str:
             return (
                 f"Tool '{query}' not found. Did you mean:\n"
                 + "\n".join(suggestions)
-                + f"\n\nUse tool_search(\"{close[0]}\", exact=True) for full details."
+                + f'\n\nUse tool_search("{close[0]}", exact=True) for full details.'
             )
 
     # Not found in available tools — check if it exists but is out of scope
@@ -457,7 +513,7 @@ def _exact_search(query: str, available: dict[str, ToolInfo]) -> str:
 def _use_case_search(
     query: str,
     available: dict[str, ToolInfo],
-    category: Optional[str],
+    category: str | None,
     max_results: int,
 ) -> str:
     """Search by use case within available tools."""
@@ -509,15 +565,16 @@ def _use_case_search(
 
 # ─── Auto-Correction ────────────────────────────────────────────────────
 
+
 def auto_correct(tool_name: str, kwargs: dict[str, Any] = None) -> str:
     """
     Validate a tool call and return corrections if needed.
-    
+
     Checks:
     1. Tool exists in registry
     2. Tool is available under current policy
     3. Parameters are correct
-    
+
     Returns:
         Correction message or validation confirmation.
     """

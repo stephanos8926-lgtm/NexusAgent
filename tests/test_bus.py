@@ -1,4 +1,3 @@
-
 import pytest
 
 from nexusagent.bus import AgentBus
@@ -14,7 +13,7 @@ async def test_bus_connection():
         await bus.connect()
         await bus.close()
     except Exception as e:
-        # If NATS is not running, we should skip or mock, but the error 
+        # If NATS is not running, we should skip or mock, but the error
         # "Failed: async def functions are not natively supported"
         # is the primary issue.
         pytest.skip(f"NATS not running or connection failed: {e}")

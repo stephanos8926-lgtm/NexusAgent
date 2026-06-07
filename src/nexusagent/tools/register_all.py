@@ -5,10 +5,8 @@ This module imports all tools and calls register_tool() for each one.
 Import this module once at startup to populate the registry.
 """
 
-from nexusagent.tools.registry import register_tool
-
 # Import discovery tools
-from nexusagent.tools.registry import tool_search, auto_correct
+from nexusagent.tools.registry import auto_correct, register_tool, tool_search
 
 # ═══════════════════════════════════════════════════════════════════════
 # Discovery Tools (register first so they're available in the registry)
@@ -28,7 +26,7 @@ register_tool(
         "max_results": "Maximum results (default: 5)",
     },
     example=(
-        'tool_search()                              # List all available tools\n'
+        "tool_search()                              # List all available tools\n"
         'tool_search("run tests")                   # Search by use case\n'
         'tool_search("read_file", exact=True       # Get specific tool details\n'
         'tool_search(category="git")               # List git tools'
@@ -57,17 +55,31 @@ register_tool(
 # File System Tools
 # ═══════════════════════════════════════════════════════════════════════
 
-from nexusagent.tools.fs import read_file, read_multiple_files, write_file, write_multiple_files, edit_file, list_directory
-from nexusagent.tools.shell import run_shell, run_shell_streaming
-from nexusagent.tools.git import (
-    git_status, git_diff, git_log, git_branch, git_show,
-    git_stash_push, git_stash_pop, git_stash_list,
-    git_commit, git_checkout_branch,
+from nexusagent.tools.code_search import find_references, find_symbol, search_code
+from nexusagent.tools.fs import (
+    edit_file,
+    list_directory,
+    read_file,
+    read_multiple_files,
+    write_file,
+    write_multiple_files,
 )
-from nexusagent.tools.test_runner import run_tests, run_single_test
-from nexusagent.tools.code_search import search_code, find_symbol, find_references
+from nexusagent.tools.git import (
+    git_branch,
+    git_checkout_branch,
+    git_commit,
+    git_diff,
+    git_log,
+    git_show,
+    git_stash_list,
+    git_stash_pop,
+    git_stash_push,
+    git_status,
+)
 from nexusagent.tools.patch import apply_patch
-from nexusagent.tools.research import search_web, search_local_docs
+from nexusagent.tools.research import search_local_docs, search_web
+from nexusagent.tools.shell import run_shell, run_shell_streaming
+from nexusagent.tools.test_runner import run_single_test, run_tests
 
 # Register FS tools
 register_tool(
@@ -183,7 +195,7 @@ register_tool(
     name="git_status",
     description="Show working tree status (short format).",
     parameters={"workdir": "Repository working directory"},
-    example='git_status()',
+    example="git_status()",
     category="git",
     returns="Short-format status output.",
 )(git_status)
@@ -210,7 +222,7 @@ register_tool(
         "oneline": "Show one commit per line (default: True)",
         "workdir": "Repository working directory",
     },
-    example='git_log(count=5, oneline=True)',
+    example="git_log(count=5, oneline=True)",
     category="git",
     returns="Commit log output.",
 )(git_log)
@@ -219,7 +231,7 @@ register_tool(
     name="git_branch",
     description="List branches. Current branch is marked with *.",
     parameters={"workdir": "Repository working directory"},
-    example='git_branch()',
+    example="git_branch()",
     category="git",
     returns="Branch list with current marker.",
 )(git_branch)
@@ -252,7 +264,7 @@ register_tool(
     name="git_stash_pop",
     description="Pop the most recent stash. Write operation.",
     parameters={"workdir": "Repository working directory"},
-    example='git_stash_pop()',
+    example="git_stash_pop()",
     category="git",
     returns="Pop result.",
 )(git_stash_pop)
@@ -261,7 +273,7 @@ register_tool(
     name="git_stash_list",
     description="List stashed changes.",
     parameters={"workdir": "Repository working directory"},
-    example='git_stash_list()',
+    example="git_stash_list()",
     category="git",
     returns="Stash list.",
 )(git_stash_list)

@@ -1,61 +1,61 @@
-.PHONY: test lint format dev clean docs help
+.PHONY: test lint format dev clean docs help typecheck security check all
 
-# Variables
 PYTHON = python3
-PIP = pip
 TEST_DIR = tests
 SRC_DIR = src
-DOCS_DIR = docs
 
-# Test target: run pytest
+all: lint typecheck test security
+	@echo "All checks passed!"
+
 test:
 	@echo "Running tests..."
-	$(PYTHON) -m pytest $(TEST_DIR) -v
+	$(PYTHON) -m pytest $(TEST_DIR) -v --tb=short
 
-# Lint target: run ruff and mypy
 lint:
-	@echo "Running linting..."
+	@echo "Running ruff lint..."
 	$(PYTHON) -m ruff check $(SRC_DIR) $(TEST_DIR)
-	$(PYTHON) -m mypy $(SRC_DIR)
 
-# Format target: format code with ruff
+lint-fix:
+	@echo "Running ruff lint with auto-fix..."
+	$(PYTHON) -m ruff check $(SRC_DIR) $(TEST_DIR) --fix
+
 format:
 	@echo "Formatting code..."
 	$(PYTHON) -m ruff format $(SRC_DIR) $(TEST_DIR)
 
-# Dev target: run the development server (using the nexus-server script)
+typecheck:
+	@echo "Running mypy..."
+	$(PYTHON) -m mypy $(SRC_DIR)
+
+check: lint typecheck
+	@echo "Checking formatting..."
+	$(PYTHON) -m ruff format --check $(SRC_DIR) $(TEST_DIR)
+
 dev:
 	@echo "Starting development server..."
 	$(PYTHON) -m nexusagent.server
 
-# Clean target: remove generated files
 clean:
 	@echo "Cleaning up..."
 	find . -type f -name "*.pyc" -delete
 	find . -type d -name "__pycache__" -exec rm -rf {} +
 	find . -type d -name ".pytest_cache" -exec rm -rf {} +
 	find . -type d -name ".ruff_cache" -exec rm -rf {} +
-	find . -type d -name "*.egg-info" -exec rm -rf {} +
-	find . -type d -name "build" -exec rm -rf {} +
-	find . -type d -name "dist" -exec rm -rf {} +
-	rm -f .coverage
-	rm -f coverage.xml
-	rm -f htmlcov
+	rm -f .coverage coverage.xml
 
-# Docs target: generate documentation (if using mkdocs or similar, otherwise placeholder)
 docs:
-	@echo "Generating documentation..."
-	# If you have a documentation tool like mkdocs, uncomment and adjust:
-	# mkdocs build --site-dir docs/build
-	@echo "No documentation generator configured. Add mkdocs or sphinx configuration to generate docs."
+	@echo "No documentation generator configured."
 
-# Help target: display available targets
 help:
 	@echo "Available targets:"
-	@echo "  test   - Run tests with pytest"
-	@echo "  lint   - Lint code with ruff and mypy"
-	@echo "  format - Format code with ruff"
-	@echo "  dev    - Start development server"
-	@echo "  clean  - Remove generated files"
-	@echo "  docs   - Generate documentation"
-	@echo "  help   - Show this help message"
+	@echo "  all         - Run all checks"
+	@echo "  test        - Run tests"
+	@echo "  lint        - Lint code"
+	@echo "  lint-fix    - Lint and auto-fix"
+	@echo "  format      - Format code"
+	@echo "  typecheck   - Type check"
+	@echo "  check       - Combined check"
+	@echo "  dev         - Start dev server"
+	@echo "  clean       - Remove generated files"
+	@echo "  docs        - Generate docs"
+	@echo "  help        - Show help"

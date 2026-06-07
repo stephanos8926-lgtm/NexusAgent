@@ -1,17 +1,15 @@
 # src/nexusagent/worker.py
 import asyncio
-import logging
 import json
+import logging
 import time
-from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
-from nexusagent.bus import bus
-from nexusagent.models import TaskSchema, ResultSchema, TaskStatus
 from nexusagent.agent import run_agent_task
-from nexusagent.config import settings
+from nexusagent.bus import bus
 from nexusagent.db import task_repo
-from nexusagent.utils import retry_with_backoff, CircuitBreaker
+from nexusagent.models import ResultSchema, TaskSchema, TaskStatus
+from nexusagent.utils import CircuitBreaker, retry_with_backoff
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +31,7 @@ class NexusWorker:
 
         # Subscribe to the task submission subject
         await self.bus.subscribe("tasks.submit", self.handle_task)
-        
+
         # Allow subscription to propagate before processing
         await asyncio.sleep(0.1)
 
@@ -66,7 +64,7 @@ class NexusWorker:
                 task_id=task.id,
                 description=task.description,
                 priority=task.priority,
-                metadata=task.metadata if hasattr(task, 'metadata') else {}
+                metadata=task.metadata if hasattr(task, "metadata") else {},
             )
 
             # 1. Update status to PROCESSING in DB
@@ -79,10 +77,7 @@ class NexusWorker:
 
             # 3. Prepare the result
             result = ResultSchema(
-                task_id=task.id,
-                success=True,
-                data=result_data,
-                duration=duration
+                task_id=task.id, success=True, data=result_data, duration=duration
             )
 
             # 4. Persist the result in DB and NATS KV
@@ -91,7 +86,7 @@ class NexusWorker:
                 success=True,
                 data=str(result_data),
                 error=None,
-                duration=duration
+                duration=duration,
             )
             await task_repo.update_task_status(task.id, TaskStatus.COMPLETED)
 
@@ -110,17 +105,13 @@ class NexusWorker:
                 # Mark as failed in DB
                 await task_repo.update_task_status(task_id, TaskStatus.FAILED)
 
-                failure_result = ResultSchema(
-                    task_id=task_id,
-                    success=False,
-                    error=str(e)
-                )
+                failure_result = ResultSchema(task_id=task_id, success=False, error=str(e))
                 await task_repo.save_result(
                     task_id=task_id,
                     success=False,
                     data=None,
                     error=str(e),
-                    duration=None
+                    duration=None,
                 )
                 # Store failure in JetStream KV
                 await self.bus.put_result(task_id, failure_result.model_dump())

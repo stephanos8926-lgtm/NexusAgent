@@ -21,6 +21,7 @@ class ErrorModal(ModalScreen):
             Button("Abort", id="abort"),
         )
 
+
 class NexusApp(App):
     BINDINGS = [("q", "quit", "Quit")]
     CSS = """
@@ -55,9 +56,11 @@ class NexusApp(App):
 
             event.input.value = ""
 
+
 def main() -> None:
     app = NexusApp()
     app.run()
+
 
 if __name__ == "__main__":
     main()

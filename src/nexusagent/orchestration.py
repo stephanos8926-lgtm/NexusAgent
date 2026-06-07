@@ -1,13 +1,11 @@
 # src/nexusagent/orchestration.py
 import logging
-import asyncio
-from typing import Optional, List, Dict, Any
+
 from pydantic import BaseModel
 
-from src.nexusagent.config import settings
 from src.nexusagent.llm import llm
-from src.nexusagent.tools.research import research_orchestrator, SearchResult
 from src.nexusagent.registry import ToolRegistry
+from src.nexusagent.tools.research import SearchResult, research_orchestrator
 
 logger = logging.getLogger(__name__)
 
@@ -15,15 +13,15 @@ logger = logging.getLogger(__name__)
 class ResearchPlan(BaseModel):
     thesis: str
     objective: str
-    steps: List[str]
-    expected_outcomes: List[str]
+    steps: list[str]
+    expected_outcomes: list[str]
 
 
 class ResearchState(BaseModel):
     query: str
-    plan: Optional[ResearchPlan] = None
-    gathered_data: List[SearchResult] = []
-    synthesis: Optional[str] = None
+    plan: ResearchPlan | None = None
+    gathered_data: list[SearchResult] = []
+    synthesis: str | None = None
     current_step_index: int = 0
 
 
@@ -54,7 +52,7 @@ class DeepResearchOrchestrator:
         # 4. Execution Loop
         for i, step in enumerate(state.plan.steps):
             state.current_step_index = i
-            logger.info(f"Executing research step {i+1}/{len(state.plan.steps)}: {step}")
+            logger.info(f"Executing research step {i + 1}/{len(state.plan.steps)}: {step}")
 
             # Perform search and fetch
             results = await research_orchestrator.web_search(step, depth="deep")
@@ -82,18 +80,21 @@ class DeepResearchOrchestrator:
 
         Respond ONLY in JSON format matching this schema:
         {
-            'thesis': 'string',
+            "thesis": 'string',
             'objective': 'string',
             'steps': ['query 1', 'query 2', ...],
             'expected_outcomes': ['outcome 1', 'outcome 2', ...]
         }"""
-        response = await llm.generate(prompt, system_prompt="You are a world-class research strategist.")
+        response = await llm.generate(
+            prompt, system_prompt="You are a world-class research strategist."
+        )
         # Parse JSON response from LLM
         import json
         import re
+
         try:
             # Try to extract JSON from response (handle cases where LLM adds extra text)
-            json_match = re.search(r'\{.*\}', response.content, re.DOTALL)
+            json_match = re.search(r"\{.*\}", response.content, re.DOTALL)
             if json_match:
                 plan_data = json.loads(json_match.group())
             else:
@@ -107,8 +108,12 @@ class DeepResearchOrchestrator:
             return ResearchPlan(
                 thesis=f"Research on {query}",
                 objective=f"Gather information about {query}",
-                steps=[f"Search for {query}", "Analyze key aspects", "Synthesize findings"],
-                expected_outcomes=["Basic information", "Key insights", "Summary"]
+                steps=[
+                    f"Search for {query}",
+                    "Analyze key aspects",
+                    "Synthesize findings",
+                ],
+                expected_outcomes=["Basic information", "Key insights", "Summary"],
             )
 
     async def _refine_plan(self, plan: ResearchPlan) -> ResearchPlan:
@@ -124,9 +129,10 @@ class DeepResearchOrchestrator:
         # Parse JSON response from LLM
         import json
         import re
+
         try:
             # Try to extract JSON from response (handle cases where LLM adds extra text)
-            json_match = re.search(r'\{.*\}', response.content, re.DOTALL)
+            json_match = re.search(r"\{.*\}", response.content, re.DOTALL)
             if json_match:
                 plan_data = json.loads(json_match.group())
             else:
@@ -143,12 +149,14 @@ class DeepResearchOrchestrator:
         # Load the appropriate template from /src/nexusagent/templates/
         template_path = f"src/nexusagent/templates/{template_type}.md"
         try:
-            with open(template_path, "r") as f:
+            with open(template_path) as f:
                 template = f.read()
         except FileNotFoundError:
             template = "General Report Template\n\n{content}"
 
-        combined_evidence = "\n\n".join([f"Source: {r.url}\n{r.content}" for r in state.gathered_data])
+        combined_evidence = "\n\n".join(
+            [f"Source: {r.url}\n{r.content}" for r in state.gathered_data]
+        )
 
         prompt = f"""Using the following research evidence, generate a final report following this template:
 

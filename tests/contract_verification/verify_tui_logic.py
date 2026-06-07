@@ -1,7 +1,6 @@
 import unittest
 import uuid
 from dataclasses import dataclass
-from typing import Optional
 
 
 # --- MOCK CONTRACTS (Same as in verify_logic.py for consistency) ---
@@ -10,11 +9,13 @@ class TaskSchema:
     id: str
     description: str
 
+
 @dataclass
 class TaskResponse:
     success: bool
-    data: Optional[str] = None
-    error: Optional[str] = None
+    data: str | None = None
+    error: str | None = None
+
 
 class MockSDK:
     def submit_task(self, task):
@@ -22,17 +23,19 @@ class MockSDK:
             return TaskResponse(success=False, error="Simulated TUI Failure")
         return TaskResponse(success=True, data="TUI Success")
 
+
 # --- TUI LOGIC EXTRACTED ---
 # We simulate the on_input_submitted logic from NexusApp
 def tui_handle_input(value, sdk):
     task_id = str(uuid.uuid4())[:8]
     task = TaskSchema(id=task_id, description=value)
     result = sdk.submit_task(task)
-    
+
     if result.success:
         return True, f"Task {task_id} submitted: {value}"
     else:
         return False, result.error
+
 
 # --- TESTS ---
 class TestTUIContract(unittest.TestCase):
@@ -50,6 +53,7 @@ class TestTUIContract(unittest.TestCase):
         self.assertFalse(success)
         self.assertEqual(msg, "Simulated TUI Failure")
         print("✓ TUI Error Path Verified")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,4 +1,3 @@
-import os
 from nexusagent.config import load_config
 
 
@@ -12,6 +11,7 @@ def test_load_config_success(tmp_path, monkeypatch):
     config_file.write_text("server:\n  nats_url: nats://test\n  db_path: test.db")
 
     from unittest.mock import patch
+
     with patch("nexusagent.config.get_project_root", return_value=tmp_path):
         config = load_config("nexusagent.yaml")
         assert config.server.nats_url == "nats://test"

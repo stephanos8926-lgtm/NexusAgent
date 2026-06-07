@@ -14,9 +14,9 @@ class TestWebUIContract(unittest.TestCase):
         self.mock_sdk.submit_task.return_value = TaskResponse(
             success=True, data="Task completed successfully", error=None
         )
-        
+
         result, status = handle_submit("Test task", sdk=self.mock_sdk)
-        
+
         self.assertEqual(status, "ACTIVE")
         self.assertIn("Task completed successfully", result)
 
@@ -25,9 +25,9 @@ class TestWebUIContract(unittest.TestCase):
         self.mock_sdk.submit_task.return_value = TaskResponse(
             success=False, data=None, error="Internal Server Error"
         )
-        
+
         result, status = handle_submit("Test task", sdk=self.mock_sdk)
-        
+
         self.assertEqual(status, "ERROR")
         self.assertIn("Critical Failure: Internal Server Error", result)
 
@@ -35,6 +35,7 @@ class TestWebUIContract(unittest.TestCase):
         result, status = handle_submit("", sdk=self.mock_sdk)
         self.assertEqual(status, "ERROR")
         self.assertIn("Error: Task definition empty", result)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,8 +1,9 @@
 import asyncio
 import json
 import logging
-from datetime import datetime, date
-from typing import Any, Callable, Awaitable, Optional
+from collections.abc import Callable
+from datetime import date, datetime
+from typing import Any
 
 import nats
 from nats.aio.client import Client as NATSClient
@@ -10,9 +11,9 @@ from nats.aio.subscription import Subscription
 from nats.errors import Error as NATSError
 
 from nexusagent.config import settings
-from nexusagent.utils import retry_with_backoff
 
 logger = logging.getLogger(__name__)
+
 
 class NATSJSONEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -20,10 +21,11 @@ class NATSJSONEncoder(json.JSONEncoder):
             return obj.isoformat()
         return super().default(obj)
 
+
 class AgentBus:
-    def __init__(self, url: Optional[str] = None) -> None:
+    def __init__(self, url: str | None = None) -> None:
         self.url = url or settings.server.nats_url
-        self.nc: Optional[NATSClient] = None
+        self.nc: NATSClient | None = None
         self.js: Any = None
         self.kv: Any = None
         self._subscriptions: list[Subscription] = []
@@ -44,7 +46,7 @@ class AgentBus:
             try:
                 self.kv = await self.js.create_key_value(bucket="nexus_results")
                 logger.info("JetStream KV bucket 'nexus_results' created.")
-            except nats.errors.Error as e:
+            except nats.errors.Error:
                 # Bucket already exist - attach to it
                 self.kv = await self.js.key_value(bucket="nexus_results")
                 logger.info("JetStream KV bucket 'nexus_results' attached.")
@@ -64,7 +66,7 @@ class AgentBus:
             return sub
 
         # Retry subscription up to 3 times with backoff
-        last_err: Optional[Exception] = None
+        last_err: Exception | None = None
         for attempt in range(3):
             try:
                 await _do_subscribe()
@@ -72,8 +74,10 @@ class AgentBus:
             except NATSError as e:
                 last_err = e
                 if attempt < 2:
-                    delay = 0.5 * (2 ** attempt)
-                    logger.warning(f"Subscribe to '{subject}' failed (attempt {attempt+1}/3): {e}. Retrying in {delay}s...")
+                    delay = 0.5 * (2**attempt)
+                    logger.warning(
+                        f"Subscribe to '{subject}' failed (attempt {attempt + 1}/3): {e}. Retrying in {delay}s..."
+                    )
                     await asyncio.sleep(delay)
         raise last_err  # type: ignore[misc]
 
@@ -96,7 +100,7 @@ class AgentBus:
             payload = json.dumps(result, cls=NATSJSONEncoder).encode()
             await self.kv.put(task_id, payload)
 
-        last_err: Optional[Exception] = None
+        last_err: Exception | None = None
         for attempt in range(3):
             try:
                 await _do_put()
@@ -105,12 +109,14 @@ class AgentBus:
             except Exception as e:
                 last_err = e
                 if attempt < 2:
-                    delay = 0.5 * (2 ** attempt)
-                    logger.warning(f"KV put for '{task_id}' failed (attempt {attempt+1}/3): {e}. Retrying in {delay}s...")
+                    delay = 0.5 * (2**attempt)
+                    logger.warning(
+                        f"KV put for '{task_id}' failed (attempt {attempt + 1}/3): {e}. Retrying in {delay}s..."
+                    )
                     await asyncio.sleep(delay)
         raise last_err  # type: ignore[misc]
 
-    async def get_result(self, task_id: str) -> Optional[Any]:
+    async def get_result(self, task_id: str) -> Any | None:
         """Retrieve a task result from the JetStream KV store."""
         if not self.kv:
             raise RuntimeError("KV store not connected. Call connect() first.")
@@ -120,7 +126,7 @@ class AgentBus:
             if entry and entry.value:
                 return json.loads(entry.value.decode())
             return None
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.warning(f"KV get for '{task_id}' timed out")
             return None
         except nats.errors.Error as e:
@@ -146,6 +152,7 @@ class AgentBus:
             self.kv = None
             self._subscriptions.clear()
             logger.info("NATS connection closed.")
+
 
 # Singleton instance for the project
 bus = AgentBus()

@@ -32,13 +32,38 @@ nexus-server = "nexusagent.server:run_server"
 nexus-client = "nexusagent.cli:main"
 nexus = "nexusagent.tui:main"
 nexus-web = "nexusagent.web_ui:create_ui"
+
 [tool.ruff]
-select = ["E", "F", "I"]
-line-length = 88
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "F",    # pyflakes
+    "I",    # isort
+    "N",    # pep8-naming
+    "W",    # pycodestyle warnings
+    "UP",   # pyupgrade
+    "B",    # flake8-bugbear
+    "SIM",  # flake8-simplify
+    "RUF",  # ruff-specific rules
+]
+ignore = [
+    "E501",  # Line too long (handled by formatter)
+    "B008",  # Do not perform function calls in default arguments
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["nexusagent"]
 
 [tool.mypy]
-python_version = "3.14"
+python_version = "3.13"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
 ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"

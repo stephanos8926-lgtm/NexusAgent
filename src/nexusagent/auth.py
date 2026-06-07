@@ -1,17 +1,17 @@
 # src/nexusagent/auth.py
-import os
-import json
-import secrets
 import base64
+import json
+import os
+import secrets
 from pathlib import Path
-from typing import Optional
 
 from cryptography.fernet import Fernet
+from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-from cryptography.hazmat.backends import default_backend
 
-from nexusagent.config import settings, get_project_root
+from nexusagent.config import settings
+
 
 class AuthManager:
     def __init__(self):
@@ -30,7 +30,7 @@ class AuthManager:
                 f.write(salt)
             os.chmod(self.salt_path, 0o600)
             return salt
-        
+
         with open(self.salt_path, "rb") as f:
             return f.read()
 
@@ -39,20 +39,22 @@ class AuthManager:
         Retrieves the master secret and derives a 32-byte key for Fernet using a unique salt.
         """
         if not self.master_secret_path.exists():
-            raise FileNotFoundError(f"Master secret not found at {self.master_secret_path}. Please run initialization wizard.")
+            raise FileNotFoundError(
+                f"Master secret not found at {self.master_secret_path}. Please run initialization wizard."
+            )
 
         with open(self.master_secret_path, "rb") as f:
             secret = f.read().strip()
-        
+
         salt = self._get_salt()
-        
+
         # Derive a fixed-length key from the master secret and the installation-specific salt
         kdf = PBKDF2HMAC(
             algorithm=hashes.SHA256(),
             length=32,
             salt=salt,
             iterations=settings.auth.kdf_iterations,
-            backend=default_backend()
+            backend=default_backend(),
         )
         return base64.urlsafe_b64encode(kdf.derive(secret))
 
@@ -71,16 +73,16 @@ class AuthManager:
 
         # Generate high-entropy random secret
         secret = secrets.token_urlsafe(32)
-        
+
         # Create file with restricted permissions
         with open(self.master_secret_path, "wb") as f:
             f.write(secret.encode())
-        
+
         os.chmod(self.master_secret_path, 0o600)
-        
+
         # Also ensure salt exists
         self._get_salt()
-        
+
         return f"Master secret initialized successfully. Path: {self.master_secret_path}"
 
     def save_key(self, service: str, key: str):
@@ -89,12 +91,12 @@ class AuthManager:
         """
         fernet = self._get_fernet()
         encrypted_key = fernet.encrypt(key.encode()).decode()
-        
+
         keystore = self._load_keystore()
         keystore[service] = encrypted_key
         self._save_keystore(keystore)
 
-    def get_key(self, service: str) -> Optional[str]:
+    def get_key(self, service: str) -> str | None:
         """
         Retrieves and decrypts a service API key.
         """
@@ -111,7 +113,7 @@ class AuthManager:
     def _load_keystore(self) -> dict:
         if not self.keystore_path.exists():
             return {}
-        with open(self.keystore_path, "r") as f:
+        with open(self.keystore_path) as f:
             try:
                 return json.load(f)
             except json.JSONDecodeError:
@@ -121,6 +123,7 @@ class AuthManager:
         with open(self.keystore_path, "w") as f:
             json.dump(keystore, f, indent=4)
         os.chmod(self.keystore_path, 0o600)
+
 
 # Global instance for use across the app
 auth_manager = AuthManager()

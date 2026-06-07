@@ -1,11 +1,10 @@
 # src/nexusagent/config.py
+import logging
 import os
 from pathlib import Path
-from typing import Optional
 
 import yaml
 from pydantic import BaseModel, Field, ValidationError
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +34,9 @@ class AuthConfig(BaseModel):
 
 class AgentConfig(BaseModel):
     default_model: str = Field(default="gemini-3.1-flash-lite")
-    enabled_tools: list[str] = Field(default_factory=lambda: ["read_file", "write_file", "run_shell"])
+    enabled_tools: list[str] = Field(
+        default_factory=lambda: ["read_file", "write_file", "run_shell"]
+    )
 
 
 class ConfigSchema(BaseModel):
@@ -59,7 +60,7 @@ def load_config(config_file: str = "config/nexusagent.yaml") -> ConfigSchema:
     raw_data = {}
     if config_path.exists():
         try:
-            with open(config_path, "r") as f:
+            with open(config_path) as f:
                 raw_data = yaml.safe_load(f) or {}
         except Exception as e:
             logger.error(f"Failed to load config file {config_path}: {e}")
@@ -69,7 +70,7 @@ def load_config(config_file: str = "config/nexusagent.yaml") -> ConfigSchema:
     def override_from_env(prefix: str, data: dict, current_level: dict):
         for key, value in os.environ.items():
             if key.startswith(prefix):
-                stripped = key[len(prefix):]
+                stripped = key[len(prefix) :]
                 if "__" in stripped:
                     parts = stripped.split("__")
                     target = current_level
@@ -93,10 +94,26 @@ def load_config(config_file: str = "config/nexusagent.yaml") -> ConfigSchema:
 
         # Resolve relative paths to absolute paths
         root = get_project_root()
-        config.server.db_path = str(root / config.server.db_path) if not Path(config.server.db_path).is_absolute() else config.server.db_path
-        config.auth.master_secret_path = str(root / config.auth.master_secret_path) if not Path(config.auth.master_secret_path).is_absolute() else config.auth.master_secret_path
-        config.auth.keystore_path = str(root / config.auth.keystore_path) if not Path(config.auth.keystore_path).is_absolute() else config.auth.keystore_path
-        config.auth.salt_path = str(root / config.auth.salt_path) if not Path(config.auth.salt_path).is_absolute() else config.auth.salt_path
+        config.server.db_path = (
+            str(root / config.server.db_path)
+            if not Path(config.server.db_path).is_absolute()
+            else config.server.db_path
+        )
+        config.auth.master_secret_path = (
+            str(root / config.auth.master_secret_path)
+            if not Path(config.auth.master_secret_path).is_absolute()
+            else config.auth.master_secret_path
+        )
+        config.auth.keystore_path = (
+            str(root / config.auth.keystore_path)
+            if not Path(config.auth.keystore_path).is_absolute()
+            else config.auth.keystore_path
+        )
+        config.auth.salt_path = (
+            str(root / config.auth.salt_path)
+            if not Path(config.auth.salt_path).is_absolute()
+            else config.auth.salt_path
+        )
 
         return config
     except ValidationError as e:
