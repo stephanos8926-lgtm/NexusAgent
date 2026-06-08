@@ -130,12 +130,12 @@ class NexusSDK:
         poll_interval: float = 1.0,
     ) -> ResultSchema | None:
         """Poll for a task result until timeout. Returns the result or None."""
-        start = asyncio.get_event_loop().time()
+        start = asyncio.get_running_loop().time()
         while True:
             result = await self.get_result(task_id)
             if result is not None:
                 return result
-            if asyncio.get_event_loop().time() - start >= timeout:
+            if asyncio.get_running_loop().time() - start >= timeout:
                 return None
             await asyncio.sleep(poll_interval)
 
@@ -158,6 +158,52 @@ class NexusSDK:
             task_id = await self.submit_task(task_data)
             ids.append(task_id)
         return ids
+
+    # ─── Status Helpers ──────────────────────────────────────────────────
+
+    async def health_check(self) -> dict:
+        """Check system health (NATS connection status)."""
+        return {"status": "ok", "nats": "connected" if self.bus.nc else "disconnected"}
+
+    async def list_workers(self) -> dict:
+        """List worker status including circuit breaker state."""
+        from nexusagent.worker import _agent_breaker, _nats_breaker
+
+        return {
+            "workers": [
+                {
+                    "name": "default",
+                    "status": "running",
+                    "circuit_breakers": {
+                        "agent": {
+                            "state": _agent_breaker.state,
+                            "failure_count": _agent_breaker.failure_count,
+                        },
+                        "nats": {
+                            "state": _nats_breaker.state,
+                            "failure_count": _nats_breaker.failure_count,
+                        },
+                    },
+                }
+            ]
+        }
+
+    async def list_tools(self) -> dict:
+        """List all registered tools grouped by category."""
+        from nexusagent.tools.registry import list_all_tools
+
+        tools = list_all_tools()
+        by_cat: dict[str, list[dict]] = {}
+        for t in tools:
+            by_cat.setdefault(t.category, []).append(
+                {
+                    "name": t.name,
+                    "description": t.description,
+                    "parameters": t.parameters,
+                }
+            )
+
+        return {"tools": by_cat, "total": len(tools)}
 
 
 # Global SDK instance
