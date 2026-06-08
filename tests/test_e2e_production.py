@@ -114,6 +114,10 @@ async def test_sdk_end_to_end_flow():
         assert db_result.success == 1
 
 
+# API auth header for E2E tests (all non-health endpoints require X-API-Key)
+AUTH_HEADERS = {"X-API-Key": "test-e2e-key"}
+
+
 @pytest.mark.asyncio
 async def test_api_end_to_end_flow():
     """
@@ -122,7 +126,7 @@ async def test_api_end_to_end_flow():
     async with AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as ac:
         # 1. Submit task via API
         response = await ac.post(
-            "/tasks", json={"description": "Verify API E2E flow", "priority": 2}
+            "/tasks", json={"description": "Verify API E2E flow", "priority": 2}, headers=AUTH_HEADERS
         )
         assert response.status_code == 200
         data = response.json()
@@ -133,7 +137,7 @@ async def test_api_end_to_end_flow():
         max_retries = 30
         completed = False
         for _ in range(max_retries):
-            status_res = await ac.get(f"/tasks/{task_id}/status")
+            status_res = await ac.get(f"/tasks/{task_id}/status", headers=AUTH_HEADERS)
             if status_res.json()["status"] == "completed":
                 completed = True
                 break
@@ -142,7 +146,7 @@ async def test_api_end_to_end_flow():
         assert completed, f"API Task {task_id} did not complete"
 
         # 3. Get Result
-        result_res = await ac.get(f"/tasks/{task_id}/result")
+        result_res = await ac.get(f"/tasks/{task_id}/result", headers=AUTH_HEADERS)
         assert result_res.status_code == 200
         result_data = result_res.json()
         assert result_data["success"] is True
@@ -158,7 +162,7 @@ async def test_invalid_task_failure():
     # Current Worker handles most things, let's see if it handles extreme metadata or similar.
     # Or we can just check if a non-existent task returns 404 via API.
     async with AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as ac:
-        response = await ac.get("/tasks/non-existent-id/result")
+        response = await ac.get("/tasks/non-existent-id/result", headers=AUTH_HEADERS)
         assert response.status_code == 404
 
 
