@@ -1,4 +1,5 @@
 # src/nexusagent/sdk.py
+import asyncio
 import logging
 import uuid
 
@@ -12,6 +13,23 @@ class NexusSDK:
     """
     High-level SDK for interacting with the NexusAgent system.
     This can be used by both the FastAPI server and external clients.
+
+    Usage:
+        # One-off calls (auto-connects)
+        sdk = NexusSDK()
+        task_id = await sdk.submit_task({"description": "hello"})
+        result = await sdk.get_result(task_id)
+
+        # Context manager (explicit connect/disconnect)
+        async with NexusSDK() as sdk:
+            task_id = await sdk.submit_task({"description": "hello"})
+            result = await sdk.wait_for_result(task_id, timeout=60)
+
+        # Batch submit
+        ids = await sdk.submit_batch([
+            {"description": "task 1"},
+            {"description": "task 2"},
+        ])
     """
 
     def __init__(self):
@@ -21,6 +39,20 @@ class NexusSDK:
         """Ensure NATS connection is established."""
         if not self.bus.nc:
             await self.bus.connect()
+
+    async def disconnect(self) -> None:
+        """Close the NATS connection."""
+        if self.bus and self.bus.nc:
+            await self.bus.close()
+
+    async def __aenter__(self) -> "NexusSDK":
+        await self.connect()
+        return self
+
+    async def __aexit__(self, *args) -> None:
+        await self.disconnect()
+
+    # ─── Core Operations ─────────────────────────────────────────────────
 
     async def submit_task(self, task_data: dict) -> str:
         """Submits a task to the NATS bus. Returns the task ID."""
@@ -36,9 +68,7 @@ class NexusSDK:
         return task_id
 
     async def get_task_status(self, task_id: str) -> TaskStatus | None:
-        """
-        Query the current status of a task from the database.
-        """
+        """Query the current status of a task from the database."""
         from nexusagent.db import task_repo
 
         status_str = await task_repo.get_task_status(task_id)
@@ -61,6 +91,73 @@ class NexusSDK:
             return None
 
         return ResultSchema(**result_data)
+
+    # ─── Listing & Management ────────────────────────────────────────────
+
+    async def list_tasks(
+        self,
+        status: str | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[dict]:
+        """List tasks with optional status filter and pagination."""
+        from nexusagent.db import task_repo
+
+        return await task_repo.list_tasks(status=status, limit=limit, offset=offset)
+
+    async def cancel_task(self, task_id: str) -> bool:
+        """Cancel a pending or processing task. Returns True if cancelled."""
+        from nexusagent.db import task_repo
+
+        return await task_repo.cancel_task(task_id)
+
+    async def retry_task(self, task_id: str) -> str | None:
+        """Retry a failed task. Returns task ID or None if not eligible."""
+        from nexusagent.db import task_repo
+
+        new_id = await task_repo.retry_task(task_id)
+        if new_id:
+            # Re-publish to NATS
+            await self.submit_task({"id": new_id, "description": "retried", "priority": 1})
+        return new_id
+
+    # ─── Polling Helpers ─────────────────────────────────────────────────
+
+    async def wait_for_result(
+        self,
+        task_id: str,
+        timeout: float = 300.0,
+        poll_interval: float = 1.0,
+    ) -> ResultSchema | None:
+        """Poll for a task result until timeout. Returns the result or None."""
+        start = asyncio.get_event_loop().time()
+        while True:
+            result = await self.get_result(task_id)
+            if result is not None:
+                return result
+            if asyncio.get_event_loop().time() - start >= timeout:
+                return None
+            await asyncio.sleep(poll_interval)
+
+    async def submit_and_wait(
+        self,
+        task_data: dict,
+        timeout: float = 300.0,
+        poll_interval: float = 1.0,
+    ) -> ResultSchema | None:
+        """Submit a task and wait for the result."""
+        task_id = await self.submit_task(task_data)
+        return await self.wait_for_result(task_id, timeout=timeout, poll_interval=poll_interval)
+
+    # ─── Batch Operations ────────────────────────────────────────────────
+
+    async def submit_batch(self, tasks: list[dict]) -> list[str]:
+        """Submit multiple tasks. Returns list of task IDs."""
+        ids = []
+        for task_data in tasks:
+            task_id = await self.submit_task(task_data)
+            ids.append(task_id)
+        return ids
 
 
 # Global SDK instance
