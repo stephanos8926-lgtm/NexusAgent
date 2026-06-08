@@ -18,6 +18,14 @@ dependencies = [
     "ruff",
     "mypy",
     "pydantic",
+    "google-generativeai",
+    "openai",
+    "gradio",
+    "textual",
+    "cryptography",
+    "httpx",
+    "sqlalchemy[asyncio]",
+    "aiosqlite",
 ]
 
 [build-system]
@@ -28,7 +36,7 @@ build-backend = "setuptools.build_meta"
 where = ["src"]
 
 [project.scripts]
-nexus-server = "nexusagent.server:run_server"
+nexus-server = "nexusagent.server:app"
 nexus-client = "nexusagent.cli:main"
 nexus = "nexusagent.tui:main"
 nexus-web = "nexusagent.web_ui:create_ui"
