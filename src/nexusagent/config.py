@@ -48,8 +48,6 @@ class ConfigSchema(BaseModel):
     client: ClientConfig = Field(default_factory=ClientConfig)
     auth: AuthConfig = Field(default_factory=AuthConfig)
     agent: AgentConfig = Field(default_factory=AgentConfig)
-    loop_threshold: int = Field(default=4, ge=1)
-    post_research_retries: int = Field(default=4, ge=0)
     log_level: str = Field(default="INFO")
 
 
