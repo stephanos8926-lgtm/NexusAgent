@@ -231,7 +231,12 @@ async def list_tools():
     return {"tools": by_cat, "total": len(tools)}
 
 
-if __name__ == "__main__":
+def run() -> None:
+    """Entry point for the nexus-server command."""
     import uvicorn
 
     uvicorn.run(app, host="0.0.0.0", port=settings.server.api_port)
+
+
+if __name__ == "__main__":
+    run()

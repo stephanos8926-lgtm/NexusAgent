@@ -36,10 +36,10 @@ build-backend = "setuptools.build_meta"
 where = ["src"]
 
 [project.scripts]
-nexus-server = "nexusagent.server:app"
+nexus-server = "nexusagent.server:run"
 nexus-client = "nexusagent.cli:main"
 nexus = "nexusagent.tui:main"
-nexus-web = "nexusagent.web_ui:create_ui"
+nexus-web = "nexusagent.web_ui:run_ui"
 
 [tool.ruff]
 line-length = 100

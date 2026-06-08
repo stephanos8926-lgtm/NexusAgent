@@ -80,6 +80,11 @@ def create_ui():
     return demo
 
 
-if __name__ == "__main__":
+def run_ui() -> None:
+    """Entry point for the nexus-web command."""
     demo = create_ui()
     demo.launch(server_name="0.0.0.0", server_port=7860)
+
+
+if __name__ == "__main__":
+    run_ui()
