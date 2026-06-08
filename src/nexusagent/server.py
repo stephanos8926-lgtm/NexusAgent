@@ -3,10 +3,11 @@ import asyncio
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+from nexusagent.api_auth import verify_api_key
 from nexusagent.bus import bus
 from nexusagent.config import settings
 from nexusagent.sdk import sdk
@@ -73,7 +74,7 @@ class SubmitTaskRequest(BaseModel):
     metadata: dict = {}
 
 
-@app.post("/tasks", response_model=dict)
+@app.post("/tasks", response_model=dict, dependencies=[Depends(verify_api_key)])
 async def create_task(request: SubmitTaskRequest):
     """
     Submit a new task to the orchestrator.
@@ -112,7 +113,7 @@ async def create_task(request: SubmitTaskRequest):
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
-@app.get("/tasks/{task_id}/status")
+@app.get("/tasks/{task_id}/status", dependencies=[Depends(verify_api_key)])
 async def get_task_status(task_id: str):
     """
     Check the status of a task.
@@ -121,7 +122,7 @@ async def get_task_status(task_id: str):
     return {"task_id": task_id, "status": status}
 
 
-@app.get("/tasks/{task_id}/result")
+@app.get("/tasks/{task_id}/result", dependencies=[Depends(verify_api_key)])
 async def get_task_result(task_id: str):
     """
     Retrieve the result of a task.
@@ -136,6 +137,98 @@ async def get_task_result(task_id: str):
 @app.get("/health")
 async def health_check():
     return {"status": "ok", "nats": "connected" if bus.nc else "disconnected"}
+
+
+# ─── Task Listing ──────────────────────────────────────────────────────
+
+
+@app.get("/tasks", dependencies=[Depends(verify_api_key)])
+async def list_tasks(status: str | None = None, limit: int = 50, offset: int = 0):
+    """List tasks with optional status filter and pagination."""
+    from nexusagent.db import task_repo
+
+    tasks = await task_repo.list_tasks(status=status, limit=limit, offset=offset)
+    return {"tasks": tasks, "count": len(tasks)}
+
+
+# ─── Task Cancellation ─────────────────────────────────────────────────
+
+
+@app.post("/tasks/{task_id}/cancel", dependencies=[Depends(verify_api_key)])
+async def cancel_task(task_id: str):
+    """Cancel a pending or processing task."""
+    from nexusagent.db import task_repo
+
+    cancelled = await task_repo.cancel_task(task_id)
+    if not cancelled:
+        raise HTTPException(status_code=400, detail="Task not found or already completed/failed")
+    return {"task_id": task_id, "status": "cancelled"}
+
+
+# ─── Task Retry ────────────────────────────────────────────────────────
+
+
+@app.post("/tasks/{task_id}/retry", dependencies=[Depends(verify_api_key)])
+async def retry_task(task_id: str):
+    """Retry a failed task."""
+    from nexusagent.db import task_repo
+
+    new_id = await task_repo.retry_task(task_id)
+    if not new_id:
+        raise HTTPException(status_code=400, detail="Task not found or not in failed state")
+
+    # Re-publish to NATS
+    task_data = {"id": new_id, "description": "retried", "priority": 1}
+    await sdk.submit_task(task_data)
+
+    return {"task_id": new_id, "status": "re-queued"}
+
+
+# ─── Worker & Tool Status ──────────────────────────────────────────────
+
+
+@app.get("/workers", dependencies=[Depends(verify_api_key)])
+async def list_workers():
+    """List worker status including circuit breaker state."""
+    from nexusagent.worker import _agent_breaker, _nats_breaker
+
+    return {
+        "workers": [
+            {
+                "name": "default",
+                "status": "running",
+                "circuit_breakers": {
+                    "agent": {
+                        "state": _agent_breaker.state,
+                        "failure_count": _agent_breaker.failure_count,
+                    },
+                    "nats": {
+                        "state": _nats_breaker.state,
+                        "failure_count": _nats_breaker.failure_count,
+                    },
+                },
+            }
+        ]
+    }
+
+
+@app.get("/tools", dependencies=[Depends(verify_api_key)])
+async def list_tools():
+    """List all registered tools grouped by category."""
+    from nexusagent.tools.registry import list_all_tools
+
+    tools = list_all_tools()
+    by_cat: dict[str, list[dict]] = {}
+    for t in tools:
+        by_cat.setdefault(t.category, []).append(
+            {
+                "name": t.name,
+                "description": t.description,
+                "parameters": t.parameters,
+            }
+        )
+
+    return {"tools": by_cat, "total": len(tools)}
 
 
 if __name__ == "__main__":
