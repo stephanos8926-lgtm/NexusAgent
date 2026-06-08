@@ -23,13 +23,11 @@ class NexusSDK:
             await self.bus.connect()
 
     async def submit_task(self, task_data: dict) -> str:
-        """
-        Submits a task to the NATS bus.
-        Returns the task ID.
-        """
+        """Submits a task to the NATS bus. Returns the task ID."""
         await self.connect()
 
-        # Assign ID if not provided, remove from data to avoid duplicate
+        # Don't mutate the caller's dict
+        task_data = dict(task_data)
         task_id = task_data.pop("id", str(uuid.uuid4()))
         task = TaskSchema(id=task_id, **task_data)
 
