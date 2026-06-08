@@ -37,7 +37,7 @@ class TaskModel(Base):
     updated_at = Column(
         DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC)
     )
-    metadata_json = Column(JSON, default={})
+    metadata_json = Column(JSON, default=dict)
 
 
 class ResultModel(Base):
