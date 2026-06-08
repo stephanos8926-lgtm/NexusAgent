@@ -34,6 +34,10 @@ class AuthConfig(BaseModel):
 
 class AgentConfig(BaseModel):
     default_model: str = Field(default="gemini-3.1-flash-lite")
+    primary_provider: str = Field(default="gemini")
+    gemini_model: str = Field(default="gemini-3.1-flash-lite")
+    openrouter_default_model: str = Field(default="openrouter/auto")
+    openrouter_override_model: str | None = None
     enabled_tools: list[str] = Field(
         default_factory=lambda: ["read_file", "write_file", "run_shell"]
     )
