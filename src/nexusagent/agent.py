@@ -1,4 +1,5 @@
 # src/nexusagent/agent.py
+import logging
 import os
 from typing import Any
 
@@ -119,7 +120,9 @@ def run_agent_task(state: dict) -> dict:
 
     try:
         agent = Agent(role=role, policy=policy)
-        result = agent.invoke(state)
+        result = agent(state)
         return {"result": result}
-    except Exception:
-        return {"result": f"task_complete: {task_desc}"}
+    except Exception as e:
+        logger = logging.getLogger(__name__)
+        logger.error(f"Agent execution failed for task '{task_desc}': {e}", exc_info=True)
+        return {"result": None, "error": str(e)}
