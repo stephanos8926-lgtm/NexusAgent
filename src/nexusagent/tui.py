@@ -1,4 +1,5 @@
 import uuid
+from typing import ClassVar
 
 from textual.app import App, ComposeResult
 from textual.containers import Vertical
@@ -23,7 +24,7 @@ class ErrorModal(ModalScreen):
 
 
 class NexusApp(App):
-    BINDINGS = [("q", "quit", "Quit")]
+    BINDINGS: ClassVar = [("q", "quit", "Quit")]
     CSS = """
     #error-text { color: red; text-style: bold; }
     Log { border: solid #333; background: #000; color: #0f0; }

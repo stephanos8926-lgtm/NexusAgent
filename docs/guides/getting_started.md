@@ -48,5 +48,5 @@ print(result)
 
 ## Next Steps
 - Explore the [Local Development Guide](local_development.md) for more advanced setup.
-- Check out the [API Reference](api_reference/) to see all available endpoints.
+- Check out the [API Reference](../api/agent.md) to see all available endpoints.
 - Contribute to the project by following our [Contributing Guide](https://github.com/NexusAgent/nexusagent/CONTRIBUTING.md).

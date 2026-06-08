@@ -311,15 +311,12 @@ def _is_tool_allowed(tool_name: str) -> tuple[bool, str]:
         return False, f"Tool '{tool_name}' does not exist."
 
     # Tool not in this role's manifest
-    if tool_name not in manifest:
-        # In strict/restricted mode, this is a hard deny
-        if policy in ("restricted", "strict"):
-            return False, (
-                f"Tool '{tool_name}' is not available for role '{role}' "
-                f"(policy: {policy}). Use tool_search() to see available tools."
-            )
-        # In permissive mode, the role manifest is just a starting point
-        # Allow unlock
+    if tool_name not in manifest and policy in ("restricted", "strict"):
+        return False, (
+            f"Tool '{tool_name}' is not available for role '{role}' "
+            f"(policy: {policy}). Use tool_search() to see available tools."
+        )
+    # In permissive mode, the role manifest is just a starting point
 
     # In permissive mode: auto-unlock on first call
     if policy == "permissive":
@@ -566,7 +563,7 @@ def _use_case_search(
 # ─── Auto-Correction ────────────────────────────────────────────────────
 
 
-def auto_correct(tool_name: str, kwargs: dict[str, Any] = None) -> str:
+def auto_correct(tool_name: str, kwargs: dict[str, Any] | None = None) -> str:
     """
     Validate a tool call and return corrections if needed.
 

@@ -140,11 +140,10 @@ class AgentBus:
             return None
 
     async def close(self) -> None:
+        import contextlib
         for sub in self._subscriptions:
-            try:
+            with contextlib.suppress(Exception):
                 await sub.unsubscribe()
-            except Exception:
-                pass
         if self.nc:
             await self.nc.close()
             self.nc = None

@@ -194,10 +194,8 @@ def retry_on_false(
 
             @functools.wraps(func)
             def sync_wrapper(*args, **kwargs) -> T:
-                last_result: Any = None
                 for attempt in range(max_attempts):
                     result = func(*args, **kwargs)
-                    last_result = result
                     if result:  # Truthy value means success
                         return result
 

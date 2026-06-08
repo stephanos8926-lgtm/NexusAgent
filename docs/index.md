@@ -1,31 +1,69 @@
-# Welcome to NexusAgent Documentation
+# NexusAgent
 
-Welcome to the official documentation for the NexusAgent Orchestration Framework.
+**Multi-agent orchestration framework with NATS messaging.**
 
-## Project Overview
-NexusAgent is a professional-grade platform for the intelligent orchestration of multi-agent AI systems. It provides the necessary primitives for communication (NATS), security (Keystore/Auth), and observation (Telemetry) required for production-ready AI workflows.
+NexusAgent is a lightweight, self-hosted agent platform that runs anywhere — from a Dell Optiplex to a Bobcat Miner. It features:
 
-## Quick Navigation
+- **NATS-native**: Async messaging without Kafka's operational weight
+- **Multi-interface**: CLI, TUI, Web UI, and API out of the box
+- **Policy-aware tool system**: Progressive discovery with per-agent access control
+- **Multi-agent parallelism**: Dynamic sub-agent spawning with memory slicing
+- **Production-grade**: Circuit breakers, encrypted credentials, observability
 
-### Core Documentation
-- [Architecture Decision Records (ADRs)](adrs/index.md) - Learn why we made key architectural choices.
-- [Technical Specifications (Tech Specs)](specs/index.md) - Find detailed implementation guides.
-- [Guides](guides/) - Step-by-step instructions for developers and users.
-- [API Reference](api_reference/) - Detailed documentation for our SDK and API.
+## Quick Start
 
-### Project Management
-- [Plans](plans/) - Project plans, roadmaps, and iteration plans.
-- [Research](research/) - Research findings, feature parity studies, and exploratory work.
-- [Collaboration](collab/) - Team collaboration spaces, TODO lists, and working documents.
+```bash
+# Install
+pip install -e .
 
-### Operational Documents
-- [Runbook](RUNBOOK.md) - Procedures for operating, maintaining, and troubleshooting the system.
-- [Execution Summary](EXECUTION_SUMMARY.md) - Summary of recent execution activities and results.
-- [Audit Report](AUDIT_REPORT.md) - Security and compliance audit findings.
-- [State](state.md) - Current system state and configuration snapshot.
+# Run tests
+make test
 
-### Specialized Topics
-- [Superpowers](superpowers/) - Advanced capabilities and extension points.
+# Start dev server
+make dev
+```
 
----
-*Maintained by the NexusAgent Team.*
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    NexusAgent System                         │
+│                                                             │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐   │
+│  │   CLI    │  │   TUI    │  │  Web UI  │  │ REST API │   │
+│  └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬─────┘   │
+│       └──────────────┴──────────────┴──────────────┘        │
+│                          │                                  │
+│                   ┌──────┴──────┐                           │
+│                   │ Agent (Core)│                           │
+│                   └──────┬──────┘                           │
+│                          │                                  │
+│       ┌──────────────────┼──────────────────┐              │
+│       │                  │                  │              │
+│  ┌────┴────┐      ┌─────┴─────┐     ┌─────┴─────┐        │
+│  │  Tools  │      │   NATS    │     │    DB     │        │
+│  │Registry │      │   Bus     │     │ (SQLite)  │        │
+│  └─────────┘      └───────────┘     └───────────┘        │
+└─────────────────────────────────────────────────────────────┘
+```
+
+## Key Features
+
+### Policy-Aware Tool System
+Agents start with a minimal tool set and discover tools on demand. Three policy levels control access:
+
+- **Permissive**: Auto-unlock on first call (user-spawned agents)
+- **Restricted**: Enforced role boundaries (sub-agents)
+- **Strict**: Locked to initial manifest (sandboxed)
+
+### Multi-Agent Parallelism
+Parent agents can spawn specialized sub-agents that run in parallel:
+
+- Adaptive spawning based on runtime complexity metrics
+- Memory slicing: only relevant context is transferred
+- 3-tier conflict resolution for concurrent edits
+
+### NATS JetStream Backbone
+- 15MB binary vs Kafka's operational weight
+- Built-in clustering and persistence
+- JetStream KV for result storage

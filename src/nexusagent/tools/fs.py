@@ -13,6 +13,12 @@ from pathlib import Path
 # Track files read in the current session (module-level state)
 _read_files: set[str] = set()
 
+# Default directory excludes for list_directory
+_DEFAULT_DIR_EXCLUDES = frozenset({
+    ".git", "__pycache__", "node_modules", ".venv", "venv",
+    ".tox", ".mypy_cache", ".eggs", "*.egg-info",
+})
+
 
 def _resolve(path: str) -> Path:
     """Resolve a path and return absolute Path."""
@@ -176,7 +182,7 @@ def edit_file(
 
         # Verify old_text starts within the range (not just overlaps)
         # Find the position of old_text in the full content
-        range_start_offset = sum(len(l) + 1 for l in lines[:s])  # +1 for newlines
+        range_start_offset = sum(len(line) + 1 for line in lines[:s])  # +1 for newlines
         pos = content.find(old_text, range_start_offset)
 
         if pos == -1:
@@ -242,23 +248,11 @@ def list_directory(
     Returns:
         Nested dict: {"dirname": {"subdir": {...}, "file.py": "file"}, "file.txt": "file"}
     """
-    DEFAULT_EXCLUDES = {
-        ".git",
-        "__pycache__",
-        "node_modules",
-        ".venv",
-        "venv",
-        ".tox",
-        ".mypy_cache",
-        ".eggs",
-        "*.egg-info",
-    }
-
     p = _resolve(path)
     if not p.exists() or not p.is_dir():
         return {}
 
-    excludes = set(exclude) if exclude else DEFAULT_EXCLUDES
+    excludes = set(exclude) if exclude else _DEFAULT_DIR_EXCLUDES
 
     def _should_exclude(name: str) -> bool:
         return name in excludes
@@ -280,7 +274,7 @@ def list_directory(
             if item.is_dir():
                 if recursive:
                     subtree = _build_tree(item, depth + 1)
-                    if subtree:  # Only include non-empty directories
+                    if subtree:
                         tree[item.name] = subtree
                 else:
                     tree[item.name] = "directory"

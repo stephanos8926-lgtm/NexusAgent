@@ -11,8 +11,8 @@ def get_version() -> str:
     try:
         return pkg_version("nexusagent")
     except Exception:
-        BASE_DIR = Path(__file__).resolve().parent.parent.parent
-        pyproject_path = BASE_DIR / "pyproject.toml"
+        base_dir = Path(__file__).resolve().parent.parent.parent
+        pyproject_path = base_dir / "pyproject.toml"
         with open(pyproject_path, "rb") as f:
             data = tomllib.load(f)
         return data["project"]["version"]
