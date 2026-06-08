@@ -1,7 +1,7 @@
 import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import (
@@ -33,8 +33,10 @@ class TaskModel(Base):
     description = Column(String, nullable=False)
     priority = Column(Integer, default=1)
     status = Column(String, default="pending")
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
+    updated_at = Column(
+        DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC)
+    )
     metadata_json = Column(JSON, default={})
 
 
@@ -44,7 +46,7 @@ class ResultModel(Base):
     success = Column(Integer, default=0)
     data = Column(String, nullable=True)
     error = Column(String, nullable=True)
-    completed_at = Column(DateTime, default=datetime.utcnow)
+    completed_at = Column(DateTime, default=lambda: datetime.now(UTC))
     duration = Column(Float, nullable=True)
 
 
@@ -169,6 +171,7 @@ class TaskRepository:
                     "description": t.description,
                     "priority": t.priority,
                     "status": t.status,
+                    "metadata": t.metadata_json,
                     "created_at": t.created_at.isoformat() if t.created_at else None,
                     "updated_at": t.updated_at.isoformat() if t.updated_at else None,
                 }
