@@ -2,7 +2,6 @@ import uuid
 
 import gradio as gr
 
-from nexusagent.models import TaskSchema
 from nexusagent.sdk import NexusSDK
 
 # Aesthetic Constants (Industrial/Utilitarian Direction)
@@ -21,18 +20,21 @@ def handle_submit(text, sdk=None):
         return "Error: Task definition empty", "ERROR"
 
     task_id = str(uuid.uuid4())[:8]
-    task = TaskSchema(id=task_id, description=text)
 
-    result = sdk.submit_task(task)
+    # submit_task expects a dict, not a TaskSchema object
+    sdk.submit_task(
+        {
+            "id": task_id,
+            "description": text,
+        }
+    )
 
-    if result.success:
-        return f"[{task_id}] {result.data}", "ACTIVE"
-    else:
-        return f"Critical Failure: {result.error}", "ERROR"
+    # submit_task returns a task_id string, not a result object
+    return f"[{task_id}] Submitted successfully", "ACTIVE"
 
 
 def create_ui():
-    sdk = NexusSDK()
+    NexusSDK()
 
     with gr.Blocks(
         title="NexusAgent Control Center",
