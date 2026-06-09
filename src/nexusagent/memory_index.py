@@ -80,6 +80,7 @@ class EmbeddingProvider:
         if not api_key:
             # Try loading from .env file in project root
             from nexusagent.config import get_project_root
+
             env_path = get_project_root() / ".env"
             if env_path.exists():
                 for line in env_path.read_text().splitlines():
@@ -191,17 +192,21 @@ class HybridMemoryIndex:
             vec_exists = conn.execute(
                 "SELECT name FROM sqlite_master WHERE type='table' AND name='chunks_vec'"
             ).fetchone()
-            
+
             if vec_exists:
                 # Check the dimension of existing vectors
                 row = conn.execute("SELECT embedding FROM chunks_vec LIMIT 1").fetchone()
                 if row and row[0]:
                     existing_dim = len(row[0]) // 4  # float32 = 4 bytes
                     if existing_dim != EMBED_DIM:
-                        logger.info("Vector dimension changed (%d → %d), rebuilding index", existing_dim, EMBED_DIM)
+                        logger.info(
+                            "Vector dimension changed (%d → %d), rebuilding index",
+                            existing_dim,
+                            EMBED_DIM,
+                        )
                         conn.execute("DROP TABLE IF EXISTS chunks_vec")
                         conn.execute("DELETE FROM chunks WHERE embedding IS NOT NULL")
-            
+
             conn.execute(
                 f"""
                 CREATE VIRTUAL TABLE IF NOT EXISTS chunks_vec USING vec0(
@@ -273,6 +278,101 @@ class HybridMemoryIndex:
                 # Get embedding — use hash fallback for sync context
                 try:
                     vec = self.embedder._embed_hash(chunk["content"])
+                    vec_blob = _vec_to_blob(vec)
+                except Exception as e:
+                    logger.warning("Embedding failed for chunk: %s", e)
+                    vec_blob = None
+
+                conn.execute(
+                    "INSERT INTO chunks (id, file_path, line_start, line_end, content, embedding, indexed_at) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    (
+                        chunk_id,
+                        relative_path,
+                        chunk["start"],
+                        chunk["end"],
+                        chunk["content"],
+                        vec_blob,
+                        now,
+                    ),
+                )
+
+                conn.execute(
+                    "INSERT INTO chunks_fts (id, content, file_path) VALUES (?, ?, ?)",
+                    (chunk_id, chunk["content"], relative_path),
+                )
+
+                if vec_blob:
+                    try:
+                        conn.execute(
+                            "INSERT OR REPLACE INTO chunks_vec (id, embedding) VALUES (?, ?)",
+                            (chunk_id, vec_blob),
+                        )
+                    except Exception as e:
+                        logger.warning("Vector insert failed: %s", e)
+
+            # Update file meta
+            file_hash = hashlib.md5(filepath.read_bytes()).hexdigest()
+            conn.execute(
+                "INSERT OR REPLACE INTO file_meta (file_path, mtime, hash, last_indexed) VALUES (?, ?, ?, ?)",
+                (relative_path, filepath.stat().st_mtime, file_hash, now),
+            )
+
+            conn.commit()
+        finally:
+            conn.close()
+
+    async def async_index_file(self, relative_path: str):
+        """Index a file using the full async embedding chain (Gemini → local → hash).
+
+        Same logic as index_file() but uses the async embedder.embed() call
+        instead of the sync _embed_hash() fallback, producing high-quality vectors.
+        """
+        filepath = self.workspace / relative_path
+        if not filepath.exists():
+            logger.warning("File not found: %s", filepath)
+            return
+
+        content = filepath.read_text()
+
+        # Remove YAML frontmatter for indexing
+        if content.startswith("---"):
+            parts = content.split("---", 2)
+            if len(parts) >= 3:
+                content = parts[2]
+
+        # Chunk the content
+        chunks = self._chunk_text(content)
+
+        conn = sqlite3.connect(str(self.db_path))
+        try:
+            conn.enable_load_extension(True)
+            sqlite_vec.load(conn)
+            conn.enable_load_extension(False)
+
+            # Fetch old chunk IDs for this file (needed to clean vec entries)
+            old_ids = [
+                r[0]
+                for r in conn.execute(
+                    "SELECT id FROM chunks WHERE file_path = ?", (relative_path,)
+                ).fetchall()
+            ]
+
+            # Delete old chunks for this file
+            conn.execute("DELETE FROM chunks WHERE file_path = ?", (relative_path,))
+            conn.execute("DELETE FROM chunks_fts WHERE file_path = ?", (relative_path,))
+            # Delete old vec entries for this file
+            for oid in old_ids:
+                conn.execute("DELETE FROM chunks_vec WHERE id = ?", (oid,))
+
+            now = datetime.now(UTC).isoformat()
+
+            for i, chunk in enumerate(chunks):
+                chunk_id = f"{relative_path}:{i}:{uuid.uuid4().hex[:8]}"
+
+                # Use the ASYNC embedding chain (Gemini → local → hash fallback)
+                try:
+                    vec = await self.embedder.embed(chunk["content"])
                     vec_blob = _vec_to_blob(vec)
                 except Exception as e:
                     logger.warning("Embedding failed for chunk: %s", e)

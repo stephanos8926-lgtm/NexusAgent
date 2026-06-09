@@ -24,13 +24,14 @@ def tmp_workspace():
 # ── HybridMemoryManager tests ──────────────────────────────────────────
 
 
-def test_remember_and_recall(tmp_workspace):
+@pytest.mark.asyncio
+async def test_remember_and_recall(tmp_workspace):
     """Create HybridMemoryManager, remember something, recall it."""
     mgr = HybridMemoryManager(tmp_workspace)
     mgr.initialize()
 
-    # Remember an entry
-    filepath = mgr.remember(
+    # Remember an entry (now async)
+    filepath = await mgr.remember(
         content="The authentication module uses JWT tokens for session management.",
         type="world",
         description="Auth uses JWT",
@@ -44,12 +45,13 @@ def test_remember_and_recall(tmp_workspace):
     assert any("JWT" in r["content"] for r in results)
 
 
-def test_memory_context_format(tmp_workspace):
+@pytest.mark.asyncio
+async def test_memory_context_format(tmp_workspace):
     """Verify get_memory_context returns formatted string with citations."""
     mgr = HybridMemoryManager(tmp_workspace)
     mgr.initialize()
 
-    mgr.remember(
+    await mgr.remember(
         content="We use pytest for all Python testing.",
         type="opinion",
         description="Testing uses pytest",
@@ -84,7 +86,7 @@ async def test_remember_and_recall_async(tmp_workspace):
     mgr = HybridMemoryManager(tmp_workspace)
     mgr.initialize()
 
-    mgr.remember(
+    await mgr.remember(
         content="sqlite-vec provides vector similarity search in SQLite.",
         type="world",
         description="sqlite-vec for vector search",

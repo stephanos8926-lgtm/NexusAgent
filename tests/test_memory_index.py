@@ -80,3 +80,19 @@ def test_rebuild_index(tmp_index_dir):
 
     results = idx.search_sync("Python", max_results=5)
     assert len(results) >= 1
+
+
+@pytest.mark.asyncio
+async def test_async_index_and_search(populated_index):
+    """Test that async indexing produces searchable vectors."""
+    # Index a new file asynchronously
+    workspace = Path(populated_index.workspace)
+    (workspace / "bank" / "async_test.md").write_text(
+        "---\nname: Async Test\ndescription: Testing async indexing\ntype: world\n---\n\n"
+        "Async indexed content about machine learning models."
+    )
+    await populated_index.async_index_file("bank/async_test.md")
+
+    # Search should find it with vector similarity (not just keyword)
+    results = await populated_index.search("machine learning", max_results=5)
+    assert any("machine" in r["content"].lower() for r in results)

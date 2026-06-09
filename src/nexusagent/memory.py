@@ -371,7 +371,7 @@ class HybridMemoryManager:
         """Initialize the file memory layer."""
         self.file_memory.initialize()
 
-    def remember(
+    async def remember(
         self,
         content: str,
         type: str,
@@ -379,7 +379,7 @@ class HybridMemoryManager:
         confidence: float | None = None,
         entities: list[str] | None = None,
     ) -> str:
-        """Write a memory entry and index it.
+        """Write a memory entry and index it using the full async embedding chain.
 
         Returns the file path of the written entry.
         """
@@ -393,9 +393,9 @@ class HybridMemoryManager:
             confidence=confidence,
             entities=entities,
         )
-        # Index the file that was just written
+        # Index the file that was just written — async with Gemini embeddings
         rel_path = filepath.replace(self.workspace_dir, "").lstrip("/")
-        self.index.index_file(rel_path)
+        await self.index.async_index_file(rel_path)
         return filepath
 
     async def recall(self, query: str, max_results: int = 6) -> list[dict]:
