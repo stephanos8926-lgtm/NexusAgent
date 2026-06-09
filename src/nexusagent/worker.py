@@ -39,12 +39,49 @@ class NexusWorker:
     async def _execute_agent_logic(self, task: TaskSchema) -> Any:
         """
         Wraps the agent call with circuit breaker protection.
+        Routes research tasks to the LangGraph workflow,
+        coding tasks to the deepagents Agent.
         """
+        task_desc = task.description.lower()
+        metadata = task.metadata if hasattr(task, "metadata") else {}
+
+        # Route: research tasks → LangGraph workflow, everything else → Agent
+        is_research = metadata.get("mode") == "research" or any(
+            kw in task_desc
+            for kw in ["research", "investigate", "analyze", "deep dive", "report on"]
+        )
+
         async with _agent_breaker:
-            loop = asyncio.get_running_loop()
-            state = {"task": task.description, "id": task.id}
-            res = await loop.run_in_executor(None, run_agent_task, state)
-            return res.get("result", "No result returned from agent.")
+            if is_research:
+                result = await self._run_research_workflow(task)
+            else:
+                loop = asyncio.get_running_loop()
+                state = {"task": task.description, "id": task.id}
+                result = await loop.run_in_executor(None, run_agent_task, state)
+                result = result.get("result", "No result returned from agent.")
+            return result
+
+    async def _run_research_workflow(self, task: TaskSchema) -> str:
+        """Execute a research task through the LangGraph state machine."""
+        from nexusagent.graph import create_research_graph
+
+        graph = create_research_graph()
+        config = {"configurable": {"thread_id": task.id}}
+
+        initial_state = {
+            "query": task.description,
+            "template_type": "professional",
+        }
+
+        result = await graph.ainvoke(initial_state, config)
+        synthesis = result.get("synthesis")
+        error = result.get("error")
+
+        if synthesis:
+            return synthesis
+        if error:
+            return f"Research workflow error: {error}"
+        return "Research workflow completed but produced no output."
 
     async def handle_task(self, msg: Any) -> None:
         """

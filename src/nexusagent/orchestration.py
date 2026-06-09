@@ -38,6 +38,10 @@ class ResearchState(BaseModel):
     current_step_index: int = 0
 
 
+# Re-export for graph node usage
+DeepResearchPlan = ResearchPlan
+
+
 class DeepResearchOrchestrator:
     """
     Implements the agentic Deep Research workflow:
