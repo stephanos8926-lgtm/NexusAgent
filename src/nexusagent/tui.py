@@ -14,6 +14,7 @@ Features:
 
 import asyncio
 import json
+import re
 import uuid
 from datetime import datetime
 from typing import ClassVar
@@ -35,11 +36,8 @@ from textual.widgets import (
 )
 from textual.timer import Timer
 from textual.reactive import reactive
-from textual.widgets import Markdown
 
 from nexusagent.config import settings
-
-
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -211,10 +209,6 @@ class NexusApp(App):
     }
     #input-area:focus {
         border: solid #10b981;
-    }
-    #input-area Input {
-        background: #1f2937;
-        color: #e5e7eb;
     }
 
     /* ── Status bar ── */
@@ -739,8 +733,7 @@ class NexusApp(App):
     # ── Input handling ──────────────────────────────────────────────
 
     async def on_input_submitted(self, event: Input.Submitted) -> None:
-        if event.input.id != "task-input":
-            return
+        # Accept input from any Input widget (the chat input has id="input-area")
         message = event.value.strip()
         if not message:
             return
@@ -793,12 +786,12 @@ class NexusApp(App):
     # ── Helpers ─────────────────────────────────────────────────────
 
     def _truncate_output(self, output: str) -> str:
-        max_chars = MAX_TOOL_OUTPUT_VISIBLE
+        max_chars = settings.agent.max_tool_output_chars
         if len(output) <= max_chars:
             return output
         head = output[:max_chars // 2]
         tail = output[-(max_chars // 2):]
-        return f"{head}\n[dim]... ({len(output)} chars total) ...[/dim]\n{tail}"
+        return f"{head}\n[dim]... ({len(output):,} chars total) ...[/dim]\n{tail}"
 
     def _truncate(self, text: str, max_len: int) -> str:
         if len(text) <= max_len:
@@ -809,7 +802,6 @@ class NexusApp(App):
         return text.replace("[", "\\[").replace("]", "\\]")
 
     def _simple_markdown(self, text: str) -> str:
-        import re
         text = re.sub(r'\*\*(.+?)\*\*', r'[b]\1[/b]', text)
         text = re.sub(r'(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)', r'[i]\1[/i]', text)
         text = re.sub(r'`(.+?)`', r'[reverse]\1[/reverse]', text)
