@@ -288,15 +288,25 @@ class Session:
                     "success": True,
                 })
 
-        # Regular AI text content — accumulate for final response
+        # Regular AI text content — accumulate for final response AND stream chunks
         if isinstance(token, AIMessageChunk) and token.content and not token.tool_call_chunks:
+            chunk_text = ""
             if isinstance(token.content, str):
-                accumulated.append(token.content)
+                chunk_text = token.content
+                accumulated.append(chunk_text)
             elif isinstance(token.content, list):
                 # Gemma returns content as list of {type: thinking|text, ...} blocks
                 for block in token.content:
                     if isinstance(block, dict) and block.get("type") == "text":
-                        accumulated.append(block.get("text", ""))
+                        text = block.get("text", "")
+                        chunk_text += text
+                        accumulated.append(text)
+            # Emit real-time chunk event so TUI can stream token-by-token
+            if chunk_text:
+                self._enqueue({
+                    "type": "response_chunk",
+                    "content": chunk_text,
+                })
 
     async def _handle_update(self, data: dict) -> None:
         """Process an update chunk from the stream.
