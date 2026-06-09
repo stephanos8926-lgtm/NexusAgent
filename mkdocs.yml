@@ -1,0 +1,90 @@
+site_name: NexusAgent
+site_description: Multi-agent orchestration framework with NATS messaging
+site_author: Steven Page
+repo_url: https://github.com/stevenpage/nexusagent
+repo_name: nexusagent
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.tabs.link
+    - content.code.annotation
+    - content.code.copy
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src]
+          options:
+            docstring_style: google
+            show_source: true
+            show_root_heading: true
+            show_category_heading: true
+            members_order: source
+            separate_signature: true
+            show_signature_annotations: true
+            heading_level: 3
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.tabbed:
+      alternate_style: true
+  - tables
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Getting Started:
+    - Installation: guides/installation.md
+    - Quick Start: guides/quickstart.md
+    - Configuration: guides/configuration.md
+  - Architecture:
+    - Overview: architecture/overview.md
+    - Tool System: architecture/tools.md
+    - Policy System: architecture/policies.md
+    - Multi-Agent: architecture/multi-agent.md
+  - API Reference:
+    - Agent: api/agent.md
+    - Tools: api/tools.md
+    - Registry: api/registry.md
+    - Bus: api/bus.md
+    - Models: api/models.md
+    - Server: api/server.md
+  - Development:
+    - Contributing: development/contributing.md
+    - Changelog: development/changelog.md
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/stevenpage/nexusagent
+  version:
+    provider: mike

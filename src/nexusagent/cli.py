@@ -61,8 +61,9 @@ def submit(task):
 @click.option("--working-dir", "-d", default=".", help="Working directory")
 @click.option("--max-turns", "-t", default=20, help="Max agent turns")
 @click.option("--wall-time", "-w", default=1800.0, help="Wall time limit (seconds)")
-@click.option("--memory-mode", "-m", default="isolated",
-              type=click.Choice(["isolated", "scoped", "shared"]))
+@click.option(
+    "--memory-mode", "-m", default="isolated", type=click.Choice(["isolated", "scoped", "shared"])
+)
 @click.option("--acceptance", "-a", multiple=True, help="Acceptance criteria")
 def run(task, working_dir, max_turns, wall_time, memory_mode, acceptance):
     """Spawn an isolated worker to complete a task.

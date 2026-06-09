@@ -126,7 +126,9 @@ async def test_api_end_to_end_flow():
     async with AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as ac:
         # 1. Submit task via API
         response = await ac.post(
-            "/tasks", json={"description": "Verify API E2E flow", "priority": 2}, headers=AUTH_HEADERS
+            "/tasks",
+            json={"description": "Verify API E2E flow", "priority": 2},
+            headers=AUTH_HEADERS,
         )
         assert response.status_code == 200
         data = response.json()

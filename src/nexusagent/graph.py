@@ -24,6 +24,7 @@ Roles:
     orchestration.py provides the RESEARCH LOGIC (LLM prompts, plan parsing).
     agent.py / deepagents provides the TOOL EXECUTION (file ops, shell, etc).
 """
+
 import logging
 import sqlite3
 from typing import Any, TypedDict
@@ -36,24 +37,25 @@ logger = logging.getLogger(__name__)
 
 class ResearchGraphState(TypedDict, total=False):
     """State that flows through the graph nodes."""
+
     # Input
-    query: str                    # Original user query
-    template_type: str            # Report template ("professional", "academic", etc.)
+    query: str  # Original user query
+    template_type: str  # Report template ("professional", "academic", etc.)
 
     # Planning
-    plan: dict | None             # ResearchPlan as dict (thesis, steps, expected_outcomes)
-    plan_approved: bool           # Whether plan passed refinement
+    plan: dict | None  # ResearchPlan as dict (thesis, steps, expected_outcomes)
+    plan_approved: bool  # Whether plan passed refinement
 
     # Execution
-    current_step_index: int       # Which plan step we're on
-    step_results: list[dict]      # Accumulated search results per step
-    gathered_data: list[dict]     # All gathered evidence
+    current_step_index: int  # Which plan step we're on
+    step_results: list[dict]  # Accumulated search results per step
+    gathered_data: list[dict]  # All gathered evidence
 
     # Output
-    synthesis: str | None         # Final report text
+    synthesis: str | None  # Final report text
 
     # Control
-    error: str | None             # Error message if a node fails
+    error: str | None  # Error message if a node fails
 
 
 async def plan_node(state: dict) -> dict:
@@ -131,11 +133,13 @@ async def execute_node(state: dict) -> dict:
         # Accumulate
         gathered.extend([r.model_dump() for r in results])
         step_results = list(state.get("step_results", []))
-        step_results.append({
-            "step": step,
-            "index": current_index,
-            "num_results": len(results),
-        })
+        step_results.append(
+            {
+                "step": step,
+                "index": current_index,
+                "num_results": len(results),
+            }
+        )
 
         return {
             "current_step_index": current_index + 1,

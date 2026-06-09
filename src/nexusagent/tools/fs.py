@@ -14,10 +14,19 @@ from pathlib import Path
 _read_files: set[str] = set()
 
 # Default directory excludes for list_directory
-_DEFAULT_DIR_EXCLUDES = frozenset({
-    ".git", "__pycache__", "node_modules", ".venv", "venv",
-    ".tox", ".mypy_cache", ".eggs", "*.egg-info",
-})
+_DEFAULT_DIR_EXCLUDES = frozenset(
+    {
+        ".git",
+        "__pycache__",
+        "node_modules",
+        ".venv",
+        "venv",
+        ".tox",
+        ".mypy_cache",
+        ".eggs",
+        "*.egg-info",
+    }
+)
 
 
 def _resolve(path: str) -> Path:

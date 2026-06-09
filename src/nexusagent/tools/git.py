@@ -134,9 +134,7 @@ def git_stash_pop(workdir: str | None = None) -> str:
     return _run_git("stash pop", workdir=workdir)
 
 
-def git_commit(
-    message: str, files: list[str] | None = None, workdir: str | None = None
-) -> str:
+def git_commit(message: str, files: list[str] | None = None, workdir: str | None = None) -> str:
     """
     Stage and commit changes. Write operation.
 

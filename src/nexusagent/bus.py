@@ -141,6 +141,7 @@ class AgentBus:
 
     async def close(self) -> None:
         import contextlib
+
         for sub in self._subscriptions:
             with contextlib.suppress(Exception):
                 await sub.unsubscribe()

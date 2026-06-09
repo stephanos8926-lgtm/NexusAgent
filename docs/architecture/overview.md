@@ -1,0 +1,38 @@
+# Architecture Overview
+
+## System Components
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    NexusAgent System                         │
+│                                                             │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐   │
+│  │   CLI    │  │   TUI    │  │  Web UI  │  │ REST API │   │
+│  └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬─────┘   │
+│       └──────────────┴──────────────┴──────────────┘        │
+│                          │                                  │
+│                   ┌──────┴──────┐                           │
+│                   │ Agent (Core)│                           │
+│                   └──────┬──────┘                           │
+│                          │                                  │
+│       ┌──────────────────┼──────────────────┐              │
+│       │                  │                  │              │
+│  ┌────┴────┐      ┌─────┴─────┐     ┌─────┴─────┐        │
+│  │  Tools  │      │   NATS    │     │    DB     │        │
+│  │Registry │      │   Bus     │     │ (SQLite)  │        │
+│  └─────────┘      └───────────┘     └───────────┘        │
+└─────────────────────────────────────────────────────────────┘
+```
+
+## Core Modules
+
+| Module | Description |
+|---|---|
+| `agent.py` | Main agent class with policy-aware tool access |
+| `tools/` | Tool implementations (fs, git, test, search, etc.) |
+| `registry.py` | Tool registry, policy enforcement, and discovery |
+| `bus.py` | NATS JetStream message bus |
+| `models.py` | Pydantic data models |
+| `server.py` | FastAPI REST API |
+| `worker.py` | Task worker with circuit breakers |
+| `db.py` | SQLite database manager |

@@ -4,6 +4,7 @@ Deep Research Orchestrator — multi-phase research workflow.
 
 Implements: Intent → Planning → Refinement → Execution → Synthesis
 """
+
 import json
 import logging
 import re
@@ -17,6 +18,7 @@ logger = logging.getLogger(__name__)
 
 class SearchResult(BaseModel):
     """A single search result with optional fetched content."""
+
     url: str
     title: str = ""
     snippet: str = ""
@@ -48,9 +50,7 @@ class DeepResearchOrchestrator:
     Intent -> Planning -> Refinement -> Approval -> Execution -> Synthesis.
     """
 
-    async def run_deep_research(
-        self, user_query: str, template_type: str = "professional"
-    ) -> str:
+    async def run_deep_research(self, user_query: str, template_type: str = "professional") -> str:
         state = ResearchState(query=user_query)
 
         # 1. Intent Extraction & Initial Planning
@@ -68,9 +68,7 @@ class DeepResearchOrchestrator:
         # 4. Execution Loop
         for i, step in enumerate(state.plan.steps):
             state.current_step_index = i
-            logger.info(
-                f"Executing research step {i + 1}/{len(state.plan.steps)}: {step}"
-            )
+            logger.info(f"Executing research step {i + 1}/{len(state.plan.steps)}: {step}")
 
             # Perform search using the registered search_web tool
             results = await self._search(step)
@@ -133,9 +131,7 @@ class DeepResearchOrchestrator:
         Refine the steps to be more precise and exhaustive.
 
         Respond ONLY in JSON format matching the ResearchPlan schema."""
-        response = await llm.generate(
-            prompt, system_prompt="You are a critical peer reviewer."
-        )
+        response = await llm.generate(prompt, system_prompt="You are a critical peer reviewer.")
         try:
             return self._parse_plan_response(response.content, plan.thesis)
         except (json.JSONDecodeError, KeyError, TypeError) as e:
@@ -165,19 +161,14 @@ class DeepResearchOrchestrator:
         # Load the appropriate template
         from pathlib import Path
 
-        template_path = (
-            Path(__file__).parent / "templates" / f"{template_type}.md"
-        )
+        template_path = Path(__file__).parent / "templates" / f"{template_type}.md"
         try:
             template = template_path.read_text()
         except FileNotFoundError:
             template = "General Report Template\n\n{content}"
 
         combined_evidence = "\n\n".join(
-            [
-                f"Source: {r.url}\n{r.content or r.snippet}"
-                for r in state.gathered_data
-            ]
+            [f"Source: {r.url}\n{r.content or r.snippet}" for r in state.gathered_data]
         )
 
         prompt = f"""Using the following research evidence, generate a final report following this template:
@@ -191,9 +182,7 @@ class DeepResearchOrchestrator:
 
         Instructions: Ensure every claim is backed by a source. Use citations like [1], [2].
         Maintain a {template_type} tone."""
-        response = await llm.generate(
-            prompt, system_prompt="You are a master technical writer."
-        )
+        response = await llm.generate(prompt, system_prompt="You are a master technical writer.")
         return response.content
 
 

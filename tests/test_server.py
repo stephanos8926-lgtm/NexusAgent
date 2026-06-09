@@ -1,4 +1,5 @@
 """Tests for NexusAgent API endpoints."""
+
 import pytest
 from httpx import ASGITransport, AsyncClient
 
