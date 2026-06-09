@@ -19,7 +19,7 @@ class ServerConfig(BaseModel):
 
 
 class ClientConfig(BaseModel):
-    tui_colors: str = Field(default="monokai")
+    tui_theme: str = Field(default="textual-dark")
     timeout: int = Field(default=30, ge=1)
     retry_limit: int = Field(default=3, ge=0)
     result_timeout: int = Field(default=300, ge=1)
@@ -41,6 +41,34 @@ class AgentConfig(BaseModel):
     enabled_tools: list[str] = Field(
         default_factory=lambda: ["read_file", "write_file", "run_shell"]
     )
+    max_tool_output_chars: int = Field(default=400, ge=100)
+    max_conversation_history: int = Field(default=40, ge=4)
+    compaction_enabled: bool = Field(default=True)
+
+
+class PromptConfig(BaseModel):
+    """Configuration for the NEXUS.md prompt system."""
+    # Path to the base prompt file (relative to project root)
+    base_prompt_file: str = Field(default="config/NEXUS.md")
+    # Whether to look for a project-specific NEXUS.md in CWD
+    load_cwd_prompt: bool = Field(default=True)
+    # Maximum @file chain depth (prevents infinite recursion)
+    max_chain_depth: int = Field(default=8, ge=1, le=32)
+    # Maximum file size for @file injection (bytes)
+    max_inject_file_size: int = Field(default=262144, ge=1024)  # 256KB
+    # Whether to enable @file injection in chat input
+    chat_file_injection: bool = Field(default=True)
+    # Number of recent sessions to summarize for context injection
+    session_history_count: int = Field(default=5, ge=0, le=20)
+    # Max chars per session summary
+    session_summary_max_chars: int = Field(default=2000, ge=200)
+
+
+class LoggingConfig(BaseModel):
+    level: str = Field(default="INFO")
+    format: str = Field(
+        default="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+    )
 
 
 class ConfigSchema(BaseModel):
@@ -48,6 +76,9 @@ class ConfigSchema(BaseModel):
     client: ClientConfig = Field(default_factory=ClientConfig)
     auth: AuthConfig = Field(default_factory=AuthConfig)
     agent: AgentConfig = Field(default_factory=AgentConfig)
+    prompt: PromptConfig = Field(default_factory=PromptConfig)
+    logging: LoggingConfig = Field(default_factory=LoggingConfig)
+    # Back-compat: top-level log_level maps to logging.level
     log_level: str = Field(default="INFO")
 
 
@@ -72,7 +103,7 @@ def load_config(config_file: str = "config/nexusagent.yaml") -> ConfigSchema:
     def override_from_env(prefix: str, data: dict, current_level: dict):
         for key, value in os.environ.items():
             if key.startswith(prefix):
-                stripped = key[len(prefix) :]
+                stripped = key[len(prefix):]
                 if "__" in stripped:
                     parts = stripped.split("__")
                     target = current_level
@@ -83,12 +114,16 @@ def load_config(config_file: str = "config/nexusagent.yaml") -> ConfigSchema:
                     current_level[stripped.lower()] = value
 
     # Systematic overrides for each section
-    for section in ["server", "client", "auth", "agent"]:
+    for section in ["server", "client", "auth", "agent", "prompt", "logging"]:
         section_data = raw_data.get(section, {})
         override_from_env(f"NEXUS_{section.upper()}__", section_data, section_data)
         raw_data[section] = section_data
 
-    # Global overrides
+    # Back-compat: NEXUS_LOG_LEVEL -> logging.level
+    if "log_level" in raw_data and "logging" not in raw_data:
+        raw_data.setdefault("logging", {})["level"] = raw_data["log_level"]
+
+    # Global overrides (NEXUS_SERVER__API_PORT etc.)
     override_from_env("NEXUS_", raw_data, raw_data)
 
     try:

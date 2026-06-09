@@ -8,30 +8,28 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import platform
+import subprocess
 from collections.abc import AsyncGenerator
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from langchain_core.messages import AIMessage, SystemMessage
 
+from nexusagent.config import settings
 from nexusagent.models import ErrorEvent, ResponseEvent, ThinkingEvent
+from nexusagent.prompt_loader import load_nexus_prompt, inject_file_at_reference
 
 logger = logging.getLogger(__name__)
 
+# ── Helpers ──────────────────────────────────────────────────────────────
+
 
 def _extract_agent_response(result) -> str:
-    """Extract the last assistant message content from an agent result.
-
-    Handles:
-    - str — returned as-is
-    - list — extracts 'text' blocks (Gemma thinking+text format)
-    - dict with 'messages' key — extracts last non-system message content
-    - dict with 'response'/'result'/'content' key — uses that directly
-    - anything else — str() fallback
-    """
+    """Extract the last assistant message content from an agent result."""
     if isinstance(result, str):
         return result
-    # Gemma models return content as a list of {type: thinking|text, ...} blocks
     if isinstance(result, list):
         text_parts = []
         for block in result:
@@ -39,26 +37,22 @@ def _extract_agent_response(result) -> str:
                 if block.get("type") == "text":
                     text_parts.append(block.get("text", ""))
                 elif block.get("type") == "thinking":
-                    pass  # skip thinking blocks in output
+                    pass
                 else:
                     text_parts.append(str(block))
             else:
                 text_parts.append(str(block))
         return "\n".join(text_parts) if text_parts else str(result)
     if isinstance(result, dict):
-        # DeepResearch/LangGraph style: {"messages": [...]}
         if "messages" in result:
             from langchain_core.messages import BaseMessage
             messages = result["messages"]
-            # Find last non-system message
             for msg in reversed(messages):
                 if isinstance(msg, BaseMessage) and not isinstance(msg, SystemMessage):
                     content = msg.content
-                    # Gemma returns content as list of {type, text, thinking} blocks
                     if isinstance(content, list):
                         return _extract_agent_response(content)
                     return content or str(msg)
-            # Fallback: last message regardless
             if messages:
                 last = messages[-1]
                 content = last.content if isinstance(last, BaseMessage) else str(last)
@@ -66,7 +60,6 @@ def _extract_agent_response(result) -> str:
                     return _extract_agent_response(content)
                 return str(content)
             return "No messages in response"
-        # Simple dict returns
         if "response" in result:
             return str(result["response"])
         if "result" in result:
@@ -75,6 +68,95 @@ def _extract_agent_response(result) -> str:
             return str(result["content"])
         return str(result)
     return str(result)
+
+
+def _get_git_info(working_dir: str) -> str:
+    """Get git status summary for the working directory."""
+    try:
+        branch = subprocess.run(
+            ["git", "branch", "--show-current"],
+            capture_output=True, text=True, timeout=5,
+            cwd=working_dir,
+        ).stdout.strip()
+        if not branch:
+            return ""
+        status = subprocess.run(
+            ["git", "status", "--short"],
+            capture_output=True, text=True, timeout=5,
+            cwd=working_dir,
+        ).stdout.strip()
+        info = f"Branch: {branch}"
+        if status:
+            changed = len(status.splitlines())
+            info += f" | {changed} changed file{'s' if changed != 1 else ''}"
+        else:
+            info += " | clean"
+        return info
+    except Exception:
+        return ""
+
+
+def _build_environment_context(working_dir: str) -> str:
+    """Build the environment context block injected into every session."""
+    now = datetime.now(timezone.utc)
+    user = os.getenv("USER", os.getenv("USERNAME", "unknown"))
+    hostname = platform.node()
+    os_info = ""
+    try:
+        with open("/etc/os-release") as f:
+            for line in f:
+                if line.startswith("PRETTY_NAME="):
+                    os_info = line.split("=", 1)[1].strip().strip('"')
+                    break
+    except Exception:
+        os_info = platform.system()
+
+    cwd = str(Path(working_dir).resolve())
+    git_info = _get_git_info(working_dir)
+
+    lines = [
+        "## Environment",
+        f"- **Working Directory**: `{cwd}`",
+        f"- **User**: {user}@{hostname}",
+        f"- **OS**: {os_info}",
+        f"- **Time**: {now.strftime('%Y-%m-%d %H:%M:%S UTC')}",
+    ]
+    if git_info:
+        lines.append(f"- **Git**: {git_info}")
+
+    # List available tools
+    try:
+        from nexusagent.tools.registry import list_all_tools
+        tools = list_all_tools()
+        if tools:
+            by_cat: dict[str, list[str]] = {}
+            for t in tools:
+                by_cat.setdefault(t.category, []).append(t.name)
+            lines.append("\n## Available Tools")
+            for cat in sorted(by_cat):
+                names = ", ".join(sorted(by_cat[cat]))
+                lines.append(f"- **{cat}**: {names}")
+    except Exception:
+        pass
+
+    return "\n".join(lines)
+
+
+def _build_session_history_context(working_dir: str) -> str:
+    """Build context from recent sessions for continuity.
+    
+    Uses the hybrid memory system to find and summarize recent
+    conversation sessions, giving the agent awareness of what
+    the user has been working on.
+    """
+    try:
+        from nexusagent.db import session_repo
+        # This is a simplified version — in production you'd query
+        # the session DB for recent sessions in this working dir
+        # and extract summaries. For now, return empty.
+        return ""
+    except Exception:
+        return ""
 
 
 class Session:
@@ -118,11 +200,68 @@ class Session:
         self._seen_tool_results: set[str] = set()  # deduplicate tool_result events
         self._conversation_history: list[Any] = []  # accumulated LangChain messages
 
+    # ── Prompt & Context ─────────────────────────────────────────────────
+
+    def _load_system_prompt(self) -> str:
+        """Load the full system prompt from NEXUS.md files.
+        
+        Loads base prompt from config/NEXUS.md, then appends any
+        project-specific NEXUS.md from the working directory.
+        @file chains are resolved recursively.
+        """
+        if hasattr(self, "_cached_prompt"):
+            return self._cached_prompt
+
+        package_root = Path(__file__).parent.parent.parent
+        prompt = load_nexus_prompt(
+            package_root=package_root,
+            cwd=Path(self.working_dir),
+            max_depth=settings.prompt.max_chain_depth,
+        )
+        self._cached_prompt = prompt
+        logger.debug("Loaded system prompt (%d chars) for session %s", len(prompt), self.session_id)
+        return prompt
+
+    def _build_context_injection(self) -> str:
+        """Build the environment + session history context block."""
+        parts = [_build_environment_context(self.working_dir)]
+
+        # Session history from memory
+        history_ctx = _build_session_history_context(self.working_dir)
+        if history_ctx:
+            parts.append(f"\n## Recent Session History\n{history_ctx}")
+
+        return "\n".join(parts)
+
     # ── Send a user message ────────────────────────────────────────────
 
-    def _base_system_prompt(self) -> str:
-        """Return the default system prompt for this session."""
-        return "You are a helpful AI assistant."
+    def _process_chat_input(self, user_message: str) -> str:
+        """Process chat input: handle @file injection if enabled."""
+        if not settings.prompt.chat_file_injection:
+            return user_message
+
+        # Check if the message contains @file references
+        has_at_ref = False
+        for line in user_message.split("\n"):
+            stripped = line.strip()
+            if stripped.startswith("@") and len(stripped) > 1 and stripped[1] != " ":
+                has_at_ref = True
+                break
+
+        if not has_at_ref:
+            return user_message
+
+        try:
+            injected = inject_file_at_reference(
+                user_message,
+                cwd=Path(self.working_dir),
+                max_depth=settings.prompt.max_chain_depth,
+            )
+            logger.debug("Chat @file injection: %d -> %d chars", len(user_message), len(injected))
+            return injected
+        except Exception as e:
+            logger.warning("Chat @file injection failed: %s", e)
+            return user_message
 
     async def send(self, user_message: str) -> None:
         """Process a user message: store in DB, recall memory, invoke agent, emit events.
@@ -135,6 +274,9 @@ class Session:
             self._enqueue(ErrorEvent(message="Session is not active").model_dump())
             return
 
+        # Process @file injection in chat input
+        user_message = self._process_chat_input(user_message)
+
         # Emit thinking indicator so the TUI can show busy state
         self._enqueue(ThinkingEvent(content="Processing...").model_dump())
 
@@ -144,12 +286,19 @@ class Session:
         except Exception as exc:
             logger.warning("Failed to store user message in DB: %s", exc)
 
-        # Build messages list: system prompt + memory context + conversation history + new user message
+        # Build messages list: system prompt + context + memory + history + user message
         from langchain_core.messages import HumanMessage
 
-        system_prompt = self._base_system_prompt()
+        # 1. System prompt from NEXUS.md
+        system_prompt = self._load_system_prompt()
         messages = [SystemMessage(content=system_prompt)]
 
+        # 2. Environment context injection
+        context_block = self._build_context_injection()
+        if context_block:
+            messages.append(SystemMessage(content=context_block))
+
+        # 3. Memory context from hybrid memory
         try:
             hybrid_context = self.hybrid_memory.get_memory_context(user_message, max_results=5)
             if hybrid_context:
@@ -157,10 +306,10 @@ class Session:
         except Exception as exc:
             logger.warning("Hybrid memory context retrieval failed: %s", exc)
 
-        # Append prior conversation history (user + assistant turns)
-        messages.extend(self._conversation_history)
+        # 4. Conversation history
+        messages.extend(self._conversation_history[-settings.agent.max_conversation_history:])
 
-        # Append the new user message
+        # 5. New user message
         user_msg = HumanMessage(content=user_message)
         messages.append(user_msg)
 
@@ -168,7 +317,9 @@ class Session:
         from nexusagent.compaction import CompactionPipeline, pre_compaction_flush
 
         _compaction = CompactionPipeline()
-        if _compaction.should_compact([{"role": "system", "content": m.content} for m in messages]):
+        if settings.agent.compaction_enabled and _compaction.should_compact(
+            [{"role": "system" if isinstance(m, SystemMessage) else "user" if isinstance(m, HumanMessage) else "assistant", "content": m.content} for m in messages]
+        ):
             # Pre-compaction flush to memory
             summary = f"Session {self.session_id} turn: {user_message[:100]}"
             try:
@@ -231,9 +382,10 @@ class Session:
                 # Update conversation history for continuity
                 self._conversation_history.append(user_msg)
                 self._conversation_history.append(AIMessage(content=final_content))
-                # Trim history to last 20 turns (40 messages)
-                if len(self._conversation_history) > 40:
-                    self._conversation_history = self._conversation_history[-40:]
+                # Trim history to configured max
+                max_hist = settings.agent.max_conversation_history
+                if len(self._conversation_history) > max_hist:
+                    self._conversation_history = self._conversation_history[-max_hist:]
 
                 # Store assistant response in DB
                 try:

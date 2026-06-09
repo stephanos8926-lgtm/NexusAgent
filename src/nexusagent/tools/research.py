@@ -16,13 +16,17 @@ def _search_exa(query: str) -> str | None:
         from exa_py import Exa  # type: ignore[import-untyped]
 
         client = Exa(api_key=api_key)
-        response = client.search_and_contents(query, num_results=3, text=True)
+        # Use the newer search() API (search_and_contents is deprecated)
+        response = client.search(query, num_results=5, text=True)
         results = response.results
         if not results:
             return f"No results for: {query}"
         parts = []
         for r in results:
-            parts.append(f"Title: {r.title}\nURL: {r.url}\n{r.text[:500]}")
+            title = getattr(r, "title", "Untitled")
+            url = getattr(r, "url", "")
+            text = getattr(r, "text", "")[:600]
+            parts.append(f"Title: {title}\nURL: {url}\n{text}")
         return "\n\n".join(parts)
     except ImportError:
         logger.debug("exa_py not installed")

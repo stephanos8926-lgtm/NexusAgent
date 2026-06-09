@@ -39,7 +39,7 @@ from textual.widgets import Markdown
 
 from nexusagent.config import settings
 
-MAX_TOOL_OUTPUT_VISIBLE = 400  # chars before collapsing
+
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -162,90 +162,137 @@ class NexusApp(App):
         Binding("a", "collapse_all", "Collapse", show=True),
     ]
 
+    # Use textual-dark as base theme, then override with our custom CSS
     CSS = """
-    Screen { layers: base overlay; }
+    Screen {
+        layers: base overlay;
+        background: #111827;
+    }
 
-    /* Conversation log — word wrap, no horizontal scroll */
+    /* ── Conversation log ── */
+    #log-container {
+        width: 100%;
+        height: 1fr;
+        border: solid #1f2937;
+        margin: 0 1;
+    }
+
     #conversation-log {
-        border: solid #444;
-        background: #1a1a1a;
-        padding: 0 1;
+        width: 100%;
+        height: auto;
+        min-height: 100%;
+        background: #111827;
+        padding: 1 2;
         overflow-y: auto;
         overflow-x: hidden;
+        text-wrap: wrap;
     }
 
-    /* Input */
-    #task-input {
-        border: solid #666;
-        height: 3;
-    }
-    #task-input:focus {
-        border: solid #88f;
-    }
-
-    /* Status bar */
-    #status-bar {
-        height: 1;
-        background: #222;
-        color: #888;
-        padding: 0 1;
-    }
-    #status-bar SpinnerLabel { width: 100%; }
-
-    /* Streaming response */
+    /* ── Streaming response ── */
     #streaming-response {
         height: auto;
         min-height: 1;
-        color: #ddd;
-        padding: 0 1;
-        overflow-y: hidden;
+        color: #93c5fd;
+        padding: 1 2;
+        margin: 0 1;
+        background: #1f2937;
+        border-left: wide #3b82f6;
         overflow-x: hidden;
+        text-wrap: wrap;
     }
 
-    /* Queue status */
+    /* ── Input area ── */
+    #input-area {
+        border: solid #374151;
+        height: 3;
+        margin: 0 1;
+        padding: 0 1;
+        background: #1f2937;
+    }
+    #input-area:focus {
+        border: solid #10b981;
+    }
+    #input-area Input {
+        background: #1f2937;
+        color: #e5e7eb;
+    }
+
+    /* ── Status bar ── */
+    #status-bar {
+        height: 1;
+        background: #1f2937;
+        color: #9ca3af;
+        padding: 0 2;
+    }
+    #status-bar SpinnerLabel { width: 100%; }
+
+    /* ── Queue status ── */
     #queue-status {
-        color: #666;
+        color: #6b7280;
         text-style: italic;
         height: 1;
-        padding: 0 1;
+        padding: 0 2;
     }
 
-    /* Collapsible tool results */
+    /* ── Collapsible tool results ── */
     Collapsible {
-        border: solid #333;
-        margin: 0 0 1 0;
+        border-left: wide #fbbf24;
+        margin: 1 2;
+        padding: 0 0 0 1;
+        background: #1f2937;
     }
     Collapsible > .collapsible--content {
-        padding-left: 2;
-        padding-top: 0;
-        padding-bottom: 0;
+        padding: 1 2;
+        color: #d1d5db;
     }
     Collapsible > .collapsible--header {
-        color: #fa0;
+        color: #fbbf24;
         text-style: bold;
+        padding: 0 1;
     }
     Collapsible.-collapsed > .collapsible--header {
-        color: #888;
+        color: #6b7280;
     }
 
-    /* Approval modal */
+    /* ── Approval / Error modal ── */
     #approval-dialog {
         width: 80%;
         height: auto;
         max-height: 20;
-        border: solid #fa0;
-        background: #222;
+        border: solid #fbbf24;
+        background: #1f2937;
         padding: 1 2;
     }
     #approval-title {
         text-style: bold;
-        color: #fa0;
+        color: #fbbf24;
         padding: 0 0 1 0;
     }
-    #approval-args { color: #ccc; padding: 0 0 1 0; }
-    #approval-buttons { height: 3; align: right middle; }
-    #approval-buttons Button { margin-left: 1; }
-    #approval-scroll { max-height: 12; }
+    #approval-args {
+        color: #d1d5db;
+        padding: 0 0 1 0;
+    }
+    #approval-buttons {
+        height: 3;
+        align: right middle;
+    }
+    #approval-buttons Button {
+        margin-left: 1;
+    }
+    #approval-scroll {
+        max-height: 12;
+    }
+
+    /* ── Header / Footer ── */
+    Header {
+        background: #1f2937;
+        color: #10b981;
+        text-style: bold;
+    }
+    Footer {
+        background: #1f2937;
+        color: #6b7280;
+    }
     """
 
     def compose(self) -> ComposeResult:
@@ -258,8 +305,8 @@ class NexusApp(App):
         yield SpinnerLabel("Ready", id="status-bar")
         yield Static("", id="queue-status")
         yield Input(
-            placeholder="Type a message or /help for commands...",
-            id="task-input",
+            placeholder="Type a message, @file to inject, or /help for commands...",
+            id="input-area",
         )
         yield Footer()
 
@@ -442,10 +489,10 @@ class NexusApp(App):
         icon = "✓" if success else "✗"
         color = "green" if success else "red"
 
-        # Try to parse JSON output for cleaner display
         display = self._format_tool_output(output)
+        max_chars = settings.agent.max_tool_output_chars
 
-        if len(display) <= MAX_TOOL_OUTPUT_VISIBLE:
+        if len(display) <= max_chars:
             self.log_widget.write(
                 f"   [{color}]{icon}[/{color}] {display}",
                 shrink=False,
@@ -454,7 +501,7 @@ class NexusApp(App):
             truncated = self._truncate_output(display)
             collapsible = Collapsible(
                 Static(truncated),
-                title=f"[{color}]{icon} Tool result ({len(output)} chars)[/{color}]",
+                title=f"[{color}]{icon}[/{color}] Tool result ({len(output):,} chars)",
                 collapsed=True,
             )
             self._collapsibles.append(collapsible)
@@ -462,38 +509,62 @@ class NexusApp(App):
             self.log_widget.scroll_end(animate=False)
 
     def _format_tool_output(self, output: str) -> str:
-        """Format tool output for display — parse JSON, clean up common formats."""
-        if not output:
+        """Format tool output for display — parse JSON into human-readable form."""
+        if not output or not output.strip():
             return "[dim](empty)[/dim]"
 
-        # Try to parse as JSON and extract meaningful content
+        # Try to parse as JSON
         try:
             data = json.loads(output)
             if isinstance(data, dict):
-                # Common patterns
-                if "content" in data:
-                    return self._escape(str(data["content"]))
-                if "result" in data:
-                    return self._escape(str(data["result"]))
-                if "output" in data:
-                    return self._escape(str(data["output"]))
-                if "stdout" in data:
-                    return self._escape(str(data["stdout"]))
-                # Show first few keys
-                preview = {k: self._truncate(str(v), 80) for k, v in list(data.items())[:5]}
-                return self._escape(json.dumps(preview, indent=2))
+                # Common tool output patterns — extract meaningful content
+                for key in ("content", "result", "output", "stdout", "text", "message", "data"):
+                    if key in data and data[key]:
+                        val = data[key]
+                        if isinstance(val, str):
+                            return self._escape(val.strip())
+                        return self._escape(json.dumps(val, indent=2, default=str))
+                # Show key-value summary for dicts
+                preview = {}
+                for k, v in list(data.items())[:6]:
+                    v_str = str(v)
+                    if len(v_str) > 120:
+                        v_str = v_str[:117] + "..."
+                    preview[k] = v_str
+                lines = [f"[b]{k}[/b]: {v}" for k, v in preview.items()]
+                if len(data) > 6:
+                    lines.append(f"[dim]... +{len(data) - 6} more keys[/dim]")
+                return "\n".join(lines)
             if isinstance(data, list):
                 if len(data) == 0:
                     return "[dim](empty list)[/dim]"
-                # Show first few items
-                preview = data[:5]
-                suffix = f"\n[dim]... ({len(data)} items total)[/dim]" if len(data) > 5 else ""
-                return self._escape(json.dumps(preview, indent=2)) + suffix
+                if len(data) <= 5:
+                    items = []
+                    for item in data:
+                        s = str(item)
+                        if len(s) > 200:
+                            s = s[:197] + "..."
+                        items.append(f"  • {s}")
+                    return "\n".join(items)
+                # Large list: show first 5 + count
+                items = []
+                for item in data[:5]:
+                    s = str(item)
+                    if len(s) > 200:
+                        s = s[:197] + "..."
+                    items.append(f"  • {s}")
+                items.append(f"[dim]  ... +{len(data) - 5} more items[/dim]")
+                return "\n".join(items)
+            # Primitive JSON value
+            return self._escape(str(data))
         except (json.JSONDecodeError, TypeError):
             pass
 
-        # Not JSON — show as-is (escaped)
-        return self._escape(output.strip())
+        # Not JSON — show as-is, cleaned up
+        cleaned = output.strip()
+        # Collapse excessive blank lines
+        cleaned = re.sub(r'\n{3,}', '\n\n', cleaned)
+        return self._escape(cleaned)
 
     def _write_response(self, content: str):
         """Write the final agent response with markdown formatting."""

@@ -1,7 +1,28 @@
 server:
   nats_url: "nats://localhost:4222"
   db_path: "nexus.db"
+  api_port: 8000
+
 client:
-  tui_colors: "monokai"
-loop_threshold: 4
-post_research_retries: 4
+  tui_theme: "textual-dark"
+  timeout: 30
+  retry_limit: 3
+
+agent:
+  default_model: "gemma-4-31b-it"
+  primary_provider: "gemini"
+  max_tool_output_chars: 400
+  max_conversation_history: 40
+  compaction_enabled: true
+
+prompt:
+  base_prompt_file: "config/NEXUS.md"
+  load_cwd_prompt: true
+  max_chain_depth: 8
+  max_inject_file_size: 262144
+  chat_file_injection: true
+  session_history_count: 5
+  session_summary_max_chars: 2000
+
+logging:
+  level: "INFO"
