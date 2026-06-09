@@ -56,3 +56,47 @@ class ResultSchema(BaseModel):
     error: str | None = None
     completed_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     duration: float | None = None  # In seconds
+
+
+# --- Agent Event Types (streaming protocol) ---
+
+
+class AgentEvent(BaseModel):
+    type: str
+
+
+class ThinkingEvent(AgentEvent):
+    type: str = "thinking"
+    content: str = ""
+
+
+class ToolCallEvent(AgentEvent):
+    type: str = "tool_call"
+    tool: str
+    args: dict[str, Any]
+    call_id: str = ""
+
+
+class ToolResultEvent(AgentEvent):
+    type: str = "tool_result"
+    call_id: str
+    output: str = ""
+    success: bool = True
+
+
+class ApprovalRequestEvent(AgentEvent):
+    type: str = "approval_request"
+    tool: str
+    args: dict[str, Any]
+    call_id: str = ""
+    reason: str = ""
+
+
+class ResponseEvent(AgentEvent):
+    type: str = "response"
+    content: str = ""
+
+
+class ErrorEvent(AgentEvent):
+    type: str = "error"
+    message: str = ""
