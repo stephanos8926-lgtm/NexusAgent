@@ -26,6 +26,7 @@ dependencies = [
     "httpx",
     "sqlalchemy[asyncio]",
     "aiosqlite",
+    "sqlite-vec",
 ]
 
 [build-system]
