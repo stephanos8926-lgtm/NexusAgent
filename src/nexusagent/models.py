@@ -23,6 +23,32 @@ class TaskSchema(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
+class MemoryScope(StrEnum):
+    SHARED = "shared"
+    ISOLATED = "isolated"
+    SCOPED = "scoped"
+
+
+class TaskContract(BaseModel):
+    task_id: str
+    title: str
+    working_dir: str = Field(default=".")
+    allowed_tools: list[str] | None = None
+    denied_tools: list[str] = Field(default_factory=list)
+    max_turns: int = Field(default=20, ge=1, le=100)
+    max_wall_time: float = Field(default=1800.0, ge=10.0)
+    max_tokens: int | None = None
+    acceptance_criteria: list[str] = Field(default_factory=list)
+    memory_scope: MemoryScope = MemoryScope.ISOLATED
+    parent_memory_id: str | None = None
+    human_in_the_loop: bool = False
+    on_failure: str = "escalate"
+    expected_outputs: list[str] = Field(default_factory=list)
+    description: str = ""
+    priority: int = Field(default=1, ge=1, le=5)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
 class ResultSchema(BaseModel):
     task_id: str
     success: bool
