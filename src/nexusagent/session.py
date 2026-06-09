@@ -194,6 +194,7 @@ class SessionManager:
 
     def __init__(self) -> None:
         self._sessions: dict[str, Session] = {}
+        self._lock = asyncio.Lock()
 
     def get(
         self,
@@ -210,25 +211,33 @@ class SessionManager:
         memory: Any = None,
         db_repo: Any = None,
     ) -> Session:
-        """Return an existing session or create a new one."""
+        """Get existing session or create new one (thread-safe)."""
+        # Fast path: no lock needed for read
         existing = self._sessions.get(session_id)
         if existing is not None:
             return existing
 
-        # Build the memory directory path for this session
-        memory_dir = os.path.expanduser(f"~/.nexusagent/sessions/{session_id}/memory")
-        os.makedirs(memory_dir, exist_ok=True)
+        # Slow path: acquire lock to prevent duplicate creation
+        async with self._lock:
+            # Double-check after acquiring lock
+            existing = self._sessions.get(session_id)
+            if existing is not None:
+                return existing
 
-        session = Session(
-            session_id=session_id,
-            working_dir=working_dir,
-            agent=agent,
-            memory=memory,
-            db_repo=db_repo,
-            memory_dir=memory_dir,
-        )
-        self._sessions[session_id] = session
-        return session
+            # Build the memory directory path for this session
+            memory_dir = os.path.expanduser(f"~/.nexusagent/sessions/{session_id}/memory")
+            os.makedirs(memory_dir, exist_ok=True)
+
+            session = Session(
+                session_id=session_id,
+                working_dir=working_dir,
+                agent=agent,
+                memory=memory,
+                db_repo=db_repo,
+                memory_dir=memory_dir,
+            )
+            self._sessions[session_id] = session
+            return session
 
     async def mark_idle(self, session_id: str) -> None:
         """Transition a session to idle status."""

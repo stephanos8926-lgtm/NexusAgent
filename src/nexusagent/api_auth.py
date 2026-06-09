@@ -30,12 +30,24 @@ async def verify_api_key(api_key: str = Security(api_key_header)) -> str:
                     detail="Invalid API key",
                 )
             return api_key
+        # Keystore initialized but no API key configured — fail closed
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="API key not configured",
+        )
     except FileNotFoundError:
-        # Auth not initialized yet — fall through to permissive mode
-        logger.debug("Auth keystore not initialized, accepting any non-empty key")
+        # Auth not initialized — fail closed
+        logger.warning("Auth keystore not found — rejecting all requests")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication not configured",
+        )
+    except HTTPException:
+        raise  # Re-raise our own 401s
     except Exception as e:
-        # Auth system error — fail safe
-        logger.warning(f"Auth system error: {e}, accepting any non-empty key")
-
-    # No keystore configured or not initialized — accept any non-empty key
-    return api_key
+        # Any other auth system error — fail closed
+        logger.error(f"Auth system error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Authentication system error",
+        )

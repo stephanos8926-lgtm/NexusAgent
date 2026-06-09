@@ -29,13 +29,14 @@ def run_shell(
     Returns:
         Command output (stdout). On error, returns stderr prefixed with "Error:".
     """
-    # Build environment
     cmd_env = os.environ.copy()
     if env:
         cmd_env.update(env)
 
-    # Resolve working directory
     cwd = workdir if workdir else None
+
+    # Validate command for shell injection
+    _validate_command(command)
 
     try:
         result = subprocess.run(
@@ -60,6 +61,24 @@ def run_shell(
         return f"Error: Command not found: {e}"
     except Exception as e:
         return f"Error executing command: {e}"
+
+
+def _validate_command(command: str) -> None:
+    """Validate command for shell injection patterns.
+    
+    Raises ValueError if dangerous patterns are detected.
+    Rejects: ; && || | $() ${} backticks > < >> << ` eval exec
+    These are legitimate in shells but dangerous when the command string
+    comes from an untrusted source (like an LLM).
+    """
+    import re
+    # Block injection characters that allow command chaining/substitution
+    dangerous = re.search(r'[;&|`$(){}<>]', command)
+    if dangerous:
+        raise ValueError(
+            f"Command contains potentially dangerous characters: {dangerous.group()!r}. "
+            "Use a list of arguments instead of shell command chaining."
+        )
 
 
 def run_shell_streaming(
@@ -87,6 +106,9 @@ def run_shell_streaming(
         cmd_env.update(env)
 
     cwd = workdir if workdir else None
+
+    # Validate command for shell injection
+    _validate_command(command)
 
     try:
         process = subprocess.Popen(

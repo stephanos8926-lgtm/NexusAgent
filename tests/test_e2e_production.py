@@ -115,7 +115,7 @@ async def test_sdk_end_to_end_flow():
 
 
 # API auth header for E2E tests (all non-health endpoints require X-API-Key)
-AUTH_HEADERS = {"X-API-Key": "test-e2e-key"}
+AUTH_HEADERS = {"X-API-Key": "test-key"}
 
 
 @pytest.mark.asyncio

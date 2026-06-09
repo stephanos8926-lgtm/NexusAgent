@@ -201,7 +201,7 @@ class WorkerPool:
             except Exception as e:
                 handle._mark_failed(str(e))
             finally:
-                await asyncio.sleep(60)
+                # Remove from active set immediately — don't hold the slot
                 self._active.pop(handle.worker_id, None)
 
     async def _execute_bounded(self, task, handle) -> str:

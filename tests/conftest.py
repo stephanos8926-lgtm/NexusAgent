@@ -10,3 +10,33 @@ try:
         load_dotenv(_env, override=False)
 except ImportError:
     pass
+
+# Initialize auth keystore for tests
+# The fail-closed auth requires a valid keystore. Create one for tests.
+import os
+import tempfile
+from pathlib import Path as _Path
+from nexusagent.auth import AuthManager
+
+_test_auth_dir = tempfile.mkdtemp()
+_test_master = _Path(_test_auth_dir) / ".master.secret"
+_test_salt = _Path(_test_auth_dir) / ".master.salt"
+_test_keystore = _Path(_test_auth_dir) / "keystore.json"
+
+# Generate test secrets
+_test_master.write_bytes(b"test-master-secret-for-tests-only")
+import secrets as _secrets
+_test_salt.write_bytes(_secrets.token_bytes(16))
+
+# Create auth manager with test paths and save test API keys
+_test_auth = AuthManager()
+# Override paths before initialization
+_test_auth.master_secret_path = _test_master
+_test_auth.salt_path = _test_salt
+_test_auth.keystore_path = _test_keystore
+_test_auth.initialize_wizard(force=True)
+_test_auth.save_key("api", "test-key")
+
+# Patch the global auth_manager to use test keystore
+import nexusagent.auth as _auth_module
+_auth_module.auth_manager = _test_auth
