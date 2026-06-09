@@ -1,0 +1,101 @@
+"""Tests for the scoped memory system."""
+
+from pathlib import Path
+
+import pytest
+
+from nexusagent.memory import MemoryManager, MemoryScope
+
+
+@pytest.fixture
+async def tmp_db(tmp_path: Path):
+    """Provide a temporary DB path and ensure cleanup."""
+    db_path = str(tmp_path / "test_memory.db")
+    yield db_path
+
+
+async def test_remember_and_recall(tmp_db: str):
+    """Create a memory, remember something, recall it."""
+    mgr = MemoryManager(db_path=tmp_db)
+    mem = await mgr.create("agent-1", MemoryScope.ISOLATED)
+
+    item_id = await mem.remember("The project uses Python 3.13 and pytest", {"topic": "tech"})
+    assert item_id
+
+    results = await mem.recall("What Python version?", limit=5)
+    assert len(results) >= 1
+    assert "Python" in results[0].content
+    assert results[0].metadata.get("topic") == "tech"
+
+    await mgr.close()
+
+
+async def test_fork_isolated(tmp_db: str):
+    """Parent + child isolated: they cannot see each other's memories."""
+    mgr = MemoryManager(db_path=tmp_db)
+    parent = await mgr.create("parent", MemoryScope.ISOLATED)
+    child = await parent.fork(MemoryScope.ISOLATED)
+
+    await parent.remember("parent-only secret")
+    await child.remember("child-only secret")
+
+    # Parent cannot see child's memory
+    parent_results = await parent.recall("child-only secret", limit=10)
+    assert all("child-only" not in r.content for r in parent_results)
+
+    # Child cannot see parent's memory
+    child_results = await child.recall("parent-only secret", limit=10)
+    assert all("parent-only" not in r.content for r in child_results)
+
+    # But each sees their own
+    parent_own = await parent.recall("parent-only secret", limit=10)
+    assert any("parent-only" in r.content for r in parent_own)
+
+    child_own = await child.recall("child-only secret", limit=10)
+    assert any("child-only" in r.content for r in child_own)
+
+    await mgr.close()
+
+
+async def test_fork_scoped_reads_parent(tmp_db: str):
+    """Parent + scoped child: child can read parent's memories."""
+    mgr = MemoryManager(db_path=tmp_db)
+    parent = await mgr.create("parent", MemoryScope.ISOLATED)
+    child = await parent.fork(MemoryScope.SCOPED)
+
+    await parent.remember("important context from parent")
+
+    # Child should be able to recall parent's memory
+    results = await child.recall("important context", limit=10)
+    assert len(results) >= 1
+    assert any("important context from parent" in r.content for r in results)
+
+    # But child's own writes don't appear in parent
+    await child.remember("child note")
+    parent_results = await parent.recall("child note", limit=10)
+    assert all("child note" not in r.content for r in parent_results)
+
+    await mgr.close()
+
+
+async def test_merge_selective(tmp_db: str):
+    """Parent + child: merge child into parent; parent sees child's memories."""
+    mgr = MemoryManager(db_path=tmp_db)
+    parent = await mgr.create("parent", MemoryScope.ISOLATED)
+    child = await parent.fork(MemoryScope.ISOLATED)
+
+    await child.remember("discovered fact A")
+    await child.remember("discovered fact B")
+    # Also add something to parent
+    await parent.remember("parent fact")
+
+    moved = await parent.merge(child, strategy="selective")
+    assert moved == 2
+
+    # Parent should now see child's facts via recall
+    results = await parent.recall("discovered fact", limit=10)
+    contents = [r.content for r in results]
+    assert any("discovered fact A" in c for c in contents)
+    assert any("discovered fact B" in c for c in contents)
+
+    await mgr.close()
