@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from nexusagent.api_auth import verify_api_key
-from nexusagent.bus import bus
+from nexusagent.bus import AgentBus, get_bus
 from nexusagent.config import settings
 from nexusagent.sdk import sdk
 from nexusagent.worker import worker
@@ -34,7 +34,8 @@ async def lifespan(app: FastAPI):
         logger.info("Database initialized.")
 
         # 2. Connect to NATS
-        await bus.connect()
+        _bus = get_bus()
+        await _bus.connect()
 
         # 3. Start the Worker as a background task within the same process
         # This co-locates the API and the Worker for simplicity in deployment.
@@ -46,7 +47,7 @@ async def lifespan(app: FastAPI):
         # Shutdown
         logger.info("Shutting down NexusAgent Backend...")
         worker_task.cancel()
-        await bus.close()
+        await _bus.close()
 
     except Exception as e:
         logger.error(f"Critical error during startup: {e}", exc_info=True)
@@ -136,7 +137,8 @@ async def get_task_result(task_id: str):
 
 @app.get("/health")
 async def health_check():
-    return {"status": "ok", "nats": "connected" if bus.nc else "disconnected"}
+    _bus = get_bus()
+    return {"status": "ok", "nats": "connected" if _bus.nc else "disconnected"}
 
 
 # ─── Task Listing ──────────────────────────────────────────────────────

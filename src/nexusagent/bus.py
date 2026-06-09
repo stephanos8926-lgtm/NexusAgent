@@ -154,5 +154,19 @@ class AgentBus:
             logger.info("NATS connection closed.")
 
 
-# Singleton instance for the project
-bus = AgentBus()
+# Module-level default bus (lazy-created, overridable)
+_default_bus: AgentBus | None = None
+
+
+def get_bus() -> AgentBus:
+    """Get or create the default bus instance."""
+    global _default_bus
+    if _default_bus is None:
+        _default_bus = AgentBus()
+    return _default_bus
+
+
+def set_bus(bus: AgentBus) -> None:
+    """Override the default bus (for testing/dependency injection)."""
+    global _default_bus
+    _default_bus = bus

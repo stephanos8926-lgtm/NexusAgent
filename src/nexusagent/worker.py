@@ -10,7 +10,7 @@ from typing import Any
 from sqlalchemy import select
 
 from nexusagent.agent import run_agent_task
-from nexusagent.bus import bus
+from nexusagent.bus import AgentBus, get_bus
 from nexusagent.db import TaskModel, task_repo
 from nexusagent.models import ResultSchema, TaskContract, TaskSchema, TaskStatus
 from nexusagent.subagent import SubAgentHandle
@@ -23,9 +23,62 @@ _nats_breaker = CircuitBreaker("nats", failure_threshold=3, recovery_timeout=15.
 _agent_breaker = CircuitBreaker("agent", failure_threshold=5, recovery_timeout=30.0)
 
 
+async def _run_agent_task(task: TaskSchema) -> str:
+    """
+    Shared agent execution entry point.
+
+    Routes research tasks to the LangGraph workflow and coding tasks to the
+    deepagents Agent, protected by the module-level agent circuit breaker.
+
+    Both NexusWorker and WorkerPool delegate to this function so that routing
+    logic, circuit-breaker protection, and the research/code split live in one
+    place.
+    """
+    task_desc = task.description.lower()
+    metadata = task.metadata if hasattr(task, "metadata") else {}
+
+    # Route: research tasks → LangGraph workflow, everything else → Agent
+    is_research = metadata.get("mode") == "research" or any(
+        kw in task_desc
+        for kw in ["research", "investigate", "analyze", "deep dive", "report on"]
+    )
+
+    async with _agent_breaker:
+        if is_research:
+            return await _run_research_workflow(task)
+        else:
+            loop = asyncio.get_running_loop()
+            state = {"task": task.description, "id": task.id, **metadata}
+            result = await loop.run_in_executor(None, run_agent_task, state)
+            return result.get("result", "No result returned from agent.")
+
+
+async def _run_research_workflow(task: TaskSchema) -> str:
+    """Execute a research task through the LangGraph state machine."""
+    from nexusagent.graph import create_research_graph
+
+    graph = create_research_graph()
+    config = {"configurable": {"thread_id": task.id}}
+
+    initial_state = {
+        "query": task.description,
+        "template_type": "professional",
+    }
+
+    result = await graph.ainvoke(initial_state, config)
+    synthesis = result.get("synthesis")
+    error = result.get("error")
+
+    if synthesis:
+        return synthesis
+    if error:
+        return f"Research workflow error: {error}"
+    return "Research workflow completed but produced no output."
+
+
 class NexusWorker:
-    def __init__(self) -> None:
-        self.bus = bus
+    def __init__(self, bus: AgentBus | None = None) -> None:
+        self.bus = bus or get_bus()
 
     async def start(self) -> None:
         """
@@ -47,46 +100,7 @@ class NexusWorker:
         Routes research tasks to the LangGraph workflow,
         coding tasks to the deepagents Agent.
         """
-        task_desc = task.description.lower()
-        metadata = task.metadata if hasattr(task, "metadata") else {}
-
-        # Route: research tasks → LangGraph workflow, everything else → Agent
-        is_research = metadata.get("mode") == "research" or any(
-            kw in task_desc
-            for kw in ["research", "investigate", "analyze", "deep dive", "report on"]
-        )
-
-        async with _agent_breaker:
-            if is_research:
-                result = await self._run_research_workflow(task)
-            else:
-                loop = asyncio.get_running_loop()
-                state = {"task": task.description, "id": task.id}
-                result = await loop.run_in_executor(None, run_agent_task, state)
-                result = result.get("result", "No result returned from agent.")
-            return result
-
-    async def _run_research_workflow(self, task: TaskSchema) -> str:
-        """Execute a research task through the LangGraph state machine."""
-        from nexusagent.graph import create_research_graph
-
-        graph = create_research_graph()
-        config = {"configurable": {"thread_id": task.id}}
-
-        initial_state = {
-            "query": task.description,
-            "template_type": "professional",
-        }
-
-        result = await graph.ainvoke(initial_state, config)
-        synthesis = result.get("synthesis")
-        error = result.get("error")
-
-        if synthesis:
-            return synthesis
-        if error:
-            return f"Research workflow error: {error}"
-        return "Research workflow completed but produced no output."
+        return await _run_agent_task(task)
 
     async def _heartbeat(self, task_id: str, stop_event: asyncio.Event):
         """Periodically bump task updated_at so the reaper doesn't eat it."""
@@ -253,9 +267,22 @@ class WorkerPool:
                 "last_result": last_result,
             }
             try:
-                loop = asyncio.get_running_loop()
-                result = await loop.run_in_executor(None, run_agent_task, state)
-                last_result = result.get("result", "")
+                # Build a transient TaskSchema that carries the turn/contract
+                # context so the shared function can route correctly.
+                turn_task = TaskSchema(
+                    id=task.id,
+                    description=task.description,
+                    priority=task.priority,
+                    metadata={
+                        **task.metadata,
+                        "turn": turn,
+                        "max_turns": contract.max_turns,
+                        "acceptance_criteria": contract.acceptance_criteria,
+                        "last_result": last_result,
+                    },
+                )
+                result = await _run_agent_task(turn_task)
+                last_result = result
                 if result.get("status") == "complete":
                     return last_result
             except Exception as e:

@@ -567,9 +567,42 @@ class HybridMemoryIndex:
             conn.close()
 
     def _search_vector_brute(self, query_vec: list[float], limit: int) -> list[dict]:
-        """Brute-force cosine similarity fallback when sqlite-vec fails."""
+        """Brute-force cosine similarity fallback when sqlite-vec fails.
+
+        Includes an OOM guard: estimates memory for all embeddings before loading.
+        If estimated usage exceeds the threshold, processes in batches instead.
+        """
+        import psutil
+
+        OOM_THRESHOLD = 0.85  # refuse brute-force if system memory usage exceeds this
+
         conn = sqlite3.connect(str(self.db_path))
         try:
+            # OOM guard: check system memory before bulk-load
+            mem = psutil.virtual_memory()
+            if mem.percent > OOM_THRESHOLD * 100:
+                logger.warning(
+                    "Skipping brute-force vector search: system memory at %d%% (threshold %d%%)",
+                    mem.percent,
+                    int(OOM_THRESHOLD * 100),
+                )
+                return []
+
+            row_count = conn.execute(
+                "SELECT COUNT(*) FROM chunks WHERE embedding IS NOT NULL"
+            ).fetchone()[0]
+
+            # Estimate: each embedding = EMBED_DIM * 4 bytes (float32)
+            estimated_bytes = row_count * EMBED_DIM * 4
+            available_bytes = mem.available
+            if estimated_bytes > available_bytes * 0.5:
+                logger.warning(
+                    "Brute-force vector search would use ~%.0f MB embeddings with %.0f MB available — skipping",
+                    estimated_bytes / (1024 * 1024),
+                    available_bytes / (1024 * 1024),
+                )
+                return []
+
             rows = conn.execute(
                 "SELECT id, file_path, content, embedding FROM chunks WHERE embedding IS NOT NULL"
             ).fetchall()

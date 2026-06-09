@@ -6,7 +6,7 @@ import pytest
 import pytest_asyncio
 from httpx import AsyncClient
 
-from nexusagent.bus import bus
+from nexusagent.bus import AgentBus, get_bus
 from nexusagent.db import db_manager
 from nexusagent.models import ResultSchema, TaskStatus
 from nexusagent.sdk import sdk
@@ -42,7 +42,8 @@ async def setup_system():
     await db_manager.init_db()
 
     # Connect to NATS
-    await bus.connect()
+    _bus = get_bus()
+    await _bus.connect()
 
     # Start the worker (normally started by server lifespan, but we need it for SDK tests)
     from nexusagent.worker import worker
@@ -55,7 +56,7 @@ async def setup_system():
 
     # Cleanup
     worker_task.cancel()
-    await bus.close()
+    await _bus.close()
     for suffix in ["", "-shm", "-wal"]:
         p = TEST_DB_PATH + suffix
         if os.path.exists(p):

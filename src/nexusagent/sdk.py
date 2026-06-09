@@ -3,7 +3,7 @@ import asyncio
 import logging
 import uuid
 
-from nexusagent.bus import bus
+from nexusagent.bus import AgentBus, get_bus
 from nexusagent.models import ResultSchema, TaskSchema, TaskStatus
 
 logger = logging.getLogger(__name__)
@@ -32,8 +32,8 @@ class NexusSDK:
         ])
     """
 
-    def __init__(self):
-        self.bus = bus
+    def __init__(self, bus: AgentBus | None = None):
+        self.bus = bus or get_bus()
 
     async def connect(self):
         """Ensure NATS connection is established."""
