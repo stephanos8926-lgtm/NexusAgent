@@ -1,4 +1,5 @@
 import logging
+import uuid
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
@@ -48,6 +49,29 @@ class ResultModel(Base):
     error = Column(String, nullable=True)
     completed_at = Column(DateTime, default=lambda: datetime.now(UTC))
     duration = Column(Float, nullable=True)
+
+
+class SessionModel(Base):
+    __tablename__ = "sessions"
+    id = Column(String, primary_key=True)
+    working_dir = Column(String, nullable=False, default=".")
+    memory_id = Column(String, nullable=True)
+    status = Column(String, default="active")
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
+    updated_at = Column(
+        DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC)
+    )
+
+
+class MessageModel(Base):
+    __tablename__ = "messages"
+    id = Column(String, primary_key=True)
+    session_id = Column(String, nullable=False)
+    role = Column(String, nullable=False)
+    content = Column(String, nullable=False)
+    tool_name = Column(String, nullable=True)
+    tool_args = Column(JSON, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC))
 
 
 class DatabaseManager:
@@ -205,5 +229,88 @@ class TaskRepository:
             return task_id
 
 
+class SessionRepository:
+    def __init__(self, db_manager: DatabaseManager) -> None:
+        self.db_manager = db_manager
+
+    async def create_session(self, working_dir: str = ".", memory_id: str | None = None) -> str:
+        session_id = str(uuid.uuid4())
+        async with self.db_manager.get_session() as session:
+            sess = SessionModel(
+                id=session_id,
+                working_dir=working_dir,
+                memory_id=memory_id,
+            )
+            session.add(sess)
+        return session_id
+
+    async def get_session(self, session_id: str) -> dict | None:
+        async with self.db_manager.get_session() as session:
+            result = await session.execute(
+                select(SessionModel).where(SessionModel.id == session_id)
+            )
+            s = result.scalar_one_or_none()
+            if not s:
+                return None
+            return {
+                "id": s.id,
+                "working_dir": s.working_dir,
+                "memory_id": s.memory_id,
+                "status": s.status,
+                "created_at": s.created_at.isoformat() if s.created_at else None,
+                "updated_at": s.updated_at.isoformat() if s.updated_at else None,
+            }
+
+    async def update_status(self, session_id: str, status: str) -> None:
+        async with self.db_manager.get_session() as session:
+            stmt = update(SessionModel).where(SessionModel.id == session_id).values(status=status)
+            await session.execute(stmt)
+
+    async def add_message(
+        self,
+        session_id: str,
+        role: str,
+        content: str,
+        tool_name: str | None = None,
+        tool_args: dict | None = None,
+    ) -> str:
+        msg_id = str(uuid.uuid4())
+        async with self.db_manager.get_session() as session:
+            msg = MessageModel(
+                id=msg_id,
+                session_id=session_id,
+                role=role,
+                content=content,
+                tool_name=tool_name,
+                tool_args=tool_args,
+            )
+            session.add(msg)
+        return msg_id
+
+    async def get_messages(self, session_id: str, limit: int = 100) -> list[dict]:
+        async with self.db_manager.get_session() as session:
+            query = (
+                select(MessageModel)
+                .where(MessageModel.session_id == session_id)
+                .order_by(MessageModel.created_at.asc())
+                .limit(limit)
+            )
+            result = await session.execute(query)
+            messages = result.scalars().all()
+            return [
+                {
+                    "id": m.id,
+                    "session_id": m.session_id,
+                    "role": m.role,
+                    "content": m.content,
+                    "tool_name": m.tool_name,
+                    "tool_args": m.tool_args,
+                    "created_at": m.created_at.isoformat() if m.created_at else None,
+                }
+                for m in messages
+            ]
+
+
 db_manager = DatabaseManager()
 task_repo = TaskRepository(db_manager)
+session_repo = SessionRepository(db_manager)
