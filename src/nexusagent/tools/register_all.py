@@ -488,3 +488,122 @@ async def spawn_subagent(
 
     handle = await worker_pool.spawn(contract)
     return f"Spawned worker {handle.worker_id} (status: {handle.status.value})"
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Memory Tools
+# ═══════════════════════════════════════════════════════════════════════
+
+_DEFAULT_MEMORY_WORKSPACE = "~/.nexusagent/memory/"
+
+
+def _get_memory_workspace() -> str:
+    """Get (and create if needed) the default memory workspace path."""
+    import os
+
+    path = os.path.expanduser(_DEFAULT_MEMORY_WORKSPACE)
+    os.makedirs(path, exist_ok=True)
+    return path
+
+
+@register_tool(
+    name="memory_search",
+    description="Search memory using hybrid keyword + vector search. Returns results with source citations.",
+    parameters={
+        "query": "Search query string",
+        "max_results": "Maximum results to return (default: 6)",
+    },
+    example='memory_search("authentication", max_results=5)',
+    category="memory",
+    returns="Formatted search results with citations.",
+)
+async def memory_search(query: str, max_results: int = 6) -> str:
+    from nexusagent.memory import HybridMemoryManager
+
+    workspace = _get_memory_workspace()
+    mgr = HybridMemoryManager(workspace)
+    mgr.initialize()
+    results = await mgr.recall(query, max_results=max_results)
+    if not results:
+        return f"No memories found for: {query}"
+
+    lines = [f"Memory search results for: {query}\n"]
+    for r in results:
+        source = r.get("file", "unknown")
+        content = r.get("content", "").strip()
+        score = r.get("score", 0)
+        lines.append(f"Source: {source} (score: {score:.2f})")
+        lines.append(f"{content}\n")
+    return "\n".join(lines)
+
+
+@register_tool(
+    name="memory_get",
+    description="Read a memory file by its relative path (e.g., 'bank/auth-20260712.md').",
+    parameters={
+        "path": "Relative path within the memory workspace",
+        "offset": "Starting line number (1-indexed, default: 1)",
+        "limit": "Maximum lines to read (default: 50)",
+    },
+    example='memory_get("bank/auth-20260712.md", offset=1, limit=50)',
+    category="memory",
+    returns="File content as string.",
+)
+def memory_get(path: str, offset: int = 1, limit: int = 50) -> str:
+    import os
+
+    workspace = _get_memory_workspace()
+    # Security: prevent path traversal
+    full_path = os.path.realpath(os.path.join(workspace, path))
+    if not full_path.startswith(os.path.realpath(workspace)):
+        return "ACCESS DENIED: Path traversal detected"
+
+    if not os.path.exists(full_path):
+        return f"File not found: {path}"
+
+    with open(full_path) as f:
+        lines = f.readlines()
+
+    start = max(0, offset - 1)
+    end = min(len(lines), start + limit)
+    selected = lines[start:end]
+
+    # Add line numbers
+    numbered = [f"{start + i + 1}|{line}" for i, line in enumerate(selected)]
+    return "".join(numbered)
+
+
+@register_tool(
+    name="memory_write",
+    description="Write a memory entry. Stores in bank/ directory with YAML frontmatter and indexes it.",
+    parameters={
+        "content": "The memory content to store",
+        "type": "Entry type: world, experience, opinion, observation (default: world)",
+        "description": "Short description/title for the entry",
+        "confidence": "Confidence score 0.0-1.0 (optional, for opinion entries)",
+        "entities": "List of entity names this relates to (optional)",
+    },
+    example='memory_write("The auth module uses JWT tokens", type="world", description="Auth uses JWT", entities=["auth", "jwt"])',
+    category="memory",
+    returns="Confirmation message with file path of the written entry.",
+)
+def memory_write(
+    content: str,
+    type: str = "world",
+    description: str = "",
+    confidence: float | None = None,
+    entities: list[str] | None = None,
+) -> str:
+    from nexusagent.memory import HybridMemoryManager
+
+    workspace = _get_memory_workspace()
+    mgr = HybridMemoryManager(workspace)
+    mgr.initialize()
+    filepath = mgr.remember(
+        content=content,
+        type=type,
+        description=description or content[:50],
+        confidence=confidence,
+        entities=entities,
+    )
+    return f"Memory written to: {filepath}"

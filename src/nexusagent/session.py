@@ -7,7 +7,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 from collections.abc import AsyncGenerator
+from pathlib import Path
 from typing import Any
 
 from nexusagent.models import ErrorEvent, ResponseEvent
@@ -28,12 +30,25 @@ class Session:
         agent: Any,
         memory: Any,
         db_repo: Any,
+        memory_dir: str | Path | None = None,
     ) -> None:
         self.session_id = session_id
         self.working_dir = working_dir
         self.agent = agent
         self.memory = memory
         self.db_repo = db_repo
+
+        # Hybrid memory directory — defaults to ~/.nexusagent/sessions/{session_id}/memory
+        if memory_dir is None:
+            memory_dir = os.path.expanduser(f"~/.nexusagent/sessions/{session_id}/memory")
+        self.memory_dir = Path(memory_dir)
+        self.memory_dir.mkdir(parents=True, exist_ok=True)
+
+        # Hybrid memory manager (file + index)
+        from nexusagent.memory import HybridMemoryManager
+
+        self.hybrid_memory = HybridMemoryManager(str(self.memory_dir))
+        self.hybrid_memory.initialize()
 
         self.status: str = "active"
         self._cancel_flag: bool = False
@@ -55,7 +70,7 @@ class Session:
         except Exception as exc:
             logger.warning("Failed to store user message in DB: %s", exc)
 
-        # Recall relevant memories
+        # Recall relevant memories (scoped memory)
         context: list[str] = []
         try:
             if self.memory is not None:
@@ -64,6 +79,14 @@ class Session:
                     context = [item.content for item in recalled]
         except Exception as exc:
             logger.warning("Memory recall failed: %s", exc)
+
+        # Prepend hybrid memory context (file + index)
+        try:
+            hybrid_context = self.hybrid_memory.get_memory_context(user_message, max_results=5)
+            if hybrid_context:
+                context.insert(0, hybrid_context)
+        except Exception as exc:
+            logger.warning("Hybrid memory context retrieval failed: %s", exc)
 
         # Build agent input
         state: dict[str, Any] = {"message": user_message, "context": context}
@@ -103,6 +126,20 @@ class Session:
         except Exception as exc:
             logger.error("Agent invocation failed: %s", exc)
             self._enqueue(ErrorEvent(message=str(exc)).model_dump())
+
+    # ── Pre-compaction flush ───────────────────────────────────────────
+
+    def pre_compaction_flush(self) -> str:
+        """Flush session state to daily log before context compaction.
+
+        Returns a summary string to be used as context after compaction.
+        """
+        summary = f"Session {self.session_id} compaction flush at {asyncio.get_event_loop().time()}"
+        try:
+            self.hybrid_memory.flush(summary)
+        except Exception as exc:
+            logger.warning("Pre-compaction flush failed: %s", exc)
+        return summary
 
     # ── Approval gate ──────────────────────────────────────────────────
 
@@ -183,12 +220,17 @@ class SessionManager:
         if existing is not None:
             return existing
 
+        # Build the memory directory path for this session
+        memory_dir = os.path.expanduser(f"~/.nexusagent/sessions/{session_id}/memory")
+        os.makedirs(memory_dir, exist_ok=True)
+
         session = Session(
             session_id=session_id,
             working_dir=working_dir,
             agent=agent,
             memory=memory,
             db_repo=db_repo,
+            memory_dir=memory_dir,
         )
         self._sessions[session_id] = session
         return session
