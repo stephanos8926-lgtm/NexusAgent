@@ -58,6 +58,10 @@ class Session:
 
     # ── Send a user message ────────────────────────────────────────────
 
+    def _base_system_prompt(self) -> str:
+        """Return the default system prompt for this session."""
+        return "You are a helpful AI assistant."
+
     async def send(self, user_message: str) -> None:
         """Process a user message: store in DB, recall memory, invoke agent, emit events."""
         if self.status != "active":
@@ -70,31 +74,22 @@ class Session:
         except Exception as exc:
             logger.warning("Failed to store user message in DB: %s", exc)
 
-        # Recall relevant memories (scoped memory)
-        context: list[str] = []
-        try:
-            if self.memory is not None:
-                recalled = await self.memory.recall(user_message, top_k=5)
-                if recalled:
-                    context = [item.content for item in recalled]
-        except Exception as exc:
-            logger.warning("Memory recall failed: %s", exc)
-
-        # Prepend hybrid memory context (file + index)
+        # Build system prompt with memory context
+        system_prompt = self._base_system_prompt()
         try:
             hybrid_context = self.hybrid_memory.get_memory_context(user_message, max_results=5)
             if hybrid_context:
-                context.insert(0, hybrid_context)
+                system_prompt = f"{system_prompt}\n\n{hybrid_context}"
         except Exception as exc:
             logger.warning("Hybrid memory context retrieval failed: %s", exc)
 
-        # Build agent input
-        state: dict[str, Any] = {"message": user_message, "context": context}
-
-        # Invoke agent
+        # Invoke agent with system_prompt
         self._cancel_flag = False
         try:
-            result = self.agent(state)
+            result = self.agent(
+                {"message": user_message},
+                system_prompt=system_prompt,
+            )
             # If the agent returns an async generator, stream events
             if hasattr(result, "__aiter__"):
                 async for event in result:
