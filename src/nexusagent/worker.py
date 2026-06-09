@@ -3,12 +3,14 @@ import asyncio
 import json
 import logging
 import time
+import uuid
 from typing import Any
 
 from nexusagent.agent import run_agent_task
 from nexusagent.bus import bus
 from nexusagent.db import task_repo
-from nexusagent.models import ResultSchema, TaskSchema, TaskStatus
+from nexusagent.models import ResultSchema, TaskContract, TaskSchema, TaskStatus
+from nexusagent.subagent import SubAgentHandle
 from nexusagent.utils import CircuitBreaker, retry_with_backoff
 
 logger = logging.getLogger(__name__)
@@ -159,3 +161,87 @@ class NexusWorker:
 
 # Global instance
 worker = NexusWorker()
+
+
+class WorkerPool:
+    """Manages a pool of isolated worker executions."""
+
+    def __init__(self, max_workers: int = 4):
+        self.max_workers = max_workers
+        self._active: dict[str, SubAgentHandle] = {}
+        self._tasks: set[asyncio.Task] = set()
+        self._semaphore = asyncio.Semaphore(max_workers)
+
+    async def spawn(self, contract: TaskContract) -> SubAgentHandle:
+        """Spawn an isolated worker. Returns a handle to monitor/control it."""
+        worker_id = f"worker-{str(uuid.uuid4())[:8]}"
+        handle = SubAgentHandle(worker_id=worker_id, contract=contract)
+        self._active[worker_id] = handle
+        task = asyncio.create_task(self._run_worker(handle))
+        self._tasks.add(task)
+        task.add_done_callback(self._tasks.discard)
+        return handle
+
+    async def _run_worker(self, handle: SubAgentHandle):
+        """Run a worker to completion within its contract bounds."""
+        async with self._semaphore:
+            handle._mark_running()
+            try:
+                task = TaskSchema(
+                    id=handle.contract.task_id,
+                    description=handle.contract.description,
+                    priority=handle.contract.priority,
+                    metadata=handle.contract.metadata,
+                )
+                result = await self._execute_bounded(task, handle)
+                if handle.is_cancelled():
+                    handle._mark_failed("Cancelled by user")
+                else:
+                    handle._mark_completed(result)
+            except Exception as e:
+                handle._mark_failed(str(e))
+            finally:
+                await asyncio.sleep(60)
+                self._active.pop(handle.worker_id, None)
+
+    async def _execute_bounded(self, task, handle) -> str:
+        """Execute with turn counting, wall time, and cancellation checks."""
+        start = time.time()
+        turn = 0
+        last_result = None
+        contract = handle.contract
+
+        while turn < contract.max_turns:
+            if handle.is_cancelled():
+                return "Cancelled"
+            elapsed = time.time() - start
+            if elapsed >= contract.max_wall_time:
+                return f"Timed out after {elapsed:.1f}s"
+            state = {
+                "task": task.description,
+                "id": task.id,
+                "turn": turn,
+                "max_turns": contract.max_turns,
+                "acceptance_criteria": contract.acceptance_criteria,
+                "last_result": last_result,
+            }
+            try:
+                loop = asyncio.get_running_loop()
+                result = await loop.run_in_executor(None, run_agent_task, state)
+                last_result = result.get("result", "")
+                if result.get("status") == "complete":
+                    return last_result
+            except Exception as e:
+                if contract.on_failure == "abort":
+                    return f"Aborted: {e}"
+                elif contract.on_failure == "retry":
+                    continue
+                return f"Escalated: {e}"
+            turn += 1
+        return f"Max turns reached. Last: {last_result}"
+
+    def list_active(self) -> list[SubAgentHandle]:
+        return list(self._active.values())
+
+
+worker_pool = WorkerPool()
