@@ -12,11 +12,69 @@ from collections.abc import AsyncGenerator
 from pathlib import Path
 from typing import Any
 
-from langchain_core.messages import SystemMessage
+from langchain_core.messages import AIMessage, SystemMessage
 
-from nexusagent.models import ErrorEvent, ResponseEvent
+from nexusagent.models import ErrorEvent, ResponseEvent, ThinkingEvent
 
 logger = logging.getLogger(__name__)
+
+
+def _extract_agent_response(result) -> str:
+    """Extract the last assistant message content from an agent result.
+
+    Handles:
+    - str — returned as-is
+    - list — extracts 'text' blocks (Gemma thinking+text format)
+    - dict with 'messages' key — extracts last non-system message content
+    - dict with 'response'/'result'/'content' key — uses that directly
+    - anything else — str() fallback
+    """
+    if isinstance(result, str):
+        return result
+    # Gemma models return content as a list of {type: thinking|text, ...} blocks
+    if isinstance(result, list):
+        text_parts = []
+        for block in result:
+            if isinstance(block, dict):
+                if block.get("type") == "text":
+                    text_parts.append(block.get("text", ""))
+                elif block.get("type") == "thinking":
+                    pass  # skip thinking blocks in output
+                else:
+                    text_parts.append(str(block))
+            else:
+                text_parts.append(str(block))
+        return "\n".join(text_parts) if text_parts else str(result)
+    if isinstance(result, dict):
+        # DeepResearch/LangGraph style: {"messages": [...]}
+        if "messages" in result:
+            from langchain_core.messages import BaseMessage
+            messages = result["messages"]
+            # Find last non-system message
+            for msg in reversed(messages):
+                if isinstance(msg, BaseMessage) and not isinstance(msg, SystemMessage):
+                    content = msg.content
+                    # Gemma returns content as list of {type, text, thinking} blocks
+                    if isinstance(content, list):
+                        return _extract_agent_response(content)
+                    return content or str(msg)
+            # Fallback: last message regardless
+            if messages:
+                last = messages[-1]
+                content = last.content if isinstance(last, BaseMessage) else str(last)
+                if isinstance(content, list):
+                    return _extract_agent_response(content)
+                return str(content)
+            return "No messages in response"
+        # Simple dict returns
+        if "response" in result:
+            return str(result["response"])
+        if "result" in result:
+            return str(result["result"])
+        if "content" in result:
+            return str(result["content"])
+        return str(result)
+    return str(result)
 
 
 class Session:
@@ -57,6 +115,8 @@ class Session:
         self._event_queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
         self._pending_approvals: dict[str, asyncio.Event] = {}
         self._approval_results: dict[str, bool] = {}
+        self._seen_tool_results: set[str] = set()  # deduplicate tool_result events
+        self._conversation_history: list[Any] = []  # accumulated LangChain messages
 
     # ── Send a user message ────────────────────────────────────────────
 
@@ -65,10 +125,18 @@ class Session:
         return "You are a helpful AI assistant."
 
     async def send(self, user_message: str) -> None:
-        """Process a user message: store in DB, recall memory, invoke agent, emit events."""
+        """Process a user message: store in DB, recall memory, invoke agent, emit events.
+
+        Uses deepagents' astream() for real-time streaming of tool calls,
+        tool results, and tokens — so the TUI can show progress instead of
+        going silent for the entire duration.
+        """
         if self.status != "active":
             self._enqueue(ErrorEvent(message="Session is not active").model_dump())
             return
+
+        # Emit thinking indicator so the TUI can show busy state
+        self._enqueue(ThinkingEvent(content="Processing...").model_dump())
 
         # Store user message in DB
         try:
@@ -76,7 +144,7 @@ class Session:
         except Exception as exc:
             logger.warning("Failed to store user message in DB: %s", exc)
 
-        # Build messages list with memory context injected as SystemMessage
+        # Build messages list: system prompt + memory context + conversation history + new user message
         from langchain_core.messages import HumanMessage
 
         system_prompt = self._base_system_prompt()
@@ -89,7 +157,12 @@ class Session:
         except Exception as exc:
             logger.warning("Hybrid memory context retrieval failed: %s", exc)
 
-        messages.append(HumanMessage(content=user_message))
+        # Append prior conversation history (user + assistant turns)
+        messages.extend(self._conversation_history)
+
+        # Append the new user message
+        user_msg = HumanMessage(content=user_message)
+        messages.append(user_msg)
 
         # Compaction: if messages exceed context window, compact before model call
         from nexusagent.compaction import CompactionPipeline, pre_compaction_flush
@@ -116,25 +189,55 @@ class Session:
                 else:
                     messages.append(HumanMessage(content=md["content"]))  # fallback
 
-        # Invoke agent with proper messages format
+        # Stream agent execution with real-time tool call/result events
         self._cancel_flag = False
         try:
-            result = self.agent({"messages": messages})
-            # If the agent returns an async generator, stream events
-            if hasattr(result, "__aiter__"):
-                async for event in result:
-                    if self._cancel_flag:
-                        self._enqueue(ErrorEvent(message="Session interrupted").model_dump())
-                        break
-                    self._enqueue(event if isinstance(event, dict) else event.model_dump())
-            else:
-                # Synchronous result — emit as ResponseEvent
-                content = result if isinstance(result, str) else str(result)
-                self._enqueue(ResponseEvent(content=content).model_dump())
+            accumulated_content: list[str] = []
+            async for chunk in self.agent._inner.astream(
+                {"messages": messages},
+                stream_mode=["updates", "messages"],
+                subgraphs=True,
+                version="v2",
+            ):
+                if self._cancel_flag:
+                    self._enqueue(ErrorEvent(message="Session interrupted").model_dump())
+                    break
+
+                chunk_type = chunk.get("type")
+                chunk_data = chunk.get("data", {})
+
+                if chunk_type == "messages":
+                    # Stream tokens and tool calls from messages
+                    if isinstance(chunk_data, tuple):
+                        token, metadata = chunk_data[0], chunk_data[1] if len(chunk_data) > 1 else {}
+                    else:
+                        token, metadata = chunk_data, {}
+                    await self._handle_message_token(token, metadata, accumulated_content)
+
+                elif chunk_type == "updates":
+                    # Track node-level progress (tool execution, model requests)
+                    await self._handle_update(chunk_data)
+
+            # After the stream ends, emit the final response from accumulated text
+            if not self._cancel_flag:
+                final_content = "".join(accumulated_content).strip()
+                if not final_content:
+                    # Fallback: if streaming didn't capture text (e.g. tool-only turn),
+                    # extract from the last message in the conversation
+                    final_content = "Tool execution completed."
+
+                self._enqueue(ResponseEvent(content=final_content).model_dump())
+
+                # Update conversation history for continuity
+                self._conversation_history.append(user_msg)
+                self._conversation_history.append(AIMessage(content=final_content))
+                # Trim history to last 20 turns (40 messages)
+                if len(self._conversation_history) > 40:
+                    self._conversation_history = self._conversation_history[-40:]
 
                 # Store assistant response in DB
                 try:
-                    await self.db_repo.add_message(self.session_id, "assistant", content)
+                    await self.db_repo.add_message(self.session_id, "assistant", final_content)
                 except Exception as exc:
                     logger.warning("Failed to store assistant message in DB: %s", exc)
 
@@ -143,14 +246,81 @@ class Session:
                     if self.memory is not None:
                         await self.memory.remember(
                             user_message,
-                            metadata={"response": content},
+                            metadata={"response": final_content},
                         )
                 except Exception as exc:
                     logger.warning("Failed to remember in memory: %s", exc)
 
         except Exception as exc:
-            logger.error("Agent invocation failed: %s", exc)
+            logger.error("Agent streaming failed: %s", exc, exc_info=True)
             self._enqueue(ErrorEvent(message=str(exc)).model_dump())
+
+    async def _handle_message_token(self, token, metadata: dict, accumulated: list[str]) -> None:
+        """Process a single message token from the stream.
+
+        Handles:
+        - AIMessageChunk with tool_call_chunks → emit tool_call event
+        - ToolMessage → emit tool_result event
+        - AIMessageChunk with text content → accumulate for final response
+        """
+        from langchain_core.messages import AIMessageChunk, ToolMessage
+
+        # Tool call chunks (streaming tool invocations)
+        if isinstance(token, AIMessageChunk) and token.tool_call_chunks:
+            for tc in token.tool_call_chunks:
+                if tc.get("name"):
+                    self._enqueue({
+                        "type": "tool_call",
+                        "tool": tc["name"],
+                        "args": tc.get("args", {}),
+                        "call_id": tc.get("id", ""),
+                    })
+
+        # Tool results — deduplicate by call_id
+        if isinstance(token, ToolMessage):
+            call_id = getattr(token, "tool_call_id", "")
+            if call_id and call_id not in self._seen_tool_results:
+                self._seen_tool_results.add(call_id)
+                self._enqueue({
+                    "type": "tool_result",
+                    "call_id": call_id,
+                    "output": str(token.content) if token.content else "",
+                    "success": True,
+                })
+
+        # Regular AI text content — accumulate for final response
+        if isinstance(token, AIMessageChunk) and token.content and not token.tool_call_chunks:
+            if isinstance(token.content, str):
+                accumulated.append(token.content)
+            elif isinstance(token.content, list):
+                # Gemma returns content as list of {type: thinking|text, ...} blocks
+                for block in token.content:
+                    if isinstance(block, dict) and block.get("type") == "text":
+                        accumulated.append(block.get("text", ""))
+
+    async def _handle_update(self, data: dict) -> None:
+        """Process an update chunk from the stream.
+
+        Tracks node-level progress for status bar updates.
+        """
+        if not isinstance(data, dict):
+            return
+
+        for node_name, node_data in data.items():
+            # Detect tool execution from the "tools" node — deduplicate
+            if node_name == "tools" and isinstance(node_data, dict):
+                msgs = node_data.get("messages", [])
+                for msg in msgs:
+                    if hasattr(msg, "type") and msg.type == "tool":
+                        call_id = getattr(msg, "tool_call_id", "")
+                        if call_id and call_id not in self._seen_tool_results:
+                            self._seen_tool_results.add(call_id)
+                            self._enqueue({
+                                "type": "tool_result",
+                                "call_id": call_id,
+                                "output": str(msg.content) if msg.content else "",
+                                "success": True,
+                            })
 
     # ── Pre-compaction flush ───────────────────────────────────────────
 

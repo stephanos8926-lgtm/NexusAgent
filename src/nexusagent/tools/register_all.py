@@ -469,6 +469,7 @@ async def spawn_subagent(
     acceptance_criteria: list[str] | None = None,
     memory_mode: str = "isolated",
 ) -> str:
+    """Spawn a sub-agent worker to execute an isolated task and return its ID."""
     from nexusagent.models import MemoryScope, TaskContract
     from nexusagent.worker import worker_pool
 
@@ -518,6 +519,7 @@ def _get_memory_workspace() -> str:
     returns="Formatted search results with citations.",
 )
 async def memory_search(query: str, max_results: int = 6) -> str:
+    """Search memory using hybrid keyword + vector search. Returns results with source citations."""
     from nexusagent.memory import HybridMemoryManager
 
     workspace = _get_memory_workspace()
@@ -550,6 +552,7 @@ async def memory_search(query: str, max_results: int = 6) -> str:
     returns="File content as string.",
 )
 def memory_get(path: str, offset: int = 1, limit: int = 50) -> str:
+    """Read a memory file by its relative path (e.g., 'bank/auth-20260712.md')."""
     import os
 
     workspace = _get_memory_workspace()
@@ -594,6 +597,7 @@ def memory_write(
     confidence: float | None = None,
     entities: list[str] | None = None,
 ) -> str:
+    """Write a memory entry. Stores in bank/ directory with YAML frontmatter and indexes it."""
     from nexusagent.memory import HybridMemoryManager
 
     workspace = _get_memory_workspace()

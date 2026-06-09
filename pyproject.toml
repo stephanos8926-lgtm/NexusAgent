@@ -19,6 +19,7 @@ dependencies = [
     "mypy",
     "pydantic",
     "google-generativeai",
+    "google-genai>=2.0.0,<2.3.0",
     "openai",
     "gradio",
     "textual",

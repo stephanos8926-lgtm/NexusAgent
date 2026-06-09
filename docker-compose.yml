@@ -1,6 +1,8 @@
 services:
   nexus:
     build: .
+    env_file:
+      - .env
     network_mode: host
     environment:
       - NEXUS_SERVER__NATS_URL=nats://127.0.0.1:4222

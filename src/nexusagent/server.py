@@ -257,9 +257,20 @@ async def session_websocket(websocket: WebSocket, session_id: str):
     """
     await websocket.accept()
 
+    from nexusagent.agent import Agent
+    from nexusagent.db import session_repo
     from nexusagent.session import session_manager
 
-    session = await session_manager.get_or_create(session_id)
+    # Create a real agent for this interactive session
+    agent = Agent(role="full", policy="permissive")
+
+    session = await session_manager.get_or_create(
+        session_id,
+        working_dir=".",
+        agent=agent,
+        memory=None,
+        db_repo=session_repo,
+    )
 
     try:
         await websocket.send_json({"type": "session_status", "status": session.status})

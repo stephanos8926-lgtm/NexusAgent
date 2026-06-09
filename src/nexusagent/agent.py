@@ -5,6 +5,8 @@ from typing import Any
 
 from deepagents import create_deep_agent
 
+from nexusagent.config import settings
+
 # Run registration (populates _REGISTRY)
 import nexusagent.tools.register_all  # noqa: F401
 
@@ -81,7 +83,12 @@ class Agent:
                   tester, reviewer, debugger, researcher, full.
             policy: Access policy. One of: permissive, restricted, strict.
         """
-        model_name = os.getenv("AGENT_MODEL", "gemini-3.1-flash-lite")
+        model_name = os.getenv("AGENT_MODEL") or settings.agent.default_model
+
+        # Auto-prefix google models with google_genai provider to avoid
+        # deepagents routing them to VertexAI (which needs langchain-google-vertexai + GCP project)
+        if model_name.startswith(("gemini", "gemma")) and ":" not in model_name:
+            model_name = f"google_genai:{model_name}"
 
         # Set policy context for this agent (thread-local)
         set_policy_context(role, policy)

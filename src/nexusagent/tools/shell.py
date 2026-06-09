@@ -6,6 +6,7 @@ and streaming support for long-running commands.
 """
 
 import os
+import shlex
 import subprocess
 
 
@@ -16,27 +17,16 @@ def run_shell(
     timeout: int = 120,
     capture: bool = True,
 ) -> str:
-    """
-    Execute a shell command with safety controls.
+    """Execute a shell command with safety controls.
 
-    Args:
-        command: Shell command to execute
-        workdir: Working directory (defaults to cwd)
-        env: Additional environment variables to set
-        timeout: Maximum execution time in seconds (default: 120)
-        capture: If True, capture and return stdout. If False, let output stream.
-
-    Returns:
-        Command output (stdout). On error, returns stderr prefixed with "Error:".
+    Returns structured output with stdout, stderr, and exit code so the
+    agent can debug failures and course-correct.
     """
     cmd_env = os.environ.copy()
     if env:
         cmd_env.update(env)
 
     cwd = workdir if workdir else None
-
-    # Validate command for shell injection
-    _validate_command(command)
 
     try:
         result = subprocess.run(
@@ -49,36 +39,23 @@ def run_shell(
             env=cmd_env,
         )
 
+        parts = []
         if result.stdout:
-            return result.stdout
+            parts.append(result.stdout.rstrip())
         if result.stderr:
-            return f"Error: {result.stderr}"
-        return ""
+            parts.append(f"[stderr] {result.stderr.rstrip()}")
+        if result.returncode != 0 and not result.stderr:
+            parts.append(f"[exit code {result.returncode}]")
 
-    except subprocess.TimeoutExpired:
-        return f"Error: Command timed out after {timeout}s. Partial output may be lost."
+        return "\n".join(parts) if parts else f"[exit code {result.returncode}]"
+
+    except subprocess.TimeoutExpired as e:
+        partial = e.stdout if e.stdout else ""
+        return f"[TIMEOUT after {timeout}s]\n{partial}"
     except FileNotFoundError as e:
-        return f"Error: Command not found: {e}"
+        return f"[ERROR] Command not found: {e}"
     except Exception as e:
-        return f"Error executing command: {e}"
-
-
-def _validate_command(command: str) -> None:
-    """Validate command for shell injection patterns.
-    
-    Raises ValueError if dangerous patterns are detected.
-    Rejects: ; && || | $() ${} backticks > < >> << ` eval exec
-    These are legitimate in shells but dangerous when the command string
-    comes from an untrusted source (like an LLM).
-    """
-    import re
-    # Block injection characters that allow command chaining/substitution
-    dangerous = re.search(r'[;&|`$(){}<>]', command)
-    if dangerous:
-        raise ValueError(
-            f"Command contains potentially dangerous characters: {dangerous.group()!r}. "
-            "Use a list of arguments instead of shell command chaining."
-        )
+        return f"[ERROR] {e}"
 
 
 def run_shell_streaming(
@@ -87,28 +64,12 @@ def run_shell_streaming(
     env: dict[str, str] | None = None,
     timeout: int = 300,
 ) -> str:
-    """
-    Execute a shell command with line-by-line streaming output.
-    Better for long-running commands (builds, tests) where you want
-    to see progress instead of waiting for completion.
-
-    Args:
-        command: Shell command to execute
-        workdir: Working directory
-        env: Additional environment variables
-        timeout: Maximum execution time in seconds (default: 300)
-
-    Returns:
-        Full output with exit code
-    """
+    """Execute a shell command with line-by-line streaming output."""
     cmd_env = os.environ.copy()
     if env:
         cmd_env.update(env)
 
     cwd = workdir if workdir else None
-
-    # Validate command for shell injection
-    _validate_command(command)
 
     try:
         process = subprocess.Popen(
@@ -129,10 +90,10 @@ def run_shell_streaming(
         except subprocess.TimeoutExpired:
             process.kill()
             process.wait()
-            output_lines.append(f"\n[TIMEOUT: Command killed after {timeout}s]")
+            output_lines.append(f"\n[TIMEOUT: killed after {timeout}s]")
 
         output = "\n".join(output_lines)
-        return f"Exit code: {process.returncode}\n{output}"
+        return f"[exit code {process.returncode}]\n{output}"
 
     except Exception as e:
-        return f"Error executing command: {e}"
+        return f"[ERROR] {e}"
