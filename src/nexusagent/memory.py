@@ -18,7 +18,7 @@ from nexusagent.models import MemoryScope
 
 logger = logging.getLogger(__name__)
 
-EMBED_DIM = 384
+EMBED_DIM = 3072  # Must match memory_index.py for cross-compatibility
 
 # ---------------------------------------------------------------------------
 # Deterministic hash-based embedding (placeholder)
@@ -30,16 +30,19 @@ def _hash_embed(text: str) -> list[float]:
     """Deterministic hash-based embedding function.
 
     Produces a unit-normalised vector of dimension EMBED_DIM from the input text.
-    This is a placeholder — replace with a proper sentence-transformer or similar
-    model in production.
+    This is a placeholder — replace with a proper embedding model in production.
     """
+    import struct as _struct
+
     vec = [0.0] * EMBED_DIM
-    for i in range(EMBED_DIM):
-        chunk = f"{text}|{i}"
-        h = hashlib.sha256(chunk.encode()).hexdigest()
-        # Map 8 hex chars to a float in [-1, 1]
-        val = int(h[:8], 16) / 0x8000_0000 - 1.0
-        vec[i] = val
+    # Fill dims in batches of 32 using SHA256
+    batch_idx = 0
+    for batch_start in range(0, EMBED_DIM, 32):
+        h = hashlib.sha256(f"{text}|{batch_idx}".encode()).digest()
+        for j in range(min(32, EMBED_DIM - batch_start)):
+            vec[batch_start + j] = _struct.unpack("b", bytes([h[j]]))[0] / 128.0
+        batch_idx += 1
+
     # Normalise to unit length
     norm = sum(v * v for v in vec) ** 0.5
     if norm > 0:

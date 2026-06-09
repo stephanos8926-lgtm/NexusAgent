@@ -31,7 +31,7 @@ from nexusagent.config import settings
 
 logger = logging.getLogger(__name__)
 
-EMBED_DIM = 768  # Gemini embedding-001 dimension
+EMBED_DIM = 3072  # gemini-embedding-001 returns 3072-dim vectors
 CHUNK_SIZE = 400  # chars per chunk (~4 chars per token)
 CHUNK_OVERLAP = 80  # overlap between chunks in chars
 VECTOR_WEIGHT = 0.7
@@ -94,15 +94,9 @@ class EmbeddingProvider:
         result = genai.embed_content(
             model="models/gemini-embedding-001",
             content=text,
-            task_type="RETRIEVAL_DOCUMENT",
+            task_type="RETRIEVAL_QUERY",
         )
-        vec = result["embedding"]
-        # Pad or truncate to EMBED_DIM
-        if len(vec) < EMBED_DIM:
-            vec = vec + [0.0] * (EMBED_DIM - len(vec))
-        elif len(vec) > EMBED_DIM:
-            vec = vec[:EMBED_DIM]
-        return vec
+        return result["embedding"]
 
     async def _embed_local(self, text: str) -> list[float]:
         """Use local sentence-transformers model."""
@@ -128,11 +122,13 @@ class EmbeddingProvider:
     def _embed_hash(self, text: str) -> list[float]:
         """Fallback: deterministic hash-based embedding (low quality, always works)."""
         vec = [0.0] * EMBED_DIM
-        for i in range(0, len(text), 64):
-            chunk = text[i : i + 64]
-            h = hashlib.sha256(chunk.encode()).digest()
-            for j in range(min(EMBED_DIM, len(h))):
-                vec[j] += struct.unpack("b", bytes([h[j]]))[0] / 128.0
+        # Fill dims in batches using SHA256 chunks
+        batch_idx = 0
+        for batch_start in range(0, EMBED_DIM, 32):
+            h = hashlib.sha256(f"{text}|{batch_idx}".encode()).digest()
+            for j in range(min(32, EMBED_DIM - batch_start)):
+                vec[batch_start + j] = struct.unpack("b", bytes([h[j]]))[0] / 128.0
+            batch_idx += 1
 
         mag = math.sqrt(sum(x * x for x in vec)) or 1.0
         return [x / mag for x in vec]
@@ -191,6 +187,21 @@ class HybridMemoryIndex:
                 """
             )
 
+            # Check if chunks_vec exists with wrong dimension
+            vec_exists = conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='chunks_vec'"
+            ).fetchone()
+            
+            if vec_exists:
+                # Check the dimension of existing vectors
+                row = conn.execute("SELECT embedding FROM chunks_vec LIMIT 1").fetchone()
+                if row and row[0]:
+                    existing_dim = len(row[0]) // 4  # float32 = 4 bytes
+                    if existing_dim != EMBED_DIM:
+                        logger.info("Vector dimension changed (%d → %d), rebuilding index", existing_dim, EMBED_DIM)
+                        conn.execute("DROP TABLE IF EXISTS chunks_vec")
+                        conn.execute("DELETE FROM chunks WHERE embedding IS NOT NULL")
+            
             conn.execute(
                 f"""
                 CREATE VIRTUAL TABLE IF NOT EXISTS chunks_vec USING vec0(
