@@ -219,14 +219,14 @@ class CompactionPipeline:
 # ---------------------------------------------------------------------------
 
 
-def pre_compaction_flush(session, summary: str) -> str:
+async def pre_compaction_flush(session, summary: str) -> str:
     """Flush session state to memory before compaction.
 
     Writes the summary to the daily log via the session's hybrid memory
     manager, then returns a context string to inject after compaction.
     """
     try:
-        session.hybrid_memory.flush(summary)
+        await session.hybrid_memory.flush(summary)
     except Exception as exc:
         logger.warning("Pre-compaction flush failed: %s", exc)
 

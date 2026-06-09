@@ -427,12 +427,16 @@ class HybridMemoryManager:
 
         return "\n".join(lines)
 
-    def flush(self, session_summary: str):
-        """Persist a session summary to the daily log and re-index."""
+    async def flush(self, session_summary: str):
+        """Persist a session summary to the daily log and re-index.
+
+        Uses async embedding (Gemini → local → hash fallback) for the re-index
+        step so that stored vectors match query vectors.
+        """
         self.file_memory.append_daily_log(session_summary)
-        # Re-index the daily log file
+        # Re-index the daily log file — async with full embedding chain
         from datetime import UTC, datetime
 
         today = datetime.now(UTC).strftime("%Y-%m-%d")
         rel_path = f"memory/{today}.md"
-        self.index.index_file(rel_path)
+        await self.index.async_index_file(rel_path)

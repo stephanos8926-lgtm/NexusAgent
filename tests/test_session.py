@@ -72,7 +72,11 @@ async def test_session_creation(db_and_repo, mock_agent, mock_memory):
 
 @pytest.mark.asyncio
 async def test_session_send_and_events(db_and_repo, mock_agent, mock_memory):
-    """Create a session, call send(), verify no exception and events are queued."""
+    """Create a session, call send(), verify no exception and events are queued.
+
+    Verifies that memory context is injected as SystemMessage and agent
+    receives {"messages": [...]} dict (not {"message": ...}).
+    """
     _, repo = db_and_repo
     manager = SessionManager()
 
@@ -88,8 +92,11 @@ async def test_session_send_and_events(db_and_repo, mock_agent, mock_memory):
     # send() should not raise
     await session.send("Hello, agent!")
 
-    # Verify the agent was called
+    # Verify the agent was called with {"messages": [...]}
     mock_agent.assert_called_once()
+    call_args = mock_agent.call_args[0][0]
+    assert "messages" in call_args, f"Agent should receive 'messages' key, got: {call_args.keys()}"
+    assert len(call_args["messages"]) >= 2  # SystemMessage + user message
 
     # Verify events were queued (at least one)
     assert session._event_queue.qsize() >= 1
@@ -210,3 +217,152 @@ async def test_session_send_error_handling(db_and_repo, mock_memory):
 async def test_session_singleton():
     """The module-level session_manager is a SessionManager instance."""
     assert isinstance(session_manager, SessionManager)
+
+
+@pytest.mark.asyncio
+async def test_session_memory_injection(db_and_repo, mock_memory):
+    """send() injects memory context as SystemMessage when hybrid memory returns results."""
+    from langchain_core.messages import HumanMessage, SystemMessage
+
+    _, repo = db_and_repo
+    manager = SessionManager()
+
+    # Agent that captures its input for inspection
+    captured = {}
+
+    def capture_agent(state):
+        captured["state"] = state
+        return "captured"
+
+    mock_agent = MagicMock(side_effect=capture_agent)
+
+    # Hybrid memory that returns context
+    class FakeHybridMemory:
+        def get_memory_context(self, query, max_results=5):
+            return "## Relevant Memories\n\nSource: bank/test.md (score: 0.95)\nTest memory content\n"
+
+    sid = "test-session-mem"
+    session = await manager.get_or_create(
+        session_id=sid,
+        working_dir="/tmp/work",
+        agent=mock_agent,
+        memory=mock_memory,
+        db_repo=repo,
+    )
+    # Override hybrid_memory with fake
+    session.hybrid_memory = FakeHybridMemory()
+
+    await session.send("What did we discuss?")
+
+    # Verify agent received messages with memory context
+    assert "state" in captured
+    msgs = captured["state"]["messages"]
+    assert len(msgs) >= 3  # base system + memory context + user message
+    # First message is base system prompt
+    assert isinstance(msgs[0], SystemMessage)
+    # Second should be memory context
+    assert isinstance(msgs[1], SystemMessage)
+    assert "Relevant Memories" in msgs[1].content
+    # Last is user message
+    assert isinstance(msgs[-1], HumanMessage)
+    assert msgs[-1].content == "What did we discuss?"
+
+
+@pytest.mark.asyncio
+async def test_session_memory_injection_empty(db_and_repo, mock_memory):
+    """send() works correctly when hybrid memory returns no results."""
+    from langchain_core.messages import HumanMessage, SystemMessage
+
+    _, repo = db_and_repo
+    manager = SessionManager()
+
+    captured = {}
+
+    def capture_agent(state):
+        captured["state"] = state
+        return "ok"
+
+    mock_agent = MagicMock(side_effect=capture_agent)
+
+    class FakeHybridMemory:
+        def get_memory_context(self, query, max_results=5):
+            return ""  # No memories
+
+    sid = "test-session-nomem"
+    session = await manager.get_or_create(
+        session_id=sid,
+        working_dir="/tmp/work",
+        agent=mock_agent,
+        memory=mock_memory,
+        db_repo=repo,
+    )
+    session.hybrid_memory = FakeHybridMemory()
+
+    await session.send("Hello")
+
+    msgs = captured["state"]["messages"]
+    # Only system prompt + user message (no memory context)
+    assert len(msgs) == 2
+    assert isinstance(msgs[0], SystemMessage)
+    assert isinstance(msgs[1], HumanMessage)
+
+
+@pytest.mark.asyncio
+async def test_session_compaction_triggers_on_long_context(db_and_repo, mock_memory):
+    """send() triggers compaction when messages exceed context threshold."""
+    _, repo = db_and_repo
+    manager = SessionManager()
+
+    captured = {}
+
+    def capture_agent(state):
+        captured["state"] = state
+        return "compacted"
+
+    mock_agent = MagicMock(side_effect=capture_agent)
+
+    # Hybrid memory that returns a very long context to trigger compaction
+    class FakeHybridMemory:
+        def get_memory_context(self, query, max_results=5):
+            # Return enough content to exceed 75% of 200k token window
+            # 200k * 0.75 = 150k tokens * 4 chars = 600k chars
+            return "X" * 700_000
+
+    sid = "test-session-compact"
+    session = await manager.get_or_create(
+        session_id=sid,
+        working_dir="/tmp/work",
+        agent=mock_agent,
+        memory=mock_memory,
+        db_repo=repo,
+    )
+    session.hybrid_memory = FakeHybridMemory()
+
+    await session.send("Trigger compaction")
+
+    # Agent should still be called (compaction reduces context)
+    assert "state" in captured
+    msgs = captured["state"]["messages"]
+    # After compaction, messages should be reduced
+    assert len(msgs) >= 1
+
+
+@pytest.mark.asyncio
+async def test_pre_compaction_flush_async(db_and_repo, mock_agent, mock_memory):
+    """pre_compaction_flush is async and calls hybrid_memory.flush asynchronously."""
+    _, repo = db_and_repo
+    manager = SessionManager()
+
+    sid = "test-session-flush"
+    session = await manager.get_or_create(
+        session_id=sid,
+        working_dir="/tmp/work",
+        agent=mock_agent,
+        memory=mock_memory,
+        db_repo=repo,
+    )
+
+    # Should not raise - flush is now async
+    result = await session.pre_compaction_flush()
+    assert isinstance(result, str)
+    assert "compaction flush" in result

@@ -37,32 +37,41 @@ def mock_session():
 
 @pytest.mark.asyncio
 async def test_memory_context_in_system_prompt(mock_session):
-    """Verify memory context is injected into the agent's system prompt."""
+    """Verify memory context is injected as a SystemMessage in the messages list."""
+    from langchain_core.messages import SystemMessage
+
     await mock_session.send("Fix the auth bug")
 
-    # Agent should have been called
+    # Agent should have been called with {"messages": [...]}
     call_args = mock_session.agent.call_args
     assert call_args is not None, "Agent was never called"
 
-    # Check that system_prompt was passed and contains memory context
-    kwargs = (
-        call_args.kwargs
-        if hasattr(call_args, "kwargs")
-        else (call_args[1] if len(call_args) > 1 else {})
-    )
-    system_prompt = kwargs.get("system_prompt", "") if kwargs else ""
-    assert "Test memory context" in system_prompt, (
-        f"system_prompt does not contain memory context. Got: {system_prompt!r}\n"
-        f"Full call_args: {call_args}"
+    # Check that messages contain memory context as a SystemMessage
+    state = call_args[0][0] if call_args[0] else call_args[1]
+    assert "messages" in state, f"Expected 'messages' key in state, got: {list(state.keys())}"
+    msgs = state["messages"]
+    # Find a SystemMessage with memory context
+    memory_msgs = [m for m in msgs if isinstance(m, SystemMessage) and "Test memory context" in m.content]
+    assert len(memory_msgs) >= 1, (
+        f"No SystemMessage with memory context found. Messages: {[type(m).__name__ for m in msgs]}"
     )
 
 
 @pytest.mark.asyncio
 async def test_no_memory_context_when_empty(mock_session):
-    """When no memories are found, system_prompt should not have memory section."""
+    """When no memories are found, messages should only have base system prompt + user message."""
+    from langchain_core.messages import HumanMessage, SystemMessage
+
     mock_session.hybrid_memory.get_memory_context = MagicMock(return_value="")
     await mock_session.send("Hello")
 
     # Should still work — agent gets called
     call_args = mock_session.agent.call_args
     assert call_args is not None, "Agent was never called"
+
+    state = call_args[0][0] if call_args[0] else call_args[1]
+    msgs = state["messages"]
+    # Only base SystemMessage + HumanMessage (no memory SystemMessage)
+    system_msgs = [m for m in msgs if isinstance(m, SystemMessage)]
+    assert len(system_msgs) == 1, f"Expected 1 SystemMessage, got {len(system_msgs)}"
+    assert isinstance(msgs[-1], HumanMessage)

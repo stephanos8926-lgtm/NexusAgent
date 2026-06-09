@@ -66,12 +66,13 @@ async def test_memory_context_format(tmp_workspace):
     assert "bank/" in context
 
 
-def test_flush_creates_daily_log(tmp_workspace):
+@pytest.mark.asyncio
+async def test_flush_creates_daily_log(tmp_workspace):
     """Call flush, verify daily log file created."""
     mgr = HybridMemoryManager(tmp_workspace)
     mgr.initialize()
 
-    mgr.flush("Session summary: worked on memory system today")
+    await mgr.flush("Session summary: worked on memory system today")
 
     # Check daily log was created
     daily_files = list(Path(tmp_workspace).joinpath("memory").glob("*.md"))

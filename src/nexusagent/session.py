@@ -12,6 +12,8 @@ from collections.abc import AsyncGenerator
 from pathlib import Path
 from typing import Any
 
+from langchain_core.messages import SystemMessage
+
 from nexusagent.models import ErrorEvent, ResponseEvent
 
 logger = logging.getLogger(__name__)
@@ -74,22 +76,50 @@ class Session:
         except Exception as exc:
             logger.warning("Failed to store user message in DB: %s", exc)
 
-        # Build system prompt with memory context
+        # Build messages list with memory context injected as SystemMessage
+        from langchain_core.messages import HumanMessage
+
         system_prompt = self._base_system_prompt()
+        messages = [SystemMessage(content=system_prompt)]
+
         try:
             hybrid_context = self.hybrid_memory.get_memory_context(user_message, max_results=5)
             if hybrid_context:
-                system_prompt = f"{system_prompt}\n\n{hybrid_context}"
+                messages.append(SystemMessage(content=hybrid_context))
         except Exception as exc:
             logger.warning("Hybrid memory context retrieval failed: %s", exc)
 
-        # Invoke agent with system_prompt
+        messages.append(HumanMessage(content=user_message))
+
+        # Compaction: if messages exceed context window, compact before model call
+        from nexusagent.compaction import CompactionPipeline, pre_compaction_flush
+
+        _compaction = CompactionPipeline()
+        if _compaction.should_compact([{"role": "system", "content": m.content} for m in messages]):
+            # Pre-compaction flush to memory
+            summary = f"Session {self.session_id} turn: {user_message[:100]}"
+            try:
+                flush_ctx = await pre_compaction_flush(self, summary)
+                messages.insert(1, SystemMessage(content=flush_ctx))
+            except Exception as exc:
+                logger.warning("Pre-compaction flush failed: %s", exc)
+            # Compact messages
+            msg_dicts = [{"role": "system" if isinstance(m, SystemMessage) else "user" if isinstance(m, HumanMessage) else "assistant", "content": m.content} for m in messages]
+            compacted = _compaction.compact(msg_dicts)
+            # Rebuild messages list from compacted dicts
+            messages = []
+            for md in compacted:
+                if md["role"] == "system":
+                    messages.append(SystemMessage(content=md["content"]))
+                elif md["role"] == "user":
+                    messages.append(HumanMessage(content=md["content"]))
+                else:
+                    messages.append(HumanMessage(content=md["content"]))  # fallback
+
+        # Invoke agent with proper messages format
         self._cancel_flag = False
         try:
-            result = self.agent(
-                {"message": user_message},
-                system_prompt=system_prompt,
-            )
+            result = self.agent({"messages": messages})
             # If the agent returns an async generator, stream events
             if hasattr(result, "__aiter__"):
                 async for event in result:
@@ -124,14 +154,14 @@ class Session:
 
     # ── Pre-compaction flush ───────────────────────────────────────────
 
-    def pre_compaction_flush(self) -> str:
+    async def pre_compaction_flush(self) -> str:
         """Flush session state to daily log before context compaction.
 
         Returns a summary string to be used as context after compaction.
         """
         summary = f"Session {self.session_id} compaction flush at {asyncio.get_event_loop().time()}"
         try:
-            self.hybrid_memory.flush(summary)
+            await self.hybrid_memory.flush(summary)
         except Exception as exc:
             logger.warning("Pre-compaction flush failed: %s", exc)
         return summary

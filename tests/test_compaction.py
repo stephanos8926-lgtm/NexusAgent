@@ -1,6 +1,8 @@
 """Tests for the context compaction pipeline."""
 
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
+
+import pytest
 
 from nexusagent.compaction import CompactionPipeline, pre_compaction_flush
 
@@ -306,22 +308,24 @@ class TestCompactionPipeline:
 
 
 class TestPreCompactionFlush:
-    def test_flush_writes_to_daily_log(self):
+    @pytest.mark.asyncio
+    async def test_flush_writes_to_daily_log(self):
         """Verify flush writes to daily log via hybrid_memory."""
         mock_session = MagicMock()
-        mock_hybrid = mock_session.hybrid_memory
+        mock_session.hybrid_memory.flush = AsyncMock()
 
         summary = "Test compaction summary"
-        result = pre_compaction_flush(mock_session, summary)
+        result = await pre_compaction_flush(mock_session, summary)
 
-        mock_hybrid.flush.assert_called_once_with(summary)
+        mock_session.hybrid_memory.flush.assert_called_once_with(summary)
         assert "Before compaction" in result
         assert summary in result
 
-    def test_flush_handles_errors_gracefully(self):
+    @pytest.mark.asyncio
+    async def test_flush_handles_errors_gracefully(self):
         """If flush fails, should not raise."""
         mock_session = MagicMock()
-        mock_session.hybrid_memory.flush.side_effect = RuntimeError("DB error")
+        mock_session.hybrid_memory.flush = AsyncMock(side_effect=RuntimeError("DB error"))
 
-        result = pre_compaction_flush(mock_session, "test summary")
+        result = await pre_compaction_flush(mock_session, "test summary")
         assert "Before compaction" in result
