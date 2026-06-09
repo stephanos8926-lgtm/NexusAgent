@@ -3,7 +3,7 @@ import asyncio
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -229,6 +229,66 @@ async def list_tools():
         )
 
     return {"tools": by_cat, "total": len(tools)}
+
+
+# ─── WebSocket Interactive Sessions ────────────────────────────────────
+
+
+@app.websocket("/sessions/{session_id}/ws")
+async def session_websocket(websocket: WebSocket, session_id: str):
+    """Real-time interactive session via WebSocket.
+
+    Client → Server messages (JSON):
+      {"type": "user_input", "content": "..."}
+      {"type": "approval", "call_id": "...", "approved": true}
+      {"type": "interrupt"}
+      {"type": "close"}
+
+    Server → Client messages (JSON):
+      {"type": "thinking", "content": "..."}
+      {"type": "tool_call", "tool": "...", "args": {...}, "call_id": "..."}
+      {"type": "tool_result", "call_id": "...", "output": "...", "success": true}
+      {"type": "approval_request", "tool": "...", "args": {...}, "call_id": "..."}
+      {"type": "response", "content": "..."}
+      {"type": "error", "message": "..."}
+      {"type": "session_status", "status": "active|idle|closed"}
+    """
+    await websocket.accept()
+
+    from nexusagent.session import session_manager
+
+    session = await session_manager.get_or_create(session_id)
+
+    try:
+        await websocket.send_json({"type": "session_status", "status": session.status})
+
+        async def send_events():
+            async for event in session.event_stream():
+                await websocket.send_json(event)
+
+        async def receive_messages():
+            while True:
+                msg = await websocket.receive_json()
+                msg_type = msg.get("type")
+
+                if msg_type == "user_input":
+                    await session.send(msg["content"])
+                elif msg_type == "approval":
+                    await session.approve(msg["call_id"], msg.get("approved", False))
+                elif msg_type == "interrupt":
+                    await session.interrupt()
+                elif msg_type == "close":
+                    await session.close()
+                    break
+
+        await asyncio.gather(send_events(), receive_messages())
+
+    except WebSocketDisconnect:
+        logger.info(f"Session {session_id} disconnected")
+        await session_manager.mark_idle(session_id)
+    except Exception as e:
+        logger.error(f"WebSocket error in session {session_id}: {e}", exc_info=True)
+        await websocket.close(code=1011)
 
 
 def run() -> None:
