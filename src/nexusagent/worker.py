@@ -4,11 +4,14 @@ import json
 import logging
 import time
 import uuid
+from datetime import UTC, datetime
 from typing import Any
+
+from sqlalchemy import select
 
 from nexusagent.agent import run_agent_task
 from nexusagent.bus import bus
-from nexusagent.db import task_repo
+from nexusagent.db import TaskModel, task_repo
 from nexusagent.models import ResultSchema, TaskContract, TaskSchema, TaskStatus
 from nexusagent.subagent import SubAgentHandle
 from nexusagent.utils import CircuitBreaker, retry_with_backoff
@@ -85,6 +88,21 @@ class NexusWorker:
             return f"Research workflow error: {error}"
         return "Research workflow completed but produced no output."
 
+    async def _heartbeat(self, task_id: str, stop_event: asyncio.Event):
+        """Periodically bump task updated_at so the reaper doesn't eat it."""
+        while not stop_event.is_set():
+            await asyncio.sleep(30)
+            try:
+                async with task_repo.db_manager.get_session() as session:
+                    result = await session.execute(
+                        select(TaskModel).where(TaskModel.id == task_id)
+                    )
+                    task_obj = result.scalar_one_or_none()
+                    if task_obj and task_obj.status == "processing":
+                        task_obj.updated_at = datetime.now(UTC)
+            except Exception:
+                pass  # Heartbeat must never crash the worker
+
     async def handle_task(self, msg: Any) -> None:
         """
         NATS callback to process an incoming task.
@@ -109,8 +127,17 @@ class NexusWorker:
             # 1. Update status to PROCESSING in DB
             await task_repo.update_task_status(task.id, TaskStatus.PROCESSING)
 
-            # 2. Execute the agent task (with retry + circuit breaker)
-            result_data = await self._execute_agent_logic(task)
+            # Start heartbeat to keep updated_at fresh during execution
+            heartbeat_stop = asyncio.Event()
+            heartbeat_task = asyncio.create_task(
+                self._heartbeat(task.id, heartbeat_stop)
+            )
+            try:
+                # 2. Execute the agent task (with retry + circuit breaker)
+                result_data = await self._execute_agent_logic(task)
+            finally:
+                heartbeat_stop.set()
+                await heartbeat_task
 
             duration = time.time() - start_time
 
