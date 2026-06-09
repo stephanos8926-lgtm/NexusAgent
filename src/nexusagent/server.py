@@ -237,24 +237,23 @@ async def list_tools():
 
 
 @app.websocket("/sessions/{session_id}/ws")
-async def session_websocket(websocket: WebSocket, session_id: str):
+async def session_websocket(
+    websocket: WebSocket,
+    session_id: str,
+    api_key: str | None = None,
+):
     """Real-time interactive session via WebSocket.
 
-    Client → Server messages (JSON):
-      {"type": "user_input", "content": "..."}
-      {"type": "approval", "call_id": "...", "approved": true}
-      {"type": "interrupt"}
-      {"type": "close"}
-
-    Server → Client messages (JSON):
-      {"type": "thinking", "content": "..."}
-      {"type": "tool_call", "tool": "...", "args": {...}, "call_id": "..."}
-      {"type": "tool_result", "call_id": "...", "output": "...", "success": true}
-      {"type": "approval_request", "tool": "...", "args": {...}, "call_id": "..."}
-      {"type": "response", "content": "..."}
-      {"type": "error", "message": "..."}
-      {"type": "session_status", "status": "active|idle|closed"}
+    Requires API key via query parameter: ?api_key=xxx
     """
+    # Verify API key before accepting the connection
+    from nexusagent.api_auth import verify_api_key
+    try:
+        verify_api_key(api_key)
+    except HTTPException:
+        await websocket.close(code=4001, reason="Invalid or missing API key")
+        return
+
     await websocket.accept()
 
     from nexusagent.agent import Agent
@@ -271,6 +270,10 @@ async def session_websocket(websocket: WebSocket, session_id: str):
         memory=None,
         db_repo=session_repo,
     )
+
+    # Set workspace root for file operation path jail
+    from nexusagent.tools.fs import set_workspace_root
+    set_workspace_root(session.working_dir)
 
     try:
         await websocket.send_json({"type": "session_status", "status": session.status})

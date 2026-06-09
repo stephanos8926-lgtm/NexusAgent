@@ -3,11 +3,39 @@ Shell execution tools for NexusAgent.
 
 Provides run_shell with timeout, working directory, environment control,
 and streaming support for long-running commands.
+
+SECURITY: Uses shell=False with shlex.split() to prevent shell injection.
+Commands are split into argument arrays, not passed to a shell interpreter.
 """
 
 import os
 import shlex
 import subprocess
+
+MAX_OUTPUT_BYTES = 1024 * 1024  # 1MB output cap to prevent memory exhaustion
+
+
+def _split_command(command: str) -> list[str]:
+    """Split a command string into an argument list safely.
+
+    Uses shlex.split() which handles quoting correctly and does NOT
+    invoke a shell. This prevents shell injection attacks.
+    """
+    try:
+        return shlex.split(command)
+    except ValueError as e:
+        raise ValueError(f"Invalid command syntax: {e}")
+
+
+def _truncate_output(output: str) -> str:
+    """Truncate output to MAX_OUTPUT_BYTES to prevent memory exhaustion."""
+    encoded = output.encode("utf-8")
+    if len(encoded) <= MAX_OUTPUT_BYTES:
+        return output
+    # Truncate at a character boundary
+    truncated = encoded[:MAX_OUTPUT_BYTES].decode("utf-8", errors="replace")
+    truncated += f"\n[OUTPUT TRUNCATED: exceeded {MAX_OUTPUT_BYTES:,} bytes]"
+    return truncated
 
 
 def run_shell(
@@ -19,19 +47,32 @@ def run_shell(
 ) -> str:
     """Execute a shell command with safety controls.
 
-    Returns structured output with stdout, stderr, and exit code so the
-    agent can debug failures and course-correct.
+    Uses shell=False with shlex.split() to prevent shell injection.
+    Output is truncated to 1MB to prevent memory exhaustion.
+
+    Returns structured output with stdout, stderr, and exit code.
     """
+    try:
+        cmd_args = _split_command(command)
+    except ValueError as e:
+        return f"[ERROR] {e}"
+
+    if not cmd_args:
+        return "[ERROR] Empty command"
+
     cmd_env = os.environ.copy()
     if env:
-        cmd_env.update(env)
+        # Sanitize env vars — only allow alphanumeric + underscore keys
+        for k, v in env.items():
+            if k.replace("_", "").replace("-", "").isalnum():
+                cmd_env[k] = str(v)
 
     cwd = workdir if workdir else None
 
     try:
         result = subprocess.run(
-            command,
-            shell=True,
+            cmd_args,
+            shell=False,  # SECURITY: never use shell=True
             capture_output=capture,
             text=True,
             timeout=timeout,
@@ -41,20 +82,22 @@ def run_shell(
 
         parts = []
         if result.stdout:
-            parts.append(result.stdout.rstrip())
+            parts.append(_truncate_output(result.stdout.rstrip()))
         if result.stderr:
-            parts.append(f"[stderr] {result.stderr.rstrip()}")
+            parts.append(f"[stderr] {_truncate_output(result.stderr.rstrip())}")
         if result.returncode != 0 and not result.stderr:
             parts.append(f"[exit code {result.returncode}]")
 
         return "\n".join(parts) if parts else f"[exit code {result.returncode}]"
 
     except subprocess.TimeoutExpired as e:
-        partial = e.stdout if e.stdout else ""
+        partial = _truncate_output(e.stdout) if e.stdout else ""
         return f"[TIMEOUT after {timeout}s]\n{partial}"
     except FileNotFoundError as e:
-        return f"[ERROR] Command not found: {e}"
-    except Exception as e:
+        return f"[ERROR] Command not found: {e.filename}"
+    except PermissionError:
+        return f"[ERROR] Permission denied: {cmd_args[0]}"
+    except OSError as e:
         return f"[ERROR] {e}"
 
 
@@ -64,17 +107,31 @@ def run_shell_streaming(
     env: dict[str, str] | None = None,
     timeout: int = 300,
 ) -> str:
-    """Execute a shell command with line-by-line streaming output."""
+    """Execute a shell command with line-by-line streaming output.
+
+    Uses shell=False with shlex.split() to prevent shell injection.
+    Output is truncated to 1MB to prevent memory exhaustion.
+    """
+    try:
+        cmd_args = _split_command(command)
+    except ValueError as e:
+        return f"[ERROR] {e}"
+
+    if not cmd_args:
+        return "[ERROR] Empty command"
+
     cmd_env = os.environ.copy()
     if env:
-        cmd_env.update(env)
+        for k, v in env.items():
+            if k.replace("_", "").replace("-", "").isalnum():
+                cmd_env[k] = str(v)
 
     cwd = workdir if workdir else None
 
     try:
         process = subprocess.Popen(
-            command,
-            shell=True,
+            cmd_args,
+            shell=False,  # SECURITY: never use shell=True
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
@@ -83,8 +140,15 @@ def run_shell_streaming(
         )
 
         output_lines = []
+        total_bytes = 0
         try:
             for line in process.stdout:
+                total_bytes += len(line.encode("utf-8"))
+                if total_bytes > MAX_OUTPUT_BYTES:
+                    output_lines.append(
+                        f"\n[OUTPUT TRUNCATED: exceeded {MAX_OUTPUT_BYTES:,} bytes]"
+                    )
+                    break
                 output_lines.append(line.rstrip())
             process.wait(timeout=timeout)
         except subprocess.TimeoutExpired:
@@ -95,5 +159,9 @@ def run_shell_streaming(
         output = "\n".join(output_lines)
         return f"[exit code {process.returncode}]\n{output}"
 
-    except Exception as e:
+    except FileNotFoundError as e:
+        return f"[ERROR] Command not found: {e.filename}"
+    except PermissionError:
+        return f"[ERROR] Permission denied: {cmd_args[0]}"
+    except OSError as e:
         return f"[ERROR] {e}"

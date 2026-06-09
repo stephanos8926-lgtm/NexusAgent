@@ -198,6 +198,7 @@ class Session:
         self._pending_approvals: dict[str, asyncio.Event] = {}
         self._approval_results: dict[str, bool] = {}
         self._seen_tool_results: set[str] = set()  # deduplicate tool_result events
+        self._seen_tool_calls: set[str] = set()  # deduplicate tool_call events
         self._conversation_history: list[Any] = []  # accumulated LangChain messages
 
     # ── Prompt & Context ─────────────────────────────────────────────────
@@ -338,7 +339,9 @@ class Session:
                 elif md["role"] == "user":
                     messages.append(HumanMessage(content=md["content"]))
                 else:
-                    messages.append(HumanMessage(content=md["content"]))  # fallback
+                    # assistant and any other roles → AIMessage
+                    from langchain_core.messages import AIMessage
+                    messages.append(AIMessage(content=md["content"]))
 
         # Stream agent execution with real-time tool call/result events
         self._cancel_flag = False
@@ -417,15 +420,17 @@ class Session:
         """
         from langchain_core.messages import AIMessageChunk, ToolMessage
 
-        # Tool call chunks (streaming tool invocations)
+        # Tool call chunks (streaming tool invocations) — deduplicate by call_id
         if isinstance(token, AIMessageChunk) and token.tool_call_chunks:
             for tc in token.tool_call_chunks:
-                if tc.get("name"):
+                call_id = tc.get("id", "")
+                if tc.get("name") and call_id and call_id not in self._seen_tool_calls:
+                    self._seen_tool_calls.add(call_id)
                     self._enqueue({
                         "type": "tool_call",
                         "tool": tc["name"],
                         "args": tc.get("args", {}),
-                        "call_id": tc.get("id", ""),
+                        "call_id": call_id,
                     })
 
         # Tool results — deduplicate by call_id

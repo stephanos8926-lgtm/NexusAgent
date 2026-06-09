@@ -356,7 +356,10 @@ class NexusApp(App):
     # ── WebSocket loop ──────────────────────────────────────────────
 
     async def _ws_loop(self) -> None:
+        api_key = settings.client.api_key
         ws_url = f"ws://127.0.0.1:{settings.server.api_port}/sessions/{self.session_id}/ws"
+        if api_key:
+            ws_url += f"?api_key={api_key}"
         try:
             async with websockets.connect(ws_url, ping_interval=20, ping_timeout=10) as ws:
                 self._ws = ws
@@ -475,6 +478,12 @@ class NexusApp(App):
             self._busy = False
             self._process_next_in_queue()
             self.status_widget.set_text("Error")
+
+        elif etype == "session_closed":
+            self.log_widget.write("[dim]Session closed by server.[/dim]", shrink=False)
+            self._busy = False
+            self._ws = None
+            self.status_widget.set_text("Disconnected")
 
     # ── Display helpers ──────────────────────────────────────────────
 

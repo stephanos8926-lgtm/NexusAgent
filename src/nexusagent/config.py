@@ -23,6 +23,8 @@ class ClientConfig(BaseModel):
     timeout: int = Field(default=30, ge=1)
     retry_limit: int = Field(default=3, ge=0)
     result_timeout: int = Field(default=300, ge=1)
+    # API key for TUI WebSocket connection (read from env NEXUS_CLIENT__API_KEY)
+    api_key: str = Field(default="")
 
 
 class AuthConfig(BaseModel):
