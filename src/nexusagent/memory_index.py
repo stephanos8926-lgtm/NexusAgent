@@ -73,7 +73,20 @@ class EmbeddingProvider:
         """Use Gemini embedding API."""
         import google.generativeai as genai
 
-        api_key = getattr(settings, "gemini_api_key", None) or os.environ.get("GEMINI_API_KEY")
+        # Try settings first, then environment, then .env file
+        api_key = getattr(settings, "gemini_api_key", None)
+        if not api_key:
+            api_key = os.environ.get("GEMINI_API_KEY")
+        if not api_key:
+            # Try loading from .env file in project root
+            from nexusagent.config import get_project_root
+            env_path = get_project_root() / ".env"
+            if env_path.exists():
+                for line in env_path.read_text().splitlines():
+                    line = line.strip()
+                    if line.startswith("GEMINI_API_KEY="):
+                        api_key = line.split("=", 1)[1].strip().strip('"').strip("'")
+                        break
         if not api_key:
             raise ValueError("No Gemini API key configured")
 
