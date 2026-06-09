@@ -1,20 +1,17 @@
 services:
   nexus:
     build: .
-    ports:
-      - "8000:8000"
+    network_mode: host
     environment:
-      - NEXUS_SERVER__NATS_URL=nats://host.docker.internal:4222
+      - NEXUS_SERVER__NATS_URL=nats://127.0.0.1:4222
       - NEXUS_SERVER__DB_PATH=/data/nexus.db
       - NEXUS_SERVER__API_PORT=8000
       - NEXUS_LOG_LEVEL=INFO
     volumes:
       - nexus-data:/data
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
       interval: 30s
       timeout: 5s
       retries: 3

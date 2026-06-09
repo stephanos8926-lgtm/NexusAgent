@@ -8,13 +8,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libsqlite3-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies first (layer caching)
+# Copy everything first so pip install -e . can find src/
 COPY pyproject.toml .
-RUN pip install --no-cache-dir -e .
-
-# Copy source
 COPY src/ src/
-COPY config/ config/ 2>/dev/null || true
+COPY config/ config/
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -e .
 
 # Create data directory for SQLite DB
 RUN mkdir -p /data
