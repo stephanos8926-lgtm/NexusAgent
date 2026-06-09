@@ -99,3 +99,24 @@ async def test_merge_selective(tmp_db: str):
     assert any("discovered fact B" in c for c in contents)
 
     await mgr.close()
+
+
+async def test_fork_does_not_leak_connection(tmp_db: str):
+    """fork() should share the parent's connection, not create a new one."""
+    mgr = MemoryManager(db_path=tmp_db)
+    parent = await mgr.create("parent-leak-test", MemoryScope.ISOLATED)
+    await parent.remember("Parent memory", {})
+
+    child = await parent.fork(MemoryScope.ISOLATED)
+    await child.remember("Child memory", {})
+
+    # Child should be able to recall its own memories
+    child_results = await child.recall("memory", limit=10)
+    assert len(child_results) >= 1
+
+    # Parent should not see child's memories (isolated)
+    parent_results = await parent.recall("memory", limit=10)
+    assert any("Parent" in r.content for r in parent_results)
+    assert not any("Child" in r.content for r in parent_results)
+
+    await mgr.close()

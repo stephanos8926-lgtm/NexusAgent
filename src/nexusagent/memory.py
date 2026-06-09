@@ -89,12 +89,13 @@ class Memory:
         scope: MemoryScope,
         db_path: str,
         parent_memory_id: str | None = None,
+        conn: Any = None,
     ) -> None:
         self.memory_id = memory_id
         self.scope = scope
         self.db_path = db_path
         self.parent_memory_id = parent_memory_id
-        self._conn: Any = None  # sqlite3.Connection (set by MemoryManager)
+        self._conn: Any = conn  # sqlite3.Connection (set by MemoryManager or fork)
 
     # -- internal helpers ----------------------------------------------------
 
@@ -203,11 +204,13 @@ class Memory:
     async def fork(self, scope: MemoryScope = MemoryScope.SCOPED) -> "Memory":
         """Create a child memory whose parent is this memory."""
         child_id = str(uuid.uuid4())
-        mgr = MemoryManager(db_path=self.db_path)
-        # Reuse the same underlying connection for the child so they share the DB
-        child = await mgr.create(child_id, scope, parent_memory_id=self.memory_id)
-        # Point child at the same connection
-        child._conn = self._get_connection()
+        child = Memory(
+            memory_id=child_id,
+            scope=scope,
+            db_path=self.db_path,
+            parent_memory_id=self.memory_id,
+            conn=self._conn,  # Share parent's connection — no leak
+        )
         return child
 
     async def merge(self, child: "Memory", strategy: str = "selective") -> int:
