@@ -65,11 +65,15 @@ def submit(task):
     "--memory-mode", "-m", default="isolated", type=click.Choice(["isolated", "scoped", "shared"])
 )
 @click.option("--acceptance", "-a", multiple=True, help="Acceptance criteria")
-def run(task, working_dir, max_turns, wall_time, memory_mode, acceptance):
+@click.option("--model", "-M", default=None, help="Model override for this agent")
+@click.option("--max-depth", default=3, help="Max sub-agent nesting depth")
+@click.option("--summary-only", is_flag=True, default=False, help="Return only summary (not full output)")
+def run(task, working_dir, max_turns, wall_time, memory_mode, acceptance, model, max_depth, summary_only):
     """Spawn an isolated worker to complete a task.
 
     Example:
         nexus run "Fix the auth bug in server.py" -d /project -t 20 -a "Tests pass"
+        nexus run "Research X" --model gemini-3.1-flash-lite --max-depth 5 --summary-only
     """
     from nexusagent.models import MemoryScope, TaskContract
     from nexusagent.worker import worker_pool
@@ -83,10 +87,13 @@ def run(task, working_dir, max_turns, wall_time, memory_mode, acceptance):
         max_wall_time=wall_time,
         acceptance_criteria=list(acceptance) if acceptance else ["Task completed"],
         memory_scope=MemoryScope(memory_mode),
+        model=model,
+        max_depth=max_depth,
+        summary_only=summary_only,
     )
 
     async def _run():
-        handle = await worker_pool.spawn(contract)
+        handle = await worker_pool.spawn(contract, depth=0)
         click.echo(f"Spawned worker {handle.worker_id}")
 
         try:
@@ -97,6 +104,92 @@ def run(task, working_dir, max_turns, wall_time, memory_mode, acceptance):
             await handle.cancel()
         except RuntimeError as e:
             click.echo(f"Failed: {e}", err=True)
+
+    asyncio.run(_run())
+
+
+@main.command("session")
+@click.argument("action", type=click.Choice(["list", "resume", "fork", "rename", "delete"]))
+@click.argument("session_id", required=False)
+@click.option("--new-id", "-n", default=None, help="New session ID (for rename/fork)")
+@click.option("--working-dir", "-d", default=None, help="Working directory (for fork)")
+@click.option("--status", "-s", default=None, type=click.Choice(["active", "idle", "closed"]), help="Filter by status")
+@click.option("--limit", "-l", default=20, help="Max results")
+def session_cmd(action, session_id, new_id, working_dir, status, limit):
+    """Manage interactive sessions.
+
+    Actions:
+        list    — List sessions (optionally filter by status)
+        resume  — Print session info (use with nexus run to reconnect)
+        fork    — Copy a session to a new ID
+        rename  — Rename a session
+        delete  — Delete a session and its messages
+
+    Examples:
+        nexus session list
+        nexus session list --status active
+        nexus session resume abc123
+        nexus session fork abc123 --new-id xyz789
+        nexus session rename abc123 --new-id xyz789
+        nexus session delete abc123
+    """
+    from nexusagent.db import session_repo
+
+    async def _run():
+        if action == "list":
+            sessions = await session_repo.list_sessions(status=status, limit=limit)
+            if not sessions:
+                click.echo("No sessions found.")
+                return
+            click.echo(f"{'ID':<40} {'Status':<10} {'Working Dir':<30} {'Updated':<20}")
+            click.echo("-" * 100)
+            for s in sessions:
+                updated = s["updated_at"][:19] if s["updated_at"] else "unknown"
+                click.echo(f"{s['id']:<40} {s['status']:<10} {s['working_dir']:<30} {updated:<20}")
+
+        elif action == "resume":
+            if not session_id:
+                click.echo("Error: session_id required", err=True)
+                return
+            s = await session_repo.get_session(session_id)
+            if not s:
+                click.echo(f"Session {session_id} not found.", err=True)
+                return
+            click.echo(f"Session: {s['id']}")
+            click.echo(f"  Status: {s['status']}")
+            click.echo(f"  Working Dir: {s['working_dir']}")
+            click.echo(f"  Created: {s['created_at']}")
+            click.echo(f"  Updated: {s['updated_at']}")
+
+        elif action == "fork":
+            if not session_id:
+                click.echo("Error: session_id required", err=True)
+                return
+            new_id_res = await session_repo.fork_session(session_id, working_dir)
+            if new_id_res:
+                click.echo(f"Forked {session_id} → {new_id_res}")
+            else:
+                click.echo(f"Session {session_id} not found.", err=True)
+
+        elif action == "rename":
+            if not session_id or not new_id:
+                click.echo("Error: session_id and --new-id required", err=True)
+                return
+            ok = await session_repo.rename_session(session_id, new_id)
+            if ok:
+                click.echo(f"Renamed {session_id} → {new_id}")
+            else:
+                click.echo(f"Failed. Session {session_id} not found or {new_id} already exists.", err=True)
+
+        elif action == "delete":
+            if not session_id:
+                click.echo("Error: session_id required", err=True)
+                return
+            ok = await session_repo.delete_session(session_id)
+            if ok:
+                click.echo(f"Deleted {session_id}")
+            else:
+                click.echo(f"Session {session_id} not found.", err=True)
 
     asyncio.run(_run())
 

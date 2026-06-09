@@ -47,6 +47,10 @@ class TaskContract(BaseModel):
     description: str = ""
     priority: int = Field(default=1, ge=1, le=5)
     metadata: dict[str, Any] = Field(default_factory=dict)
+    # P5: Sub-agent improvements
+    model: str | None = None  # Per-agent model override (e.g. "gemini-3.1-flash-lite")
+    max_depth: int = Field(default=3, ge=1, le=10)  # Max sub-agent nesting depth
+    summary_only: bool = False  # If True, return only a summary (not full output)
 
 
 class ResultSchema(BaseModel):

@@ -213,10 +213,20 @@ class WorkerPool:
         self._tasks: set[asyncio.Task] = set()
         self._semaphore = asyncio.Semaphore(max_workers)
 
-    async def spawn(self, contract: TaskContract) -> SubAgentHandle:
-        """Spawn an isolated worker. Returns a handle to monitor/control it."""
+    async def spawn(self, contract: TaskContract, depth: int = 0) -> SubAgentHandle:
+        """Spawn an isolated worker. Returns a handle to monitor/control it.
+
+        Args:
+            contract: Task configuration including model, max_depth, summary_only.
+            depth: Current nesting depth (0 = top-level). Children get depth+1.
+        """
+        if depth >= contract.max_depth:
+            raise RuntimeError(
+                f"Max sub-agent depth ({contract.max_depth}) reached. "
+                f"Cannot spawn worker for task: {contract.task_id}"
+            )
         worker_id = f"worker-{str(uuid.uuid4())[:8]}"
-        handle = SubAgentHandle(worker_id=worker_id, contract=contract)
+        handle = SubAgentHandle(worker_id=worker_id, contract=contract, depth=depth)
         self._active[worker_id] = handle
         task = asyncio.create_task(self._run_worker(handle))
         self._tasks.add(task)

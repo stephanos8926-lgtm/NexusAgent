@@ -310,6 +310,98 @@ class SessionRepository:
                 for m in messages
             ]
 
+    async def list_sessions(
+        self,
+        status: str | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[dict]:
+        """List sessions with optional status filter and pagination."""
+        async with self.db_manager.get_session() as session:
+            query = select(SessionModel).order_by(SessionModel.updated_at.desc())
+            if status:
+                query = query.where(SessionModel.status == status)
+            query = query.limit(limit).offset(offset)
+            result = await session.execute(query)
+            sessions = result.scalars().all()
+            return [
+                {
+                    "id": s.id,
+                    "working_dir": s.working_dir,
+                    "memory_id": s.memory_id,
+                    "status": s.status,
+                    "created_at": s.created_at.isoformat() if s.created_at else None,
+                    "updated_at": s.updated_at.isoformat() if s.updated_at else None,
+                }
+                for s in sessions
+            ]
+
+    async def rename_session(self, session_id: str, new_id: str) -> bool:
+        """Rename a session. Returns True if renamed, False if not found or new_id taken."""
+        async with self.db_manager.get_session() as session:
+            # Check target doesn't exist
+            existing = await session.execute(
+                select(SessionModel).where(SessionModel.id == new_id)
+            )
+            if existing.scalar_one_or_none():
+                return False
+            # Rename
+            stmt = update(SessionModel).where(SessionModel.id == session_id).values(id=new_id)
+            result = await session.execute(stmt)
+            return result.rowcount > 0
+
+    async def delete_session(self, session_id: str) -> bool:
+        """Delete a session and its messages. Returns True if deleted."""
+        async with self.db_manager.get_session() as session:
+            # Delete messages first (FK-like cleanup, no actual FK constraint)
+            await session.execute(
+                text("DELETE FROM messages WHERE session_id = :sid"),
+                {"sid": session_id},
+            )
+            result = await session.execute(
+                text("DELETE FROM sessions WHERE id = :sid"),
+                {"sid": session_id},
+            )
+            return result.rowcount > 0
+
+    async def fork_session(self, source_id: str, new_working_dir: str | None = None) -> str | None:
+        """Fork a session: copy messages to a new session ID. Returns new session ID or None."""
+        async with self.db_manager.get_session() as session:
+            src = await session.execute(
+                select(SessionModel).where(SessionModel.id == source_id)
+            )
+            src_sess = src.scalar_one_or_none()
+            if not src_sess:
+                return None
+
+            new_id = str(uuid.uuid4())
+            new_sess = SessionModel(
+                id=new_id,
+                working_dir=new_working_dir or src_sess.working_dir,
+                memory_id=src_sess.memory_id,
+                status="active",
+            )
+            session.add(new_sess)
+
+            # Copy messages
+            msgs = await session.execute(
+                select(MessageModel)
+                .where(MessageModel.session_id == source_id)
+                .order_by(MessageModel.created_at.asc())
+            )
+            for msg in msgs.scalars().all():
+                new_msg = MessageModel(
+                    id=str(uuid.uuid4()),
+                    session_id=new_id,
+                    role=msg.role,
+                    content=msg.content,
+                    tool_name=msg.tool_name,
+                    tool_args=msg.tool_args,
+                )
+                session.add(new_msg)
+
+            return new_id
+
 
 db_manager = DatabaseManager()
 task_repo = TaskRepository(db_manager)

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
@@ -25,15 +26,18 @@ class SubAgentHandle:
     """Control handle for a spawned sub-agent worker.
 
     Provides status tracking, cancellation signaling, and synchronous/async
-    waiting for completion.
+    waiting for completion. Supports summary-only returns and per-agent
+    model/depth configuration via the TaskContract.
     """
 
-    def __init__(self, worker_id: str, contract: TaskContract) -> None:
+    def __init__(self, worker_id: str, contract: TaskContract, depth: int = 0) -> None:
         self.worker_id = worker_id
         self.contract = contract
+        self.depth = depth  # Nesting depth (0 = top-level)
 
         self._status: SubAgentStatus = SubAgentStatus.PENDING
         self._result: Any = None
+        self._summary: str | None = None  # Summary-only return
         self._error: str | None = None
 
         self._cancel_event: asyncio.Event = asyncio.Event()
@@ -50,11 +54,24 @@ class SubAgentHandle:
 
     @property
     def result(self) -> Any:
+        """Return full result or summary depending on contract.summary_only."""
+        if self.contract.summary_only:
+            return self._summary
         return self._result
+
+    @property
+    def summary(self) -> str | None:
+        """Return the summary string (available when summary_only=True)."""
+        return self._summary
 
     @property
     def error(self) -> str | None:
         return self._error
+
+    @property
+    def model(self) -> str:
+        """Return the model for this sub-agent (from contract or default)."""
+        return self.contract.model or os.getenv("AGENT_MODEL", "gemini-3.1-flash-lite")
 
     # -- public query methods ------------------------------------------------
 
@@ -69,6 +86,10 @@ class SubAgentHandle:
     def is_cancelled(self) -> bool:
         """Return True if the sub-agent was cancelled."""
         return self._status == SubAgentStatus.CANCELLED
+
+    def can_spawn_child(self) -> bool:
+        """Return True if this sub-agent can spawn children (depth < max_depth)."""
+        return self.depth < self.contract.max_depth
 
     # -- cancellation --------------------------------------------------------
 
@@ -92,8 +113,8 @@ class SubAgentHandle:
     async def wait(self, timeout: float | None = None) -> Any:
         """Wait for the sub-agent to reach a terminal state.
 
-        Returns the result on completion.  Raises ``RuntimeError`` on failure
-        or ``CancelledError`` on cancellation.
+        Returns the result (or summary if summary_only=True) on completion.
+        Raises ``RuntimeError`` on failure or ``CancelledError`` on cancellation.
         """
         await asyncio.wait_for(self._done_event.wait(), timeout=timeout)
 
@@ -102,7 +123,7 @@ class SubAgentHandle:
         if self._status == SubAgentStatus.CANCELLED:
             raise asyncio.CancelledError(f"Sub-agent {self.worker_id} was cancelled")
 
-        return self._result
+        return self.result
 
     # -- internal state transitions ------------------------------------------
 
@@ -117,6 +138,9 @@ class SubAgentHandle:
         """Transition to COMPLETED with the given result."""
         self._status = SubAgentStatus.COMPLETED
         self._result = result
+        # Generate summary if summary_only
+        if self.contract.summary_only:
+            self._summary = self._generate_summary(result)
         self.completed_at = datetime.now(UTC)
         self._done_event.set()
 
@@ -126,3 +150,12 @@ class SubAgentHandle:
         self._error = error
         self.completed_at = datetime.now(UTC)
         self._done_event.set()
+
+    @staticmethod
+    def _generate_summary(result: Any) -> str:
+        """Generate a concise summary from a full result."""
+        text = str(result)
+        # Take first 500 chars as summary
+        if len(text) > 500:
+            return text[:500] + "... [truncated]"
+        return text

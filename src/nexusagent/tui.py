@@ -1,12 +1,15 @@
+import asyncio
+import json
 import uuid
 from typing import ClassVar
 
+import websockets
 from textual.app import App, ComposeResult
 from textual.containers import Vertical
 from textual.screen import ModalScreen
 from textual.widgets import Button, Footer, Header, Input, Log, Static
 
-from nexusagent.sdk import NexusSDK
+from nexusagent.config import settings
 
 
 class ErrorModal(ModalScreen):
@@ -24,10 +27,11 @@ class ErrorModal(ModalScreen):
 
 
 class ApprovalModal(ModalScreen[bool]):
-    def __init__(self, tool_name: str, tool_args: dict) -> None:
+    def __init__(self, tool_name: str, tool_args: dict, call_id: str = "") -> None:
         super().__init__()
         self.tool_name = tool_name
         self.tool_args = tool_args
+        self.call_id = call_id
 
     def compose(self) -> ComposeResult:
         args_str = "\n".join(f"  {k}: {v}" for k, v in self.tool_args.items())
@@ -65,14 +69,107 @@ class NexusApp(App):
     def compose(self) -> ComposeResult:
         yield Header()
         yield Log(id="conversation-log")
-        yield Input(placeholder="Enter coding task...", id="task-input")
+        yield Input(placeholder="Enter message... (Enter to submit)", id="task-input")
         yield Footer()
 
     def on_mount(self) -> None:
         self.session_id = str(uuid.uuid4())[:8]
-        self.sdk = NexusSDK()
         self.log_widget = self.query_one(Log)
-        self.log_widget.write(f"[Session {self.session_id}] Connected to NexusAgent.")
+        self.log_widget.write(f"[Session {self.session_id}] Connecting to NexusAgent via WebSocket...")
+        self._ws_task = asyncio.create_task(self._ws_loop())
+
+    async def _ws_loop(self) -> None:
+        """Maintain WebSocket connection: send user input, stream agent events."""
+        ws_url = f"ws://127.0.0.1:{settings.server.api_port}/sessions/{self.session_id}/ws"
+        try:
+            async with websockets.connect(ws_url, ping_interval=20, ping_timeout=10) as ws:
+                self.log_widget.write(f"[Session {self.session_id}] Connected.")
+
+                async def send_messages():
+                    """Read from the TUI input queue and send to WS."""
+                    while True:
+                        # Wait for input from the TUI event handler
+                        msg = await self._input_queue.get()
+                        if msg is None:
+                            break
+                        await ws.send(json.dumps({"type": "user_input", "content": msg}))
+
+                async def receive_events():
+                    """Read WS events and write to the log."""
+                    async for raw in ws:
+                        try:
+                            event = json.loads(raw)
+                        except json.JSONDecodeError:
+                            continue
+                        await self._handle_event(event)
+
+                await asyncio.gather(send_messages(), receive_events())
+
+        except ConnectionRefusedError:
+            self.log_widget.write("[Error] Cannot connect to NexusAgent server.")
+            self.log_widget.write("Start the server with: nexus-server")
+        except websockets.exceptions.ConnectionClosedOK:
+            self.log_widget.write("[Session closed]")
+        except websockets.exceptions.ConnectionClosedError as e:
+            self.log_widget.write(f"[Connection lost: {e}]")
+        except Exception as e:
+            self.log_widget.write(f"[Error: {e}]")
+
+    async def _handle_event(self, event: dict) -> None:
+        """Route a server event to the appropriate UI update."""
+        etype = event.get("type")
+
+        if etype == "session_status":
+            status = event.get("status", "?")
+            if status == "active":
+                self.log_widget.write("[Session active]")
+            else:
+                self.log_widget.write(f"[Session {status}]")
+
+        elif etype == "thinking":
+            content = event.get("content", "")
+            self.log_widget.write(f"[Thinking] {content}")
+
+        elif etype == "tool_call":
+            tool = event.get("tool", "?")
+            args = event.get("args", {})
+            call_id = event.get("call_id", "")
+            args_str = ", ".join(f"{k}={v}" for k, v in args.items())
+            self.log_widget.write(f"[Tool] {tool}({args_str})")
+
+        elif etype == "tool_result":
+            call_id = event.get("call_id", "")
+            output = event.get("output", "")
+            success = event.get("success", True)
+            status = "✓" if success else "✗"
+            self.log_widget.write(f"[Result {status}] {output[:200]}")
+
+        elif etype == "approval_request":
+            tool = event.get("tool", "?")
+            args = event.get("args", {})
+            call_id = event.get("call_id", "")
+            # Show approval modal
+            self.log_widget.write(f"[Approval Required] {tool}")
+            approved = await self.push_screen_wait(ApprovalModal(tool, args, call_id))
+            # Send approval response via WS
+            try:
+                ws_url = f"ws://127.0.0.1:{settings.server.api_port}/sessions/{self.session_id}/ws"
+                async with websockets.connect(ws_url) as ws:
+                    await ws.send(json.dumps({
+                        "type": "approval",
+                        "call_id": call_id,
+                        "approved": approved,
+                    }))
+            except Exception:
+                self.log_widget.write("[Error] Failed to send approval response")
+
+        elif etype == "response":
+            content = event.get("content", "")
+            self.log_widget.write(f"Agent: {content}")
+
+        elif etype == "error":
+            message = event.get("message", "Unknown error")
+            self.log_widget.write(f"[Error] {message}")
 
     async def on_input_submitted(self, event: Input.Submitted) -> None:
         if event.input.id == "task-input":
@@ -81,25 +178,19 @@ class NexusApp(App):
                 return
             self.log_widget.write(f"User: {message}")
             event.input.value = ""
-            await self._send_to_agent(message)
-
-    async def _send_to_agent(self, message: str) -> None:
-        task_id = str(uuid.uuid4())[:8]
-        try:
-            submitted_id = await self.sdk.submit_task({"id": task_id, "description": message})
-            self.log_widget.write(f"Agent: Task {submitted_id} submitted.")
-            result = await self.sdk.wait_for_result(submitted_id, timeout=300)
-            if result and result.success:
-                self.log_widget.write(f"Agent: {result.data}")
-            elif result:
-                self.log_widget.write(f"Agent Error: {result.error}")
-            else:
-                self.log_widget.write("Agent: No result received (timeout).")
-        except Exception as e:
-            self.push_screen(ErrorModal(str(e)))
+            # Queue the message for the WS sender
+            if not hasattr(self, '_input_queue'):
+                self._input_queue = asyncio.Queue()
+            await self._input_queue.put(message)
 
     def action_clear(self) -> None:
         self.log_widget.clear()
+
+    def action_quit(self) -> None:
+        """Clean shutdown: close WS task."""
+        if hasattr(self, '_ws_task'):
+            self._ws_task.cancel()
+        super().action_quit()
 
 
 def main() -> None:
