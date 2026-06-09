@@ -82,8 +82,7 @@ register_tool(
 register_tool(
     name="read_file",
     description=(
-        "Read a file's contents with optional line-range selection. "
-        "Tracks files read in session."
+        "Read a file's contents with optional line-range selection. Tracks files read in session."
     ),
     parameters={
         "path": "File path (absolute or relative)",
@@ -97,10 +96,7 @@ register_tool(
 
 register_tool(
     name="read_multiple_files",
-    description=(
-        "Read multiple files at once. "
-        "Each file is marked as read in session tracking."
-    ),
+    description=("Read multiple files at once. Each file is marked as read in session tracking."),
     parameters={"paths": "List of file paths"},
     example='read_multiple_files(["src/main.py", "tests/test_main.py"])',
     category="fs",
@@ -110,8 +106,7 @@ register_tool(
 register_tool(
     name="write_file",
     description=(
-        "Write content to a file (full replacement). "
-        "SAFETY: existing files must be read first."
+        "Write content to a file (full replacement). SAFETY: existing files must be read first."
     ),
     parameters={
         "path": "File path",
@@ -125,8 +120,7 @@ register_tool(
 register_tool(
     name="write_multiple_files",
     description=(
-        "Write multiple files at once. "
-        "Each file must be read first if it already exists."
+        "Write multiple files at once. Each file must be read first if it already exists."
     ),
     parameters={"files": "Dict mapping file path to content"},
     example='write_multiple_files({"a.py": "x=1", "b.py": "y=2"})',
@@ -148,8 +142,7 @@ register_tool(
         "end_line": "Optional end line (1-indexed) to constrain search",
     },
     example=(
-        'edit_file("src/main.py", old_text="x = 1", new_text="x = 42", '
-        "start_line=10, end_line=15)"
+        'edit_file("src/main.py", old_text="x = 1", new_text="x = 42", start_line=10, end_line=15)'
     ),
     category="fs",
     returns="Success message with line change summary.",
@@ -192,8 +185,7 @@ register_tool(
 register_tool(
     name="run_shell",
     description=(
-        "Execute a shell command with timeout, working directory, "
-        "and environment variable control."
+        "Execute a shell command with timeout, working directory, and environment variable control."
     ),
     parameters={
         "command": "Shell command to execute",
@@ -238,10 +230,7 @@ register_tool(
 
 register_tool(
     name="git_diff",
-    description=(
-        "Show changes between working tree and index/HEAD. "
-        "Supports specific files."
-    ),
+    description=("Show changes between working tree and index/HEAD. Supports specific files."),
     parameters={
         "file_path": "Optional specific file to diff",
         "cached": "If True, show staged changes",
@@ -384,9 +373,7 @@ register_tool(
 
 register_tool(
     name="search_code",
-    description=(
-        "Search code using ripgrep with context lines. Falls back to grep."
-    ),
+    description=("Search code using ripgrep with context lines. Falls back to grep."),
     parameters={
         "query": "Search pattern (regex supported)",
         "path": "Directory or file to search (default: '.')",
@@ -402,10 +389,7 @@ register_tool(
 
 register_tool(
     name="find_symbol",
-    description=(
-        "Find symbol definitions across languages "
-        "(def/class/func/fn/struct/impl)."
-    ),
+    description=("Find symbol definitions across languages (def/class/func/fn/struct/impl)."),
     parameters={
         "symbol": "Symbol name to find",
         "path": "Directory to search (default: '.')",
@@ -451,3 +435,56 @@ register_tool(
     category="web",
     returns="Documentation results.",
 )(search_local_docs)
+
+# ═══════════════════════════════════════════════════════════════════════
+# Orchestration Tools
+# ═══════════════════════════════════════════════════════════════════════
+
+
+@register_tool(
+    name="spawn_subagent",
+    description=(
+        "Spawn an isolated worker to handle a task autonomously. "
+        "The worker runs in its own space with bounded turns and reports back. "
+        "Use for delegating PRs, isolated experiments, or parallel work."
+    ),
+    parameters={
+        "task": "str — description of the work to do",
+        "working_dir": "str — directory to work in (default: current)",
+        "max_turns": "int — max agent iterations (default: 15)",
+        "acceptance_criteria": "list[str] — how the agent knows it's done",
+        "memory_mode": "str — 'isolated' or 'scoped' (default: 'isolated')",
+    },
+    example=(
+        'spawn_subagent(task="Fix the auth bug in server.py", max_turns=20, '
+        'acceptance_criteria=["All tests pass"])'
+    ),
+    category="orchestration",
+    returns="str — worker ID and status",
+)
+async def spawn_subagent(
+    task: str,
+    working_dir: str = ".",
+    max_turns: int = 15,
+    acceptance_criteria: list[str] | None = None,
+    memory_mode: str = "isolated",
+) -> str:
+    from nexusagent.models import MemoryScope, TaskContract
+    from nexusagent.worker import worker_pool
+
+    contract = TaskContract(
+        task_id=f"sub-{task[:20]}",
+        title=task[:50],
+        working_dir=working_dir,
+        description=task,
+        max_turns=max_turns,
+        acceptance_criteria=acceptance_criteria or ["Task completed"],
+        memory_scope=(
+            MemoryScope(memory_mode)
+            if memory_mode in ("isolated", "scoped")
+            else MemoryScope.ISOLATED
+        ),
+    )
+
+    handle = await worker_pool.spawn(contract)
+    return f"Spawned worker {handle.worker_id} (status: {handle.status.value})"
