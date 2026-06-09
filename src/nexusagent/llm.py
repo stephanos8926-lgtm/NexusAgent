@@ -60,15 +60,15 @@ class LLMProvider:
         exceptions=(Exception,),
     )
     async def generate(
-        self, prompt: str, system_prompt: str | None = None, **kwargs
+        self, prompt: str, system_prompt: str | None = None, timeout: float = 120.0, **kwargs
     ) -> LLMResponse:
         provider, model_id = self.get_active_model()
         logger.info(f"Generating response using {provider} ({model_id})")
 
         if provider == "gemini":
-            return await self._call_gemini(prompt, system_prompt, model_id, **kwargs)
+            return await self._call_gemini(prompt, system_prompt, model_id, timeout=timeout, **kwargs)
         elif provider == "openrouter":
-            return await self._call_openrouter(prompt, system_prompt, model_id, **kwargs)
+            return await self._call_openrouter(prompt, system_prompt, model_id, timeout=timeout, **kwargs)
         else:
             raise ValueError(f"Unsupported provider: {provider}")
 
@@ -81,12 +81,14 @@ class LLMProvider:
         exceptions=(Exception,),
     )
     async def _call_gemini(
-        self, prompt: str, system_prompt: str | None, model_id: str, **kwargs
+        self, prompt: str, system_prompt: str | None, model_id: str, timeout: float = 120.0, **kwargs
     ) -> LLMResponse:
         try:
             model = genai.GenerativeModel(model_name=model_id, system_instruction=system_prompt)
-            response = await model.generate_content_async(prompt)
+            response = await model.generate_content_async(prompt, timeout=timeout)
             return LLMResponse(content=response.text, model_used=model_id, provider="gemini")
+        except TimeoutError:
+            raise TimeoutError(f"LLM request timed out after {timeout}s") from None
         except Exception as e:
             logger.error(f"Gemini API error: {e}")
             raise
@@ -100,7 +102,7 @@ class LLMProvider:
         exceptions=(Exception,),
     )
     async def _call_openrouter(
-        self, prompt: str, system_prompt: str | None, model_id: str, **kwargs
+        self, prompt: str, system_prompt: str | None, model_id: str, timeout: float = 120.0, **kwargs
     ) -> LLMResponse:
         try:
             messages = []
@@ -109,13 +111,15 @@ class LLMProvider:
             messages.append({"role": "user", "content": prompt})
 
             response = await self.openrouter_client.chat.completions.create(
-                model=model_id, messages=messages, **kwargs
+                model=model_id, messages=messages, timeout=timeout, **kwargs
             )
             return LLMResponse(
                 content=response.choices[0].message.content,
                 model_used=model_id,
                 provider="openrouter",
             )
+        except TimeoutError:
+            raise TimeoutError(f"LLM request timed out after {timeout}s") from None
         except Exception as e:
             logger.error(f"OpenRouter API error: {e}")
             raise

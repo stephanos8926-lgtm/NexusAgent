@@ -1,4 +1,7 @@
+import inspect
+
 from nexusagent.config import load_config
+from nexusagent.llm import LLMProvider
 
 
 def test_load_config_success(tmp_path, monkeypatch):
@@ -16,3 +19,9 @@ def test_load_config_success(tmp_path, monkeypatch):
         config = load_config("nexusagent.yaml")
         assert config.server.nats_url == "nats://test"
         assert config.server.db_path.endswith("test.db")
+
+
+def test_llm_timeout_default():
+    sig = inspect.signature(LLMProvider.generate)
+    assert 'timeout' in sig.parameters
+    assert sig.parameters['timeout'].default == 120.0
