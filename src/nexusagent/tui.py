@@ -953,38 +953,19 @@ class NexusApp(App):
     # ── Streaming response ───────────────────────────────────────────
 
     def _write_response_chunk(self, content: str) -> None:
-        """Append a streaming token to the in-progress response.
+        """Write a streaming token directly to the conversation log.
 
-        Updates the streaming-response Static widget in-place so the user
-        sees text appearing token-by-token, similar to deepagents' MarkdownStream.
+        Each chunk is appended to the RichLog as it arrives, giving the user
+        true token-by-token streaming output instead of waiting for completion.
         """
-        self._streaming_response += content
-        self._streaming_widget.update(
-            f"[b green]Agent:[/b green] {self._streaming_response}"
-        )
+        self.log_widget.write(content, shrink=False)
 
     def _finalize_response(self, content: str) -> None:
         """Finalize the streaming response.
 
-        Parses and formats the response with:
-        - Syntax highlighting for code blocks (heuristic: detect ``` markers)
-        - URL auto-detection (Textual RichLog auto-links URLs)
-        - Clear separator between turns
+        Since chunks are written directly to the log widget in real time,
+        this method only needs to clear the streaming widget and separator.
         """
-        if self._streaming_response:
-            final = content if content else self._streaming_response
-            ts = datetime.now().strftime("%H:%M")
-            formatted = self._enhanced_markdown(final)
-            self.log_widget.write("", shrink=False)
-            self.log_widget.write(
-                f"[b green][{ts}] Agent:[/b green]",
-                shrink=False,
-            )
-            self.log_widget.write(formatted, shrink=False)
-            self.log_widget.write("", shrink=False)
-        elif content:
-            self._write_response(content)
-
         # Clear the streaming widget
         self._streaming_widget.update("")
         self._streaming_response = ""
