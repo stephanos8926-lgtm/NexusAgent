@@ -184,9 +184,22 @@ class NexusApp(App):
     /* ── Conversation log ── */
     #log-container {
         width: 100%;
+        max-width: 100%;
         height: 1fr;
         border: solid #1f2937;
         margin: 0 1;
+        overflow-x: hidden;
+    }
+
+    #greeting {
+        width: 100%;
+        max-width: 100%;
+        height: auto;
+        background: #111827;
+        padding: 0 2;
+        overflow-x: hidden;
+        text-wrap: wrap;
+        word-wrap: break-word;
     }
 
     #conversation-log {
@@ -200,6 +213,7 @@ class NexusApp(App):
         overflow-x: hidden;
         text-wrap: wrap;
         word-wrap: break-word;
+        text-align: left;
     }
 
     /* ── Streaming response ── */
@@ -319,6 +333,7 @@ class NexusApp(App):
 
     def compose(self) -> ComposeResult:
         yield Header()
+        yield Static("", id="greeting")
         yield ScrollableContainer(
             RichLog(id="conversation-log", markup=True, auto_scroll=True, wrap=True),
             id="log-container",
@@ -336,6 +351,7 @@ class NexusApp(App):
     def on_mount(self) -> None:
         self.session_id = str(uuid.uuid4())[:8]
         self.log_widget = self.query_one("#conversation-log", RichLog)
+        self._greeting_widget = self.query_one("#greeting", Static)
         self.status_widget = self.query_one("#status-bar", SpinnerLabel)
         self.queue_status = self.query_one("#queue-status", Static)
         self._streaming_widget = self.query_one("#streaming-response", Static)
@@ -362,33 +378,16 @@ class NexusApp(App):
 
     def _show_greeting(self):
         ts = datetime.now().strftime("%H:%M")
-        self.log_widget.write("", shrink=False)
-        self.log_widget.write(
-            "[b cyan]╔══════════════════════════════════════════╗[/b cyan]",
-            shrink=False,
+        greeting_text = (
+            "[b cyan]╔══════════════════════════════════════════╗[/b cyan]\n"
+            "[b cyan]║[/b cyan]  [b white]NexusAgent[/b white] — Interactive AI Agent    [b cyan]║[/b cyan]\n"
+            f"[b cyan]║[/b cyan]  Session: [yellow]{self.session_id}[/yellow]  {ts}              [b cyan]║[/b cyan]\n"
+            "[b cyan]╚══════════════════════════════════════════╝[/b cyan]\n"
+            "\n"
+            "[dim]Commands: [b]/help[/b]  [b]/new[/b]  [b]/clear[/b]  [b]/expand[/b]  [b]/collapse[/b]  [b]/quit[/b][/dim]\n"
+            "[dim]Keys: [b]Ctrl+C[/b]=interrupt  [b]Q[/b]=quit  [b]C[/b]=clear  [b]E[/b]=expand  [b]A[/b]=collapse[/dim]"
         )
-        self.log_widget.write(
-            "[b cyan]║[/b cyan]  [b white]NexusAgent[/b white] — Interactive AI Agent    [b cyan]║[/b cyan]",
-            shrink=False,
-        )
-        self.log_widget.write(
-            f"[b cyan]║[/b cyan]  Session: [yellow]{self.session_id}[/yellow]  {ts}              [b cyan]║[/b cyan]",
-            shrink=False,
-        )
-        self.log_widget.write(
-            "[b cyan]╚══════════════════════════════════════════╝[/b cyan]",
-            shrink=False,
-        )
-        self.log_widget.write("", shrink=False)
-        self.log_widget.write(
-            "[dim]Commands: [b]/help[/b]  [b]/new[/b]  [b]/clear[/b]  [b]/expand[/b]  [b]/collapse[/b]  [b]/quit[/b][/dim]",
-            shrink=False,
-        )
-        self.log_widget.write(
-            "[dim]Keys: [b]Ctrl+C[/b]=interrupt  [b]Q[/b]=quit  [b]C[/b]=clear  [b]E[/b]=expand  [b]A[/b]=collapse[/dim]",
-            shrink=False,
-        )
-        self.log_widget.write("", shrink=False)
+        self._greeting_widget.update(greeting_text)
 
     # ── WebSocket loop ──────────────────────────────────────────────
 
@@ -1121,11 +1120,11 @@ class NexusApp(App):
     def _format_arg_value(self, value) -> str:
         """Format a tool argument value for display — dicts as JSON, strings escaped."""
         if isinstance(value, dict):
-            return json.dumps(value, ensure_ascii=False)
+            return self._escape(json.dumps(value, ensure_ascii=False))
         if isinstance(value, list):
-            return json.dumps(value, ensure_ascii=False)
+            return self._escape(json.dumps(value, ensure_ascii=False))
         if isinstance(value, str) and len(value) > 200:
-            return textwrap.shorten(value, width=200, placeholder="...")
+            return self._escape(textwrap.shorten(value, width=200, placeholder="..."))
         return self._escape(str(value))
 
     def _escape(self, text: str) -> str:
