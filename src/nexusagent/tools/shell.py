@@ -24,7 +24,7 @@ def _split_command(command: str) -> list[str]:
     try:
         return shlex.split(command)
     except ValueError as e:
-        raise ValueError(f"Invalid command syntax: {e}")
+        raise ValueError(f"Invalid command syntax: {e}") from e
 
 
 def _truncate_output(output: str) -> str:

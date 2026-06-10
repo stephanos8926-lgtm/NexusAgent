@@ -28,7 +28,7 @@ from nexusagent.tools.git import (
 )
 from nexusagent.tools.patch import apply_patch
 from nexusagent.tools.registry import auto_correct, register_tool, tool_search
-from nexusagent.tools.research import search_local_docs, search_web
+from nexusagent.tools.research import fetch_url, search_local_docs, search_web
 from nexusagent.tools.shell import run_shell, run_shell_streaming
 from nexusagent.tools.test_runner import run_single_test, run_tests
 
@@ -436,6 +436,19 @@ register_tool(
     returns="Documentation results.",
 )(search_local_docs)
 
+register_tool(
+    name="fetch_url",
+    description=(
+        "Fetch a URL and return the content as formatted text. "
+        "Supports HTML (converted to text), JSON (pretty-printed), and plain text. "
+        "Output truncated to 5000 chars max."
+    ),
+    parameters={"url": "HTTP or HTTPS URL to fetch"},
+    example='fetch_url("https://example.com")',
+    category="web",
+    returns="Formatted page content as text.",
+)(fetch_url)
+
 # ═══════════════════════════════════════════════════════════════════════
 # Orchestration Tools
 # ═══════════════════════════════════════════════════════════════════════
@@ -489,6 +502,41 @@ async def spawn_subagent(
 
     handle = await worker_pool.spawn(contract)
     return f"Spawned worker {handle.worker_id} (status: {handle.status.value})"
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Interaction Tools
+# ═══════════════════════════════════════════════════════════════════════
+
+
+@register_tool(
+    name="ask_user",
+    description=(
+        "Ask the user a question and wait for their response. "
+        "In TUI mode, shows the question in the chat. "
+        "In headless mode, returns a default/fallback response. "
+        "Use for confirmation, clarification, or interactive decisions."
+    ),
+    parameters={
+        "question": "str — the question to ask the user",
+        "options": "list[str] — optional list of choices (default: free-form)",
+    },
+    example='ask_user("Which file should we edit?", options=["main.py", "config.py", "other"])',
+    category="interaction",
+    returns="str — the user's response",
+)
+def ask_user(question: str, options: list[str] | None = None) -> str:
+    """Ask the user a question. Returns their response or a fallback."""
+    # In a TUI context, this would push a modal or inject a prompt
+    # For headless/non-interactive mode, return a helpful fallback
+    if options:
+        opt_str = ", ".join(options)
+        return (
+            f"[ask_user] {question}\n"
+            f"Options: {opt_str}\n"
+            f"[No interactive session — returning default: {options[0]}]"
+        )
+    return f"[ask_user] {question}\n[No interactive session — please respond in the TUI]"
 
 
 # ═══════════════════════════════════════════════════════════════════════

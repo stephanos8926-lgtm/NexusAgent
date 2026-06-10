@@ -5,10 +5,9 @@ from typing import Any
 
 from deepagents import create_deep_agent
 
-from nexusagent.config import settings
-
 # Run registration (populates _REGISTRY)
 import nexusagent.tools.register_all  # noqa: F401
+from nexusagent.config import settings
 
 # Import tool modules
 # Import registry + discovery

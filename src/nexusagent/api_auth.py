@@ -41,7 +41,7 @@ async def verify_api_key(api_key: str = Security(api_key_header)) -> str:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authentication not configured",
-        )
+        ) from None
     except HTTPException:
         raise  # Re-raise our own 401s
     except Exception as e:
@@ -50,4 +50,4 @@ async def verify_api_key(api_key: str = Security(api_key_header)) -> str:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Authentication system error",
-        )
+        ) from e

@@ -124,12 +124,10 @@ class EmbeddingProvider:
         """Fallback: deterministic hash-based embedding (low quality, always works)."""
         vec = [0.0] * EMBED_DIM
         # Fill dims in batches using SHA256 chunks
-        batch_idx = 0
-        for batch_start in range(0, EMBED_DIM, 32):
+        for batch_idx, batch_start in enumerate(range(0, EMBED_DIM, 32)):
             h = hashlib.sha256(f"{text}|{batch_idx}".encode()).digest()
             for j in range(min(32, EMBED_DIM - batch_start)):
                 vec[batch_start + j] = struct.unpack("b", bytes([h[j]]))[0] / 128.0
-            batch_idx += 1
 
         mag = math.sqrt(sum(x * x for x in vec)) or 1.0
         return [x / mag for x in vec]
@@ -574,17 +572,17 @@ class HybridMemoryIndex:
         """
         import psutil
 
-        OOM_THRESHOLD = 0.85  # refuse brute-force if system memory usage exceeds this
+        oom_threshold = 0.85  # refuse brute-force if system memory usage exceeds this
 
         conn = sqlite3.connect(str(self.db_path))
         try:
             # OOM guard: check system memory before bulk-load
             mem = psutil.virtual_memory()
-            if mem.percent > OOM_THRESHOLD * 100:
+            if mem.percent > oom_threshold * 100:
                 logger.warning(
                     "Skipping brute-force vector search: system memory at %d%% (threshold %d%%)",
                     mem.percent,
-                    int(OOM_THRESHOLD * 100),
+                    int(oom_threshold * 100),
                 )
                 return []
 

@@ -11,15 +11,15 @@ import os
 import platform
 import subprocess
 from collections.abc import AsyncGenerator
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from langchain_core.messages import AIMessage, SystemMessage
+from langchain_core.messages import SystemMessage
 
 from nexusagent.config import settings
 from nexusagent.models import ErrorEvent, ResponseEvent, ThinkingEvent
-from nexusagent.prompt_loader import load_nexus_prompt, inject_file_at_reference
+from nexusagent.prompt_loader import inject_file_at_reference, load_nexus_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -98,7 +98,7 @@ def _get_git_info(working_dir: str) -> str:
 
 def _build_environment_context(working_dir: str) -> str:
     """Build the environment context block injected into every session."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     user = os.getenv("USER", os.getenv("USERNAME", "unknown"))
     hostname = platform.node()
     os_info = ""
@@ -144,13 +144,12 @@ def _build_environment_context(working_dir: str) -> str:
 
 def _build_session_history_context(working_dir: str) -> str:
     """Build context from recent sessions for continuity.
-    
+
     Uses the hybrid memory system to find and summarize recent
     conversation sessions, giving the agent awareness of what
     the user has been working on.
     """
     try:
-        from nexusagent.db import session_repo
         # This is a simplified version — in production you'd query
         # the session DB for recent sessions in this working dir
         # and extract summaries. For now, return empty.
@@ -205,7 +204,7 @@ class Session:
 
     def _load_system_prompt(self) -> str:
         """Load the full system prompt from NEXUS.md files.
-        
+
         Loads base prompt from config/NEXUS.md, then appends any
         project-specific NEXUS.md from the working directory.
         @file chains are resolved recursively.

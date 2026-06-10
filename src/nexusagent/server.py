@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from nexusagent.api_auth import verify_api_key
-from nexusagent.bus import AgentBus, get_bus
+from nexusagent.bus import get_bus
 from nexusagent.config import settings
 from nexusagent.sdk import sdk
 from nexusagent.worker import worker

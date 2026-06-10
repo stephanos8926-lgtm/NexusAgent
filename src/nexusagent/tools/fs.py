@@ -49,21 +49,18 @@ def _get_workspace_root() -> Path:
 def _resolve(path: str) -> Path:
     """Resolve a path and return absolute Path, ensuring it's within workspace jail."""
     raw = Path(path)
-    if raw.is_absolute():
-        resolved = raw.resolve()
-    else:
-        resolved = (_get_workspace_root() / raw).resolve()
+    resolved = raw.resolve() if raw.is_absolute() else (_get_workspace_root() / raw).resolve()
 
     # Path jail: ensure the resolved path is within the workspace root
     workspace = _get_workspace_root()
     try:
         resolved.relative_to(workspace)
-    except ValueError:
+    except ValueError as e:
         raise PermissionError(
             f"SAFETY: Path '{path}' resolves to '{resolved}' which is outside "
             f"the workspace root '{workspace}'. File operations are jailed to "
             f"the workspace directory."
-        )
+        ) from e
     return resolved
 
 

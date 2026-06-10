@@ -36,12 +36,10 @@ def _hash_embed(text: str) -> list[float]:
 
     vec = [0.0] * EMBED_DIM
     # Fill dims in batches of 32 using SHA256
-    batch_idx = 0
-    for batch_start in range(0, EMBED_DIM, 32):
+    for batch_idx, batch_start in enumerate(range(0, EMBED_DIM, 32)):
         h = hashlib.sha256(f"{text}|{batch_idx}".encode()).digest()
         for j in range(min(32, EMBED_DIM - batch_start)):
             vec[batch_start + j] = _struct.unpack("b", bytes([h[j]]))[0] / 128.0
-        batch_idx += 1
 
     # Normalise to unit length
     norm = sum(v * v for v in vec) ** 0.5

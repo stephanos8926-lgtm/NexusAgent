@@ -4,17 +4,22 @@ Features:
 - Word-wrapped conversation log (no horizontal scroll)
 - Real-time tool call/result streaming with collapsible output
 - Greeting screen with help on login
-- Slash commands: /new, /sessions, /help, /clear, /expand, /collapse, /quit
+- Slash commands: /new, /sessions, /help, /clear, /expand, /collapse, /quit, /compact, /copy, /version, /tokens, /model, /threads, /theme
 - Markdown rendering for agent responses
 - Status bar with spinner, state, and queued message count
-- Interrupt support (Ctrl+C) — cancels running agent turn
+- Interrupt support (Ctrl+C, Ctrl+U) — cancels running agent turn
 - Error display when tools fail (web search, subagent, etc.)
 - Auto-scroll with manual override
+- Per-tool output formatters for shell, read_file, write_file/edit_file, git_*, search_web, spawn_subagent
+- Session metadata tracking (tokens)
+- Auto-approve mode toggle (Ctrl+_)
 """
 
 import asyncio
+import contextlib
 import json
 import re
+import textwrap
 import uuid
 from datetime import datetime
 from typing import ClassVar
@@ -22,22 +27,30 @@ from typing import ClassVar
 import websockets
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Vertical, Horizontal, ScrollableContainer
+from textual.containers import Horizontal, ScrollableContainer, Vertical
+from textual.reactive import reactive
 from textual.screen import ModalScreen
+from textual.timer import Timer
 from textual.widgets import (
     Button,
+    Collapsible,
     Footer,
     Header,
     Input,
     RichLog,
     Static,
-    Collapsible,
-    Label,
 )
-from textual.timer import Timer
-from textual.reactive import reactive
 
 from nexusagent.config import settings
+
+# Color themes for /theme cycling
+NEXUS_THEMES = [
+    {"name": "midnight", "header_bg": "#1f2937", "accent": "#10b981", "bg": "#111827"},
+    {"name": "ocean", "header_bg": "#0e4d6e", "accent": "#38bdf8", "bg": "#0c1929"},
+    {"name": "forest", "header_bg": "#14532d", "accent": "#4ade80", "bg": "#052e16"},
+    {"name": "sunset", "header_bg": "#7c2d12", "accent": "#fb923c", "bg": "#1c1010"},
+    {"name": "lavender", "header_bg": "#3b3864", "accent": "#a78bfa", "bg": "#1a1830"},
+]
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -156,11 +169,12 @@ class NexusApp(App):
         Binding("escape", "quit", "Quit", priority=True, show=False),
         Binding("c", "clear", "Clear", show=True),
         Binding("ctrl+c", "interrupt", "Interrupt", show=True),
+        Binding("ctrl+u", "interrupt", "Interrupt", show=True),
         Binding("e", "expand_all", "Expand", show=True),
         Binding("a", "collapse_all", "Collapse", show=True),
+        Binding("ctrl+underscore", "toggle_auto_approve", "Auto-approve", show=False),
     ]
 
-    # Use textual-dark as base theme, then override with our custom CSS
     CSS = """
     Screen {
         layers: base overlay;
@@ -177,6 +191,7 @@ class NexusApp(App):
 
     #conversation-log {
         width: 100%;
+        max-width: 100%;
         height: auto;
         min-height: 100%;
         background: #111827;
@@ -184,12 +199,15 @@ class NexusApp(App):
         overflow-y: auto;
         overflow-x: hidden;
         text-wrap: wrap;
+        word-wrap: break-word;
     }
 
     /* ── Streaming response ── */
     #streaming-response {
         height: auto;
         min-height: 1;
+        width: 100%;
+        max-width: 100%;
         color: #93c5fd;
         padding: 1 2;
         margin: 0 1;
@@ -197,6 +215,7 @@ class NexusApp(App):
         border-left: wide #3b82f6;
         overflow-x: hidden;
         text-wrap: wrap;
+        word-wrap: break-word;
     }
 
     /* ── Input area ── */
@@ -219,6 +238,15 @@ class NexusApp(App):
         padding: 0 2;
     }
     #status-bar SpinnerLabel { width: 100%; }
+
+    /* ── Auto-approve indicator ── */
+    #auto-approve-badge {
+        height: 1;
+        background: #1f2937;
+        color: #fbbf24;
+        text-style: bold;
+        padding: 0 2;
+    }
 
     /* ── Queue status ── */
     #queue-status {
@@ -297,6 +325,7 @@ class NexusApp(App):
         )
         yield Static("", id="streaming-response")
         yield SpinnerLabel("Ready", id="status-bar")
+        yield Static("", id="auto-approve-badge")
         yield Static("", id="queue-status")
         yield Input(
             placeholder="Type a message, @file to inject, or /help for commands...",
@@ -317,6 +346,14 @@ class NexusApp(App):
         self._collapsibles: list[Collapsible] = []
         self._pending_inputs: list[str] = []
         self._current_task: asyncio.Task | None = None  # for interrupt
+        self._auto_approve = False
+        self._auto_approve_task: asyncio.Task | None = None
+        self._interrupt_task: asyncio.Task | None = None
+        self._theme_index = 0
+        self._total_tokens_used = 0
+        self._request_count = 0
+        self._auto_approve_badge = self.query_one("#auto-approve-badge", Static)
+        self._auto_approve_badge.update("")
 
         self._show_greeting()
         self._ws_task = asyncio.create_task(self._ws_loop())
@@ -327,11 +364,11 @@ class NexusApp(App):
         ts = datetime.now().strftime("%H:%M")
         self.log_widget.write("", shrink=False)
         self.log_widget.write(
-            f"[b cyan]╔══════════════════════════════════════════╗[/b cyan]",
+            "[b cyan]╔══════════════════════════════════════════╗[/b cyan]",
             shrink=False,
         )
         self.log_widget.write(
-            f"[b cyan]║[/b cyan]  [b white]NexusAgent[/b white] — Interactive AI Agent    [b cyan]║[/b cyan]",
+            "[b cyan]║[/b cyan]  [b white]NexusAgent[/b white] — Interactive AI Agent    [b cyan]║[/b cyan]",
             shrink=False,
         )
         self.log_widget.write(
@@ -339,7 +376,7 @@ class NexusApp(App):
             shrink=False,
         )
         self.log_widget.write(
-            f"[b cyan]╚══════════════════════════════════════════╝[/b cyan]",
+            "[b cyan]╚══════════════════════════════════════════╝[/b cyan]",
             shrink=False,
         )
         self.log_widget.write("", shrink=False)
@@ -384,9 +421,7 @@ class NexusApp(App):
                 await asyncio.gather(send_messages(), receive_events())
 
         except ConnectionRefusedError:
-            self.log_widget.write("[red][b]✗ Cannot connect to server at port {}[/b][/red]".format(
-                settings.server.api_port
-            ), shrink=False)
+            self.log_widget.write(f"[red][b]✗ Cannot connect to server at port {settings.server.api_port}[/b][/red]", shrink=False)
             self.status_widget.set_text("Disconnected")
         except websockets.exceptions.ConnectionClosedOK:
             self.log_widget.write("[dim]Session closed.[/dim]", shrink=False)
@@ -419,17 +454,22 @@ class NexusApp(App):
         elif etype == "tool_call":
             tool = event.get("tool", "?")
             args = event.get("args", {})
+            self._last_tool_name = tool  # store for per-tool result formatting
             if isinstance(args, dict):
                 args_str = ", ".join(
-                    f"[yellow]{k}[/yellow]=[white]{self._truncate(str(v), 60)}[/white]"
+                    f"[yellow]{k}[/yellow]=[white]{self._truncate(self._format_arg_value(v), 60)}[/white]"
                     for k, v in args.items()
                 )
             else:
-                args_str = self._truncate(str(args), 80)
+                args_str = self._truncate(self._format_arg_value(args), 80)
             self.log_widget.write(
                 f"[dim]⚙[/dim] [b orange]{tool}[/b orange]({args_str})",
                 shrink=False,
             )
+            # Auto-approve check: if auto-approve is on, send approval immediately
+            if self._auto_approve and tool != "tool_search":
+                call_id = event.get("call_id", "")
+                self._auto_approve_task = asyncio.create_task(self._send_approval(call_id, True))
             self.status_widget.set_text(f"Running: {tool}", spinning=True)
 
         elif etype == "tool_result":
@@ -469,6 +509,11 @@ class NexusApp(App):
             content = event.get("content", "")
             self._finalize_response(content)
             self._busy = False
+            self._request_count += 1
+            # Track token usage if provided by server
+            tokens = event.get("tokens_used", 0)
+            if tokens:
+                self._total_tokens_used += tokens
             self._process_next_in_queue()
             self.status_widget.set_text("Ready")
 
@@ -488,20 +533,28 @@ class NexusApp(App):
     # ── Display helpers ──────────────────────────────────────────────
 
     def _write_tool_result(self, success: bool, output: str, call_id: str):
-        """Write a tool result — short results inline, long results collapsible."""
-        icon = "✓" if success else "✗"
-        color = "green" if success else "red"
+        """Write a tool result — short results inline, long results collapsible.
 
-        display = self._format_tool_output(output)
+        Uses per-tool formatters via dispatch table for specialized output.
+        """
+        # Determine tool name from context (last tool_call event)
+        tool_name = getattr(self, "_last_tool_name", "")
+
+        # Use per-tool formatter if available
+        display = self._format_tool_result_for_display(tool_name, success, output)
         max_chars = settings.agent.max_tool_output_chars
 
         if len(display) <= max_chars:
+            icon = "✓" if success else "✗"
+            color = "green" if success else "red"
             self.log_widget.write(
                 f"   [{color}]{icon}[/{color}] {display}",
                 shrink=False,
             )
         else:
             truncated = self._truncate_output(display)
+            icon = "✓" if success else "✗"
+            color = "green" if success else "red"
             collapsible = Collapsible(
                 Static(truncated),
                 title=f"[{color}]{icon}[/{color}] Tool result ({len(output):,} chars)",
@@ -510,6 +563,113 @@ class NexusApp(App):
             self._collapsibles.append(collapsible)
             self.log_widget.mount(collapsible)
             self.log_widget.scroll_end(animate=False)
+
+    def _format_tool_result_for_display(self, tool_name: str, success: bool, output: str) -> str:
+        """Dispatch table for per-tool output formatting."""
+        if not output or not output.strip():
+            return "[dim](empty)[/dim]"
+
+        # Shell tools: show command + exit code + truncated output
+        if tool_name in ("run_shell", "run_shell_streaming", "shell"):
+            return self._format_shell_output(output)
+        # File read: show path + line count + content preview
+        elif tool_name in ("read_file", "read_multiple_files"):
+            return self._format_read_file_output(output)
+        # File write/edit: show path + success
+        elif tool_name in ("write_file", "write_multiple_files", "edit_file", "apply_patch"):
+            return self._format_write_file_output(output, tool_name)
+        # Git tools: show command + result summary
+        elif tool_name.startswith("git_"):
+            return self._format_git_output(output, tool_name)
+        # Search web: show query + result count + top URLs
+        elif tool_name in ("search_web", "search_local_docs"):
+            return self._format_search_output(output)
+        # Subagent: show task + status
+        elif tool_name == "spawn_subagent":
+            return self._format_subagent_output(output)
+        # Default: use existing generic JSON/smart formatter
+        else:
+            return self._format_tool_output(output)
+
+    def _format_shell_output(self, output: str) -> str:
+        """Format shell command output: show exit code + truncated stdout."""
+        lines = output.strip().split("\n")
+        # Try to find exit code indicator
+        exit_code = None
+        clean_lines = []
+        for line in lines:
+            if line.startswith("Exit code:") or line.startswith("exit code:"):
+                with contextlib.suppress(ValueError):
+                    exit_code = int(line.split(":")[-1].strip())
+            elif not line.startswith("Error:"):
+                clean_lines.append(line)
+
+        result = "\n".join(clean_lines[:15])
+        suffix = ""
+        if len(clean_lines) > 15:
+            suffix = f"\n[dim]... +{len(clean_lines) - 15} more lines[/dim]"
+
+        code_str = ""
+        if exit_code is not None:
+            code_color = "green" if exit_code == 0 else "red"
+            code_str = f"[{code_color}]exit {exit_code}[/{code_color}] "
+
+        return f"{code_str}{result}{suffix}"
+
+    def _format_read_file_output(self, output: str) -> str:
+        """Format read_file output: show file path + line count + content preview."""
+        lines = output.strip().split("\n")
+        # Count content lines (skip line-number prefixed ones like "1|content")
+        content_lines = [line for line in lines if not re.match(r'^\d+\|', line)]
+        line_count = len(content_lines)
+
+        preview_lines = content_lines[:12]
+        preview = "\n".join(preview_lines)
+        suffix = ""
+        if line_count > 12:
+            suffix = f"\n[dim]... +{line_count - 12} more lines[/dim]"
+
+        return f"[b cyan]({line_count} lines)[/b cyan] {preview}{suffix}"
+
+    def _format_write_file_output(self, output: str, tool_name: str) -> str:
+        """Format write_file/edit_file output: show success indicator."""
+        cleaned = output.strip()
+        # Try to extract file path from output
+        path_match = re.search(r'(?:written|saved|patched)\s+(?:to\s+)?["\']?([\w./~_-]+)["\']?', cleaned, re.IGNORECASE)
+        path = path_match.group(0) if path_match else cleaned[:80]
+        return f"[green]✓ {tool_name}[/green] → {path}"
+
+    def _format_git_output(self, output: str, tool_name: str) -> str:
+        """Format git tool output: show git command + result summary."""
+        lines = output.strip().split("\n")
+        # Show first 10 meaningful lines
+        meaningful = [line for line in lines if line.strip()][:10]
+        result = "\n".join(meaningful)
+        suffix = ""
+        if len(lines) > 10:
+            suffix = f"\n[dim]... +{len(lines) - 10} more lines[/dim]"
+        return f"[b orange]git {tool_name[4:]}[/b orange] {result}{suffix}"
+
+    def _format_search_output(self, output: str) -> str:
+        """Format search_web output: show result count + top URLs."""
+        # Count Title: occurrences as proxy for result count
+        result_count = output.count("Title:")
+        urls = re.findall(r'URL:\s*(\S+)', output)
+        url_preview = "\n".join(f"  🔗 {u}" for u in urls[:3])
+        suffix = ""
+        if len(urls) > 3:
+            suffix = f"\n[dim]  ... +{len(urls) - 3} more URLs[/dim]"
+        return f"[b cyan]({result_count} results)[/b cyan]\n{url_preview}{suffix}"
+
+    def _format_subagent_output(self, output: str) -> str:
+        """Format spawn_subagent output: show task + status."""
+        cleaned = output.strip()
+        # Extract worker ID and status
+        id_match = re.search(r'worker\s+(\S+)', cleaned)
+        status_match = re.search(r'status:\s*(\w+)', cleaned)
+        worker_id = id_match.group(1) if id_match else "?"
+        status = status_match.group(1) if status_match else "?"
+        return f"[b purple]subagent {worker_id}[/b purple] status: [yellow]{status}[/yellow]"
 
     def _format_tool_output(self, output: str) -> str:
         """Format tool output for display — parse JSON into human-readable form."""
@@ -522,7 +682,7 @@ class NexusApp(App):
             if isinstance(data, dict):
                 # Common tool output patterns — extract meaningful content
                 for key in ("content", "result", "output", "stdout", "text", "message", "data"):
-                    if key in data and data[key]:
+                    if data.get(key):
                         val = data[key]
                         if isinstance(val, str):
                             return self._escape(val.strip())
@@ -586,7 +746,7 @@ class NexusApp(App):
         """Handle slash commands. Returns True if handled."""
         parts = cmd.strip().lower().split()
         command = parts[0] if parts else ""
-        args = parts[1:] if len(parts) > 1 else []
+        parts[1:] if len(parts) > 1 else []
 
         if command == "/help" or command == "/h":
             self._show_help()
@@ -598,8 +758,6 @@ class NexusApp(App):
                 "[yellow]⟶ New conversation started. Previous context cleared.[/yellow]",
                 shrink=False,
             )
-            # Reset conversation history on server side by creating new session
-            # For now, just clear the log
             self.log_widget.clear()
             self._collapsibles.clear()
             self._show_greeting()
@@ -608,6 +766,9 @@ class NexusApp(App):
         elif command == "/clear":
             self.log_widget.clear()
             self._collapsibles.clear()
+            self._streaming_response = ""
+            self._streaming_widget.update("")
+            self._show_greeting()
             return True
 
         elif command == "/expand" or command == "/e":
@@ -634,15 +795,116 @@ class NexusApp(App):
 
         elif command == "/status":
             status = "busy" if self._busy else "ready"
+            auto = "ON" if self._auto_approve else "OFF"
             self.log_widget.write(
                 f"[dim]Status: {status} | Session: {self.session_id} | "
-                f"Queued: {len(self._pending_inputs)}[/dim]",
+                f"Queued: {len(self._pending_inputs)} | "
+                f"Auto-approve: {auto} | "
+                f"Tokens: {self._total_tokens_used:,} | "
+                f"Requests: {self._request_count}[/dim]",
                 shrink=False,
             )
             return True
 
         elif command == "/interrupt":
             self.action_interrupt()
+            return True
+
+        elif command == "/compact":
+            self.log_widget.write(
+                "[yellow]⟶ Context compaction requested.[/yellow]",
+                shrink=False,
+            )
+            if self._ws and self._ws.open:
+                await self._ws.send(json.dumps({"type": "compact"}))
+                self.status_widget.set_text("Compacting...", spinning=True)
+            else:
+                self.log_widget.write(
+                    "[red]Cannot compact — not connected to server.[/red]",
+                    shrink=False,
+                )
+            return True
+
+        elif command == "/copy":
+            self.log_widget.write(
+                "[dim]Copy is not available in the TUI. Use your terminal's "
+                "selection mechanism.[/dim]",
+                shrink=False,
+            )
+            return True
+
+        elif command == "/version":
+            model = settings.agent.default_model
+            self.log_widget.write(
+                f"[dim]NexusAgent v0.1.0 | Model: {model} | "
+                f"Session: {self.session_id} | "
+                f"Theme: {NEXUS_THEMES[self._theme_index]['name']}[/dim]",
+                shrink=False,
+            )
+            return True
+
+        elif command == "/tokens":
+            model = settings.agent.default_model
+            self.log_widget.write("[b cyan]Token Usage[/b cyan]", shrink=False)
+            self.log_widget.write(
+                f"  Total tokens used: [yellow]{self._total_tokens_used:,}[/yellow]",
+                shrink=False,
+            )
+            self.log_widget.write(
+                f"  Requests made: [yellow]{self._request_count}[/yellow]",
+                shrink=False,
+            )
+            self.log_widget.write(
+                f"  Model: [yellow]{model}[/yellow]",
+                shrink=False,
+            )
+            self.log_widget.write(
+                f"  Session: [yellow]{self.session_id}[/yellow]",
+                shrink=False,
+            )
+            if self._request_count > 0 and self._total_tokens_used > 0:
+                avg = self._total_tokens_used // self._request_count
+                self.log_widget.write(
+                    f"  Avg tokens/request: [yellow]{avg:,}[/yellow]",
+                    shrink=False,
+                )
+            return True
+
+        elif command == "/model":
+            model = settings.agent.default_model
+            provider = settings.agent.primary_provider
+            self.log_widget.write("[b cyan]Model Info[/b cyan]", shrink=False)
+            self.log_widget.write(f"  Model: [yellow]{model}[/yellow]", shrink=False)
+            self.log_widget.write(
+                f"  Provider: [yellow]{provider}[/yellow]", shrink=False
+            )
+            self.log_widget.write(
+                f"  Session: [yellow]{self.session_id}[/yellow]", shrink=False
+            )
+            return True
+
+        elif command == "/threads":
+            self.log_widget.write(
+                "[dim]Recent sessions (via server):[/dim]",
+                shrink=False,
+            )
+            if self._ws and self._ws.open:
+                await self._ws.send(json.dumps({"type": "list_sessions"}))
+            else:
+                self.log_widget.write(
+                    f"[dim]  Current session: {self.session_id}[/dim]",
+                    shrink=False,
+                )
+            return True
+
+        elif command == "/theme":
+            self._theme_index = (self._theme_index + 1) % len(NEXUS_THEMES)
+            theme = NEXUS_THEMES[self._theme_index]
+            self._apply_theme(theme)
+            self.log_widget.write(
+                f"[yellow]⟶ Theme switched to: {theme['name']}[/yellow]",
+                shrink=False,
+            )
             return True
 
         else:
@@ -652,24 +914,40 @@ class NexusApp(App):
             )
             return True
 
+    def _apply_theme(self, theme: dict) -> None:
+        """Apply a color theme by updating CSS."""
+        self.styles.background = theme["bg"]
+        # Update header styles
+        self.query_one(Header).styles.background = theme["header_bg"]
+        self.query_one(Header).styles.color = theme["accent"]
+
     def _show_help(self):
         self.log_widget.write("", shrink=False)
         self.log_widget.write("[b cyan]Available Commands:[/b cyan]", shrink=False)
         self.log_widget.write("  [b]/help[/b]      Show this help message", shrink=False)
         self.log_widget.write("  [b]/new[/b]       Start a new conversation", shrink=False)
-        self.log_widget.write("  [b]/clear[/b]     Clear the conversation log", shrink=False)
+        self.log_widget.write("  [b]/clear[/b]     Clear the conversation log + greeting", shrink=False)
         self.log_widget.write("  [b]/expand[/b]    Expand all tool results", shrink=False)
         self.log_widget.write("  [b]/collapse[/b]  Collapse all tool results", shrink=False)
         self.log_widget.write("  [b]/status[/b]    Show session status", shrink=False)
+        self.log_widget.write("  [b]/compact[/b]   Trigger context compaction", shrink=False)
+        self.log_widget.write("  [b]/copy[/b]      Copy placeholder", shrink=False)
+        self.log_widget.write("  [b]/version[/b]   Show version info", shrink=False)
+        self.log_widget.write("  [b]/tokens[/b]    Show token usage", shrink=False)
+        self.log_widget.write("  [b]/model[/b]     Show current model info", shrink=False)
+        self.log_widget.write("  [b]/threads[/b]   List recent sessions", shrink=False)
+        self.log_widget.write("  [b]/theme[/b]     Cycle color theme", shrink=False)
         self.log_widget.write("  [b]/interrupt[/b] Cancel current agent turn", shrink=False)
         self.log_widget.write("  [b]/quit[/b]      Exit the application", shrink=False)
         self.log_widget.write("", shrink=False)
         self.log_widget.write("[b cyan]Keyboard Shortcuts:[/b cyan]", shrink=False)
         self.log_widget.write("  [b]Ctrl+C[/b]  Interrupt current turn", shrink=False)
+        self.log_widget.write("  [b]Ctrl+U[/b]  Interrupt current turn", shrink=False)
         self.log_widget.write("  [b]Q[/b]       Quit", shrink=False)
-        self.log_widget.write("  [b]C[/b>       Clear log", shrink=False)
-        self.log_widget.write("  [b]E[/b>       Expand all", shrink=False)
-        self.log_widget.write("  [b]A[/b>       Collapse all", shrink=False)
+        self.log_widget.write("  [b]C[/b]       Clear log", shrink=False)
+        self.log_widget.write("  [b]E[/b]       Expand all", shrink=False)
+        self.log_widget.write("  [b]A[/b]       Collapse all", shrink=False)
+        self.log_widget.write("  [b]Ctrl+_[/b]  Toggle auto-approve", shrink=False)
         self.log_widget.write("", shrink=False)
 
     # ── Streaming response ───────────────────────────────────────────
@@ -688,27 +966,61 @@ class NexusApp(App):
     def _finalize_response(self, content: str) -> None:
         """Finalize the streaming response.
 
-        If streaming was active, the widget already shows the accumulated content.
-        Writes the final response into the RichLog for history, clears the
-        streaming widget, and resets state.
+        Parses and formats the response with:
+        - Syntax highlighting for code blocks (heuristic: detect ``` markers)
+        - URL auto-detection (Textual RichLog auto-links URLs)
+        - Clear separator between turns
         """
         if self._streaming_response:
-            # Write the complete response to the conversation log for history
             final = content if content else self._streaming_response
             ts = datetime.now().strftime("%H:%M")
+            formatted = self._enhanced_markdown(final)
             self.log_widget.write("", shrink=False)
             self.log_widget.write(
-                f"[b green][{ts}] Agent:[/b green] {self._simple_markdown(final)}",
+                f"[b green][{ts}] Agent:[/b green]",
                 shrink=False,
             )
+            self.log_widget.write(formatted, shrink=False)
             self.log_widget.write("", shrink=False)
         elif content:
-            # No streaming occurred — write full response normally
             self._write_response(content)
 
         # Clear the streaming widget
         self._streaming_widget.update("")
         self._streaming_response = ""
+
+    def _enhanced_markdown(self, text: str) -> str:
+        """Enhanced markdown: syntax highlighting for code blocks, bold, italic, inline code."""
+        # Extract code blocks first, replace with placeholders
+        code_blocks = []
+        def replace_code_block(m):
+            lang = m.group(1) or ""
+            code = m.group(2)
+            idx = len(code_blocks)
+            code_blocks.append((lang, code))
+            return f"__CODE_BLOCK_{idx}__"
+
+        # Handle fenced code blocks  ```lang\n...\n```
+        text = re.sub(r'```(\w*)\n(.*?)```', replace_code_block, text, flags=re.DOTALL)
+
+        # Handle inline code `...`
+        text = re.sub(r'`([^`]+)`', r'[reverse]\1[/reverse]', text)
+
+        # Bold and italic
+        text = re.sub(r'\*\*(.+?)\*\*', r'[b]\1[/b]', text)
+        text = re.sub(r'(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)', r'[i]\1[/i]', text)
+
+        # Restore code blocks with dim/styled formatting
+        for i, (lang, code) in enumerate(code_blocks):
+            lang_label = f"[dim]({lang})[/dim] " if lang else ""
+            # Truncate very long code blocks
+            code_lines = code.split("\n")
+            if len(code_lines) > 20:
+                code = "\n".join(code_lines[:20]) + f"\n[dim]... +{len(code_lines) - 20} more lines[/dim]"
+            styled = f"{lang_label}[dim]{code}[/dim]"
+            text = text.replace(f"__CODE_BLOCK_{i}__", styled)
+
+        return text
 
     # ── Queue management ────────────────────────────────────────────
 
@@ -719,7 +1031,7 @@ class NexusApp(App):
         self._busy = True
         self.log_widget.write(f"[b cyan]You:[/b cyan] {next_msg}", shrink=False)
         self.status_widget.set_text("Thinking...", spinning=True)
-        asyncio.create_task(self._input_queue.put(next_msg))
+        asyncio.create_task(self._input_queue.put(next_msg))  # noqa: RUF006
         self._update_queue_status()
 
     def _update_queue_status(self):
@@ -771,16 +1083,19 @@ class NexusApp(App):
     def action_clear(self) -> None:
         self.log_widget.clear()
         self._collapsibles.clear()
+        self._show_greeting()
 
     def action_quit(self) -> None:
-        asyncio.create_task(self._input_queue.put(None))
+        asyncio.create_task(self._input_queue.put(None))  # noqa: RUF006
         if hasattr(self, '_ws_task'):
             self._ws_task.cancel()
         self.exit()
 
     def action_interrupt(self) -> None:
         if self._ws and self._ws.open:
-            asyncio.create_task(self._ws.send(json.dumps({"type": "interrupt"})))
+            self._interrupt_task = asyncio.create_task(
+                self._ws.send(json.dumps({"type": "interrupt"}))
+            )
             self.status_widget.set_text("Interrupting...", spinning=True)
             self.log_widget.write("[yellow]⏹ Interrupt sent — waiting for agent to stop...[/yellow]", shrink=False)
 
@@ -791,6 +1106,21 @@ class NexusApp(App):
     def action_collapse_all(self) -> None:
         for c in self._collapsibles:
             c.collapsed = True
+
+    def action_toggle_auto_approve(self) -> None:
+        self._auto_approve = not self._auto_approve
+        if self._auto_approve:
+            self._auto_approve_badge.update("[bold yellow]⚡ AUTO-APPROVE ON[/bold yellow]")
+            self.log_widget.write(
+                "[yellow]⟶ Auto-approve enabled — tool calls will be approved automatically.[/yellow]",
+                shrink=False,
+            )
+        else:
+            self._auto_approve_badge.update("")
+            self.log_widget.write(
+                "[dim]⟶ Auto-approve disabled — tool calls require manual approval.[/dim]",
+                shrink=False,
+            )
 
     # ── Helpers ─────────────────────────────────────────────────────
 
@@ -806,6 +1136,16 @@ class NexusApp(App):
         if len(text) <= max_len:
             return text
         return text[:max_len - 3] + "..."
+
+    def _format_arg_value(self, value) -> str:
+        """Format a tool argument value for display — dicts as JSON, strings escaped."""
+        if isinstance(value, dict):
+            return json.dumps(value, ensure_ascii=False)
+        if isinstance(value, list):
+            return json.dumps(value, ensure_ascii=False)
+        if isinstance(value, str) and len(value) > 200:
+            return textwrap.shorten(value, width=200, placeholder="...")
+        return self._escape(str(value))
 
     def _escape(self, text: str) -> str:
         return text.replace("[", "\\[").replace("]", "\\]")

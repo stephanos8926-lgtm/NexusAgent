@@ -268,14 +268,6 @@ class WorkerPool:
             elapsed = time.time() - start
             if elapsed >= contract.max_wall_time:
                 return f"Timed out after {elapsed:.1f}s"
-            state = {
-                "task": task.description,
-                "id": task.id,
-                "turn": turn,
-                "max_turns": contract.max_turns,
-                "acceptance_criteria": contract.acceptance_criteria,
-                "last_result": last_result,
-            }
             try:
                 # Build a transient TaskSchema that carries the turn/contract
                 # context so the shared function can route correctly.
