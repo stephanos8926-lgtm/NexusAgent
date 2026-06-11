@@ -293,6 +293,37 @@ async def session_websocket(
                     await session.approve(msg["call_id"], msg.get("approved", False))
                 elif msg_type == "interrupt":
                     await session.interrupt()
+                elif msg_type == "list_sessions":
+                    # Return session list to the TUI
+                    try:
+                        sessions = await session_repo.list_sessions(limit=20)
+                        await websocket.send_json({
+                            "type": "session_list",
+                            "sessions": sessions,
+                        })
+                    except Exception as e:
+                        logger.warning("Failed to list sessions: %s", e)
+                        await websocket.send_json({
+                            "type": "session_list",
+                            "sessions": [],
+                            "error": str(e),
+                        })
+                elif msg_type == "compact":
+                    # Trigger context compaction for this session
+                    try:
+                        ctx = await session.pre_compaction_flush()
+                        await websocket.send_json({
+                            "type": "compact_result",
+                            "status": "ok",
+                            "summary": ctx[:200] if ctx else "",
+                        })
+                    except Exception as e:
+                        logger.warning("Compaction failed: %s", e)
+                        await websocket.send_json({
+                            "type": "compact_result",
+                            "status": "error",
+                            "error": str(e),
+                        })
                 elif msg_type == "close":
                     await session.close()
                     break

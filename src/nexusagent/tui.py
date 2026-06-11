@@ -199,7 +199,6 @@ class NexusApp(App):
         padding: 0 2;
         overflow-x: hidden;
         text-wrap: wrap;
-        word-wrap: break-word;
     }
 
     #conversation-log {
@@ -212,7 +211,6 @@ class NexusApp(App):
         overflow-y: auto;
         overflow-x: hidden;
         text-wrap: wrap;
-        word-wrap: break-word;
         text-align: left;
     }
 
@@ -229,7 +227,6 @@ class NexusApp(App):
         border-left: wide #3b82f6;
         overflow-x: hidden;
         text-wrap: wrap;
-        word-wrap: break-word;
     }
 
     /* ── Input area ── */
@@ -523,11 +520,61 @@ class NexusApp(App):
             self._process_next_in_queue()
             self.status_widget.set_text("Error")
 
+        elif etype == "compact_result":
+            status = event.get("status", "?")
+            if status == "ok":
+                summary = event.get("summary", "")
+                self.log_widget.write(
+                    f"[green]✓ Context compacted.[/green]"
+                    + (f" [dim]{summary}[/dim]" if summary else ""),
+                    shrink=False,
+                )
+            else:
+                err = event.get("error", "Unknown error")
+                self.log_widget.write(
+                    f"[red]Compaction failed: {err}[/red]",
+                    shrink=False,
+                )
+            self.status_widget.set_text("Ready")
+
         elif etype == "session_closed":
             self.log_widget.write("[dim]Session closed by server.[/dim]", shrink=False)
             self._busy = False
             self._ws = None
             self.status_widget.set_text("Disconnected")
+
+        elif etype == "session_list":
+            sessions = event.get("sessions", [])
+            error = event.get("error")
+            if error:
+                self.log_widget.write(
+                    f"[red]Failed to list sessions: {error}[/red]",
+                    shrink=False,
+                )
+            elif sessions:
+                self.log_widget.write(
+                    "[b cyan]Recent Sessions:[/b cyan]",
+                    shrink=False,
+                )
+                for s in sessions:
+                    sid = s.get("id", "?")
+                    status = s.get("status", "?")
+                    wdir = s.get("working_dir", ".")
+                    updated = s.get("updated_at", "unknown")
+                    if isinstance(updated, str) and len(updated) > 19:
+                        updated = updated[:19]
+                    self.log_widget.write(
+                        f"  [yellow]{sid}[/yellow]  "
+                        f"status=[dim]{status}[/dim]  "
+                        f"dir=[dim]{wdir}[/dim]  "
+                        f"updated=[dim]{updated}[/dim]",
+                        shrink=False,
+                    )
+            else:
+                self.log_widget.write(
+                    "[dim]No sessions found.[/dim]",
+                    shrink=False,
+                )
 
     # ── Display helpers ──────────────────────────────────────────────
 
