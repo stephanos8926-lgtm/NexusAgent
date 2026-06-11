@@ -46,7 +46,7 @@ import asyncio as _asyncio
 from nexusagent.db import DatabaseManager as _DBM
 
 async def _init_test_db():
-    _db = _DBM("nexus.db")
+    _db = _DBM("data/nexus.db")
     await _db.init_db()
 
 _asyncio.run(_init_test_db())

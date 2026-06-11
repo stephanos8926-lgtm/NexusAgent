@@ -5,9 +5,35 @@ build/
 dist/
 wheels/
 *.egg-info
+src/*.egg-info/
 
 # Virtual environments
 .venv
 site/
+
+# Secrets
 .env
+*.secret
+*.salt
+keystore*
+
+# Database & data
+*.db
+*.db-shm
+*.db-wal
+test.db*
+test_loop.db*
+
+# Logs
+*.log
+
+# IDE state
+.serena/
+.llxprt/
+.vtcode/
+.remember/
+.reports/
+.gemini/
+
+# Git worktrees
 .hermes/worktrees/

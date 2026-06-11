@@ -84,6 +84,12 @@ class DatabaseManager:
             elif not url.startswith("://"):
                 url = f"sqlite+aiosqlite:///{url}"
         self.db_url = url
+        # Ensure parent directory exists for file-based SQLite DBs
+        if "sqlite" in url:
+            from pathlib import Path as _Path
+            db_file = url.split("///")[-1] if "///" in url else ""
+            if db_file and not db_file.startswith(":memory:"):
+                _Path(db_file).parent.mkdir(parents=True, exist_ok=True)
         self.engine = create_async_engine(self.db_url, echo=False, future=True)
         self.async_session = async_sessionmaker(
             self.engine, expire_on_commit=False, class_=AsyncSession
@@ -98,10 +104,12 @@ class DatabaseManager:
             elif not url.startswith("://"):
                 url = f"sqlite+aiosqlite:///{url}"
         self.db_url = url
-        self.engine = create_async_engine(self.db_url, echo=False, future=True)
-        self.async_session = async_sessionmaker(
-            self.engine, expire_on_commit=False, class_=AsyncSession
-        )
+        # Ensure parent directory exists for file-based SQLite DBs
+        if "sqlite" in url:
+            from pathlib import Path as _Path
+            db_file = url.split("///")[-1] if "///" in url else ""
+            if db_file and not db_file.startswith(":memory:"):
+                _Path(db_file).parent.mkdir(parents=True, exist_ok=True)
 
     async def init_db(self) -> None:
         async with self.engine.begin() as conn:
