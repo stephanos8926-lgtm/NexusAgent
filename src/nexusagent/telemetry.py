@@ -113,6 +113,10 @@ class TelemetryManager:
 
     def get_recent_logs(self, lines: int = 50) -> list[str]:
         """Get recent log lines from the log file."""
+        return self.get_recent_lines(lines)
+
+    def get_recent_lines(self, lines: int = 50) -> list[str]:
+        """Get recent log lines from the log file (alias for get_recent_logs)."""
         if not self.log_file.exists():
             return ["No log file yet"]
 

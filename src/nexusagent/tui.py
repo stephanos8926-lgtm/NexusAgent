@@ -35,11 +35,12 @@ from typing import Any
 
 from textual import events
 from textual.app import App, ComposeResult
-from textual.containers import Container, VerticalScroll, Grid
+from textual.containers import Container, VerticalScroll, Grid, Horizontal, Vertical
 from textual.events import Key
 from textual.geometry import Offset
 from textual.screen import ModalScreen
-from textual.widgets import Button, Label, Static
+from textual.binding import Binding
+from textual.widgets import Button, Label, Static, Input, RichLog
 
 from nexusagent.widgets.messages import (
     UserMessage,
@@ -52,9 +53,398 @@ from nexusagent.widgets.messages import (
 from nexusagent.widgets.status import StatusBar
 from nexusagent.widgets.chat_input import ChatInput
 from nexusagent.widgets.theme import get_css_variable_defaults, register_themes
-from nexusagent.telemetry import setup_telemetry, LogViewer
+from nexusagent.telemetry import setup_telemetry
 
 logger = logging.getLogger(__name__)
+
+
+# ── Help screen -------------------------------------------------------------
+
+_HELP_CATEGORIES: dict[str, list[tuple[str, str]]] = {
+    "Navigation": [
+        ("j / ↓", "Scroll down"),
+        ("k / ↑", "Scroll up"),
+        ("q / Esc", "Close help"),
+        ("/", "Search"),
+        ("Enter", "Submit message"),
+        ("Shift+Enter", "New line in input"),
+        ("PgUp/PgDn", "Page up/down"),
+    ],
+    "Global Shortcuts": [
+        ("F1", "Show help"),
+        ("F2", "Show logs"),
+        ("F3", "Switch theme"),
+        ("F12", "Toggle devtools"),
+        ("Ctrl+C", "Interrupt / Exit"),
+    ],
+    "Commands": [
+        ("/help", "Show this help screen"),
+        ("/logs", "Open log viewer"),
+        ("/theme", "Cycle through themes"),
+        ("/clear", "Clear chat history"),
+        ("/model", "Show current model"),
+    ],
+}
+
+# Semantic style for each category header
+_HELP_CATEGORY_STYLES = {
+    "Navigation": "bold accent",
+    "Global Shortcuts": "bold warning",
+    "Commands": "bold success",
+}
+
+# Log level → color style mapping
+_LOG_LEVEL_COLORS = {
+    "DEBUG": "dim",
+    "INFO": "",
+    "WARNING": "warning",
+    "ERROR": "bold error",
+    "CRITICAL": "bold error reverse",
+}
+
+
+class HelpScreen(ModalScreen[None]):
+    """Searchable help modal with categories and vim-style navigation.
+
+    Features:
+    - Categories: Navigation, Global Shortcuts, Commands
+    - Search: press '/', type query, Enter to clear
+    - Vim nav: j/k to scroll, q/Esc to close
+    - Color-coded log levels and command types
+    """
+
+    BINDINGS = [
+        Binding("j", "scroll_down", "Down", show=False),
+        Binding("k", "scroll_up", "Up", show=False),
+        Binding("q", "dismiss", "Close", show=True),
+        Binding("escape", "dismiss", "Close", show=True),
+        Binding("/", "start_search", "Search", show=True),
+        Binding("enter", "clear_search", "Clear search", show=False),
+        Binding("pageup", "page_up", "PgUp", show=False),
+        Binding("pagedown", "page_down", "PgDn", show=False),
+    ]
+
+    DEFAULT_CSS = """
+    HelpScreen {
+        align: middle middle;
+        width: 70;
+        height: 30;
+        min-width: 50;
+        min-height: 20;
+        background: $surface;
+        border: solid $primary;
+    }
+
+    HelpScreen #title-row {
+        height: 2;
+        padding: 0 2;
+        content-align: left middle;
+    }
+
+    HelpScreen #title {
+        width: 1fr;
+        style: bold primary;
+    }
+
+    HelpScreen #search-input {
+        height: 3;
+        margin: 0 1;
+        border: solid $accent;
+        display: none;
+    }
+
+    HelpScreen #search-input.-active {
+        display: block;
+    }
+
+    HelpScreen #help-content {
+        height: 1fr;
+        padding: 0 2;
+        overflow-y: auto;
+    }
+
+    HelpScreen .help-category {
+        margin: 1 0 0 0;
+        text-style: bold;
+    }
+
+    HelpScreen .help-entry {
+        padding-left: 2;
+        height: 1;
+    }
+
+    HelpScreen .help-key {
+        width: 18;
+        color: $accent;
+    }
+
+    HelpScreen .help-desc {
+        color: $text-secondary;
+    }
+
+    HelpScreen .no-results {
+        color: $text-muted;
+        text-style: italic;
+        padding: 2;
+    }
+
+    HelpScreen #footer {
+        height: 2;
+        padding: 0 2;
+        content-align: left middle;
+        color: $text-muted;
+    }
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._search_mode = False
+        self._search_query = ""
+
+    def compose(self) -> ComposeResult:
+        # Title row
+        with Horizontal(id="title-row"):
+            yield Label("NexusAgent Help", id="title")
+        # Search input (hidden by default)
+        yield Input(placeholder="Type to search...", id="search-input")
+        # Help content area
+        yield VerticalScroll(id="help-content")
+        # Footer
+        with Horizontal(id="footer"):
+            yield Label("j/k: scroll  /: search  q: close")
+
+    def _render_help(self) -> list[tuple[str, str]]:
+        """Generate help content lines, filtered by search query if active.
+
+        Returns list of (text, style) tuples for rendering.
+        """
+        lines: list[tuple[str, str]] = []
+        for category, entries in _HELP_CATEGORIES.items():
+            filtered_entries = entries
+            if self._search_query:
+                q = self._search_query.lower()
+                filtered_entries = [
+                    (key, desc) for key, desc in entries
+                    if q in key.lower() or q in desc.lower()
+                ]
+                if not filtered_entries:
+                    continue
+
+            style = _HELP_CATEGORY_STYLES.get(category, "bold")
+            lines.append((f"▸ {category}", style))
+            for key, desc in filtered_entries:
+                lines.append((f"  {key:<18} {desc}", "text-secondary"))
+            lines.append(("", ""))  # blank line between categories
+        return lines
+
+    def _refresh_content(self) -> None:
+        """Refresh the help content area."""
+        scroller = self.query_one("#help-content", VerticalScroll)
+        # Remove existing children
+        for child in list(scroller.children):
+            child.remove()
+
+        lines = self._render_help()
+        if not lines:
+            scroller.mount(Label("No results", classes="no-results"))
+        else:
+            for text, style in lines:
+                if text:
+                    label = Label(text)
+                    if style:
+                        label.add_class(style.replace(" ", "-"))
+                    scroller.mount(label)
+                else:
+                    scroller.mount(Label(""))  # spacer
+
+        # Scroll to top
+        scroller.scroll_home(animate=False)
+
+    def on_mount(self) -> None:
+        self._refresh_content()
+
+    def action_start_search(self) -> None:
+        """Activate search mode."""
+        self._search_mode = True
+        search_input = self.query_one("#search-input", Input)
+        search_input.add_class("-active")
+        search_input.focus()
+
+    def action_clear_search(self) -> None:
+        """Exit search mode and clear query."""
+        self._search_mode = False
+        self._search_query = ""
+        search_input = self.query_one("#search-input", Input)
+        search_input.remove_class("-active")
+        search_input.value = ""
+        # Return focus to the scroller for vim nav
+        self.query_one("#help-content", VerticalScroll).focus()
+        self._refresh_content()
+
+    def on_input_changed(self, event: Input.Changed) -> None:
+        """Update search results as user types."""
+        if event.control.id == "search-input":
+            self._search_query = event.value.strip()
+            self._refresh_content()
+
+    def action_page_up(self) -> None:
+        scroller = self.query_one("#help-content", VerticalScroll)
+        scroller.scroll_page_up()
+
+    def action_page_down(self) -> None:
+        scroller = self.query_one("#help-content", VerticalScroll)
+        scroller.scroll_page_down()
+
+
+# ── Log viewer screen --------------------------------------------------------
+
+
+class LogViewerScreen(ModalScreen[None]):
+    """Enhanced log viewer modal with page controls, search, and level colours.
+
+    Features:
+    - Page up/down (PgUp/PgDn) to load more/fewer log lines
+    - Level-based colouring (DEBUG/INFO/WARNING/ERROR/CRITICAL)
+    - Timestamps on every line
+    - Vim nav: j/k to scroll, q/Esc to close
+    - Status bar showing line count and filter state
+    """
+
+    BINDINGS = [
+        Binding("j", "scroll_down", "Down", show=False),
+        Binding("k", "scroll_up", "Up", show=False),
+        Binding("q", "dismiss", "Close", show=True),
+        Binding("escape", "dismiss", "Close", show=True),
+        Binding("pageup", "page_up", "PgUp", show=True),
+        Binding("pagedown", "page_down", "PgDn", show=True),
+        Binding("/", "start_search", "Filter", show=True),
+    ]
+
+    DEFAULT_CSS = """
+    LogViewerScreen {
+        align: middle middle;
+        width: 80%;
+        height: 80%;
+        min-width: 50;
+        min-height: 15;
+        background: $surface;
+        border: solid $border;
+    }
+
+    LogViewerScreen #log-header {
+        height: 2;
+        padding: 0 2;
+        content-align: left middle;
+        border-bottom: solid $border;
+    }
+
+    LogViewerScreen #log-title {
+        width: 1fr;
+        style: bold text;
+    }
+
+    LogViewerScreen #log-search {
+        height: 3;
+        margin: 0 1;
+        border: solid $accent;
+        display: none;
+    }
+
+    LogViewerScreen #log-search.-active {
+        display: block;
+    }
+
+    LogViewerScreen #log-content {
+        height: 1fr;
+        padding: 0 1;
+    }
+
+    LogViewerScreen #log-footer {
+        height: 2;
+        padding: 0 2;
+        content-align: left middle;
+        border-top: solid $border;
+        color: $text-muted;
+    }
+    """
+
+    def __init__(self, telemetry: Any) -> None:
+        super().__init__()
+        self._telemetry = telemetry
+        self._line_count = 50
+        self._page_size = 50
+        self._min_lines = 10
+        self._filter_query = ""
+        self._search_mode = False
+
+    def compose(self) -> ComposeResult:
+        with Horizontal(id="log-header"):
+            yield Label("Log Viewer", id="log-title")
+        yield Input(placeholder="Filter logs...", id="log-search")
+        yield RichLog(id="log-content", highlight=True, markup=True)
+        with Horizontal(id="log-footer"):
+            yield Label("j/k: scroll  /: filter  PgUp/PgDn: more/fewer  q: close")
+
+    def _apply_log_colours(self, line: str) -> str:
+        """Return markup-wrapped line with colour based on log level."""
+        for level, style in _LOG_LEVEL_COLORS.items():
+            tag = f"[{level}]"
+            if tag in line:
+                if style:
+                    return f"[{style}]{line}[/]"
+                # INFO gets default (no wrapping)
+                return line
+        return line
+
+    def _load_lines(self) -> list[str]:
+        """Load and filter log lines from telemetry."""
+        all_lines = self._telemetry.get_recent_lines(self._line_count * 4)
+        if self._filter_query:
+            q = self._filter_query.lower()
+            all_lines = [line for line in all_lines if q in line.lower()]
+        return all_lines[-self._line_count:]
+
+    def _refresh(self) -> None:
+        """Reload and display filtered, coloured log lines."""
+        log_widget = self.query_one("#log-content", RichLog)
+        log_widget.clear()
+        for line in self._load_lines():
+            coloured = self._apply_log_colours(line)
+            log_widget.write(coloured)
+
+    def on_mount(self) -> None:
+        self._refresh()
+
+    def action_page_down(self) -> None:
+        """Load more log lines."""
+        self._line_count += self._page_size
+        self._refresh()
+
+    def action_page_up(self) -> None:
+        """Show fewer log lines."""
+        self._line_count = max(self._min_lines, self._line_count - self._page_size)
+        self._refresh()
+
+    def action_start_search(self) -> None:
+        """Activate filter mode."""
+        self._search_mode = True
+        search_input = self.query_one("#log-search", Input)
+        search_input.add_class("-active")
+        search_input.focus()
+
+    def on_input_changed(self, event: Input.Changed) -> None:
+        """Update filter results as user types."""
+        if event.control.id == "log-search":
+            self._filter_query = event.value.strip()
+            self._refresh()
+
+    def action_scroll_down(self) -> None:
+        log_widget = self.query_one("#log-content", RichLog)
+        log_widget.scroll_down()
+
+    def action_scroll_up(self) -> None:
+        log_widget = self.query_one("#log-content", RichLog)
+        log_widget.scroll_up()
 
 
 class NexusApp(App):
@@ -212,69 +602,14 @@ class NexusApp(App):
     # Log viewer
 
     def action_show_logs(self) -> None:
-        """Show the log viewer modal."""
+        """Show the log viewer modal with search, filter, and page controls."""
         if self.telemetry:
-            # Create a modal screen with log viewer
-            class LogViewerScreen(ModalScreen):
-                BINDINGS = [
-                    ("j", "scroll_down", "Scroll down"),
-                    ("k", "scroll_up", "Scroll up"),
-                    ("escape", "dismiss", "Close"),
-                ]
-
-                def compose(self) -> ComposeResult:
-                    yield Grid(
-                        Label("NexusAgent Log Viewer", id="title"),
-                        LogViewer(self.app.telemetry),
-                        Button("Close", variant="primary", id="close"),
-                        id="dialog",
-                    )
-
-                def on_button_pressed(self, event: Button.Pressed) -> None:
-                    if event.button.id == "close":
-                        self.app.pop_screen()
-
-                def action_scroll_down(self) -> None:
-                    self.query_one(LogViewer).action_scroll_down()
-
-                def action_scroll_up(self) -> None:
-                    self.query_one(LogViewer).action_scroll_up()
-
-            self.push_screen(LogViewerScreen())
+            self.push_screen(LogViewerScreen(self.telemetry))
 
     # Help screen
 
     def action_show_help(self) -> None:
-        """Show help screen."""
-        class HelpScreen(ModalScreen):
-            def compose(self) -> ComposeResult:
-                yield Vertical(
-                    Label("NexusAgent Help", classes="title"),
-                    Label(""),
-                    Label("Key Bindings:", classes="subtitle"),
-                    Label("  Enter      Submit message"),
-                    Label("  Ctrl+C     Interrupt / Exit"),
-                    Label("  F1         Show this help"),
-                    Label("  F2         Show logs"),
-                    Label("  F3         Switch theme"),
-                    Label("  F12        Toggle devtools"),
-                    Label("  Up/Down    Command history"),
-                    Label("  Shift+Enter New line in input"),
-                    Label(""),
-                    Label("Slash Commands:", classes="subtitle"),
-                    Label("  /help      Show this help"),
-                    Label("  /logs      Show log viewer"),
-                    Label("  /theme     Switch theme"),
-                    Label("  /clear     Clear chat"),
-                    Label("  /model     Show current model"),
-                    Label(""),
-                    Button("Close", variant="primary", id="close"),
-                )
-
-            def on_button_pressed(self, event: Button.Pressed) -> None:
-                if event.button.id == "close":
-                    self.app.pop_screen()
-
+        """Show the searchable help screen with categories and vim nav."""
         self.push_screen(HelpScreen())
 
     # Clear chat
@@ -347,15 +682,22 @@ class NexusApp(App):
                     args_str = ", ".join(f"{k}={v!r}" for k, v in args.items()) if isinstance(args, dict) else str(args)
                     tool_msg = ToolCallMessage(tool=tool, args=args_str)
                     messages.mount(tool_msg)
+                    self._current_tool = tool_msg
                     self._scroll_to_bottom()
 
                 elif etype == "tool_result":
-                    # Update tool call with result (simplified: just append result)
+                    # Update the current tool call with result
                     output = event.get("output", "")
-                    if output:
+                    status = event.get("status", "success")
+                    if self._current_tool is not None:
+                        self._current_tool.update_output(output)
+                        self._current_tool.update_status(status)
+                        self._current_tool = None
+                    elif output:
+                        # Fallback: show as app message if no tool is tracked
                         result_msg = AppMessage(f"  ↳ {output[:200]}")
                         messages.mount(result_msg)
-                        self._scroll_to_bottom()
+                    self._scroll_to_bottom()
 
                 elif etype == "error":
                     error_msg = ErrorMessage(event.get("message", "Unknown error"))
