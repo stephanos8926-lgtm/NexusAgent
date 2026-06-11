@@ -194,5 +194,55 @@ def session_cmd(action, session_id, new_id, working_dir, status, limit):
     asyncio.run(_run())
 
 
+@main.group("hooks")
+def hooks_cmd():
+    """Manage hooks (list, enable, disable)."""
+
+
+@hooks_cmd.command("list")
+def hooks_list():
+    """List all registered hooks and their status."""
+    from nexusagent.hooks import get_hook_manager
+
+    mgr = get_hook_manager()
+    hooks = mgr.list_hooks()
+    if not hooks:
+        click.echo("No hooks registered.")
+        return
+    click.echo(f"{'Name':<45} {'Event':<22} {'Status'}")
+    click.echo("-" * 80)
+    for h in hooks:
+        status = "enabled" if h.enabled else "disabled"
+        click.echo(f"{h.name:<45} {h.event.value:<22} {status}")
+
+
+@hooks_cmd.command("enable")
+@click.argument("hook_name")
+def hooks_enable(hook_name):
+    """Enable a hook by name."""
+    from nexusagent.hooks import get_hook_manager
+
+    mgr = get_hook_manager()
+    try:
+        mgr.enable_hook(hook_name)
+        click.echo(f"Enabled hook '{hook_name}'")
+    except KeyError:
+        click.echo(f"Hook '{hook_name}' not found.", err=True)
+
+
+@hooks_cmd.command("disable")
+@click.argument("hook_name")
+def hooks_disable(hook_name):
+    """Disable a hook by name."""
+    from nexusagent.hooks import get_hook_manager
+
+    mgr = get_hook_manager()
+    try:
+        mgr.disable_hook(hook_name)
+        click.echo(f"Disabled hook '{hook_name}'")
+    except KeyError:
+        click.echo(f"Hook '{hook_name}' not found.", err=True)
+
+
 if __name__ == "__main__":
     main()

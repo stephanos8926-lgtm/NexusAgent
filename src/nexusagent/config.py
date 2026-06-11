@@ -78,6 +78,13 @@ class LoggingConfig(BaseModel):
     )
 
 
+class HooksConfig(BaseModel):
+    """Configuration for the hooks system."""
+
+    hooks_enabled: bool = Field(default=True)
+    hooks_dir: str = Field(default=".nexusagent/hooks")
+
+
 class ConfigSchema(BaseModel):
     server: ServerConfig = Field(default_factory=ServerConfig)
     client: ClientConfig = Field(default_factory=ClientConfig)
@@ -85,6 +92,7 @@ class ConfigSchema(BaseModel):
     agent: AgentConfig = Field(default_factory=AgentConfig)
     prompt: PromptConfig = Field(default_factory=PromptConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
+    hooks: HooksConfig = Field(default_factory=HooksConfig)
     # Back-compat: top-level log_level maps to logging.level
     log_level: str = Field(default="INFO")
 
@@ -121,7 +129,7 @@ def load_config(config_file: str = "config/nexusagent.yaml") -> ConfigSchema:
                     current_level[stripped.lower()] = value
 
     # Systematic overrides for each section
-    for section in ["server", "client", "auth", "agent", "prompt", "logging"]:
+    for section in ["server", "client", "auth", "agent", "prompt", "logging", "hooks"]:
         section_data = raw_data.get(section, {})
         override_from_env(f"NEXUS_{section.upper()}__", section_data, section_data)
         raw_data[section] = section_data
