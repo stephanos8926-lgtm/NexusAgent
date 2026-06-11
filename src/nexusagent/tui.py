@@ -1,65 +1,122 @@
-"""NexusAgent Terminal User Interface (TUI).
+"""Terminal UI for NexusAgent — real-time streaming chat interface.
 
-A clean, professional terminal chat interface built with Textual.
 Features:
-- Individual message widgets in Container(layout="stream") for O(1) append
-- Semantic color system with Linear-inspired dark theme
-- VerticalScroll for chat area with smart auto-scroll
-- Compact status bar with responsive behavior
-- Chat input with history and image detection
-- Streaming token-by-token updates
-- Welcome banner that doesn't scroll away
-- Structured logging and telemetry
-- Multiple themes (nexus-dark, catppuccin-mocha, gruvbox-dark, nord)
-- ASCII fallback detection
-- iTerm2 cursor guide workaround
-- gc.freeze() before first paint for performance
-- Panic handler for terminal state restoration
-- Responsive design
-- Log viewer (/logs command)
-- Help screen (/help command)
-- Theme switching (/theme command)
-- Chat clearing (/clear command)
+- Word-wrapped conversation log (no horizontal scroll)
+- Real-time tool call/result streaming with collapsible output
+- Greeting screen with help on login
+- Slash commands: /new, /sessions, /help, /clear, /expand, /collapse, /quit, /compact, /copy, /version, /tokens, /model, /threads, /theme
+- Markdown rendering for agent responses
+- Status bar with spinner, state, and queued message count
+- Interrupt support (Ctrl+C, Ctrl+U) — cancels running agent turn
+- Error display when tools fail (web search, subagent, etc.)
+- Auto-scroll with manual override
+- Per-tool output formatters for shell, read_file, write_file/edit_file, git_*, search_web, spawn_subagent
+- Session metadata tracking (tokens)
+- Auto-approve mode toggle (Ctrl+_)
 """
 
-from __future__ import annotations
-
+import asyncio
+import contextlib
 import enum
 import json
 import logging
 import os
-import signal
-import sys
+import re
+import textwrap
 import time
-import termios
-from pathlib import Path
-from typing import Any
-
-from textual import events
-from textual.app import App, ComposeResult
-from textual.containers import Container, VerticalScroll, Grid
-from textual.events import Key
-from textual.geometry import Offset
-from textual.screen import ModalScreen
-from textual.widgets import Button, Label, Static
-
-from nexusagent.widgets.messages import (
-    UserMessage,
-    AssistantMessage,
-    ToolCallMessage,
-    AppMessage,
-    ErrorMessage,
-    WelcomeBanner,
-)
-from nexusagent.widgets.status import StatusBar
-from nexusagent.widgets.chat_input import ChatInput
-from nexusagent.widgets.theme import get_css_variable_defaults, register_themes
-from nexusagent.telemetry import setup_telemetry, LogViewer
+import uuid
+from datetime import datetime
+from typing import Any, ClassVar
 
 logger = logging.getLogger(__name__)
 
+import websockets
+from textual.app import App, ComposeResult
+from textual.binding import Binding
+from textual.containers import Horizontal, ScrollableContainer, Vertical
+from textual.reactive import reactive
+from textual.screen import ModalScreen
+from textual.timer import Timer
+from textual.widgets import (
+    Button,
+    Collapsible,
+    Footer,
+    Header,
+    Input,
+    RichLog,
+    Static,
+)
 
-# ── Responsive breakpoints ---------------------------------------------------
+from nexusagent.config import settings
+
+# Color themes for /theme cycling
+NEXUS_THEMES = [
+    {"name": "midnight", "header_bg": "#1f2937", "accent": "#10b981", "bg": "#111827"},
+    {"name": "ocean", "header_bg": "#0e4d6e", "accent": "#38bdf8", "bg": "#0c1929"},
+    {"name": "forest", "header_bg": "#14532d", "accent": "#4ade80", "bg": "#052e16"},
+    {"name": "sunset", "header_bg": "#7c2d12", "accent": "#fb923c", "bg": "#1c1010"},
+    {"name": "lavender", "header_bg": "#3b3864", "accent": "#a78bfa", "bg": "#1a1830"},
+]
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# SpinnerLabel — animated spinner + text
+# ═══════════════════════════════════════════════════════════════════════════
+
+class SpinnerLabel(Horizontal):
+    """Label with an animated spinner prefix."""
+    spinner_chars = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
+    tick = reactive(0)
+
+    def __init__(self, text: str = "Ready", **kwargs):
+        super().__init__(**kwargs)
+        self._text = text
+        self._timer: Timer | None = None
+        self._spinning = False
+
+    def compose(self) -> ComposeResult:
+        yield Static("", id="spinner-icon")
+        yield Static("", id="spinner-text")
+
+    def on_mount(self) -> None:
+        self.update_display()
+
+    def set_text(self, text: str, spinning: bool = False):
+        self._text = text
+        if spinning and not self._spinning:
+            self._spinning = True
+            self._timer = self.set_interval(0.1, self._tick_spinner)
+        elif not spinning and self._spinning:
+            self._spinning = False
+            if self._timer:
+                self._timer.stop()
+                self._timer = None
+        self.update_display()
+
+    def _tick_spinner(self):
+        self.tick += 1
+
+    def watch_tick(self):
+        self.update_display()
+
+    def update_display(self):
+        try:
+            spinner = ""
+            if self._spinning:
+                spinner = self.spinner_chars[int(self.tick) % len(self.spinner_chars)]
+            self.query_one("#spinner-icon", Static).update(spinner)
+            self.query_one("#spinner-text", Static).update(self._text)
+        except Exception:
+            pass
+
+    def on_unmount(self):
+        if self._timer:
+            self._timer.stop()
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Responsive breakpoints
+# ═══════════════════════════════════════════════════════════════════════════
 
 
 class Breakpoint(enum.Enum):
@@ -140,14 +197,11 @@ def debounce_resize(
     return False
 
 
-def _sigwinch_handler(app: NexusApp) -> None:
+def _sigwinch_handler(app: "NexusApp") -> None:
     """Handle SIGWINCH (window resize signal) with debounce.
 
     Updates the app's breakpoint classification and notifies the user
     when the terminal is too small.
-
-    Args:
-        app: The NexusApp instance to update.
     """
     try:
         now = time.monotonic()
@@ -186,35 +240,312 @@ def _get_terminal_size() -> tuple[int, int]:
         return (80, 24)
 
 
+# ═══════════════════════════════════════════════════════════════════════════
+# ApprovalModal — tool call approval dialog
+# ═══════════════════════════════════════════════════════════════════════════
+
+class ApprovalModal(ModalScreen[bool]):
+    def __init__(self, tool_name: str, tool_args: dict, call_id: str = "") -> None:
+        super().__init__()
+        self.tool_name = tool_name
+        self.tool_args = tool_args
+        self.call_id = call_id
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="approval-dialog"):
+            yield Static(f"⚡ Approval Required: {self.tool_name}", id="approval-title")
+            with ScrollableContainer(id="approval-scroll"):
+                args_str = "\n".join(f"  {k}: {v}" for k, v in self.tool_args.items())
+                yield Static(args_str, id="approval-args")
+            with Horizontal(id="approval-buttons"):
+                yield Button("✓ Approve", id="approve", variant="success")
+                yield Button("✗ Reject", id="reject", variant="error")
+                yield Button("Cancel", id="cancel")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "approve":
+            self.dismiss(True)
+        else:
+            self.dismiss(False)
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# ErrorModal — error display dialog
+# ═══════════════════════════════════════════════════════════════════════════
+
+class ErrorModal(ModalScreen[None]):
+    """Modal dialog for displaying errors."""
+
+    def __init__(self, error_message: str) -> None:
+        super().__init__()
+        self.error_message = error_message
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="approval-dialog"):
+            yield Static("⚠ Error", id="approval-title")
+            yield Static(self.error_message, id="approval-args")
+            with Horizontal(id="approval-buttons"):
+                yield Button("OK", id="ok", variant="primary")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        self.dismiss(None)
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# NexusApp — main TUI application
+# ═══════════════════════════════════════════════════════════════════════════
+
 class NexusApp(App):
-    """Main NexusAgent TUI application."""
+    BINDINGS: ClassVar = [
+        Binding("q", "quit", "Quit", priority=True, show=True),
+        Binding("escape", "quit", "Quit", priority=True, show=False),
+        Binding("c", "clear", "Clear", show=True),
+        Binding("ctrl+c", "interrupt", "Interrupt", show=True),
+        Binding("ctrl+u", "interrupt", "Interrupt", show=True),
+        Binding("e", "expand_all", "Expand", show=True),
+        Binding("a", "collapse_all", "Collapse", show=True),
+        Binding("ctrl+underscore", "toggle_auto_approve", "Auto-approve", show=False),
+    ]
 
-    TITLE = "NexusAgent"
-    SUB_TITLE = "AI Coding Agent"
+    CSS = """
+    Screen {
+        layers: base overlay;
+        background: #111827;
+    }
 
-    # Telemetry instance
-    telemetry: TelemetryManager | None = None
+    /* ── Conversation log ── */
+    #log-container {
+        width: 100%;
+        height: 1fr;
+        border: solid #1f2937;
+        margin: 0 1;
+    }
 
-    def __init__(self, session_id: str, **kwargs: Any) -> None:
+    #conversation-log {
+        width: 100%;
+        max-width: 100%;
+        height: auto;
+        min-height: 100%;
+        background: #111827;
+        padding: 1 2;
+        overflow-y: auto;
+        overflow-x: hidden;
+        text-wrap: wrap;
+        word-wrap: break-word;
+    }
+
+    /* ── Streaming response ── */
+    #streaming-response {
+        height: auto;
+        min-height: 1;
+        width: 100%;
+        max-width: 100%;
+        color: #93c5fd;
+        padding: 1 2;
+        margin: 0 1;
+        background: #1f2937;
+        border-left: wide #3b82f6;
+        overflow-x: hidden;
+        text-wrap: wrap;
+        word-wrap: break-word;
+    }
+
+    /* ── Input area ── */
+    #input-area {
+        border: solid #374151;
+        height: 3;
+        margin: 0 1;
+        padding: 0 1;
+        background: #1f2937;
+    }
+    #input-area:focus {
+        border: solid #10b981;
+    }
+
+    /* ── Status bar ── */
+    #status-bar {
+        height: 1;
+        background: #1f2937;
+        color: #9ca3af;
+        padding: 0 2;
+    }
+    #status-bar SpinnerLabel { width: 100%; }
+
+    /* ── Auto-approve indicator ── */
+    #auto-approve-badge {
+        height: 1;
+        background: #1f2937;
+        color: #fbbf24;
+        text-style: bold;
+        padding: 0 2;
+    }
+
+    /* ── Queue status ── */
+    #queue-status {
+        color: #6b7280;
+        text-style: italic;
+        height: 1;
+        padding: 0 2;
+    }
+
+    /* ── Collapsible tool results ── */
+    Collapsible {
+        border-left: wide #fbbf24;
+        margin: 1 2;
+        padding: 0 0 0 1;
+        background: #1f2937;
+    }
+    Collapsible > .collapsible--content {
+        padding: 1 2;
+        color: #d1d5db;
+    }
+    Collapsible > .collapsible--header {
+        color: #fbbf24;
+        text-style: bold;
+        padding: 0 1;
+    }
+    Collapsible.-collapsed > .collapsible--header {
+        color: #6b7280;
+    }
+
+    /* ── Approval / Error modal ── */
+    #approval-dialog {
+        width: 80%;
+        height: auto;
+        max-height: 20;
+        border: solid #fbbf24;
+        background: #1f2937;
+        padding: 1 2;
+    }
+    #approval-title {
+        text-style: bold;
+        color: #fbbf24;
+        padding: 0 0 1 0;
+    }
+    #approval-args {
+        color: #d1d5db;
+        padding: 0 0 1 0;
+    }
+    #approval-buttons {
+        height: 3;
+        align: right middle;
+    }
+    #approval-buttons Button {
+        margin-left: 1;
+    }
+    #approval-scroll {
+        max-height: 12;
+    }
+
+    /* ── Header / Footer ── */
+    Header {
+        background: #1f2937;
+        color: #10b981;
+        text-style: bold;
+    }
+    Footer {
+        background: #1f2937;
+        color: #6b7280;
+    }
+    """
+
+    def compose(self) -> ComposeResult:
+        yield Header()
+        yield ScrollableContainer(
+            RichLog(id="conversation-log", markup=True, auto_scroll=True, wrap=True),
+            id="log-container",
+        )
+        yield Static("", id="streaming-response")
+        yield SpinnerLabel("Ready", id="status-bar")
+        yield Static("", id="auto-approve-badge")
+        yield Static("", id="queue-status")
+        yield Input(
+            placeholder="Type a message, @file to inject, or /help for commands...",
+            id="input-area",
+        )
+        yield Footer()
+
+    def __init__(self, session_id: str | None = None, yolo: bool = False, **kwargs) -> None:
         super().__init__(**kwargs)
-        self.session_id = session_id
-        self._busy = False
-        self._pending_inputs: list[str] = []
-        self._current_assistant: AssistantMessage | None = None
-        self._current_tool: ToolCallMessage | None = None
-        self._theme_name = "nexus-dark"
-        self._gc_frozen = False
-        self._is_ascii_mode = False
-        # Responsive state
+        self._yolo_default = yolo
         self._breakpoint: Breakpoint = Breakpoint.STANDARD
-        self._no_color: bool = NO_COLOR
         self._resize_state: dict[str, float] = {}
+        self._no_color: bool = NO_COLOR
 
-    def _get_theme(self) -> str:
-        """Determine which theme to use."""
-        # Check for theme preference in environment or config
-        # For now, use the stored theme name
-        return self._theme_name
+    def on_mount(self) -> None:
+        self.session_id = str(uuid.uuid4())[:8]
+        self.log_widget = self.query_one("#conversation-log", RichLog)
+        self.status_widget = self.query_one("#status-bar", SpinnerLabel)
+        self.queue_status = self.query_one("#queue-status", Static)
+        self._streaming_widget = self.query_one("#streaming-response", Static)
+        self._streaming_response: str = ""  # accumulated streaming text
+        self._input_queue: asyncio.Queue[str | None] = asyncio.Queue()
+        self._busy = False
+        self._ws: websockets.WebSocketClientProtocol | None = None
+        self._collapsibles: list[Collapsible] = []
+        self._pending_inputs: list[str] = []
+        self._current_task: asyncio.Task | None = None  # for interrupt
+        self._auto_approve = self._yolo_default or settings.agent.yolo
+        self._auto_approve_task: asyncio.Task | None = None
+        self._interrupt_task: asyncio.Task | None = None
+        self._theme_index = 0
+        self._total_tokens_used = 0
+        self._request_count = 0
+        self._auto_approve_badge = self.query_one("#auto-approve-badge", Static)
+        self._auto_approve_badge.update("")
+
+        self._show_greeting()
+        self._ws_task = asyncio.create_task(self._ws_loop())
+
+        # Install SIGWINCH handler for responsive layout
+        self._install_sigwinch()
+
+    # ── SIGWINCH (responsive resize) ────────────────────────────────────
+
+    def _install_sigwinch(self) -> None:
+        """Install SIGWINCH signal handler for responsive terminal resizing.
+
+        Uses signal.SIGWINCH on Unix systems. The handler is a closure
+        that captures the app instance and delegates to _sigwinch_handler.
+        Gracefully skips on platforms where SIGWINCH is not available
+        (e.g., Windows).
+        """
+        try:
+            import signal as _signal
+
+            sig = _signal.SIGWINCH
+        except AttributeError:
+            logger.debug("SIGWINCH not available on this platform")
+            return
+
+        def _handler(signum: int, frame: Any) -> None:
+            self._sigwinch_pending = True
+
+        self._sigwinch_pending = False
+        self._original_sigwinch = _signal.getsignal(sig)
+        _signal.signal(sig, _handler)
+        logger.debug("SIGWINCH handler installed")
+
+    def _check_sigwinch(self) -> None:
+        """Check if a SIGWINCH was received and process it.
+
+        This is called periodically from the event loop to handle
+        pending resize events with debouncing.
+        """
+        if getattr(self, "_sigwinch_pending", False):
+            self._sigwinch_pending = False
+            _sigwinch_handler(self)
+
+    def _restore_sigwinch(self) -> None:
+        """Restore the original SIGWINCH signal handler."""
+        import signal as _signal
+
+        if hasattr(self, "_original_sigwinch"):
+            try:
+                _signal.signal(_signal.SIGWINCH, self._original_sigwinch)
+                logger.debug("SIGWINCH handler restored")
+            except Exception as exc:
+                logger.debug(f"Failed to restore SIGWINCH handler: {exc}")
 
     def _is_ascii_terminal(self) -> bool:
         """Detect if we're in an ASCII-only terminal (no color support).
@@ -233,398 +564,870 @@ class NexusApp(App):
             return True
         return False
 
-    def compose(self) -> ComposeResult:
-        """Create child widgets for the TUI."""
-        # Register themes
-        register_themes(self)
+    # ── Greeting ──────────────────────────────────────────────────────
 
-        # Main layout: VerticalScroll for chat, then input, then status bar
-        # NO HEADER WIDGET - saves 1 line of real estate
-        with VerticalScroll(id="chat"):
-            yield Container(id="messages", layout="stream")
-        yield ChatInput(id="input-area")
-        yield StatusBar(id="status-bar")
+    def _show_greeting(self):
+        ts = datetime.now().strftime("%H:%M")
+        self.log_widget.write("", shrink=False)
+        self.log_widget.write(
+            "[b cyan]╔══════════════════════════════════════════╗[/b cyan]",
+            shrink=False,
+        )
+        self.log_widget.write(
+            "[b cyan]║[/b cyan]  [b white]NexusAgent[/b white] — Interactive AI Agent    [b cyan]║[/b cyan]",
+            shrink=False,
+        )
+        self.log_widget.write(
+            f"[b cyan]║[/b cyan]  Session: [yellow]{self.session_id}[/yellow]  {ts}              [b cyan]║[/b cyan]",
+            shrink=False,
+        )
+        self.log_widget.write(
+            "[b cyan]╚══════════════════════════════════════════╝[/b cyan]",
+            shrink=False,
+        )
+        self.log_widget.write("", shrink=False)
+        self.log_widget.write(
+            "[dim]Commands: [b]/help[/b]  [b]/new[/b]  [b]/clear[/b]  [b]/expand[/b]  [b]/collapse[/b]  [b]/quit[/b][/dim]",
+            shrink=False,
+        )
+        self.log_widget.write(
+            "[dim]Keys: [b]Ctrl+C[/b]=interrupt  [b]Q[/b]=quit  [b]C[/b]=clear  [b]E[/b]=expand  [b]A[/b]=collapse[/dim]",
+            shrink=False,
+        )
+        self.log_widget.write("", shrink=False)
 
-    def on_mount(self) -> None:
-        """Called when app is mounted."""
-        # Enable garbage collection freeze before first paint (performance)
-        if not self._gc_frozen:
-            try:
-                import gc
-                gc.freeze()
-                self._gc_frozen = True
-                logger.debug("Garbage collection frozen")
-            except Exception:
-                pass
+    # ── WebSocket loop ──────────────────────────────────────────────
 
-        # Detect ASCII mode
-        self._is_ascii_mode = self._is_ascii_terminal()
-        if self._is_ascii_mode:
-            logger.info("ASCII terminal detected - disabling colors")
-
-        # Set theme (will be overridden if ASCII mode)
-        if not self._is_ascii_mode:
-            self.theme = self._get_theme()
-        else:
-            # In ASCII mode, use a minimal theme
-            self.theme = "textual"
-
-        # Setup telemetry
-        self.telemetry = setup_telemetry(self)
-        logger.info(f"NexusAgent TUI started - session {self.session_id}")
-        logger.info(f"Theme: {self._theme_name}, ASCII mode: {self._is_ascii_mode}")
-
-        # Install SIGWINCH handler for responsive layout
-        self._install_sigwinch()
-
-        # Show welcome banner
-        messages = self.query_one("#messages", Container)
-        welcome = WelcomeBanner(session_id=self.session_id)
-        messages.mount(welcome)
-
-        # Focus input
-        self.query_one("#input-area", ChatInput).focus()
-
-    def _install_sigwinch(self) -> None:
-        """Install SIGWINCH signal handler for responsive terminal resizing.
-
-        Uses signal.SIGWINCH on Unix systems. The handler is a closure
-        that captures the app instance and delegates to _sigwinch_handler.
-        Gracefully skips on platforms where SIGWINCH is not available
-        (e.g., Windows).
-        """
+    async def _ws_loop(self) -> None:
+        api_key = settings.client.api_key
+        ws_url = f"ws://127.0.0.1:{settings.server.api_port}/sessions/{self.session_id}/ws"
+        if api_key:
+            ws_url += f"?api_key={api_key}"
         try:
-            sig = signal.SIGWINCH
-        except AttributeError:
-            logger.debug("SIGWINCH not available on this platform")
-            return
+            async with websockets.connect(ws_url, ping_interval=20, ping_timeout=10) as ws:
+                self._ws = ws
+                self.log_widget.write("[green]● Connected to server[/green]", shrink=False)
+                self.status_widget.set_text("Ready")
 
-        def _handler(signum: int, frame: Any) -> None:
-            self._sigwinch_pending = True
+                async def send_messages():
+                    while True:
+                        msg = await self._input_queue.get()
+                        if msg is None:
+                            break
+                        await ws.send(json.dumps({"type": "user_input", "content": msg}))
 
-        self._sigwinch_pending = False
-        self._original_sigwinch = signal.getsignal(sig)
-        signal.signal(sig, _handler)
-        logger.debug("SIGWINCH handler installed")
+                async def receive_events():
+                    async for raw in ws:
+                        try:
+                            event = json.loads(raw)
+                        except json.JSONDecodeError:
+                            continue
+                        await self._handle_event(event)
 
-    def _check_sigwinch(self) -> None:
-        """Check if a SIGWINCH was received and process it.
+                await asyncio.gather(send_messages(), receive_events())
 
-        This is called periodically from the event loop to handle
-        pending resize events with debouncing.
-        """
-        if getattr(self, "_sigwinch_pending", False):
-            self._sigwinch_pending = False
-            _sigwinch_handler(self)
+        except ConnectionRefusedError:
+            self.log_widget.write(f"[red][b]✗ Cannot connect to server at port {settings.server.api_port}[/b][/red]", shrink=False)
+            self.status_widget.set_text("Disconnected")
+        except websockets.exceptions.ConnectionClosedOK:
+            self.log_widget.write("[dim]Session closed.[/dim]", shrink=False)
+            self.status_widget.set_text("Disconnected")
+        except websockets.exceptions.ConnectionClosedError as e:
+            self.log_widget.write(f"[red]Connection lost: {e}[/red]", shrink=False)
+            self.status_widget.set_text("Disconnected")
+        except Exception as e:
+            self.log_widget.write(f"[red]Error: {e}[/red]", shrink=False)
+            self.status_widget.set_text("Error")
+        finally:
+            self._ws = None
 
-    def _restore_sigwinch(self) -> None:
-        """Restore the original SIGWINCH signal handler."""
-        if hasattr(self, "_original_sigwinch"):
-            try:
-                signal.signal(signal.SIGWINCH, self._original_sigwinch)
-                logger.debug("SIGWINCH handler restored")
-            except Exception as exc:
-                logger.debug(f"Failed to restore SIGWINCH handler: {exc}")
+    # ── Event handling ──────────────────────────────────────────────
 
-    def on_unmount(self) -> None:
-        """Called when app is unmounted."""
-        # Restore original SIGWINCH handler
-        self._restore_sigwinch()
+    async def _handle_event(self, event: dict) -> None:
+        etype = event.get("type")
 
-        # Restore garbage collection
-        if self._gc_frozen:
-            try:
-                import gc
-                gc.unfreeze()
-                self._gc_frozen = False
-                logger.debug("Garbage collection unfrozen")
-            except Exception:
-                pass
-
-        # Log final metrics
-        if self.telemetry:
-            metrics = self.telemetry.get_metrics()
-            logger.info(f"Session ended - metrics: {metrics}")
-
-    def on_key(self, event: Key) -> None:
-        """Handle global key presses."""
-        if event.key == "ctrl+c":
-            self._handle_interrupt()
-            event.prevent_default()
-            event.stop()
-        elif event.key == "f1":
-            # F1 to show help
-            self.action_show_help()
-            event.prevent_default()
-            event.stop()
-        elif event.key == "f2":
-            # F2 to show logs
-            self.action_show_logs()
-            event.prevent_default()
-            event.stop()
-        elif event.key == "f3":
-            # F3 to switch theme
-            self.action_switch_theme()
-            event.prevent_default()
-            event.stop()
-        elif event.key == "f12":
-            # F12 to toggle devtools (if enabled)
-            self.action_toggle_devtools()
-            event.prevent_default()
-            event.stop()
-
-    def _handle_interrupt(self) -> None:
-        """Handle Ctrl+C interrupt."""
-        if self._busy:
-            self.notify("Interrupting...", timeout=2)
-            self.post_message(self.InterruptRequested())
-        else:
-            self.exit()
-
-    # Theme switching
-
-    def action_switch_theme(self) -> None:
-        """Cycle through available themes."""
-        themes = ["nexus-dark", "catppuccin-mocha", "gruvbox-dark", "nord"]
-        current_idx = themes.index(self._theme_name) if self._theme_name in themes else 0
-        next_idx = (current_idx + 1) % len(themes)
-        self._theme_name = themes[next_idx]
-        if not self._is_ascii_mode:
-            self.theme = self._theme_name
-        self.notify(f"Theme: {self._theme_name}", timeout=1.5)
-        logger.info(f"Switched to theme: {self._theme_name}")
-
-    # Log viewer
-
-    def action_show_logs(self) -> None:
-        """Show the log viewer modal."""
-        if self.telemetry:
-            # Create a modal screen with log viewer
-            class LogViewerScreen(ModalScreen):
-                BINDINGS = [
-                    ("j", "scroll_down", "Scroll down"),
-                    ("k", "scroll_up", "Scroll up"),
-                    ("escape", "dismiss", "Close"),
-                ]
-
-                def compose(self) -> ComposeResult:
-                    yield Grid(
-                        Label("NexusAgent Log Viewer", id="title"),
-                        LogViewer(self.app.telemetry),
-                        Button("Close", variant="primary", id="close"),
-                        id="dialog",
-                    )
-
-                def on_button_pressed(self, event: Button.Pressed) -> None:
-                    if event.button.id == "close":
-                        self.app.pop_screen()
-
-                def action_scroll_down(self) -> None:
-                    self.query_one(LogViewer).action_scroll_down()
-
-                def action_scroll_up(self) -> None:
-                    self.query_one(LogViewer).action_scroll_up()
-
-            self.push_screen(LogViewerScreen())
-
-    # Help screen
-
-    def action_show_help(self) -> None:
-        """Show help screen."""
-        class HelpScreen(ModalScreen):
-            def compose(self) -> ComposeResult:
-                yield Vertical(
-                    Label("NexusAgent Help", classes="title"),
-                    Label(""),
-                    Label("Key Bindings:", classes="subtitle"),
-                    Label("  Enter      Submit message"),
-                    Label("  Ctrl+C     Interrupt / Exit"),
-                    Label("  F1         Show this help"),
-                    Label("  F2         Show logs"),
-                    Label("  F3         Switch theme"),
-                    Label("  F12        Toggle devtools"),
-                    Label("  Up/Down    Command history"),
-                    Label("  Shift+Enter New line in input"),
-                    Label(""),
-                    Label("Slash Commands:", classes="subtitle"),
-                    Label("  /help      Show this help"),
-                    Label("  /logs      Show log viewer"),
-                    Label("  /theme     Switch theme"),
-                    Label("  /clear     Clear chat"),
-                    Label("  /model     Show current model"),
-                    Label(""),
-                    Button("Close", variant="primary", id="close"),
-                )
-
-            def on_button_pressed(self, event: Button.Pressed) -> None:
-                if event.button.id == "close":
-                    self.app.pop_screen()
-
-        self.push_screen(HelpScreen())
-
-    # Clear chat
-
-    def action_clear_chat(self) -> None:
-        """Clear the chat history."""
-        messages = self.query_one("#messages", Container)
-        # Remove all messages
-        for child in list(messages.children):
-            child.remove()
-        # Add welcome banner back
-        welcome = WelcomeBanner(session_id=self.session_id)
-        messages.mount(welcome)
-        self.notify("Chat cleared", timeout=1)
-        logger.info("Chat cleared by user")
-
-    def action_show_model(self) -> None:
-        """Show current model information."""
-        try:
-            from nexusagent.config import settings
-            model_name = getattr(settings.agent, 'default_model', 'unknown')
-        except Exception:
-            model_name = "unknown"
-        self.notify(f"Model: {model_name}", timeout=3)
-        logger.info(f"Model info requested: {model_name}")
-
-    # Event stream consumer
-
-    async def consume_event_stream(self, session) -> None:
-        """Consume events from the session's event stream and update the TUI.
-
-        This runs as a background task, processing events from the session's
-        async queue and updating the message widgets in real-time.
-        """
-        messages = self.query_one("#messages", Container)
-        try:
-            async for event in session.event_stream():
-                etype = event.get("type", "")
-
-                if etype == "thinking":
-                    # Show thinking indicator
-                    thinking_msg = AppMessage(event.get("content", "Thinking..."))
-                    messages.mount(thinking_msg)
-                    self._scroll_to_bottom()
-
-                elif etype == "response_chunk":
-                    # Streaming token — append to current assistant message
-                    content = event.get("content", "")
-                    if content:
-                        if self._current_assistant is None:
-                            # Remove welcome banner on first response
-                            self._remove_welcome_banner(messages)
-                            self._current_assistant = AssistantMessage()
-                            messages.mount(self._current_assistant)
-                        await self._current_assistant.append_token(content)
-                        self._scroll_to_bottom()
-
-                elif etype == "response":
-                    # Final response — finalize the assistant message
-                    if self._current_assistant is not None:
-                        self._current_assistant.finalize(event.get("content", ""))
-                        self._current_assistant = None
-                    self._busy = False
-                    self._scroll_to_bottom()
-
-                elif etype == "tool_call":
-                    # Show tool call
-                    tool = event.get("tool", "unknown")
-                    args = event.get("args", {})
-                    args_str = ", ".join(f"{k}={v!r}" for k, v in args.items()) if isinstance(args, dict) else str(args)
-                    tool_msg = ToolCallMessage(tool=tool, args=args_str)
-                    messages.mount(tool_msg)
-                    self._scroll_to_bottom()
-
-                elif etype == "tool_result":
-                    # Update tool call with result (simplified: just append result)
-                    output = event.get("output", "")
-                    if output:
-                        result_msg = AppMessage(f"  ↳ {output[:200]}")
-                        messages.mount(result_msg)
-                        self._scroll_to_bottom()
-
-                elif etype == "error":
-                    error_msg = ErrorMessage(event.get("message", "Unknown error"))
-                    messages.mount(error_msg)
-                    self._current_assistant = None
-                    self._busy = False
-                    self._scroll_to_bottom()
-
-                elif etype == "session_closed":
-                    break
-
-        except Exception as exc:
-            logger.error(f"Event stream consumer error: {exc}", exc_info=True)
-
-    def _remove_welcome_banner(self, messages: Container) -> None:
-        """Remove the welcome banner if it exists."""
-        for child in list(messages.children):
-            if isinstance(child, WelcomeBanner):
-                child.remove()
-
-    def _scroll_to_bottom(self) -> None:
-        """Scroll the chat area to the bottom."""
-        try:
-            chat = self.query_one("#chat", VerticalScroll)
-            chat.scroll_end(animate=False)
-        except Exception:
+        if etype == "session_status":
             pass
 
-    # Input handling
+        elif etype == "thinking":
+            content = event.get("content", "")
+            if content and content != "Processing...":
+                self.log_widget.write(
+                    f"[dim italic]  ⟶ {self._escape(content)}[/dim italic]",
+                    shrink=False,
+                )
 
-    def on_chat_input_submitted(self, message: ChatInput.Submitted) -> None:
-        """Handle chat input submission."""
-        text = message.text.strip()
-
-        # Slash command dispatch
-        if text.startswith("/"):
-            command = text.split()[0].lower()
-            if command == "/help":
-                self.action_show_help()
-                return
-            elif command == "/logs":
-                self.action_show_logs()
-                return
-            elif command == "/theme":
-                self.action_switch_theme()
-                return
-            elif command == "/clear":
-                self.action_clear_chat()
-                return
-            elif command == "/model":
-                self.action_show_model()
-                return
+        elif etype == "tool_call":
+            tool = event.get("tool", "?")
+            args = event.get("args", {})
+            self._last_tool_name = tool  # store for per-tool result formatting
+            if isinstance(args, dict):
+                args_str = ", ".join(
+                    f"[yellow]{k}[/yellow]=[white]{self._truncate(self._format_arg_value(v), 60)}[/white]"
+                    for k, v in args.items()
+                )
             else:
-                self.notify(f"Unknown command: {command}. Type /help for available commands.", timeout=3)
-                return
-
-        if self._busy:
-            # Queue the input
-            self._pending_inputs.append(text)
-            self.notify("Message queued", timeout=1)
-            return
-
-        # Log the message
-        if self.telemetry:
-            self.telemetry.log_message(text, is_user=True)
-
-        # Send to session via custom event (handled by main app)
-        self.post_message(
-            self.UserInput(
-                content=text,
-                images=message.images,
+                args_str = self._truncate(self._format_arg_value(args), 80)
+            self.log_widget.write(
+                f"[dim]⚙[/dim] [b orange]{tool}[/b orange]({args_str})",
+                shrink=False,
             )
+            # Auto-approve check: if auto-approve is on, send approval immediately
+            if self._auto_approve and tool != "tool_search":
+                call_id = event.get("call_id", "")
+                self._auto_approve_task = asyncio.create_task(self._send_approval(call_id, True))
+            self.status_widget.set_text(f"Running: {tool}", spinning=True)
+
+        elif etype == "tool_result":
+            output = event.get("output", "")
+            success = event.get("success", True)
+            call_id = event.get("call_id", "")
+            self._write_tool_result(success, output, call_id)
+            self.status_widget.set_text("Processing response...", spinning=True)
+
+        elif etype == "tool_error":
+            """Server-emitted event when a tool fails."""
+            tool = event.get("tool", "?")
+            error = event.get("error", "Unknown error")
+            self.log_widget.write(
+                f"[red]✗ {tool} failed: {self._escape(error)}[/red]",
+                shrink=False,
+            )
+            self.status_widget.set_text(f"Error in {tool}")
+
+        elif etype == "approval_request":
+            tool = event.get("tool", "?")
+            args = event.get("args", {})
+            call_id = event.get("call_id", "")
+            self.status_widget.set_text("Awaiting approval...", spinning=False)
+            approved = await self.push_screen_wait(ApprovalModal(tool, args, call_id))
+            await self._send_approval(call_id, approved)
+            self.status_widget.set_text("Ready")
+
+        elif etype == "response_chunk":
+            # Streaming token — append to the current response in-place
+            content = event.get("content", "")
+            self._write_response_chunk(content)
+
+        elif etype == "response":
+            # Final response event — if streaming was active, the last chunk
+            # already updated the display. This event confirms completion.
+            content = event.get("content", "")
+            self._finalize_response(content)
+            self._busy = False
+            self._request_count += 1
+            # Track token usage if provided by server
+            tokens = event.get("tokens_used", 0)
+            if tokens:
+                self._total_tokens_used += tokens
+            self._process_next_in_queue()
+            self.status_widget.set_text("Ready")
+
+        elif etype == "error":
+            message = event.get("message", "Unknown error")
+            self.log_widget.write(f"[red][b]✗ Error:[/b] {self._escape(message)}[/red]", shrink=False)
+            self._busy = False
+            self._process_next_in_queue()
+            self.status_widget.set_text("Error")
+
+        elif etype == "session_closed":
+            self.log_widget.write("[dim]Session closed by server.[/dim]", shrink=False)
+            self._busy = False
+            self._ws = None
+            self.status_widget.set_text("Disconnected")
+
+    # ── Display helpers ──────────────────────────────────────────────
+
+    def _write_tool_result(self, success: bool, output: str, call_id: str):
+        """Write a tool result — short results inline, long results collapsible.
+
+        Uses per-tool formatters via dispatch table for specialized output.
+        """
+        # Determine tool name from context (last tool_call event)
+        tool_name = getattr(self, "_last_tool_name", "")
+
+        # Use per-tool formatter if available
+        display = self._format_tool_result_for_display(tool_name, success, output)
+        max_chars = settings.agent.max_tool_output_chars
+
+        if len(display) <= max_chars:
+            icon = "✓" if success else "✗"
+            color = "green" if success else "red"
+            self.log_widget.write(
+                f"   [{color}]{icon}[/{color}] {display}",
+                shrink=False,
+            )
+        else:
+            truncated = self._truncate_output(display)
+            icon = "✓" if success else "✗"
+            color = "green" if success else "red"
+            collapsible = Collapsible(
+                Static(truncated),
+                title=f"[{color}]{icon}[/{color}] Tool result ({len(output):,} chars)",
+                collapsed=True,
+            )
+            self._collapsibles.append(collapsible)
+            self.log_widget.mount(collapsible)
+            self.log_widget.scroll_end(animate=False)
+
+    def _format_tool_result_for_display(self, tool_name: str, success: bool, output: str) -> str:
+        """Dispatch table for per-tool output formatting."""
+        if not output or not output.strip():
+            return "[dim](empty)[/dim]"
+
+        # Shell tools: show command + exit code + truncated output
+        if tool_name in ("run_shell", "run_shell_streaming", "shell"):
+            return self._format_shell_output(output)
+        # File read: show path + line count + content preview
+        elif tool_name in ("read_file", "read_multiple_files"):
+            return self._format_read_file_output(output)
+        # File write/edit: show path + success
+        elif tool_name in ("write_file", "write_multiple_files", "edit_file", "apply_patch"):
+            return self._format_write_file_output(output, tool_name)
+        # Git tools: show command + result summary
+        elif tool_name.startswith("git_"):
+            return self._format_git_output(output, tool_name)
+        # Search web: show query + result count + top URLs
+        elif tool_name in ("search_web", "search_local_docs"):
+            return self._format_search_output(output)
+        # Subagent: show task + status
+        elif tool_name == "spawn_subagent":
+            return self._format_subagent_output(output)
+        # Default: use existing generic JSON/smart formatter
+        else:
+            return self._format_tool_output(output)
+
+    def _format_shell_output(self, output: str) -> str:
+        """Format shell command output: show exit code + truncated stdout."""
+        lines = output.strip().split("\n")
+        # Try to find exit code indicator
+        exit_code = None
+        clean_lines = []
+        for line in lines:
+            if line.startswith("Exit code:") or line.startswith("exit code:"):
+                with contextlib.suppress(ValueError):
+                    exit_code = int(line.split(":")[-1].strip())
+            elif not line.startswith("Error:"):
+                clean_lines.append(line)
+
+        result = "\n".join(clean_lines[:15])
+        suffix = ""
+        if len(clean_lines) > 15:
+            suffix = f"\n[dim]... +{len(clean_lines) - 15} more lines[/dim]"
+
+        code_str = ""
+        if exit_code is not None:
+            code_color = "green" if exit_code == 0 else "red"
+            code_str = f"[{code_color}]exit {exit_code}[/{code_color}] "
+
+        return f"{code_str}{result}{suffix}"
+
+    def _format_read_file_output(self, output: str) -> str:
+        """Format read_file output: show file path + line count + content preview."""
+        lines = output.strip().split("\n")
+        # Count content lines (skip line-number prefixed ones like "1|content")
+        content_lines = [line for line in lines if not re.match(r'^\d+\|', line)]
+        line_count = len(content_lines)
+
+        preview_lines = content_lines[:12]
+        preview = "\n".join(preview_lines)
+        suffix = ""
+        if line_count > 12:
+            suffix = f"\n[dim]... +{line_count - 12} more lines[/dim]"
+
+        return f"[b cyan]({line_count} lines)[/b cyan] {preview}{suffix}"
+
+    def _format_write_file_output(self, output: str, tool_name: str) -> str:
+        """Format write_file/edit_file output: show success indicator."""
+        cleaned = output.strip()
+        # Try to extract file path from output
+        path_match = re.search(r'(?:written|saved|patched)\s+(?:to\s+)?["\']?([\w./~_-]+)["\']?', cleaned, re.IGNORECASE)
+        path = path_match.group(0) if path_match else cleaned[:80]
+        return f"[green]✓ {tool_name}[/green] → {path}"
+
+    def _format_git_output(self, output: str, tool_name: str) -> str:
+        """Format git tool output: show git command + result summary."""
+        lines = output.strip().split("\n")
+        # Show first 10 meaningful lines
+        meaningful = [line for line in lines if line.strip()][:10]
+        result = "\n".join(meaningful)
+        suffix = ""
+        if len(lines) > 10:
+            suffix = f"\n[dim]... +{len(lines) - 10} more lines[/dim]"
+        return f"[b orange]git {tool_name[4:]}[/b orange] {result}{suffix}"
+
+    def _format_search_output(self, output: str) -> str:
+        """Format search_web output: show result count + top URLs."""
+        # Count Title: occurrences as proxy for result count
+        result_count = output.count("Title:")
+        urls = re.findall(r'URL:\s*(\S+)', output)
+        url_preview = "\n".join(f"  🔗 {u}" for u in urls[:3])
+        suffix = ""
+        if len(urls) > 3:
+            suffix = f"\n[dim]  ... +{len(urls) - 3} more URLs[/dim]"
+        return f"[b cyan]({result_count} results)[/b cyan]\n{url_preview}{suffix}"
+
+    def _format_subagent_output(self, output: str) -> str:
+        """Format spawn_subagent output: show task + status."""
+        cleaned = output.strip()
+        # Extract worker ID and status
+        id_match = re.search(r'worker\s+(\S+)', cleaned)
+        status_match = re.search(r'status:\s*(\w+)', cleaned)
+        worker_id = id_match.group(1) if id_match else "?"
+        status = status_match.group(1) if status_match else "?"
+        return f"[b purple]subagent {worker_id}[/b purple] status: [yellow]{status}[/yellow]"
+
+    def _format_tool_output(self, output: str) -> str:
+        """Format tool output for display — parse JSON into human-readable form."""
+        if not output or not output.strip():
+            return "[dim](empty)[/dim]"
+
+        # Try to parse as JSON
+        try:
+            data = json.loads(output)
+            if isinstance(data, dict):
+                # Common tool output patterns — extract meaningful content
+                for key in ("content", "result", "output", "stdout", "text", "message", "data"):
+                    if data.get(key):
+                        val = data[key]
+                        if isinstance(val, str):
+                            return self._escape(val.strip())
+                        return self._escape(json.dumps(val, indent=2, default=str))
+                # Show key-value summary for dicts
+                preview = {}
+                for k, v in list(data.items())[:6]:
+                    v_str = str(v)
+                    if len(v_str) > 120:
+                        v_str = v_str[:117] + "..."
+                    preview[k] = v_str
+                lines = [f"[b]{k}[/b]: {v}" for k, v in preview.items()]
+                if len(data) > 6:
+                    lines.append(f"[dim]... +{len(data) - 6} more keys[/dim]")
+                return "\n".join(lines)
+            if isinstance(data, list):
+                if len(data) == 0:
+                    return "[dim](empty list)[/dim]"
+                if len(data) <= 5:
+                    items = []
+                    for item in data:
+                        s = str(item)
+                        if len(s) > 200:
+                            s = s[:197] + "..."
+                        items.append(f"  • {s}")
+                    return "\n".join(items)
+                # Large list: show first 5 + count
+                items = []
+                for item in data[:5]:
+                    s = str(item)
+                    if len(s) > 200:
+                        s = s[:197] + "..."
+                    items.append(f"  • {s}")
+                items.append(f"[dim]  ... +{len(data) - 5} more items[/dim]")
+                return "\n".join(items)
+            # Primitive JSON value
+            return self._escape(str(data))
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+        # Not JSON — show as-is, cleaned up
+        cleaned = output.strip()
+        # Collapse excessive blank lines
+        cleaned = re.sub(r'\n{3,}', '\n\n', cleaned)
+        return self._escape(cleaned)
+
+    def _write_response(self, content: str):
+        """Write the final agent response with markdown formatting."""
+        ts = datetime.now().strftime("%H:%M")
+        formatted = self._simple_markdown(content)
+        self.log_widget.write("", shrink=False)
+        self.log_widget.write(
+            f"[b green][{ts}] Agent:[/b green] {formatted}",
+            shrink=False,
+        )
+        self.log_widget.write("", shrink=False)
+
+    # ── Slash commands ───────────────────────────────────────────────
+
+    async def _handle_slash_command(self, cmd: str) -> bool:
+        """Handle slash commands. Returns True if handled."""
+        parts = cmd.strip().lower().split()
+        command = parts[0] if parts else ""
+        parts[1:] if len(parts) > 1 else []
+
+        if command == "/help" or command == "/h":
+            self._show_help()
+            return True
+
+        elif command == "/new" or command == "/n":
+            self._show_greeting()
+            self.log_widget.write(
+                "[yellow]⟶ New conversation started. Previous context cleared.[/yellow]",
+                shrink=False,
+            )
+            self.log_widget.clear()
+            self._collapsibles.clear()
+            self._show_greeting()
+            return True
+
+        elif command == "/clear":
+            self.log_widget.clear()
+            self._collapsibles.clear()
+            self._streaming_response = ""
+            self._streaming_widget.update("")
+            self._show_greeting()
+            return True
+
+        elif command == "/expand" or command == "/e":
+            for c in self._collapsibles:
+                c.collapsed = False
+            return True
+
+        elif command == "/collapse" or command == "/a":
+            for c in self._collapsibles:
+                c.collapsed = True
+            return True
+
+        elif command == "/quit" or command == "/q":
+            self.action_quit()
+            return True
+
+        elif command == "/sessions":
+            self.log_widget.write(
+                "[dim]Session management coming soon. Current session: "
+                f"{self.session_id}[/dim]",
+                shrink=False,
+            )
+            return True
+
+        elif command == "/status":
+            status = "busy" if self._busy else "ready"
+            auto = "ON" if self._auto_approve else "OFF"
+            self.log_widget.write(
+                f"[dim]Status: {status} | Session: {self.session_id} | "
+                f"Queued: {len(self._pending_inputs)} | "
+                f"Auto-approve: {auto} | "
+                f"Tokens: {self._total_tokens_used:,} | "
+                f"Requests: {self._request_count}[/dim]",
+                shrink=False,
+            )
+            return True
+
+        elif command == "/interrupt":
+            self.action_interrupt()
+            return True
+
+        elif command == "/compact":
+            self.log_widget.write(
+                "[yellow]⟶ Context compaction requested.[/yellow]",
+                shrink=False,
+            )
+            if self._ws and self._ws.open:
+                await self._ws.send(json.dumps({"type": "compact"}))
+                self.status_widget.set_text("Compacting...", spinning=True)
+            else:
+                self.log_widget.write(
+                    "[red]Cannot compact — not connected to server.[/red]",
+                    shrink=False,
+                )
+            return True
+
+        elif command == "/copy":
+            self.log_widget.write(
+                "[dim]Copy is not available in the TUI. Use your terminal's "
+                "selection mechanism.[/dim]",
+                shrink=False,
+            )
+            return True
+
+        elif command == "/version":
+            model = settings.agent.default_model
+            self.log_widget.write(
+                f"[dim]NexusAgent v0.1.0 | Model: {model} | "
+                f"Session: {self.session_id} | "
+                f"Theme: {NEXUS_THEMES[self._theme_index]['name']}[/dim]",
+                shrink=False,
+            )
+            return True
+
+        elif command == "/auto":
+            self.action_toggle_auto_approve()
+            return True
+
+        elif command == "/tokens":
+            model = settings.agent.default_model
+            self.log_widget.write("[b cyan]Token Usage[/b cyan]", shrink=False)
+            self.log_widget.write(
+                f"  Total tokens used: [yellow]{self._total_tokens_used:,}[/yellow]",
+                shrink=False,
+            )
+            self.log_widget.write(
+                f"  Requests made: [yellow]{self._request_count}[/yellow]",
+                shrink=False,
+            )
+            self.log_widget.write(
+                f"  Model: [yellow]{model}[/yellow]",
+                shrink=False,
+            )
+            self.log_widget.write(
+                f"  Session: [yellow]{self.session_id}[/yellow]",
+                shrink=False,
+            )
+            if self._request_count > 0 and self._total_tokens_used > 0:
+                avg = self._total_tokens_used // self._request_count
+                self.log_widget.write(
+                    f"  Avg tokens/request: [yellow]{avg:,}[/yellow]",
+                    shrink=False,
+                )
+            return True
+
+        elif command == "/model":
+            model = settings.agent.default_model
+            provider = settings.agent.primary_provider
+            self.log_widget.write("[b cyan]Model Info[/b cyan]", shrink=False)
+            self.log_widget.write(f"  Model: [yellow]{model}[/yellow]", shrink=False)
+            self.log_widget.write(
+                f"  Provider: [yellow]{provider}[/yellow]", shrink=False
+            )
+            self.log_widget.write(
+                f"  Session: [yellow]{self.session_id}[/yellow]", shrink=False
+            )
+            return True
+
+        elif command == "/threads":
+            self.log_widget.write(
+                "[dim]Recent sessions (via server):[/dim]",
+                shrink=False,
+            )
+            if self._ws and self._ws.open:
+                await self._ws.send(json.dumps({"type": "list_sessions"}))
+            else:
+                self.log_widget.write(
+                    f"[dim]  Current session: {self.session_id}[/dim]",
+                    shrink=False,
+                )
+            return True
+
+        elif command == "/theme":
+            self._theme_index = (self._theme_index + 1) % len(NEXUS_THEMES)
+            theme = NEXUS_THEMES[self._theme_index]
+            self._apply_theme(theme)
+            self.log_widget.write(
+                f"[yellow]⟶ Theme switched to: {theme['name']}[/yellow]",
+                shrink=False,
+            )
+            return True
+
+        elif command == "/undo":
+            if self._ws and self._ws.open:
+                await self._ws.send(json.dumps({"type": "undo"}))
+                self.log_widget.write(
+                    "[yellow]⟶ Undo requested.[/yellow]",
+                    shrink=False,
+                )
+            else:
+                self.log_widget.write("[dim]Not connected — cannot undo.[/dim]", shrink=False)
+            return True
+
+        elif command == "/redo":
+            if self._ws and self._ws.open:
+                await self._ws.send(json.dumps({"type": "redo"}))
+                self.log_widget.write(
+                    "[yellow]⟶ Redo requested.[/yellow]",
+                    shrink=False,
+                )
+            else:
+                self.log_widget.write("[dim]Not connected — cannot redo.[/dim]", shrink=False)
+            return True
+
+        elif command == "/skills":
+            from nexusagent.skills import load_all_skills, get_skills_summary
+
+            skills = load_all_skills()
+            if skills:
+                summary = get_skills_summary(skills)
+                self.log_widget.write("[b cyan]Available Skills[/b cyan]", shrink=False)
+                for name, skill in sorted(skills.items()):
+                    desc = skill.description or "No description"
+                    self.log_widget.write(f"  [yellow]{name}[/white]: {desc}", shrink=False)
+            else:
+                self.log_widget.write("[dim]No skills found in ~/.hermes/skills/[/dim]", shrink=False)
+            return True
+
+        elif command == "/skill":
+            skill_name = parts[1] if len(parts) > 1 else ""
+            if not skill_name:
+                self.log_widget.write("[yellow]Usage: /skill <name>[/yellow]", shrink=False)
+                return True
+            from nexusagent.skills import load_all_skills, get_skill_content
+
+            skills = load_all_skills()
+            content = get_skill_content(skills, skill_name)
+            if content:
+                self.log_widget.write(f"[b cyan]Skill: {skill_name}[/b cyan]", shrink=False)
+                for line in content.split("\n")[:20]:
+                    self.log_widget.write(f"  {line}", shrink=False)
+                if len(content.split("\n")) > 20:
+                    self.log_widget.write(f"  [dim]... ({len(content.split(chr(10)))} lines total)[/dim]", shrink=False)
+            else:
+                self.log_widget.write(f"[red]Skill '{skill_name}' not found.[/red]", shrink=False)
+            return True
+
+        else:
+            self.log_widget.write(
+                f"[red]Unknown command: {command}. Type /help for available commands.[/red]",
+                shrink=False,
+            )
+            return True
+
+    def _apply_theme(self, theme: dict) -> None:
+        """Apply a color theme by updating CSS."""
+        self.styles.background = theme["bg"]
+        # Update header styles
+        self.query_one(Header).styles.background = theme["header_bg"]
+        self.query_one(Header).styles.color = theme["accent"]
+
+    def _show_help(self):
+        self.log_widget.write("", shrink=False)
+        self.log_widget.write("[b cyan]Available Commands:[/b cyan]", shrink=False)
+        self.log_widget.write("  [b]/help[/b]      Show this help message", shrink=False)
+        self.log_widget.write("  [b]/new[/b]       Start a new conversation", shrink=False)
+        self.log_widget.write("  [b]/clear[/b]     Clear the conversation log + greeting", shrink=False)
+        self.log_widget.write("  [b]/expand[/b]    Expand all tool results", shrink=False)
+        self.log_widget.write("  [b]/collapse[/b]  Collapse all tool results", shrink=False)
+        self.log_widget.write("  [b]/status[/b]    Show session status", shrink=False)
+        self.log_widget.write("  [b]/compact[/b]   Trigger context compaction", shrink=False)
+        self.log_widget.write("  [b]/copy[/b]      Copy placeholder", shrink=False)
+        self.log_widget.write("  [b]/version[/b]   Show version info", shrink=False)
+        self.log_widget.write("  [b]/tokens[/b]    Show token usage", shrink=False)
+        self.log_widget.write("  [b]/model[/b]     Show current model info", shrink=False)
+        self.log_widget.write("  [b]/threads[/b]   List recent sessions", shrink=False)
+        self.log_widget.write("  [b]/theme[/b]     Cycle color theme", shrink=False)
+        self.log_widget.write("  [b]/interrupt[/b] Cancel current agent turn", shrink=False)
+        self.log_widget.write("  [b]/quit[/b]      Exit the application", shrink=False)
+        self.log_widget.write("", shrink=False)
+        self.log_widget.write("[b cyan]Keyboard Shortcuts:[/b cyan]", shrink=False)
+        self.log_widget.write("  [b]Ctrl+C[/b]  Interrupt current turn", shrink=False)
+        self.log_widget.write("  [b]Ctrl+U[/b]  Interrupt current turn", shrink=False)
+        self.log_widget.write("  [b]Q[/b]       Quit", shrink=False)
+        self.log_widget.write("  [b]C[/b]       Clear log", shrink=False)
+        self.log_widget.write("  [b]E[/b]       Expand all", shrink=False)
+        self.log_widget.write("  [b]A[/b]       Collapse all", shrink=False)
+        self.log_widget.write("  [b]Ctrl+_[/b]  Toggle auto-approve", shrink=False)
+        self.log_widget.write("", shrink=False)
+
+    # ── Streaming response ───────────────────────────────────────────
+
+    def _write_response_chunk(self, content: str) -> None:
+        """Append a streaming token to the in-progress response.
+
+        Updates the streaming-response Static widget in-place so the user
+        sees text appearing token-by-token, similar to deepagents' MarkdownStream.
+        """
+        self._streaming_response += content
+        self._streaming_widget.update(
+            f"[b green]Agent:[/b green] {self._streaming_response}"
         )
 
-    # Custom messages
+    def _finalize_response(self, content: str) -> None:
+        """Finalize the streaming response.
 
-    class UserInput:
-        """Message sent when user submits input."""
+        Parses and formats the response with:
+        - Syntax highlighting for code blocks (heuristic: detect ``` markers)
+        - URL auto-detection (Textual RichLog auto-links URLs)
+        - Clear separator between turns
+        """
+        if self._streaming_response:
+            final = content if content else self._streaming_response
+            ts = datetime.now().strftime("%H:%M")
+            formatted = self._enhanced_markdown(final)
+            self.log_widget.write("", shrink=False)
+            self.log_widget.write(
+                f"[b green][{ts}] Agent:[/b green]",
+                shrink=False,
+            )
+            self.log_widget.write(formatted, shrink=False)
+            self.log_widget.write("", shrink=False)
+        elif content:
+            self._write_response(content)
 
-        def __init__(self, content: str, images: list[str] | None = None) -> None:
-            self.content = content
-            self.images = images or []
+        # Clear the streaming widget
+        self._streaming_widget.update("")
+        self._streaming_response = ""
 
-    class InterruptRequested:
-        """Message sent when user requests interrupt (Ctrl+C)."""
+    def _enhanced_markdown(self, text: str) -> str:
+        """Enhanced markdown: syntax highlighting for code blocks, bold, italic, inline code."""
+        # Extract code blocks first, replace with placeholders
+        code_blocks = []
+        def replace_code_block(m):
+            lang = m.group(1) or ""
+            code = m.group(2)
+            idx = len(code_blocks)
+            code_blocks.append((lang, code))
+            return f"__CODE_BLOCK_{idx}__"
 
-        pass
+        # Handle fenced code blocks  ```lang\n...\n```
+        text = re.sub(r'```(\w*)\n(.*?)```', replace_code_block, text, flags=re.DOTALL)
+
+        # Handle inline code `...`
+        text = re.sub(r'`([^`]+)`', r'[reverse]\1[/reverse]', text)
+
+        # Bold and italic
+        text = re.sub(r'\*\*(.+?)\*\*', r'[b]\1[/b]', text)
+        text = re.sub(r'(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)', r'[i]\1[/i]', text)
+
+        # Restore code blocks with dim/styled formatting
+        for i, (lang, code) in enumerate(code_blocks):
+            lang_label = f"[dim]({lang})[/dim] " if lang else ""
+            # Truncate very long code blocks
+            code_lines = code.split("\n")
+            if len(code_lines) > 20:
+                code = "\n".join(code_lines[:20]) + f"\n[dim]... +{len(code_lines) - 20} more lines[/dim]"
+            styled = f"{lang_label}[dim]{code}[/dim]"
+            text = text.replace(f"__CODE_BLOCK_{i}__", styled)
+
+        return text
+
+    # ── Queue management ────────────────────────────────────────────
+
+    def _process_next_in_queue(self):
+        if not self._pending_inputs:
+            return
+        next_msg = self._pending_inputs.pop(0)
+        self._busy = True
+        self.log_widget.write(f"[b cyan]You:[/b cyan] {next_msg}", shrink=False)
+        self.status_widget.set_text("Thinking...", spinning=True)
+        asyncio.create_task(self._input_queue.put(next_msg))  # noqa: RUF006
+        self._update_queue_status()
+
+    def _update_queue_status(self):
+        count = len(self._pending_inputs)
+        if count > 0:
+            self.queue_status.update(f"⏳ {count} message{'s' if count > 1 else ''} queued")
+        else:
+            self.queue_status.update("")
+
+    async def _send_approval(self, call_id: str, approved: bool):
+        if self._ws and self._ws.open:
+            await self._ws.send(json.dumps({
+                "type": "approval",
+                "call_id": call_id,
+                "approved": approved,
+            }))
+        else:
+            self.log_widget.write("[red]Failed to send approval (disconnected)[/red]", shrink=False)
+
+    # ── Input handling ──────────────────────────────────────────────
+
+    async def on_input_submitted(self, event: Input.Submitted) -> None:
+        # Accept input from any Input widget (the chat input has id="input-area")
+        message = event.value.strip()
+        if not message:
+            return
+
+        # Slash commands
+        if message.startswith("/"):
+            event.input.value = ""
+            await self._handle_slash_command(message)
+            return
+
+        if self._busy:
+            self._pending_inputs.append(message)
+            self.log_widget.write(f"[dim]⏳ Queued:[/dim] {message}", shrink=False)
+            self._update_queue_status()
+            event.input.value = ""
+            return
+
+        self._busy = True
+        self.log_widget.write(f"[b cyan]You:[/b cyan] {message}", shrink=False)
+        event.input.value = ""
+        self.status_widget.set_text("Thinking...", spinning=True)
+        await self._input_queue.put(message)
+
+    # ── Actions ─────────────────────────────────────────────────────
+
+    def action_clear(self) -> None:
+        self.log_widget.clear()
+        self._collapsibles.clear()
+        self._show_greeting()
+
+    def action_quit(self) -> None:
+        asyncio.create_task(self._input_queue.put(None))  # noqa: RUF006
+        if hasattr(self, '_ws_task'):
+            self._ws_task.cancel()
+        self.exit()
+
+    def action_interrupt(self) -> None:
+        if self._ws and self._ws.open:
+            self._interrupt_task = asyncio.create_task(
+                self._ws.send(json.dumps({"type": "interrupt"}))
+            )
+            self.status_widget.set_text("Interrupting...", spinning=True)
+            self.log_widget.write("[yellow]⏹ Interrupt sent — waiting for agent to stop...[/yellow]", shrink=False)
+
+    def action_expand_all(self) -> None:
+        for c in self._collapsibles:
+            c.collapsed = False
+
+    def action_collapse_all(self) -> None:
+        for c in self._collapsibles:
+            c.collapsed = True
+
+    def action_toggle_auto_approve(self) -> None:
+        self._auto_approve = not self._auto_approve
+        if self._auto_approve:
+            self._auto_approve_badge.update("[bold yellow]⚡ AUTO-APPROVE ON[/bold yellow]")
+            self.log_widget.write(
+                "[yellow]⟶ Auto-approve enabled — tool calls will be approved automatically.[/yellow]",
+                shrink=False,
+            )
+        else:
+            self._auto_approve_badge.update("")
+            self.log_widget.write(
+                "[dim]⟶ Auto-approve disabled — tool calls require manual approval.[/dim]",
+                shrink=False,
+            )
+
+    # ── Helpers ─────────────────────────────────────────────────────
+
+    def _truncate_output(self, output: str) -> str:
+        max_chars = settings.agent.max_tool_output_chars
+        if len(output) <= max_chars:
+            return output
+        head = output[:max_chars // 2]
+        tail = output[-(max_chars // 2):]
+        return f"{head}\n[dim]... ({len(output):,} chars total) ...[/dim]\n{tail}"
+
+    def _truncate(self, text: str, max_len: int) -> str:
+        if len(text) <= max_len:
+            return text
+        return text[:max_len - 3] + "..."
+
+    def _format_arg_value(self, value) -> str:
+        """Format a tool argument value for display — dicts as JSON, strings escaped."""
+        if isinstance(value, dict):
+            return json.dumps(value, ensure_ascii=False)
+        if isinstance(value, list):
+            return json.dumps(value, ensure_ascii=False)
+        if isinstance(value, str) and len(value) > 200:
+            return textwrap.shorten(value, width=200, placeholder="...")
+        return self._escape(str(value))
+
+    def _escape(self, text: str) -> str:
+        return text.replace("[", "\\[").replace("]", "\\]")
+
+    def _simple_markdown(self, text: str) -> str:
+        text = re.sub(r'\*\*(.+?)\*\*', r'[b]\1[/b]', text)
+        text = re.sub(r'(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)', r'[i]\1[/i]', text)
+        text = re.sub(r'`(.+?)`', r'[reverse]\1[/reverse]', text)
+        text = re.sub(r'```\w*\n?', '', text)
+        text = re.sub(r'```', '', text)
+        return text
+
+
+def main(yolo: bool = False) -> None:
+    app = NexusApp(yolo=yolo)
+    app.run()
+
+
+if __name__ == "__main__":
+    main()
