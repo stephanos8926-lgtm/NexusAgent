@@ -341,16 +341,14 @@ class Session:
         # Build messages list: system prompt + context + memory + history + user message
         from langchain_core.messages import HumanMessage
 
-        # 1. System prompt from NEXUS.md
+        # 1. System prompt from NEXUS.md + environment context merged together
         system_prompt = self._load_system_prompt()
-        messages = [SystemMessage(content=system_prompt)]
-
-        # 2. Environment context injection
         context_block = self._build_context_injection()
         if context_block:
-            messages.append(SystemMessage(content=context_block))
+            system_prompt = system_prompt + "\n\n" + context_block
+        messages = [SystemMessage(content=system_prompt)]
 
-        # 3. Memory context from hybrid memory
+        # 2. Memory context from hybrid memory
         try:
             hybrid_context = self.hybrid_memory.get_memory_context(user_message, max_results=5)
             if hybrid_context:
@@ -393,43 +391,17 @@ class Session:
                     # assistant and any other roles → AIMessage
                     messages.append(AIMessage(content=md["content"]))
 
-        # Stream agent execution with real-time tool call/result events
+        # Invoke the agent
         self._cancel_flag = False
         try:
-            accumulated_content: list[str] = []
-            async for chunk in self.agent._inner.astream(
-                {"messages": messages},
-                stream_mode=["updates", "messages"],
-                subgraphs=True,
-                version="v2",
-            ):
-                if self._cancel_flag:
-                    self._enqueue(ErrorEvent(message="Session interrupted").model_dump())
-                    break
+            result = self.agent({"messages": messages})
+            if asyncio.iscoroutine(result):
+                result = await result
 
-                chunk_type = chunk.get("type")
-                chunk_data = chunk.get("data", {})
-
-                if chunk_type == "messages":
-                    # Stream tokens and tool calls from messages
-                    if isinstance(chunk_data, tuple):
-                        token, metadata = chunk_data[0], chunk_data[1] if len(chunk_data) > 1 else {}
-                    else:
-                        token, metadata = chunk_data, {}
-                    await self._handle_message_token(token, metadata, accumulated_content)
-
-                elif chunk_type == "updates":
-                    # Track node-level progress (tool execution, model requests)
-                    await self._handle_update(chunk_data)
-
-            # After the stream ends, emit the final response from accumulated text
-            if not self._cancel_flag:
-                final_content = "".join(accumulated_content).strip()
-                if not final_content:
-                    # Fallback: if streaming didn't capture text (e.g. tool-only turn),
-                    # extract from the last message in the conversation
-                    final_content = "Tool execution completed."
-
+            if self._cancel_flag:
+                self._enqueue(ErrorEvent(message="Session interrupted").model_dump())
+            else:
+                final_content = _extract_agent_response(result)
                 self._enqueue(ResponseEvent(content=final_content).model_dump())
 
                 # Update conversation history for continuity
@@ -457,7 +429,7 @@ class Session:
                     logger.warning("Failed to remember in memory: %s", exc)
 
         except Exception as exc:
-            logger.error("Agent streaming failed: %s", exc, exc_info=True)
+            logger.error("Agent invocation failed: %s", exc, exc_info=True)
             # Fire error hooks
             if settings.hooks.hooks_enabled:
                 try:
