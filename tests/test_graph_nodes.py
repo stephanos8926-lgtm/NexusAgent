@@ -6,11 +6,12 @@ Each test patches the DeepResearchOrchestrator methods to isolate graph logic.
 
 import sys
 import unittest.mock as mock
+from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 import pytest
 
-sys.path.insert(0, "/home/sysop/Workspaces/NexusAgent/src")
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 from nexusagent.graph import (
     execute_node,

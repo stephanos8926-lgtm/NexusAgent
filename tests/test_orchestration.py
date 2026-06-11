@@ -8,12 +8,13 @@ synthesis, and the full run_deep_research pipeline.
 import json
 import sys
 import unittest.mock as mock
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 # Ensure src is on the path
-sys.path.insert(0, "/home/sysop/Workspaces/NexusAgent/src")
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 from nexusagent.orchestration import (
     DeepResearchOrchestrator,
