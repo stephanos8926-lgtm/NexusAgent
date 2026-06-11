@@ -14,7 +14,9 @@ Design system: Linear-inspired dark theme with indigo-violet accent.
 
 from __future__ import annotations
 
+import json
 import logging
+import re
 from typing import Any
 
 from textual.containers import Vertical
@@ -22,6 +24,10 @@ from textual.content import Content
 from textual.widgets import Static
 
 logger = logging.getLogger(__name__)
+
+# Regex to detect fenced code blocks in tool output
+_CODE_BLOCK_RE = re.compile(r"```[\s\S]*?```")
+_INLINE_CODE_RE = re.compile(r"`[^`]+`")
 
 
 class UserMessage(Static):
@@ -74,8 +80,19 @@ class AssistantMessage(Static):
         self._buffer = ""
 
     async def append_token(self, token: str) -> None:
-        """Append a streaming token and update the display."""
+        """Append a streaming token and update the display immediately.
+
+        Uses self.app.call_next() to schedule a repaint on the next
+        event-loop tick, ensuring each token is rendered individually
+        rather than batched by Textual's update coalescing.
+        """
         self._buffer += token
+        # Schedule immediate repaint so each token renders in real-time
+        # rather than being batched with subsequent updates.
+        self.app.call_next(self._render_buffer)
+
+    def _render_buffer(self) -> None:
+        """Render the current buffer content (called via call_next)."""
         self.update(Content(self._buffer))
 
     def finalize(self, content: str) -> None:
@@ -90,6 +107,11 @@ class ToolCallMessage(Static):
     Shows tool name + args in a compact header.
     Output is shown inline for short results, truncated for long ones.
     Border uses $warning color to distinguish from user/assistant messages.
+
+    Status indicators:
+    - ⚙ running (default)
+    - ✔ success
+    - ✘ failed
     """
 
     DEFAULT_CSS = """
@@ -107,26 +129,86 @@ class ToolCallMessage(Static):
     }
     """
 
-    def __init__(self, tool: str, args: str, output: str = "", **kwargs: Any) -> None:
+    # Status constants
+    STATUS_RUNNING = "running"
+    STATUS_SUCCESS = "success"
+    STATUS_FAILED = "failed"
+
+    _STATUS_ICONS = {
+        STATUS_RUNNING: "⚙",
+        STATUS_SUCCESS: "✔",
+        STATUS_FAILED: "✘",
+    }
+
+    _STATUS_STYLES = {
+        STATUS_RUNNING: "bold warning",
+        STATUS_SUCCESS: "bold success",
+        STATUS_FAILED: "bold error",
+    }
+
+    def __init__(
+        self,
+        tool: str,
+        args: str,
+        output: str = "",
+        status: str = "running",
+        **kwargs: Any,
+    ) -> None:
         super().__init__(**kwargs)
         self._tool = tool
         self._args = args
         self._output = output
+        self._status = status
+
+    def _format_args(self, raw_args: str) -> str:
+        """Pretty-print args if they look like JSON, otherwise return as-is."""
+        stripped = raw_args.strip()
+        if not stripped:
+            return ""
+        # Try to parse as JSON for pretty-printing
+        if stripped.startswith(("{", "[")):
+            try:
+                parsed = json.loads(stripped)
+                return json.dumps(parsed, indent=None, ensure_ascii=False)
+            except (json.JSONDecodeError, ValueError):
+                pass
+        return raw_args
+
+    def _detect_code(self, text: str) -> bool:
+        """Return True if the output contains code blocks or inline code."""
+        return bool(_CODE_BLOCK_RE.search(text) or _INLINE_CODE_RE.search(text))
+
+    def _truncate_output(self, text: str, max_chars: int = 300) -> str:
+        """Truncate output with a clear indicator of remaining characters."""
+        if len(text) <= max_chars:
+            return text
+        truncated = text[:max_chars].rstrip()
+        remaining = len(text) - max_chars
+        return f"{truncated} ... ({remaining} more chars)"
 
     def render(self) -> Content:
-        # Format: ⚙ tool_name(arg1, arg2)
-        header = f"⚙ {self._tool}({self._args})"
-        if self._output:
-            output = self._output
-            # Truncate long output
-            if len(output) > 300:
-                output = output[:297] + "..."
-            return Content.assemble(
-                (header, "bold warning"),
-                "\n",
-                (output, "text-muted"),
-            )
-        return Content.assemble((header, "bold warning"))
+        icon = self._STATUS_ICONS.get(self._status, "⚙")
+        style = self._STATUS_STYLES.get(self._status, "bold warning")
+
+        formatted_args = self._format_args(self._args)
+        header = f"{icon} {self._tool}({formatted_args})"
+
+        if not self._output:
+            return Content.assemble((header, style))
+
+        output = self._truncate_output(self._output)
+
+        # Build output display with code detection hint
+        has_code = self._detect_code(self._output)
+        output_parts = [(header, style), "\n"]
+
+        if has_code:
+            output_parts.append(("  [code] ", "text-muted"))
+            output_parts.append((output, "text-muted"))
+        else:
+            output_parts.append((output, "text-muted"))
+
+        return Content.assemble(*output_parts)
 
 
 class AppMessage(Static):

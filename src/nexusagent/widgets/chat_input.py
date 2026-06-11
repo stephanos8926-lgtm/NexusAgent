@@ -5,6 +5,7 @@ Multiline input with:
 - Up/Down for command history
 - @ triggers completion
 - Image paste support
+- Slash command autocomplete (Tab to complete)
 
 Design: Linear-inspired, uses $surface background, $border for border.
 """
@@ -14,12 +15,51 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
+from pathlib import Path
 from typing import Any
 
 from textual.binding import Binding
 from textual.widgets import TextArea
 
 logger = logging.getLogger(__name__)
+
+# Known slash commands for autocomplete
+SLASH_COMMANDS: list[str] = [
+    "/help",
+    "/logs",
+    "/theme",
+    "/clear",
+    "/model",
+]
+
+# History file path
+_HISTORY_DIR = Path.home() / ".nexusagent"
+_HISTORY_FILE = _HISTORY_DIR / "history.json"
+_MAX_HISTORY = 200
+
+
+def _load_history() -> list[str]:
+    """Load command history from disk."""
+    try:
+        if _HISTORY_FILE.exists():
+            with open(_HISTORY_FILE) as f:
+                data = json.load(f)
+                if isinstance(data, list):
+                    return data[-_MAX_HISTORY:]
+    except (json.JSONDecodeError, OSError) as e:
+        logger.warning(f"Failed to load command history: {e}")
+    return []
+
+
+def _save_history(history: list[str]) -> None:
+    """Persist command history to disk."""
+    try:
+        _HISTORY_DIR.mkdir(parents=True, exist_ok=True)
+        with open(_HISTORY_FILE, "w") as f:
+            json.dump(history[-_MAX_HISTORY:], f, ensure_ascii=False)
+    except OSError as e:
+        logger.warning(f"Failed to save command history: {e}")
 
 
 class ChatInput(TextArea):
@@ -29,11 +69,13 @@ class ChatInput(TextArea):
     - Key bindings for submit/history
     - Image path detection
     - Slash command completion trigger
+    - Command history persistence to ~/.nexusagent/history.json
     """
 
     BINDINGS: list[Binding] = [
         Binding("enter", "submit", "Submit", show=False),
         Binding("escape", "cancel", "Cancel", show=False),
+        Binding("tab", "autocomplete", "Autocomplete", show=False),
     ]
 
     DEFAULT_CSS = """
@@ -53,8 +95,10 @@ class ChatInput(TextArea):
 
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
-        self._history: list[str] = []
-        self._history_idx = -1
+        self._history: list[str] = _load_history()
+        self._history_idx = len(self._history)
+        self._slash_matches: list[str] = []
+        self._slash_match_idx: int = -1
 
     def on_mount(self) -> None:
         self.border_title = "Message"
@@ -69,11 +113,18 @@ class ChatInput(TextArea):
         self._history.append(text)
         self._history_idx = len(self._history)
 
+        # Persist history to disk
+        _save_history(self._history)
+
         # Parse images from text
         images = self._extract_images(text)
 
         # Clear input
         self.text = ""
+
+        # Reset slash match state
+        self._slash_matches = []
+        self._slash_match_idx = -1
 
         # Notify parent
         self.post_message(self.Submitted(text, images))
@@ -81,6 +132,29 @@ class ChatInput(TextArea):
     def action_cancel(self) -> None:
         """Cancel current input."""
         self.text = ""
+        self._slash_matches = []
+        self._slash_match_idx = -1
+
+    def action_autocomplete(self) -> None:
+        """Tab autocomplete for slash commands."""
+        text = self.text.strip()
+        if text.startswith("/") and len(text) > 0:
+            # If we already have matches, cycle through them
+            if self._slash_matches:
+                self._slash_match_idx = (self._slash_match_idx + 1) % len(self._slash_matches)
+                self.text = self._slash_matches[self._slash_match_idx]
+                self.cursor_location = (0, len(self.text))
+            else:
+                # Find matching commands
+                matches = [cmd for cmd in SLASH_COMMANDS if cmd.startswith(text)]
+                if matches:
+                    self._slash_matches = matches
+                    self._slash_match_idx = 0
+                    self.text = matches[0]
+                    self.cursor_location = (0, len(self.text))
+        else:
+            # Default tab behavior: insert spaces
+            self.insert("    ")
 
     def _extract_images(self, text: str) -> list[str]:
         """Extract image paths/URLs from text.
@@ -99,6 +173,17 @@ class ChatInput(TextArea):
         for m in re.finditer(r'(?:[/~]\S+\.(?:png|jpg|jpeg|webp|gif|bmp))\b', text, re.IGNORECASE):
             images.append(m.group())
         return images
+
+    def _get_slash_hint(self) -> str | None:
+        """Return a hint string for slash commands, or None if not applicable."""
+        text = self.text.strip()
+        if text == "/":
+            return "  ".join(SLASH_COMMANDS)
+        if text.startswith("/") and len(text) > 1:
+            matches = [cmd for cmd in SLASH_COMMANDS if cmd.startswith(text)]
+            if matches:
+                return "  ".join(matches)
+        return None
 
     class Submitted(TextArea.Changed):
         """Message posted when input is submitted."""
