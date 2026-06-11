@@ -25,6 +25,8 @@ class ClientConfig(BaseModel):
     result_timeout: int = Field(default=300, ge=1)
     # API key for TUI WebSocket connection (read from env NEXUS_CLIENT__API_KEY)
     api_key: str = Field(default="")
+    # Enable/disable responsive TUI behavior
+    tui_responsive_enabled: bool = Field(default=True)
 
 
 class AuthConfig(BaseModel):
@@ -140,6 +142,11 @@ def load_config(config_file: str = "config/nexusagent.yaml") -> ConfigSchema:
 
     # Global overrides (NEXUS_SERVER__API_PORT etc.)
     override_from_env("NEXUS_", raw_data, raw_data)
+
+    # Coerce tui_responsive_enabled from string env var
+    _resp = raw_data.get("client", {}).get("tui_responsive_enabled")
+    if isinstance(_resp, str):
+        raw_data.setdefault("client", {})["tui_responsive_enabled"] = _resp.lower() in ("true", "1", "yes", "on")
 
     try:
         config = ConfigSchema(**raw_data)
