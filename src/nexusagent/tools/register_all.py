@@ -5,6 +5,7 @@ This module imports all tools and calls register_tool() for each one.
 Import this module once at startup to populate the registry.
 """
 
+from nexusagent.tools.code_review import review_code
 from nexusagent.tools.code_search import find_references, find_symbol, search_code
 from nexusagent.tools.fs import (
     edit_file,
@@ -31,6 +32,7 @@ from nexusagent.tools.registry import auto_correct, register_tool, tool_search
 from nexusagent.tools.research import fetch_url, search_local_docs, search_web
 from nexusagent.tools.shell import run_shell, run_shell_streaming
 from nexusagent.tools.test_runner import run_single_test, run_tests
+from nexusagent.tools.write_todos import read_todos, write_todos
 
 # ═══════════════════════════════════════════════════════════════════════
 # Discovery Tools
@@ -450,6 +452,29 @@ register_tool(
 )(fetch_url)
 
 # ═══════════════════════════════════════════════════════════════════════
+# Code Review Tools
+# ═══════════════════════════════════════════════════════════════════════
+
+register_tool(
+    name="review_code",
+    description=(
+        "Analyze code for bugs, style issues, security vulnerabilities, "
+        "and performance problems. Uses static analysis (pattern matching "
+        "+ AST for Python) — no LLM call required. Returns structured "
+        "review with severity levels (CRITICAL, HIGH, MEDIUM, LOW, INFO)."
+    ),
+    parameters={
+        "code": "str — the source code to review",
+        "language": "str — programming language (default: 'python')",
+    },
+    example=(
+        'review_code(code="eval(user_input)", language="python")'
+    ),
+    category="review",
+    returns="Formatted review report with categorized issues and severity levels.",
+)(review_code)
+
+# ═══════════════════════════════════════════════════════════════════════
 # Orchestration Tools
 # ═══════════════════════════════════════════════════════════════════════
 
@@ -537,6 +562,48 @@ def ask_user(question: str, options: list[str] | None = None) -> str:
             f"[No interactive session — returning default: {options[0]}]"
         )
     return f"[ask_user] {question}\n[No interactive session — please respond in the TUI]"
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Task Management Tools
+# ═══════════════════════════════════════════════════════════════════════
+
+register_tool(
+    name="write_todos",
+    description=(
+        "Write a task list (todos) to a JSON file. "
+        "Each todo is a dict with 'task' (required) and optional 'status', 'priority', 'notes'. "
+        "Status values: pending, in_progress, done, blocked. "
+        "Creates parent directories if needed."
+    ),
+    parameters={
+        "todos": "list[dict] — list of todo dicts, each with at least 'task' key",
+        "path": "str — file path for the todos JSON (default: './todos.json')",
+    },
+    example=(
+        'write_todos(todos=['
+        '{"task": "Fix auth bug", "status": "in_progress", "priority": "high"}, '
+        '{"task": "Add tests", "status": "pending"}'
+        '], path="./work/todos.json")'
+    ),
+    category="task_mgmt",
+    returns="Success message with count and status breakdown.",
+)(write_todos)
+
+register_tool(
+    name="read_todos",
+    description=(
+        "Read a task list (todos) from a JSON file. "
+        "Returns list of todo dicts. "
+        "Returns empty list if file doesn't exist or is invalid."
+    ),
+    parameters={
+        "path": "str — file path for the todos JSON (default: './todos.json')",
+    },
+    example='read_todos(path="./work/todos.json")',
+    category="task_mgmt",
+    returns="list[dict] — list of todo dicts with task, status, etc.",
+)(read_todos)
 
 
 # ═══════════════════════════════════════════════════════════════════════
