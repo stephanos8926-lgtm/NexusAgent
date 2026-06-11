@@ -76,9 +76,8 @@ nav:
     - Tool Parity: research/TOOL-PARITY-FINAL.md
     - TUI Aesthetics: research/TUI-AESTHETICS-FINAL.md
   - Reports:
-    - Audit Report: AUDIT_REPORT.md
-    - Competitive Analysis: competitive-analysis-2026-06-06.md
     - Implementation Plan: implementation-plan-2026-07-09.md
+    - Audit Archive: archive/README.md
   - Contributing: CONTRIBUTING.md
 
 extra:
