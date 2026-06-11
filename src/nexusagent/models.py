@@ -104,3 +104,72 @@ class ResponseEvent(AgentEvent):
 class ErrorEvent(AgentEvent):
     type: str = "error"
     message: str = ""
+
+
+# ── Image Input Models ─────────────────────────────────────────────────────
+
+
+class ImageAttachment(BaseModel):
+    """Represents an image attached to a user message.
+
+    Supports both local file paths and remote URLs.
+    The image is base64-encoded before being sent to the LLM.
+    """
+
+    path: str  # Local file path or URL
+    mime_type: str = "image/png"  # MIME type (image/png, image/jpeg, image/webp, image/gif)
+    base64_data: str = ""  # Base64-encoded image data (populated by encode_image)
+
+    def encode(self) -> str:
+        """Encode the image to base64.
+
+        For local files: reads the file and encodes it.
+        For URLs: returns the URL directly (LLMs that support URLs can fetch them).
+
+        Returns:
+            Base64 data URI string or URL.
+        """
+        import base64
+        from pathlib import Path
+
+        # If it's a URL, return as-is
+        if self.path.startswith(("http://", "https://")):
+            return self.path
+
+        # Local file — read and encode
+        file_path = Path(self.path).expanduser().resolve()
+        if not file_path.exists():
+            raise FileNotFoundError(f"Image file not found: {file_path}")
+
+        # Auto-detect MIME type from extension
+        ext = file_path.suffix.lower()
+        mime_map = {
+            ".png": "image/png",
+            ".jpg": "image/jpeg",
+            ".jpeg": "image/jpeg",
+            ".webp": "image/webp",
+            ".gif": "image/gif",
+            ".bmp": "image/bmp",
+        }
+        self.mime_type = mime_map.get(ext, "image/png")
+
+        with open(file_path, "rb") as f:
+            self.base64_data = base64.b64encode(f.read()).decode("utf-8")
+
+        return f"data:{self.mime_type};base64,{self.base64_data}"
+
+
+def encode_image_to_content(path: str) -> dict:
+    """Encode an image to a LangChain-compatible content block.
+
+    Args:
+        path: Local file path or URL to the image.
+
+    Returns:
+        A dict with 'type': 'image_url' and the image data,
+        compatible with LangChain's multimodal message format.
+    """
+    attachment = ImageAttachment(path=path)
+    encoded = attachment.encode()
+
+    return {"type": "image_url", "image_url": {"url": encoded}}

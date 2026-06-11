@@ -46,6 +46,11 @@ class AgentConfig(BaseModel):
     max_tool_output_chars: int = Field(default=400, ge=100)
     max_conversation_history: int = Field(default=40, ge=4)
     compaction_enabled: bool = Field(default=True)
+    # Image input settings
+    max_image_size_mb: int = Field(default=10, ge=1, le=50)
+    supported_image_types: list[str] = Field(
+        default_factory=lambda: [".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp"]
+    )
 
 
 class PromptConfig(BaseModel):
