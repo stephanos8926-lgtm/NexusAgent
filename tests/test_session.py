@@ -240,6 +240,10 @@ async def test_session_memory_injection(db_and_repo, mock_memory):
     class FakeHybridMemory:
         def get_memory_context(self, query, max_results=5):
             return "## Relevant Memories\n\nSource: bank/test.md (score: 0.95)\nTest memory content\n"
+        async def flush(self, summary=""):
+            pass
+        async def remember(self, content, metadata=None):
+            pass
 
     sid = "test-session-mem"
     session = await manager.get_or_create(
@@ -287,6 +291,10 @@ async def test_session_memory_injection_empty(db_and_repo, mock_memory):
     class FakeHybridMemory:
         def get_memory_context(self, query, max_results=5):
             return ""  # No memories
+        async def flush(self, summary=""):
+            pass
+        async def remember(self, content, metadata=None):
+            pass
 
     sid = "test-session-nomem"
     session = await manager.get_or_create(
@@ -327,6 +335,10 @@ async def test_session_compaction_triggers_on_long_context(db_and_repo, mock_mem
             # Return enough content to exceed 75% of 200k token window
             # 200k * 0.75 = 150k tokens * 4 chars = 600k chars
             return "X" * 700_000
+        async def flush(self, summary=""):
+            pass
+        async def remember(self, content, metadata=None):
+            pass
 
     sid = "test-session-compact"
     session = await manager.get_or_create(
