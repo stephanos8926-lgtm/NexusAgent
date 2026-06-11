@@ -1,30 +1,54 @@
-# NexusAgent Orchestration Framework
+# NexusAgent
 
-**The Intelligent Automation Platform**
+**AI Coding Agent — terminal-native, privacy-first, built for real work.**
 
-## Overview
-NexusAgent is an enterprise-grade framework for deploying multi-agent AI systems, offering modular components for NATS orchestration, secure key management, and flexible client interfaces.
+## What It Is
+
+NexusAgent is a local AI coding agent that runs in your terminal. It connects to LLM providers (Gemini, OpenRouter, and more), gives them tools to read/write files, run shell commands, search the web, and manage tasks — and lets you orchestrate it all from a beautiful TUI.
+
+No cloud dependency. No data leaving your machine. Your keys, your code, your control.
 
 ## Features
-- Modular architecture for AI agent integration.
-- NATS-based message bus for scalable communication.
-- Secure Keystore and Auth management.
-- Extensible SDK, CLI, TUI, and Web UI clients.
-- Production-grade logging and telemetry.
-- Centralized configuration and branding.
 
-## Getting Started
-Refer to the [Getting Started Guide](docs/guides/getting_started.md) for detailed installation and setup instructions.
+- **Rich TUI** — Markdown rendering, collapsible tool output, 7 themes, responsive layout, braille spinners
+- **Multi-provider LLM** — Gemini, OpenRouter, local models via unified provider bridge
+- **Tool system** — Shell, file ops, code review, web search, subagent spawning, todo tracking, git, and more
+- **Skills** — Load custom skills from `~/.hermes/skills/` with YAML frontmatter
+- **Hooks** — Event-driven automation (session-init, post-tool, error hooks)
+- **Session management** — Undo/redo, session snapshots, compaction for long conversations
+- **Web UI** — Optional browser-based interface alongside the TUI
+- **Headless mode** — JSON output for scripting and CI/CD integration
+- **NATS bus** — Scalable message passing for multi-agent deployments
+
+## Quick Start
+
+```bash
+# Install
+git clone https://github.com/stephanos8926-lgtm/NexusAgent.git
+cd NexusAgent
+pip install -e ".[dev]"
+
+# Run the TUI
+python -m nexusagent
+
+# Or run headless
+python -m nexusagent run "Fix the auth bug in server.py" -d /project
+```
 
 ## Documentation
-All official documentation can be found in the [docs/](docs/) directory.
-- [Architecture Decision Records (ADRs)](docs/adrs/index.md)
-- [Technical Specifications (Tech Specs)](docs/specs/index.md)
-- [Developer and User Guides](docs/guides/)
-- [API Reference](docs/api_reference/)
+
+- [Setup](docs/getting-started.md) — Installation and configuration
+- [Usage](docs/quickstart.md) — Common workflows
+- [Architecture](docs/architecture/overview.md) — System design
+- [ADRs](docs/adrs/index.md) — Architecture decision records
+- [Roadmap](docs/plans/2026-07-12-assessment-and-roadmap.md) — Current status and next steps
+- [Codebase Map](docs/CODEBASE_MAP.md) — Annotated source map
+- [Research](docs/research/) — Feature parity and design research
 
 ## Contributing
-We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for more details.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines. All contributions welcome — bug fixes, features, docs, tests.
 
 ## License
-This project is licensed under the MIT License.
+
+MIT
