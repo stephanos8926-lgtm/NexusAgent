@@ -10,3 +10,4 @@ wheels/
 .venv
 site/
 .env
+.hermes/worktrees/
