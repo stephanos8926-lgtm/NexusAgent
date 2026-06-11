@@ -18,6 +18,7 @@ from typing import Any
 from langchain_core.messages import SystemMessage
 
 from nexusagent.config import settings
+from nexusagent.hooks import HookEvent, get_hook_manager
 from nexusagent.models import ErrorEvent, ResponseEvent, ThinkingEvent
 from nexusagent.prompt_loader import inject_file_at_reference, load_nexus_prompt
 
@@ -314,6 +315,17 @@ class Session:
             self._enqueue(ErrorEvent(message="Session is not active").model_dump())
             return
 
+        # Fire session_init hooks
+        if settings.hooks.hooks_enabled:
+            try:
+                await get_hook_manager().run_hooks(HookEvent.SESSION_INIT, {
+                    "session_id": self.session_id,
+                    "working_dir": self.working_dir,
+                    "config": settings,
+                })
+            except Exception as exc:
+                logger.warning("session_init hook failed: %s", exc)
+
         # Process @file injection in chat input
         user_message = self._process_chat_input(user_message)
 
@@ -447,6 +459,16 @@ class Session:
 
         except Exception as exc:
             logger.error("Agent streaming failed: %s", exc, exc_info=True)
+            # Fire error hooks
+            if settings.hooks.hooks_enabled:
+                try:
+                    await get_hook_manager().run_hooks(HookEvent.ERROR, {
+                        "session_id": self.session_id,
+                        "error_message": str(exc),
+                        "working_dir": self.working_dir,
+                    })
+                except Exception as hook_exc:
+                    logger.warning("error hook failed: %s", hook_exc)
             self._enqueue(ErrorEvent(message=str(exc)).model_dump())
 
     async def _handle_message_token(self, token, metadata: dict, accumulated: list[str]) -> None:
@@ -483,6 +505,18 @@ class Session:
                     "output": str(token.content) if token.content else "",
                     "success": True,
                 })
+                # Fire post_tool_use hook
+                if settings.hooks.hooks_enabled:
+                    try:
+                        await get_hook_manager().run_hooks(HookEvent.POST_TOOL_USE, {
+                            "session_id": self.session_id,
+                            "tool_name": getattr(token, "name", "unknown"),
+                            "tool_args": {},
+                            "tool_result": str(token.content)[:400] if token.content else "",
+                            "call_id": call_id,
+                        })
+                    except Exception as exc:
+                        logger.warning("post_tool_use hook failed: %s", exc)
 
         # Regular AI text content — accumulate for final response AND stream chunks
         if isinstance(token, AIMessageChunk) and token.content and not token.tool_call_chunks:
