@@ -263,12 +263,52 @@ class Session:
             logger.warning("Chat @file injection failed: %s", e)
             return user_message
 
-    async def send(self, user_message: str) -> None:
+    def _build_user_message(self, user_message: str, images: list[str] | None = None):
+        """Build a HumanMessage, optionally with image attachments.
+
+        When images are provided, the message content is a list of content blocks
+        (text + image_url blocks) for multimodal LLM input.
+
+        Args:
+            user_message: The text content.
+            images: Optional list of image file paths or URLs.
+
+        Returns:
+            A HumanMessage with either string content (text-only) or list content
+            (multimodal with images).
+        """
+        from langchain_core.messages import HumanMessage
+        from nexusagent.models import encode_image_to_content
+
+        if not images:
+            return HumanMessage(content=user_message)
+
+        # Build multimodal content: text + images
+        content_blocks: list[dict] = [{"type": "text", "text": user_message}]
+
+        for img_path in images:
+            try:
+                image_content = encode_image_to_content(img_path)
+                content_blocks.append(image_content)
+            except Exception as exc:
+                logger.warning("Failed to encode image '%s': %s", img_path, exc)
+                content_blocks.append({
+                    "type": "text",
+                    "text": f"[Image could not be loaded: {img_path}]",
+                })
+
+        return HumanMessage(content=content_blocks)
+
+    async def send(self, user_message: str, images: list[str] | None = None) -> None:
         """Process a user message: store in DB, recall memory, invoke agent, emit events.
 
         Uses deepagents' astream() for real-time streaming of tool calls,
         tool results, and tokens — so the TUI can show progress instead of
         going silent for the entire duration.
+
+        Args:
+            user_message: The user's text message.
+            images: Optional list of image file paths or URLs to attach.
         """
         if self.status != "active":
             self._enqueue(ErrorEvent(message="Session is not active").model_dump())
@@ -309,8 +349,8 @@ class Session:
         # 4. Conversation history
         messages.extend(self._conversation_history[-settings.agent.max_conversation_history:])
 
-        # 5. New user message
-        user_msg = HumanMessage(content=user_message)
+        # 5. New user message (with optional image attachments)
+        user_msg = self._build_user_message(user_message, images)
         messages.append(user_msg)
 
         # Compaction: if messages exceed context window, compact before model call

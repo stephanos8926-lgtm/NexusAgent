@@ -288,7 +288,12 @@ async def session_websocket(
                 msg_type = msg.get("type")
 
                 if msg_type == "user_input":
-                    await session.send(msg["content"])
+                    content = msg.get("content", "")
+                    images = msg.get("images", [])
+                    if images:
+                        await session.send(content, images=images)
+                    else:
+                        await session.send(content)
                 elif msg_type == "approval":
                     await session.approve(msg["call_id"], msg.get("approved", False))
                 elif msg_type == "interrupt":
