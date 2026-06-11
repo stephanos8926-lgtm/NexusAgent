@@ -1,8 +1,15 @@
 """Message widgets for NexusAgent TUI.
 
-Each message type is a separate Textual widget with its own CSS styling.
+Each message type is a separate Textual Static widget with its own CSS styling.
 This follows the deepagents pattern: individual widgets mounted into a
 Container with layout:stream for O(1) append performance.
+
+Design system: Linear-inspired dark theme with indigo-violet accent.
+- Near-black background (#11181C), not pure white text (#F7F8F8)
+- Single accent color (#5E6AD2) used sparingly
+- Semi-transparent white borders (rgba(255,255,255,0.05-0.08))
+- height:auto on all messages — expands to fit content
+- text-wrap: wrap for proper word wrapping (NOT RichLog wrap=True)
 """
 
 from __future__ import annotations
@@ -20,8 +27,8 @@ logger = logging.getLogger(__name__)
 class UserMessage(Static):
     """Widget displaying a user message.
 
-    Styled with a left border accent (like Claude Code's user messages).
-    Height is auto — expands to fit content with word wrapping.
+    Styled with a left border accent (like Claude Code / Linear).
+    Height auto-expands to fit content with proper word wrapping.
     """
 
     DEFAULT_CSS = """
@@ -47,8 +54,8 @@ class UserMessage(Static):
 class AssistantMessage(Static):
     """Widget displaying an assistant message.
 
-    Renders markdown-like content with text wrapping.
-    Height auto-expands to fit content.
+    Supports streaming via append_token() and finalize().
+    Renders markdown-like content with proper word wrapping.
     """
 
     DEFAULT_CSS = """
@@ -62,19 +69,27 @@ class AssistantMessage(Static):
     }
     """
 
-    def __init__(self, content: str, **kwargs: Any) -> None:
-        super().__init__(**kwargs)
-        self._content = content
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__("", **kwargs)
+        self._buffer = ""
 
-    def render(self) -> Content:
-        return Content(self._content)
+    async def append_token(self, token: str) -> None:
+        """Append a streaming token and update the display."""
+        self._buffer += token
+        self.update(Content(self._buffer))
+
+    def finalize(self, content: str) -> None:
+        """Set the final content (overrides buffer)."""
+        self._buffer = content
+        self.update(Content(content))
 
 
 class ToolCallMessage(Static):
-    """Widget displaying a tool call with collapsible output.
+    """Widget displaying a tool call with output.
 
     Shows tool name + args in a compact header.
-    Output is shown inline for short results, collapsible for long ones.
+    Output is shown inline for short results, truncated for long ones.
+    Border uses $warning color to distinguish from user/assistant messages.
     """
 
     DEFAULT_CSS = """
@@ -88,7 +103,7 @@ class ToolCallMessage(Static):
         overflow-x: hidden;
     }
     ToolCallMessage:hover {
-        border-left: wide $secondary;
+        border-left: wide $accent-light;
     }
     """
 
@@ -99,22 +114,26 @@ class ToolCallMessage(Static):
         self._output = output
 
     def render(self) -> Content:
+        # Format: ⚙ tool_name(arg1, arg2)
         header = f"⚙ {self._tool}({self._args})"
         if self._output:
-            # Truncate long output
             output = self._output
-            if len(output) > 200:
-                output = output[:197] + "..."
+            # Truncate long output
+            if len(output) > 300:
+                output = output[:297] + "..."
             return Content.assemble(
-                (header, "bold orange"),
+                (header, "bold warning"),
                 "\n",
-                (output, "dim"),
+                (output, "text-muted"),
             )
-        return Content(header)
+        return Content.assemble((header, "bold warning"))
 
 
 class AppMessage(Static):
-    """Widget displaying a system/app message (thinking, status, etc.)."""
+    """Widget displaying a system/app message (thinking, status, etc.).
+
+    Dim italic styling to de-emphasize vs user/assistant content.
+    """
 
     DEFAULT_CSS = """
     AppMessage {
@@ -129,15 +148,14 @@ class AppMessage(Static):
     """
 
     def __init__(self, message: str, **kwargs: Any) -> None:
-        super().__init__(**kwargs)
-        self._message = message
-
-    def render(self) -> Content:
-        return Content(self._message)
+        super().__init__(message, **kwargs)
 
 
 class ErrorMessage(Static):
-    """Widget displaying an error message."""
+    """Widget displaying an error message.
+
+    Uses $error color with icon for clear visual distinction.
+    """
 
     DEFAULT_CSS = """
     ErrorMessage {
@@ -151,17 +169,17 @@ class ErrorMessage(Static):
     """
 
     def __init__(self, message: str, **kwargs: Any) -> None:
-        super().__init__(**kwargs)
-        self._message = message
+        super().__init__(message, **kwargs)
 
     def render(self) -> Content:
-        return Content.assemble(("✗ ", "bold error"), self._message)
+        return Content.assemble(("✗ Error: ", "bold error"), self._text)
 
 
 class WelcomeBanner(Static):
     """Compact welcome banner shown at session start.
 
     Single widget — doesn't scroll away like RichLog.write() calls.
+    Auto-removed after first user message.
     """
 
     DEFAULT_CSS = """
@@ -170,7 +188,7 @@ class WelcomeBanner(Static):
         padding: 1 2;
         margin: 0 0 1 0;
         background: $surface;
-        border: solid $panel;
+        border: solid $border;
         text-wrap: wrap;
         overflow-x: hidden;
     }
@@ -180,11 +198,11 @@ class WelcomeBanner(Static):
         from datetime import datetime
         ts = datetime.now().strftime("%H:%M")
         text = (
-            f"[b cyan]╔══════════════════════════════════════╗[/b cyan]\n"
-            f"[b cyan]║[/b cyan]  [b white]NexusAgent[/b white] — AI Coding Agent    [b cyan]║[/b cyan]\n"
-            f"[b cyan]║[/b cyan]  Session: [yellow]{session_id}[/yellow]  {ts}        [b cyan]║[/b cyan]\n"
-            f"[b cyan]╚══════════════════════════════════════╝[/b cyan]\n"
+            f"[b primary]╔══════════════════════════════════════╗[/b primary]\n"
+            f"[b primary]║[/b primary]  [b]NexusAgent[/b] — AI Coding Agent    [b primary]║[/b primary]\n"
+            f"[b primary]║[/b primary]  Session: [warning]{session_id}[/warning]  {ts}        [b primary]║[/b primary]\n"
+            f"[b primary]╚══════════════════════════════════════╝[/b primary]\n"
             f"\n"
-            f"[dim]Type a message or /help for commands. Ctrl+C to interrupt.[/dim]"
+            f"[text-muted]Type a message or /help for commands. Ctrl+C to interrupt.[/text-muted]"
         )
         super().__init__(text, **kwargs)

@@ -57,7 +57,7 @@ Launch 9 agents concurrently (one `task` per agent):
 - **PR Comments**: Verdict $\rightarrow$ Inline comments via GitHub "Create Review" API.
 
 ### Step 8: Autofix
-- Offer to apply fixes using the `edit` tool.
+- Offer to apply fixes using the `edit` tool.on software
 - Commit and push fixes from the worktree to the PR branch.
 
 ### Step 9: Submit PR Review
