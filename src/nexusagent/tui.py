@@ -291,24 +291,141 @@ class NexusApp(App):
         self.notify("Chat cleared", timeout=1)
         logger.info("Chat cleared by user")
 
+    def action_show_model(self) -> None:
+        """Show current model information."""
+        try:
+            from nexusagent.config import settings
+            model_name = getattr(settings.agent, 'default_model', 'unknown')
+        except Exception:
+            model_name = "unknown"
+        self.notify(f"Model: {model_name}", timeout=3)
+        logger.info(f"Model info requested: {model_name}")
+
+    # Event stream consumer
+
+    async def consume_event_stream(self, session) -> None:
+        """Consume events from the session's event stream and update the TUI.
+
+        This runs as a background task, processing events from the session's
+        async queue and updating the message widgets in real-time.
+        """
+        messages = self.query_one("#messages", Container)
+        try:
+            async for event in session.event_stream():
+                etype = event.get("type", "")
+
+                if etype == "thinking":
+                    # Show thinking indicator
+                    thinking_msg = AppMessage(event.get("content", "Thinking..."))
+                    messages.mount(thinking_msg)
+                    self._scroll_to_bottom()
+
+                elif etype == "response_chunk":
+                    # Streaming token — append to current assistant message
+                    content = event.get("content", "")
+                    if content:
+                        if self._current_assistant is None:
+                            # Remove welcome banner on first response
+                            self._remove_welcome_banner(messages)
+                            self._current_assistant = AssistantMessage()
+                            messages.mount(self._current_assistant)
+                        await self._current_assistant.append_token(content)
+                        self._scroll_to_bottom()
+
+                elif etype == "response":
+                    # Final response — finalize the assistant message
+                    if self._current_assistant is not None:
+                        self._current_assistant.finalize(event.get("content", ""))
+                        self._current_assistant = None
+                    self._busy = False
+                    self._scroll_to_bottom()
+
+                elif etype == "tool_call":
+                    # Show tool call
+                    tool = event.get("tool", "unknown")
+                    args = event.get("args", {})
+                    args_str = ", ".join(f"{k}={v!r}" for k, v in args.items()) if isinstance(args, dict) else str(args)
+                    tool_msg = ToolCallMessage(tool=tool, args=args_str)
+                    messages.mount(tool_msg)
+                    self._scroll_to_bottom()
+
+                elif etype == "tool_result":
+                    # Update tool call with result (simplified: just append result)
+                    output = event.get("output", "")
+                    if output:
+                        result_msg = AppMessage(f"  ↳ {output[:200]}")
+                        messages.mount(result_msg)
+                        self._scroll_to_bottom()
+
+                elif etype == "error":
+                    error_msg = ErrorMessage(event.get("message", "Unknown error"))
+                    messages.mount(error_msg)
+                    self._current_assistant = None
+                    self._busy = False
+                    self._scroll_to_bottom()
+
+                elif etype == "session_closed":
+                    break
+
+        except Exception as exc:
+            logger.error(f"Event stream consumer error: {exc}", exc_info=True)
+
+    def _remove_welcome_banner(self, messages: Container) -> None:
+        """Remove the welcome banner if it exists."""
+        for child in list(messages.children):
+            if isinstance(child, WelcomeBanner):
+                child.remove()
+
+    def _scroll_to_bottom(self) -> None:
+        """Scroll the chat area to the bottom."""
+        try:
+            chat = self.query_one("#chat", VerticalScroll)
+            chat.scroll_end(animate=False)
+        except Exception:
+            pass
+
     # Input handling
 
     def on_chat_input_submitted(self, message: ChatInput.Submitted) -> None:
         """Handle chat input submission."""
+        text = message.text.strip()
+
+        # Slash command dispatch
+        if text.startswith("/"):
+            command = text.split()[0].lower()
+            if command == "/help":
+                self.action_show_help()
+                return
+            elif command == "/logs":
+                self.action_show_logs()
+                return
+            elif command == "/theme":
+                self.action_switch_theme()
+                return
+            elif command == "/clear":
+                self.action_clear_chat()
+                return
+            elif command == "/model":
+                self.action_show_model()
+                return
+            else:
+                self.notify(f"Unknown command: {command}. Type /help for available commands.", timeout=3)
+                return
+
         if self._busy:
             # Queue the input
-            self._pending_inputs.append(message.text)
+            self._pending_inputs.append(text)
             self.notify("Message queued", timeout=1)
             return
 
         # Log the message
         if self.telemetry:
-            self.telemetry.log_message(message.text, is_user=True)
+            self.telemetry.log_message(text, is_user=True)
 
         # Send to session via custom event (handled by main app)
         self.post_message(
             self.UserInput(
-                content=message.text,
+                content=text,
                 images=message.images,
             )
         )
