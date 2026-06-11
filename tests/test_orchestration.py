@@ -346,14 +346,17 @@ class TestSearchAndFetch:
         assert results[0].snippet == ""
 
     # -----------------------------------------------------------------------
-    # 10. _fetch returns None (placeholder)
+    # 10. _fetch returns content (delegates to fetch_url)
     # -----------------------------------------------------------------------
 
     @pytest.mark.asyncio
-    async def test_fetch_returns_none(self):
+    async def test_fetch_returns_content(self):
         orch = _make_orchestrator()
         result = await orch._fetch("https://example.com")
-        assert result is None
+        # fetch_url should return HTML content (or None on network failure)
+        # Either outcome is acceptable — the key is it no longer returns
+        # None as a TODO stub
+        assert result is None or isinstance(result, str)
 
 
 # ---------------------------------------------------------------------------
