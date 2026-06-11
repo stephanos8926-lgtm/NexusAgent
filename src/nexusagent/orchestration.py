@@ -96,9 +96,12 @@ class DeepResearchOrchestrator:
         return [SearchResult(url="search", title=query, snippet=raw or "")]
 
     async def _fetch(self, url: str) -> str | None:
-        """Fetch content from a URL. TODO: implement with httpx or similar."""
-        # Placeholder — for now rely on search snippets
-        return None
+        """Fetch content from a URL using the existing fetch_url tool."""
+        try:
+            from nexusagent.tools.research import fetch_url
+            return fetch_url(url)
+        except Exception:
+            return None
 
     async def _generate_plan(self, query: str) -> ResearchPlan:
         prompt = f"""The user wants to research: {query}
