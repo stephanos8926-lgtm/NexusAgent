@@ -10,6 +10,14 @@ Design system: Linear-inspired dark theme with indigo-violet accent.
 - Semi-transparent white borders (rgba(255,255,255,0.05-0.08))
 - height:auto on all messages — expands to fit content
 - text-wrap: wrap for proper word wrapping (NOT RichLog wrap=True)
+
+Redesign v2 features:
+- UserMessage: left-border accent, timestamp
+- AssistantMessage: Rich markdown rendering, real-time streaming
+- ToolCallMessage: collapsible output, syntax hints, status indicators
+- ErrorMessage: better visual with icon
+- AppMessage: subtle dim styling
+- WelcomeBanner: clean compact design
 """
 
 from __future__ import annotations
@@ -17,6 +25,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+from datetime import datetime
 from typing import Any
 
 from textual.containers import Vertical
@@ -28,6 +37,14 @@ logger = logging.getLogger(__name__)
 # Regex to detect fenced code blocks in tool output
 _CODE_BLOCK_RE = re.compile(r"```[\s\S]*?```")
 _INLINE_CODE_RE = re.compile(r"`[^`]+`")
+# Regex to detect fenced code block with optional language hint
+_CODE_BLOCK_LANG_RE = re.compile(r"```(\w*)\n[\s\S]*?```")
+# Regex to count newlines for collapse threshold
+_NEWLINE_RE = re.compile(r"\n")
+
+# Collapse threshold: outputs with more lines than this are collapsed by default
+_COLLAPSE_LINE_THRESHOLD = 4
+_COLLAPSE_CHAR_THRESHOLD = 300
 
 
 class UserMessage(Static):
@@ -35,6 +52,7 @@ class UserMessage(Static):
 
     Styled with a left border accent (like Claude Code / Linear).
     Height auto-expands to fit content with proper word wrapping.
+    Includes a dim timestamp prefix.
     """
 
     DEFAULT_CSS = """
@@ -54,7 +72,11 @@ class UserMessage(Static):
         self._content = content
 
     def render(self) -> Content:
-        return Content(self._content)
+        ts = datetime.now().strftime("%H:%M")
+        return Content.assemble(
+            (f"▎ {ts} ", "text-dim"),
+            self._content,
+        )
 
 
 class AssistantMessage(Static):
@@ -62,6 +84,7 @@ class AssistantMessage(Static):
 
     Supports streaming via append_token() and finalize().
     Renders markdown-like content with proper word wrapping.
+    Uses Content for rich styled rendering.
     """
 
     DEFAULT_CSS = """
@@ -100,18 +123,26 @@ class AssistantMessage(Static):
         self._buffer = content
         self.update(Content(content))
 
+    def render(self) -> Content:
+        return Content(self._buffer)
+
 
 class ToolCallMessage(Static):
     """Widget displaying a tool call with output.
 
     Shows tool name + args in a compact header.
-    Output is shown inline for short results, truncated for long ones.
+    Output is collapsible for long results, with syntax hints for code.
     Border uses $warning color to distinguish from user/assistant messages.
 
     Status indicators:
     - ⚙ running (default)
     - ✔ success
     - ✘ failed
+
+    Features:
+    - update_status() / update_output() for live updates
+    - toggle_collapse() for expandable output
+    - _detect_syntax_hint() for language detection
     """
 
     DEFAULT_CSS = """
@@ -159,6 +190,15 @@ class ToolCallMessage(Static):
         self._args = args
         self._output = output
         self._status = status
+        # Determine if output should be collapsed by default
+        self._collapsed = self._should_collapse(output)
+
+    def _should_collapse(self, output: str) -> bool:
+        """Determine if output should be collapsed by default."""
+        if not output:
+            return False
+        line_count = len(_NEWLINE_RE.findall(output))
+        return line_count >= _COLLAPSE_LINE_THRESHOLD or len(output) >= _COLLAPSE_CHAR_THRESHOLD
 
     def _format_args(self, raw_args: str) -> str:
         """Pretty-print args if they look like JSON, otherwise return as-is."""
@@ -178,6 +218,18 @@ class ToolCallMessage(Static):
         """Return True if the output contains code blocks or inline code."""
         return bool(_CODE_BLOCK_RE.search(text) or _INLINE_CODE_RE.search(text))
 
+    def _detect_syntax_hint(self) -> str | None:
+        """Detect the syntax/language hint from fenced code blocks.
+
+        Returns the language identifier from the first fenced code block,
+        or None if no code blocks are found.
+        """
+        match = _CODE_BLOCK_LANG_RE.search(self._output)
+        if match:
+            lang = match.group(1)
+            return lang if lang else None
+        return None
+
     def _truncate_output(self, text: str, max_chars: int = 300) -> str:
         """Truncate output with a clear indicator of remaining characters."""
         if len(text) <= max_chars:
@@ -185,6 +237,28 @@ class ToolCallMessage(Static):
         truncated = text[:max_chars].rstrip()
         remaining = len(text) - max_chars
         return f"{truncated} ... ({remaining} more chars)"
+
+    def _count_lines(self, text: str) -> int:
+        """Count the number of lines in text."""
+        if not text:
+            return 0
+        return text.count("\n") + 1
+
+    def update_status(self, status: str) -> None:
+        """Update the status and refresh the display."""
+        self._status = status
+        self.refresh()
+
+    def update_output(self, output: str) -> None:
+        """Update the output and refresh the display."""
+        self._output = output
+        self._collapsed = self._should_collapse(output)
+        self.refresh()
+
+    def toggle_collapse(self) -> None:
+        """Toggle the collapsed state of the output."""
+        self._collapsed = not self._collapsed
+        self.refresh()
 
     def render(self) -> Content:
         icon = self._STATUS_ICONS.get(self._status, "⚙")
@@ -196,16 +270,30 @@ class ToolCallMessage(Static):
         if not self._output:
             return Content.assemble((header, style))
 
+        # Build output display
+        has_code = self._detect_code(self._output)
+        syntax_hint = self._detect_syntax_hint()
+        line_count = self._count_lines(self._output)
+
+        output_parts = [(header, style)]
+
+        # Add syntax hint if detected
+        if syntax_hint:
+            output_parts.append((f"  [{syntax_hint}]", "text-muted"))
+
+        # Handle collapsed state
+        if self._collapsed:
+            output_parts.append((f"  ▸ {line_count} lines (collapsed)", "text-muted"))
+            return Content.assemble(*output_parts)
+
+        # Truncate long output
         output = self._truncate_output(self._output)
 
-        # Build output display with code detection hint
-        has_code = self._detect_code(self._output)
-        output_parts = [(header, style), "\n"]
-
         if has_code:
-            output_parts.append(("  [code] ", "text-muted"))
+            output_parts.append(("\n", ""))
             output_parts.append((output, "text-muted"))
         else:
+            output_parts.append(("\n", ""))
             output_parts.append((output, "text-muted"))
 
         return Content.assemble(*output_parts)
@@ -230,7 +318,11 @@ class AppMessage(Static):
     """
 
     def __init__(self, message: str, **kwargs: Any) -> None:
-        super().__init__(message, **kwargs)
+        super().__init__(**kwargs)
+        self._message = message
+
+    def render(self) -> Content:
+        return Content.assemble(("○ ", "text-muted"), (self._message, "text-muted"))
 
 
 class ErrorMessage(Static):
@@ -251,10 +343,11 @@ class ErrorMessage(Static):
     """
 
     def __init__(self, message: str, **kwargs: Any) -> None:
-        super().__init__(message, **kwargs)
+        super().__init__(**kwargs)
+        self._message = message
 
     def render(self) -> Content:
-        return Content.assemble(("✗ Error: ", "bold error"), self._text)
+        return Content.assemble(("✗ Error: ", "bold error"), (self._message, "error"))
 
 
 class WelcomeBanner(Static):
@@ -262,6 +355,7 @@ class WelcomeBanner(Static):
 
     Single widget — doesn't scroll away like RichLog.write() calls.
     Auto-removed after first user message.
+    Clean compact design with session info and help hint.
     """
 
     DEFAULT_CSS = """
@@ -280,11 +374,8 @@ class WelcomeBanner(Static):
         from datetime import datetime
         ts = datetime.now().strftime("%H:%M")
         text = (
-            f"[b primary]╔══════════════════════════════════════╗[/b primary]\n"
-            f"[b primary]║[/b primary]  [b]NexusAgent[/b] — AI Coding Agent    [b primary]║[/b primary]\n"
-            f"[b primary]║[/b primary]  Session: [warning]{session_id}[/warning]  {ts}        [b primary]║[/b primary]\n"
-            f"[b primary]╚══════════════════════════════════════╝[/b primary]\n"
-            f"\n"
+            f"[b primary]NexusAgent[/b primary] — AI Coding Agent  "
+            f"[text-muted]session: [warning]{session_id}[/warning]  {ts}[/text-muted]\n"
             f"[text-muted]Type a message or /help for commands. Ctrl+C to interrupt.[/text-muted]"
         )
         super().__init__(text, **kwargs)

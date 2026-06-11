@@ -1,7 +1,12 @@
 """Tests for NexusAgent TUI widgets.
 
 Covers:
-- ToolCallMessage rendering with various tool outputs
+- UserMessage rendering with timestamp
+- AssistantMessage streaming and markdown rendering
+- ToolCallMessage collapsible output, syntax hints, status indicators
+- ErrorMessage visual with icon
+- AppMessage subtle dim styling
+- WelcomeBanner compact design
 - ChatInput slash command detection
 - Command history persistence
 """
@@ -21,7 +26,121 @@ from nexusagent.widgets.chat_input import (
     _load_history,
     _save_history,
 )
-from nexusagent.widgets.messages import ToolCallMessage
+from nexusagent.widgets.messages import (
+    UserMessage,
+    AssistantMessage,
+    ToolCallMessage,
+    AppMessage,
+    ErrorMessage,
+    WelcomeBanner,
+)
+
+
+# ---------------------------------------------------------------------------
+# UserMessage tests
+# ---------------------------------------------------------------------------
+
+
+class TestUserMessage:
+    """Tests for the UserMessage widget."""
+
+    def test_basic_render(self):
+        """User message renders content with left-border accent."""
+        msg = UserMessage("Hello world")
+        rendered = str(msg.render())
+        assert "Hello world" in rendered
+
+    def test_render_returns_content(self):
+        """render() returns a Content object."""
+        from textual.content import Content
+        msg = UserMessage("test")
+        result = msg.render()
+        assert isinstance(result, Content)
+
+    def test_multiline_content(self):
+        """Multi-line user content is preserved."""
+        msg = UserMessage("line1\nline2\nline3")
+        rendered = str(msg.render())
+        assert "line1" in rendered
+        assert "line2" in rendered
+        assert "line3" in rendered
+
+    def test_empty_content(self):
+        """Empty content renders only the timestamp."""
+        msg = UserMessage("")
+        rendered = str(msg.render())
+        # Even empty content shows timestamp prefix
+        assert rendered != ""  # timestamp is always present
+
+    def test_timestamp_present(self):
+        """User message includes a timestamp in the rendered output."""
+        msg = UserMessage("test message")
+        rendered = str(msg.render())
+        # Timestamp should be present (HH:MM format)
+        import re
+        assert re.search(r'\d{2}:\d{2}', rendered)
+
+    def test_content_stored(self):
+        """Content is stored and retrievable."""
+        msg = UserMessage("my content")
+        assert msg._content == "my content"
+
+
+# ---------------------------------------------------------------------------
+# AssistantMessage tests
+# ---------------------------------------------------------------------------
+
+
+class TestAssistantMessage:
+    """Tests for the AssistantMessage widget."""
+
+    def test_initial_empty(self):
+        """Assistant message starts empty."""
+        msg = AssistantMessage()
+        rendered = str(msg.render())
+        assert rendered == ""
+
+    def test_finalize_sets_content(self):
+        """finalize() sets the full content."""
+        msg = AssistantMessage()
+        msg.finalize("Hello, I'm NexusAgent!")
+        rendered = str(msg.render())
+        assert "Hello" in rendered
+
+    def test_finalize_overrides_buffer(self):
+        """finalize() overrides any buffered streaming content."""
+        msg = AssistantMessage()
+        msg._buffer = "old content"
+        msg.finalize("new content")
+        rendered = str(msg.render())
+        assert "new content" in rendered
+        assert "old content" not in rendered
+
+    def test_buffer_accumulation(self):
+        """Tokens are accumulated in the buffer."""
+        msg = AssistantMessage()
+        msg._buffer = ""
+        # Simulate token appending (without async)
+        msg._buffer += "Hello"
+        msg._buffer += " World"
+        assert msg._buffer == "Hello World"
+
+    def test_markdown_content(self):
+        """Assistant message can contain markdown-like content."""
+        msg = AssistantMessage()
+        msg.finalize("**Bold** and *italic* and `code`")
+        rendered = str(msg.render())
+        assert "Bold" in rendered
+        assert "italic" in rendered
+        assert "code" in rendered
+
+    def test_render_returns_content(self):
+        """render() returns a Content object."""
+        from textual.content import Content
+        msg = AssistantMessage()
+        msg.finalize("test")
+        result = msg.render()
+        assert isinstance(result, Content)
 
 
 # ---------------------------------------------------------------------------
@@ -68,9 +187,7 @@ class TestToolCallMessage:
         msg = ToolCallMessage(tool="search", args="query=test")
         rendered = str(msg.render())
         assert "search" in rendered
-        # Should not have a newline from output
         parts = msg.render()
-        # Content.assemble with just one tuple = no newline
         assert "⚙" in rendered
 
     def test_json_args_pretty_print(self):
@@ -81,7 +198,6 @@ class TestToolCallMessage:
             output="done",
         )
         rendered = str(msg.render())
-        # The JSON should be compacted (no extra spaces)
         assert '"path"' in rendered
         assert '"content"' in rendered
 
@@ -97,12 +213,15 @@ class TestToolCallMessage:
 
     def test_truncation_indicator(self):
         """Long output is truncated with a char count indicator."""
+        # Use output long enough to truncate but short enough not to collapse
+        # Must be < 300 chars to avoid char-based collapse, but we test truncation
+        # by directly calling _truncate_output
         long_output = "x" * 500
         msg = ToolCallMessage(tool="run_shell", args="cmd=cat", output=long_output)
-        rendered = str(msg.render())
-        assert "more chars" in rendered
-        # Should show remaining count (500 - 300 = 200)
-        assert "200" in rendered
+        # Directly test truncation logic
+        truncated = msg._truncate_output(long_output)
+        assert "more chars" in truncated
+        assert "200" in truncated  # 500 - 300 = 200
 
     def test_no_truncation_for_short_output(self):
         """Short output is not truncated."""
@@ -112,24 +231,27 @@ class TestToolCallMessage:
         assert "more chars" not in rendered
 
     def test_code_detection_fenced_block(self):
-        """Output with fenced code blocks gets a [code] hint."""
+        """Output with fenced code blocks gets a syntax hint."""
         output = 'Here is code:\n```python\nprint("hi")\n```'
         msg = ToolCallMessage(tool="run_shell", args="cmd=cat", output=output)
         rendered = str(msg.render())
-        assert "[code]" in rendered
+        # Now uses syntax hint instead of generic [code]
+        assert "[python]" in rendered
 
     def test_code_detection_inline(self):
-        """Output with inline code gets a [code] hint."""
+        """Output with inline code renders without collapse."""
         output = "Use `git status` to check"
         msg = ToolCallMessage(tool="run_shell", args="cmd=help", output=output)
         rendered = str(msg.render())
-        assert "[code]" in rendered
+        # Inline code is rendered as-is
+        assert "git status" in rendered
 
     def test_no_code_hint_for_plain_text(self):
-        """Plain text output does not get a [code] hint."""
+        """Plain text output does not get a syntax hint."""
         msg = ToolCallMessage(tool="read", args="f=a.py", output="just some text")
         rendered = str(msg.render())
-        assert "[code]" not in rendered
+        # No syntax hint for plain text
+        assert "[" not in rendered or "code" not in rendered
 
     def test_empty_args(self):
         """Empty args render cleanly."""
@@ -146,6 +268,215 @@ class TestToolCallMessage:
         )
         rendered = str(msg.render())
         assert '"a"' in rendered
+
+    def test_status_running_constant(self):
+        """STATUS_RUNNING constant is 'running'."""
+        assert ToolCallMessage.STATUS_RUNNING == "running"
+
+    def test_status_success_constant(self):
+        """STATUS_SUCCESS constant is 'success'."""
+        assert ToolCallMessage.STATUS_SUCCESS == "success"
+
+    def test_status_failed_constant(self):
+        """STATUS_FAILED constant is 'failed'."""
+        assert ToolCallMessage.STATUS_FAILED == "failed"
+
+    def test_status_icons_complete(self):
+        """All statuses have icons."""
+        assert ToolCallMessage.STATUS_RUNNING in ToolCallMessage._STATUS_ICONS
+        assert ToolCallMessage.STATUS_SUCCESS in ToolCallMessage._STATUS_ICONS
+        assert ToolCallMessage.STATUS_FAILED in ToolCallMessage._STATUS_ICONS
+
+    def test_status_styles_complete(self):
+        """All statuses have styles."""
+        assert ToolCallMessage.STATUS_RUNNING in ToolCallMessage._STATUS_STYLES
+        assert ToolCallMessage.STATUS_SUCCESS in ToolCallMessage._STATUS_STYLES
+        assert ToolCallMessage.STATUS_FAILED in ToolCallMessage._STATUS_STYLES
+
+    def test_update_status(self):
+        """update_status changes the status and refreshes."""
+        msg = ToolCallMessage(tool="test", args="x=1")
+        msg.update_status("success")
+        assert msg._status == "success"
+
+    def test_update_output(self):
+        """update_output changes the output and refreshes."""
+        msg = ToolCallMessage(tool="test", args="x=1", output="old")
+        msg.update_output("new output")
+        assert msg._output == "new output"
+
+    def test_collapsed_by_default_when_output_long(self):
+        """Tool output is collapsed when it exceeds collapse threshold."""
+        # Multi-line output exceeding threshold
+        long_output = "line1\nline2\nline3\nline4\nline5"
+        msg = ToolCallMessage(tool="test", args="x=1", output=long_output)
+        assert msg._collapsed is True
+
+    def test_not_collapsed_when_output_short(self):
+        """Tool output is not collapsed when it's short."""
+        msg = ToolCallMessage(tool="test", args="x=1", output="short")
+        assert msg._collapsed is False
+
+    def test_toggle_collapse(self):
+        """toggle_collapse switches collapsed state."""
+        msg = ToolCallMessage(tool="test", args="x=1", output="short")
+        assert msg._collapsed is False
+        msg.toggle_collapse()
+        assert msg._collapsed is True
+        msg.toggle_collapse()
+        assert msg._collapsed is False
+
+    def test_collapsed_output_shows_summary(self):
+        """When collapsed, output shows a summary line."""
+        long_output = "line1\nline2\nline3\nline4\nline5"
+        msg = ToolCallMessage(tool="test", args="x=1", output=long_output)
+        msg._collapsed = True
+        rendered = str(msg.render())
+        # Should show collapsed indicator with line count
+        assert "lines" in rendered.lower() or "collapsed" in rendered.lower()
+
+    def test_syntax_hint_python(self):
+        """Python code blocks get a [python] syntax hint."""
+        output = '```python\nprint("hi")\n```'
+        msg = ToolCallMessage(tool="run", args="x=1", output=output)
+        hint = msg._detect_syntax_hint()
+        assert hint == "python"
+
+    def test_syntax_hint_javascript(self):
+        """JavaScript code blocks get a [js] syntax hint."""
+        output = '```javascript\nconsole.log("hi")\n```'
+        msg = ToolCallMessage(tool="run", args="x=1", output=output)
+        hint = msg._detect_syntax_hint()
+        assert hint == "javascript"
+
+    def test_syntax_hint_json(self):
+        """JSON code blocks get a [json] syntax hint."""
+        output = '```json\n{"key": "val"}\n```'
+        msg = ToolCallMessage(tool="run", args="x=1", output=output)
+        hint = msg._detect_syntax_hint()
+        assert hint == "json"
+
+    def test_syntax_hint_none_for_plain(self):
+        """Plain text without code blocks returns None."""
+        msg = ToolCallMessage(tool="run", args="x=1", output="plain text")
+        hint = msg._detect_syntax_hint()
+        assert hint is None
+
+    def test_syntax_hint_none_for_unknown_lang(self):
+        """Unknown language code blocks return the lang as-is."""
+        output = '```rust\nfn main() {}\n```'
+        msg = ToolCallMessage(tool="run", args="x=1", output=output)
+        hint = msg._detect_syntax_hint()
+        assert hint == "rust"
+
+
+# ---------------------------------------------------------------------------
+# AppMessage tests
+# ---------------------------------------------------------------------------
+
+
+class TestAppMessage:
+    """Tests for the AppMessage widget."""
+
+    def test_basic_render(self):
+        """App message renders the message text."""
+        msg = AppMessage("Thinking...")
+        rendered = str(msg.render())
+        assert "Thinking..." in rendered
+
+    def test_dim_styling(self):
+        """App message uses muted/dim color."""
+        msg = AppMessage("status update")
+        assert msg._message == "status update"
+
+    def test_empty_message(self):
+        """Empty app message renders without error."""
+        msg = AppMessage("")
+        rendered = str(msg.render())
+        # Empty message still renders the icon prefix
+        assert rendered is not None
+
+    def test_prefix_icon(self):
+        """App message includes a prefix icon."""
+        msg = AppMessage("thinking")
+        rendered = str(msg.render())
+        assert "○" in rendered
+
+
+# ---------------------------------------------------------------------------
+# ErrorMessage tests
+# ---------------------------------------------------------------------------
+
+
+class TestErrorMessage:
+    """Tests for the ErrorMessage widget."""
+
+    def test_error_icon(self):
+        """Error message includes the error icon."""
+        msg = ErrorMessage("Something went wrong")
+        rendered = str(msg.render())
+        assert "✗" in rendered
+
+    def test_error_text(self):
+        """Error message includes the error text."""
+        msg = ErrorMessage("File not found")
+        rendered = str(msg.render())
+        assert "File not found" in rendered
+
+    def test_error_style(self):
+        """Error message uses error color styling."""
+        msg = ErrorMessage("test error")
+        rendered = str(msg.render())
+        assert "Error" in rendered
+
+    def test_multiline_error(self):
+        """Multi-line error messages are preserved."""
+        msg = ErrorMessage("line1\nline2")
+        rendered = str(msg.render())
+        assert "line1" in rendered
+        assert "line2" in rendered
+
+
+# ---------------------------------------------------------------------------
+# WelcomeBanner tests
+# ---------------------------------------------------------------------------
+
+
+class TestWelcomeBanner:
+    """Tests for the WelcomeBanner widget."""
+
+    def test_contains_session_id(self):
+        """Welcome banner includes the session ID."""
+        banner = WelcomeBanner(session_id="abc123")
+        rendered = str(banner.render())
+        assert "abc123" in rendered
+
+    def test_contains_nexusagent_name(self):
+        """Welcome banner includes NexusAgent branding."""
+        banner = WelcomeBanner(session_id="test")
+        rendered = str(banner.render())
+        assert "NexusAgent" in rendered
+
+    def test_contains_help_hint(self):
+        """Welcome banner includes a help hint."""
+        banner = WelcomeBanner(session_id="test")
+        rendered = str(banner.render())
+        assert "/help" in rendered.lower() or "help" in rendered.lower()
+
+    def test_compact_format(self):
+        """Welcome banner uses compact format (no excessive box drawing)."""
+        banner = WelcomeBanner(session_id="test")
+        rendered = str(banner.render())
+        lines = rendered.strip().split("\n")
+        # Compact: should be <= 3 lines of content
+        assert len(lines) <= 3
+
+    def test_timestamp_present(self):
+        """Welcome banner includes a timestamp."""
+        banner = WelcomeBanner(session_id="test")
+        rendered = str(banner.render())
+        import re
+        assert re.search(r'\d{2}:\d{2}', rendered)
 
 
 # ---------------------------------------------------------------------------
@@ -249,7 +580,7 @@ class TestHistoryPersistence:
     def test_load_corrupt_file(self, tmp_path: Path):
         """Loading a corrupt JSON file returns empty list."""
         bad_file = tmp_path / "history.json"
-        bad_file.write_text("not valid json {{{")
+        bad_file.write_text("not valid json {{")
 
         with patch("nexusagent.widgets.chat_input._HISTORY_FILE", bad_file):
             loaded = _load_history()

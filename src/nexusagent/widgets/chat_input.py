@@ -25,13 +25,13 @@ from textual.widgets import TextArea
 logger = logging.getLogger(__name__)
 
 # Known slash commands for autocomplete
-SLASH_COMMANDS: list[str] = [
+SLASH_COMMANDS: list[str] = sorted([
     "/help",
     "/logs",
     "/theme",
     "/clear",
     "/model",
-]
+])
 
 # History file path
 _HISTORY_DIR = Path.home() / ".nexusagent"
@@ -91,6 +91,9 @@ class ChatInput(TextArea):
     ChatInput:focus {
         border: solid $border-focus;
     }
+    ChatInput .hint {
+        color: $text-muted;
+    }
     """
 
     def __init__(self, **kwargs: Any) -> None:
@@ -99,9 +102,19 @@ class ChatInput(TextArea):
         self._history_idx = len(self._history)
         self._slash_matches: list[str] = []
         self._slash_match_idx: int = -1
+        self._hint: str | None = None
 
     def on_mount(self) -> None:
         self.border_title = "Message"
+        self._update_hint()
+
+    def _update_hint(self) -> None:
+        """Update the border subtitle with slash command hints."""
+        self._hint = self._get_slash_hint()
+        if self._hint:
+            self.border_subtitle = self._hint
+        else:
+            self.border_subtitle = ""
 
     def action_submit(self) -> None:
         """Submit the current input."""
@@ -126,6 +139,9 @@ class ChatInput(TextArea):
         self._slash_matches = []
         self._slash_match_idx = -1
 
+        # Clear hint
+        self._update_hint()
+
         # Notify parent
         self.post_message(self.Submitted(text, images))
 
@@ -134,6 +150,11 @@ class ChatInput(TextArea):
         self.text = ""
         self._slash_matches = []
         self._slash_match_idx = -1
+        self._update_hint()
+
+    def on_input_changed(self, event: TextArea.Changed) -> None:
+        """Update slash command hint as user types."""
+        self._update_hint()
 
     def action_autocomplete(self) -> None:
         """Tab autocomplete for slash commands."""

@@ -1,6 +1,7 @@
 # NexusAgent Codebase — Semantic Index
 
-> Auto-generated on 2026-06-11. Read-only analysis of `src/nexusagent/`.
+> Auto-generated on 2026-06-11. Updated 2026-06-11 after TUI parity sprint.
+> Read-only analysis of `src/nexusagent/`.
 
 ---
 
@@ -73,9 +74,13 @@
 | `tools/patch.py` | `apply_patch` — unified diff application |
 | `tools/register_all.py` | Registers all 25+ tools in the global registry (including `spawn_subagent` orchestration tool) |
 | `tools/registry.py` | `ToolInfo`, `_REGISTRY`, `register_tool` decorator, role manifests, policy enforcement, `tool_search` |
-| `tools/research.py` | `search_web`, `search_local_docs`, `fetch_url` — web research tools |
+|| `tools/research.py` | `search_web`, `search_local_docs`, `fetch_url` — web research tools |
 | `tools/shell.py` | `run_shell`, `run_shell_streaming` — command execution |
 | `tools/test_runner.py` | `run_tests`, `run_single_test` — auto-detect test framework and run |
+| `tools/code_review.py` | `review_code` — static analysis code review (NEW) |
+| `tools/write_todos.py` | `write_todos`, `read_todos` — task list management (NEW) |
+| `hooks/__init__.py` | HookManager, HookEvent, register_hook, run_hooks (NEW) |
+| `hooks/builtins.py` | Built-in hooks: session_init, post_tool_use, error, subagent (NEW) |
 | `widgets/__init__.py` | Widgets package init |
 | `widgets/chat_input.py` | `ChatInput` — multiline TextArea with submit/history/image extraction |
 | `widgets/messages.py` | `UserMessage`, `AssistantMessage`, `ToolCallMessage`, `AppMessage`, `ErrorMessage`, `WelcomeBanner` |
@@ -438,7 +443,23 @@ utils.py ← (llm.py, worker.py, bus.py)
 | `config.py:38` | `default_model` is `gemini-3.1-flash-lite` — may not exist (Gemini naming convention uses `gemini-2.0-flash` etc.) |
 | `models.py:51` | `TaskContract.max_depth` default is 3 — limits sub-agent nesting |
 | `bus.py:47-49` | KV bucket creation error silently swallowed — assumes "already exists" for all errors |
-| `db.py:47-48` | `TaskModel` uses `metadata_json` column name but `TaskSchema` uses `metadata` — naming mismatch |
+|| `db.py:47-48` | `TaskModel` uses `metadata_json` column name but `TaskSchema` uses `metadata` — naming mismatch |
+
+### Fixed in This Sprint (2026-06-11)
+
+| Issue | Resolution |
+|-------|-----------|
+| `tui.py` Grid/Vertical imports | ✅ Confirmed already imported — initial audit was wrong |
+| Fake streaming | ✅ Verified real-time; enhanced with consume_event_stream() |
+| Tool output raw JSON | ✅ Enhanced with status indicators, collapsible sections |
+| Welcome message consistency | ✅ Fixed re-render on /clear |
+| Missing hooks system | ✅ Implemented with HookManager + 4 event types |
+| Missing code review | ✅ Implemented with static analysis |
+| Missing todo tools | ✅ Implemented write_todos/read_todos |
+| Basic TUI aesthetics | ✅ Complete overhaul: 7 themes, responsive, accessibility |
+| System prompt gaps | ✅ Integrated FORGE.md best practices |
+| max_tokens too low (16K) | ✅ Increased to 65K |
+| Streaming chunked errors | ✅ Disabled API streaming to avoid Cloudflare issues |
 
 ---
 
