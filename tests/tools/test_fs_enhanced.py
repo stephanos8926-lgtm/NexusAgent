@@ -6,6 +6,7 @@ from nexusagent.tools.fs import (
     list_directory,
     read_file,
     read_multiple_files,
+    set_workspace_root,
     write_file,
     write_multiple_files,
 )
@@ -14,10 +15,13 @@ from nexusagent.tools.fs import (
 # Set up a temporary directory for tests
 @pytest.fixture
 def temp_workspace(tmp_path):
+    from nexusagent.tools.fs import _WORKSPACE_ROOT as _old_workspace
     (tmp_path / "subdir").mkdir()
     (tmp_path / "subdir" / "file1.txt").write_text("hello")
     (tmp_path / "file2.txt").write_text("world")
-    return tmp_path
+    set_workspace_root(str(tmp_path))
+    yield tmp_path
+    set_workspace_root(str(_old_workspace) if _old_workspace else str(Path.cwd()))
 
 
 def test_list_directory_recursive_true(temp_workspace):

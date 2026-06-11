@@ -2,11 +2,14 @@
 import os
 import tempfile
 
-from nexusagent.tools.fs import read_file, write_file
+from nexusagent.tools.fs import read_file, write_file, set_workspace_root
 
 
 def test_fs_tools():
-    with tempfile.NamedTemporaryFile(mode="w+", delete=False) as tmp:
+    # Create temp file inside the workspace (CWD) so it passes the path jail
+    with tempfile.NamedTemporaryFile(
+        mode="w+", delete=False, dir=os.getcwd()
+    ) as tmp:
         tmp.write("hello")
         tmp_path = tmp.name
 
@@ -17,3 +20,5 @@ def test_fs_tools():
         assert read_file(tmp_path) == "world"
     finally:
         os.remove(tmp_path)
+        # Reset workspace root to default (CWD-based)
+        set_workspace_root(os.getcwd())
