@@ -391,7 +391,6 @@ class Session:
                     messages.append(HumanMessage(content=md["content"]))
                 else:
                     # assistant and any other roles → AIMessage
-                    from langchain_core.messages import AIMessage
                     messages.append(AIMessage(content=md["content"]))
 
         # Stream agent execution with real-time tool call/result events
