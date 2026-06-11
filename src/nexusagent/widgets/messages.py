@@ -15,7 +15,7 @@ Redesign v2 features:
 - UserMessage: left-border accent, timestamp
 - AssistantMessage: Rich markdown rendering, real-time streaming
 - ToolCallMessage: collapsible output, syntax hints, status indicators
-- ErrorMessage: better visual with icon
+- ErrorMessage: better visual with icon and border
 - AppMessage: subtle dim styling
 - WelcomeBanner: clean compact design
 """
@@ -46,6 +46,11 @@ _NEWLINE_RE = re.compile(r"\n")
 _COLLAPSE_LINE_THRESHOLD = 4
 _COLLAPSE_CHAR_THRESHOLD = 300
 
+# Markdown-like patterns for AssistantMessage rendering
+_BOLD_RE = re.compile(r"\*\*(.+?)\*\*")
+_ITALIC_RE = re.compile(r"\*(.+?)\*")
+_INLINE_CODE_RENDER_RE = re.compile(r"`([^`]+)`")
+
 
 class UserMessage(Static):
     """Widget displaying a user message.
@@ -74,7 +79,7 @@ class UserMessage(Static):
     def render(self) -> Content:
         ts = datetime.now().strftime("%H:%M")
         return Content.assemble(
-            (f"▎ {ts} ", "text-dim"),
+            (f"  {ts}  ", "text-dim"),
             self._content,
         )
 
@@ -83,8 +88,8 @@ class AssistantMessage(Static):
     """Widget displaying an assistant message.
 
     Supports streaming via append_token() and finalize().
-    Renders markdown-like content with proper word wrapping.
-    Uses Content for rich styled rendering.
+    Renders markdown-like content (**bold**, *italic*, `code`) with
+    proper word wrapping using Content for rich styled rendering.
     """
 
     DEFAULT_CSS = """
@@ -124,7 +129,83 @@ class AssistantMessage(Static):
         self.update(Content(content))
 
     def render(self) -> Content:
-        return Content(self._buffer)
+        return self._render_markdown(self._buffer)
+
+    def _render_markdown(self, text: str) -> Content:
+        """Parse simple markdown-like syntax and return styled Content.
+
+        Supports **bold**, *italic*, and `inline code` patterns.
+        Falls back to plain Content if no patterns are found.
+        """
+        if not text:
+            return Content("")
+
+        # Fast path: no markdown patterns at all
+        if "**" not in text and "*" not in text and "`" not in text:
+            return Content(text)
+
+        # Build styled segments by parsing markdown patterns
+        parts = self._parse_markdown(text)
+        if parts:
+            return Content.assemble(*parts)
+        return Content(text)
+
+    def _parse_markdown(self, text: str) -> list[tuple[str, str]]:
+        """Parse markdown-like syntax into (text, style) tuples.
+
+        Handles **bold**, *italic*, and `code` inline patterns.
+        """
+        result: list[tuple[str, str]] = []
+        pos = 0
+        length = len(text)
+
+        while pos < length:
+            # Try to match **bold**
+            bold_match = None
+            if pos + 1 < length and text[pos : pos + 2] == "**":
+                end = text.find("**", pos + 2)
+                if end != -1:
+                    bold_match = (pos, end + 2, text[pos + 2 : end], "bold")
+
+            # Try to match *italic* (but not inside **)
+            italic_match = None
+            if text[pos] == "*":
+                # Make sure it's not the start of **
+                if pos + 1 >= length or text[pos + 1] != "*":
+                    end = text.find("*", pos + 1)
+                    if end != -1:
+                        italic_match = (pos, end + 1, text[pos + 1 : end], "italic")
+
+            # Try to match `code`
+            code_match = None
+            if text[pos] == "`":
+                end = text.find("`", pos + 1)
+                if end != -1:
+                    code_match = (pos, end + 1, text[pos + 1 : end], "text-muted")
+
+            # Find the earliest match
+            matches = [m for m in [bold_match, italic_match, code_match] if m is not None]
+            if matches:
+                # Pick the match that starts earliest (they should all start at pos)
+                match = min(matches, key=lambda m: m[0])
+                start, end, content, style = match
+                if content:  # Only add non-empty matches
+                    result.append((content, style))
+                pos = end
+            else:
+                # No match at this position — find the next potential special char
+                next_special = length
+                for ch in ("**", "*", "`"):
+                    idx = text.find(ch, pos + 1)
+                    if idx != -1 and idx < next_special:
+                        next_special = idx
+                # Add plain text up to next special char
+                plain = text[pos:next_special] if next_special < length else text[pos:]
+                if plain:
+                    result.append((plain, ""))
+                pos = next_special if next_special < length else length
+
+        return result
 
 
 class ToolCallMessage(Static):
@@ -328,7 +409,7 @@ class AppMessage(Static):
 class ErrorMessage(Static):
     """Widget displaying an error message.
 
-    Uses $error color with icon for clear visual distinction.
+    Uses $error color with icon and left-border accent for clear visual distinction.
     """
 
     DEFAULT_CSS = """
@@ -337,6 +418,7 @@ class ErrorMessage(Static):
         padding: 0 1;
         margin: 1 0;
         color: $error;
+        border-left: wide $error;
         text-wrap: wrap;
         overflow-x: hidden;
     }
@@ -372,10 +454,19 @@ class WelcomeBanner(Static):
 
     def __init__(self, session_id: str, **kwargs: Any) -> None:
         from datetime import datetime
+
         ts = datetime.now().strftime("%H:%M")
-        text = (
-            f"[b primary]NexusAgent[/b primary] — AI Coding Agent  "
-            f"[text-muted]session: [warning]{session_id}[/warning]  {ts}[/text-muted]\n"
-            f"[text-muted]Type a message or /help for commands. Ctrl+C to interrupt.[/text-muted]"
+        self._session_id = session_id
+        self._ts = ts
+        super().__init__(**kwargs)
+
+    def render(self) -> Content:
+        return Content.assemble(
+            ("NexusAgent", "bold primary"),
+            (" — AI Coding Agent  ", ""),
+            ("session: ", "text-muted"),
+            (self._session_id, "warning"),
+            (f"  {self._ts}", "text-muted"),
+            ("\n", ""),
+            ("Type a message or /help for commands. Ctrl+C to interrupt.", "text-muted"),
         )
-        super().__init__(text, **kwargs)

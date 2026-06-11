@@ -24,9 +24,11 @@ Features:
 
 from __future__ import annotations
 
+import enum
 import json
 import logging
 import os
+import signal
 import sys
 import time
 import termios
@@ -35,12 +37,11 @@ from typing import Any
 
 from textual import events
 from textual.app import App, ComposeResult
-from textual.containers import Container, VerticalScroll, Grid, Horizontal, Vertical
+from textual.containers import Container, VerticalScroll, Grid
 from textual.events import Key
 from textual.geometry import Offset
 from textual.screen import ModalScreen
-from textual.binding import Binding
-from textual.widgets import Button, Label, Static, Input, RichLog
+from textual.widgets import Button, Label, Static
 
 from nexusagent.widgets.messages import (
     UserMessage,
@@ -53,398 +54,136 @@ from nexusagent.widgets.messages import (
 from nexusagent.widgets.status import StatusBar
 from nexusagent.widgets.chat_input import ChatInput
 from nexusagent.widgets.theme import get_css_variable_defaults, register_themes
-from nexusagent.telemetry import setup_telemetry
+from nexusagent.telemetry import setup_telemetry, LogViewer
 
 logger = logging.getLogger(__name__)
 
 
-# ── Help screen -------------------------------------------------------------
-
-_HELP_CATEGORIES: dict[str, list[tuple[str, str]]] = {
-    "Navigation": [
-        ("j / ↓", "Scroll down"),
-        ("k / ↑", "Scroll up"),
-        ("q / Esc", "Close help"),
-        ("/", "Search"),
-        ("Enter", "Submit message"),
-        ("Shift+Enter", "New line in input"),
-        ("PgUp/PgDn", "Page up/down"),
-    ],
-    "Global Shortcuts": [
-        ("F1", "Show help"),
-        ("F2", "Show logs"),
-        ("F3", "Switch theme"),
-        ("F12", "Toggle devtools"),
-        ("Ctrl+C", "Interrupt / Exit"),
-    ],
-    "Commands": [
-        ("/help", "Show this help screen"),
-        ("/logs", "Open log viewer"),
-        ("/theme", "Cycle through themes"),
-        ("/clear", "Clear chat history"),
-        ("/model", "Show current model"),
-    ],
-}
-
-# Semantic style for each category header
-_HELP_CATEGORY_STYLES = {
-    "Navigation": "bold accent",
-    "Global Shortcuts": "bold warning",
-    "Commands": "bold success",
-}
-
-# Log level → color style mapping
-_LOG_LEVEL_COLORS = {
-    "DEBUG": "dim",
-    "INFO": "",
-    "WARNING": "warning",
-    "ERROR": "bold error",
-    "CRITICAL": "bold error reverse",
-}
+# ── Responsive breakpoints ---------------------------------------------------
 
 
-class HelpScreen(ModalScreen[None]):
-    """Searchable help modal with categories and vim-style navigation.
+class Breakpoint(enum.Enum):
+    """Terminal width breakpoints for responsive layout."""
+    WIDE = "wide"           # > 120 cols
+    STANDARD = "standard"   # 80-120 cols
+    NARROW = "narrow"         # 60-79 cols
+    TOO_SMALL = "too_small" # < 60 cols
 
-    Features:
-    - Categories: Navigation, Global Shortcuts, Commands
-    - Search: press '/', type query, Enter to clear
-    - Vim nav: j/k to scroll, q/Esc to close
-    - Color-coded log levels and command types
+
+# Width thresholds
+_WIDE_THRESHOLD = 120
+_STANDARD_THRESHOLD = 80
+_NARROW_THRESHOLD = 60
+
+
+def classify_breakpoint(width: int) -> Breakpoint:
+    """Classify a terminal width into a responsive breakpoint.
+
+    Args:
+        width: Terminal width in columns.
+
+    Returns:
+        The corresponding Breakpoint enum value.
     """
+    if width > _WIDE_THRESHOLD:
+        return Breakpoint.WIDE
+    if width >= _STANDARD_THRESHOLD:
+        return Breakpoint.STANDARD
+    if width >= _NARROW_THRESHOLD:
+        return Breakpoint.NARROW
+    return Breakpoint.TOO_SMALL
 
-    BINDINGS = [
-        Binding("j", "scroll_down", "Down", show=False),
-        Binding("k", "scroll_up", "Up", show=False),
-        Binding("q", "dismiss", "Close", show=True),
-        Binding("escape", "dismiss", "Close", show=True),
-        Binding("/", "start_search", "Search", show=True),
-        Binding("enter", "clear_search", "Clear search", show=False),
-        Binding("pageup", "page_up", "PgUp", show=False),
-        Binding("pagedown", "page_down", "PgDn", show=False),
-    ]
 
-    DEFAULT_CSS = """
-    HelpScreen {
-        align: middle middle;
-        width: 70;
-        height: 30;
-        min-width: 50;
-        min-height: 20;
-        background: $surface;
-        border: solid $primary;
-    }
+# ── Accessibility: NO_COLOR + monochrome fallback ---------------------------
 
-    HelpScreen #title-row {
-        height: 2;
-        padding: 0 2;
-        content-align: left middle;
-    }
+# https://no-color.org — check at module load time
+NO_COLOR: bool = "NO_COLOR" in os.environ
 
-    HelpScreen #title {
-        width: 1fr;
-        style: bold primary;
-    }
 
-    HelpScreen #search-input {
-        height: 3;
-        margin: 0 1;
-        border: solid $accent;
-        display: none;
-    }
+def is_no_color() -> bool:
+    """Check if NO_COLOR is set (respects https://no-color.org spec).
 
-    HelpScreen #search-input.-active {
-        display: block;
-    }
-
-    HelpScreen #help-content {
-        height: 1fr;
-        padding: 0 2;
-        overflow-y: auto;
-    }
-
-    HelpScreen .help-category {
-        margin: 1 0 0 0;
-        text-style: bold;
-    }
-
-    HelpScreen .help-entry {
-        padding-left: 2;
-        height: 1;
-    }
-
-    HelpScreen .help-key {
-        width: 18;
-        color: $accent;
-    }
-
-    HelpScreen .help-desc {
-        color: $text-secondary;
-    }
-
-    HelpScreen .no-results {
-        color: $text-muted;
-        text-style: italic;
-        padding: 2;
-    }
-
-    HelpScreen #footer {
-        height: 2;
-        padding: 0 2;
-        content-align: left middle;
-        color: $text-muted;
-    }
+    Returns True if the NO_COLOR environment variable is present
+    (even if empty string), indicating the user wants monochrome output.
     """
-
-    def __init__(self) -> None:
-        super().__init__()
-        self._search_mode = False
-        self._search_query = ""
-
-    def compose(self) -> ComposeResult:
-        # Title row
-        with Horizontal(id="title-row"):
-            yield Label("NexusAgent Help", id="title")
-        # Search input (hidden by default)
-        yield Input(placeholder="Type to search...", id="search-input")
-        # Help content area
-        yield VerticalScroll(id="help-content")
-        # Footer
-        with Horizontal(id="footer"):
-            yield Label("j/k: scroll  /: search  q: close")
-
-    def _render_help(self) -> list[tuple[str, str]]:
-        """Generate help content lines, filtered by search query if active.
-
-        Returns list of (text, style) tuples for rendering.
-        """
-        lines: list[tuple[str, str]] = []
-        for category, entries in _HELP_CATEGORIES.items():
-            filtered_entries = entries
-            if self._search_query:
-                q = self._search_query.lower()
-                filtered_entries = [
-                    (key, desc) for key, desc in entries
-                    if q in key.lower() or q in desc.lower()
-                ]
-                if not filtered_entries:
-                    continue
-
-            style = _HELP_CATEGORY_STYLES.get(category, "bold")
-            lines.append((f"▸ {category}", style))
-            for key, desc in filtered_entries:
-                lines.append((f"  {key:<18} {desc}", "text-secondary"))
-            lines.append(("", ""))  # blank line between categories
-        return lines
-
-    def _refresh_content(self) -> None:
-        """Refresh the help content area."""
-        scroller = self.query_one("#help-content", VerticalScroll)
-        # Remove existing children
-        for child in list(scroller.children):
-            child.remove()
-
-        lines = self._render_help()
-        if not lines:
-            scroller.mount(Label("No results", classes="no-results"))
-        else:
-            for text, style in lines:
-                if text:
-                    label = Label(text)
-                    if style:
-                        label.add_class(style.replace(" ", "-"))
-                    scroller.mount(label)
-                else:
-                    scroller.mount(Label(""))  # spacer
-
-        # Scroll to top
-        scroller.scroll_home(animate=False)
-
-    def on_mount(self) -> None:
-        self._refresh_content()
-
-    def action_start_search(self) -> None:
-        """Activate search mode."""
-        self._search_mode = True
-        search_input = self.query_one("#search-input", Input)
-        search_input.add_class("-active")
-        search_input.focus()
-
-    def action_clear_search(self) -> None:
-        """Exit search mode and clear query."""
-        self._search_mode = False
-        self._search_query = ""
-        search_input = self.query_one("#search-input", Input)
-        search_input.remove_class("-active")
-        search_input.value = ""
-        # Return focus to the scroller for vim nav
-        self.query_one("#help-content", VerticalScroll).focus()
-        self._refresh_content()
-
-    def on_input_changed(self, event: Input.Changed) -> None:
-        """Update search results as user types."""
-        if event.control.id == "search-input":
-            self._search_query = event.value.strip()
-            self._refresh_content()
-
-    def action_page_up(self) -> None:
-        scroller = self.query_one("#help-content", VerticalScroll)
-        scroller.scroll_page_up()
-
-    def action_page_down(self) -> None:
-        scroller = self.query_one("#help-content", VerticalScroll)
-        scroller.scroll_page_down()
+    return "NO_COLOR" in os.environ
 
 
-# ── Log viewer screen --------------------------------------------------------
+# ── Debounced resize (SIGWINCH) ---------------------------------------------
+
+_DEFAULT_DEBOUNCE_SECONDS = 0.2
 
 
-class LogViewerScreen(ModalScreen[None]):
-    """Enhanced log viewer modal with page controls, search, and level colours.
+def debounce_resize(
+    state: dict[str, float],
+    current_time: float,
+    debounce_seconds: float = _DEFAULT_DEBOUNCE_SECONDS,
+) -> bool:
+    """Debounce resize events to avoid excessive re-renders.
 
-    Features:
-    - Page up/down (PgUp/PgDn) to load more/fewer log lines
-    - Level-based colouring (DEBUG/INFO/WARNING/ERROR/CRITICAL)
-    - Timestamps on every line
-    - Vim nav: j/k to scroll, q/Esc to close
-    - Status bar showing line count and filter state
+    Args:
+        state: Mutable dict tracking last resize time.
+               Must contain "last_resize_time" key after first call.
+        current_time: Current monotonic time (e.g., from time.monotonic()).
+        debounce_seconds: Minimum seconds between resize handling.
+
+    Returns:
+        True if the resize should be handled, False if debounced.
     """
+    last = state.get("last_resize_time")
+    if last is None:
+        state["last_resize_time"] = current_time
+        return True
+    if current_time - last >= debounce_seconds:
+        state["last_resize_time"] = current_time
+        return True
+    return False
 
-    BINDINGS = [
-        Binding("j", "scroll_down", "Down", show=False),
-        Binding("k", "scroll_up", "Up", show=False),
-        Binding("q", "dismiss", "Close", show=True),
-        Binding("escape", "dismiss", "Close", show=True),
-        Binding("pageup", "page_up", "PgUp", show=True),
-        Binding("pagedown", "page_down", "PgDn", show=True),
-        Binding("/", "start_search", "Filter", show=True),
-    ]
 
-    DEFAULT_CSS = """
-    LogViewerScreen {
-        align: middle middle;
-        width: 80%;
-        height: 80%;
-        min-width: 50;
-        min-height: 15;
-        background: $surface;
-        border: solid $border;
-    }
+def _sigwinch_handler(app: NexusApp) -> None:
+    """Handle SIGWINCH (window resize signal) with debounce.
 
-    LogViewerScreen #log-header {
-        height: 2;
-        padding: 0 2;
-        content-align: left middle;
-        border-bottom: solid $border;
-    }
+    Updates the app's breakpoint classification and notifies the user
+    when the terminal is too small.
 
-    LogViewerScreen #log-title {
-        width: 1fr;
-        style: bold text;
-    }
-
-    LogViewerScreen #log-search {
-        height: 3;
-        margin: 0 1;
-        border: solid $accent;
-        display: none;
-    }
-
-    LogViewerScreen #log-search.-active {
-        display: block;
-    }
-
-    LogViewerScreen #log-content {
-        height: 1fr;
-        padding: 0 1;
-    }
-
-    LogViewerScreen #log-footer {
-        height: 2;
-        padding: 0 2;
-        content-align: left middle;
-        border-top: solid $border;
-        color: $text-muted;
-    }
+    Args:
+        app: The NexusApp instance to update.
     """
+    try:
+        now = time.monotonic()
+        if not debounce_resize(app._resize_state, now):
+            return
 
-    def __init__(self, telemetry: Any) -> None:
-        super().__init__()
-        self._telemetry = telemetry
-        self._line_count = 50
-        self._page_size = 50
-        self._min_lines = 10
-        self._filter_query = ""
-        self._search_mode = False
+        cols, _ = _get_terminal_size()
+        new_bp = classify_breakpoint(cols)
+        old_bp = app._breakpoint
+        app._breakpoint = new_bp
 
-    def compose(self) -> ComposeResult:
-        with Horizontal(id="log-header"):
-            yield Label("Log Viewer", id="log-title")
-        yield Input(placeholder="Filter logs...", id="log-search")
-        yield RichLog(id="log-content", highlight=True, markup=True)
-        with Horizontal(id="log-footer"):
-            yield Label("j/k: scroll  /: filter  PgUp/PgDn: more/fewer  q: close")
+        if new_bp != old_bp:
+            logger.debug(f"Breakpoint changed: {old_bp.value} -> {new_bp.value} ({cols} cols)")
 
-    def _apply_log_colours(self, line: str) -> str:
-        """Return markup-wrapped line with colour based on log level."""
-        for level, style in _LOG_LEVEL_COLORS.items():
-            tag = f"[{level}]"
-            if tag in line:
-                if style:
-                    return f"[{style}]{line}[/]"
-                # INFO gets default (no wrapping)
-                return line
-        return line
+        if new_bp == Breakpoint.TOO_SMALL:
+            app.notify(
+                f"Terminal too small ({cols} cols). Minimum 60 cols recommended.",
+                severity="warning",
+                timeout=3,
+            )
+    except Exception as exc:
+        logger.debug(f"SIGWINCH handler error: {exc}")
 
-    def _load_lines(self) -> list[str]:
-        """Load and filter log lines from telemetry."""
-        all_lines = self._telemetry.get_recent_lines(self._line_count * 4)
-        if self._filter_query:
-            q = self._filter_query.lower()
-            all_lines = [line for line in all_lines if q in line.lower()]
-        return all_lines[-self._line_count:]
 
-    def _refresh(self) -> None:
-        """Reload and display filtered, coloured log lines."""
-        log_widget = self.query_one("#log-content", RichLog)
-        log_widget.clear()
-        for line in self._load_lines():
-            coloured = self._apply_log_colours(line)
-            log_widget.write(coloured)
+def _get_terminal_size() -> tuple[int, int]:
+    """Get terminal size as (columns, rows).
 
-    def on_mount(self) -> None:
-        self._refresh()
-
-    def action_page_down(self) -> None:
-        """Load more log lines."""
-        self._line_count += self._page_size
-        self._refresh()
-
-    def action_page_up(self) -> None:
-        """Show fewer log lines."""
-        self._line_count = max(self._min_lines, self._line_count - self._page_size)
-        self._refresh()
-
-    def action_start_search(self) -> None:
-        """Activate filter mode."""
-        self._search_mode = True
-        search_input = self.query_one("#log-search", Input)
-        search_input.add_class("-active")
-        search_input.focus()
-
-    def on_input_changed(self, event: Input.Changed) -> None:
-        """Update filter results as user types."""
-        if event.control.id == "log-search":
-            self._filter_query = event.value.strip()
-            self._refresh()
-
-    def action_scroll_down(self) -> None:
-        log_widget = self.query_one("#log-content", RichLog)
-        log_widget.scroll_down()
-
-    def action_scroll_up(self) -> None:
-        log_widget = self.query_one("#log-content", RichLog)
-        log_widget.scroll_up()
+    Returns:
+        Tuple of (columns, rows). Falls back to (80, 24) on error.
+    """
+    import shutil
+    try:
+        size = shutil.get_terminal_size()
+        return (size.columns, size.lines)
+    except OSError:
+        return (80, 24)
 
 
 class NexusApp(App):
@@ -466,6 +205,10 @@ class NexusApp(App):
         self._theme_name = "nexus-dark"
         self._gc_frozen = False
         self._is_ascii_mode = False
+        # Responsive state
+        self._breakpoint: Breakpoint = Breakpoint.STANDARD
+        self._no_color: bool = NO_COLOR
+        self._resize_state: dict[str, float] = {}
 
     def _get_theme(self) -> str:
         """Determine which theme to use."""
@@ -474,14 +217,19 @@ class NexusApp(App):
         return self._theme_name
 
     def _is_ascii_terminal(self) -> bool:
-        """Detect if we're in an ASCII-only terminal (no color support)."""
-        # Check common indicators
+        """Detect if we're in an ASCII-only terminal (no color support).
+
+        Checks (in order):
+        - NO_COLOR environment variable (https://no-color.org)
+        - TERM=dumb
+        - COLORTERM unset or empty
+        """
+        # NO_COLOR takes precedence per https://no-color.org
+        if is_no_color():
+            return True
         if os.environ.get("TERM") == "dumb":
             return True
-        if os.environ.get("COLORTERM") == "":
-            return True
-        # Check if NO_COLOR is set
-        if os.environ.get("NO_COLOR"):
+        if not os.environ.get("COLORTERM"):
             return True
         return False
 
@@ -526,6 +274,9 @@ class NexusApp(App):
         logger.info(f"NexusAgent TUI started - session {self.session_id}")
         logger.info(f"Theme: {self._theme_name}, ASCII mode: {self._is_ascii_mode}")
 
+        # Install SIGWINCH handler for responsive layout
+        self._install_sigwinch()
+
         # Show welcome banner
         messages = self.query_one("#messages", Container)
         welcome = WelcomeBanner(session_id=self.session_id)
@@ -534,8 +285,52 @@ class NexusApp(App):
         # Focus input
         self.query_one("#input-area", ChatInput).focus()
 
+    def _install_sigwinch(self) -> None:
+        """Install SIGWINCH signal handler for responsive terminal resizing.
+
+        Uses signal.SIGWINCH on Unix systems. The handler is a closure
+        that captures the app instance and delegates to _sigwinch_handler.
+        Gracefully skips on platforms where SIGWINCH is not available
+        (e.g., Windows).
+        """
+        try:
+            sig = signal.SIGWINCH
+        except AttributeError:
+            logger.debug("SIGWINCH not available on this platform")
+            return
+
+        def _handler(signum: int, frame: Any) -> None:
+            self._sigwinch_pending = True
+
+        self._sigwinch_pending = False
+        self._original_sigwinch = signal.getsignal(sig)
+        signal.signal(sig, _handler)
+        logger.debug("SIGWINCH handler installed")
+
+    def _check_sigwinch(self) -> None:
+        """Check if a SIGWINCH was received and process it.
+
+        This is called periodically from the event loop to handle
+        pending resize events with debouncing.
+        """
+        if getattr(self, "_sigwinch_pending", False):
+            self._sigwinch_pending = False
+            _sigwinch_handler(self)
+
+    def _restore_sigwinch(self) -> None:
+        """Restore the original SIGWINCH signal handler."""
+        if hasattr(self, "_original_sigwinch"):
+            try:
+                signal.signal(signal.SIGWINCH, self._original_sigwinch)
+                logger.debug("SIGWINCH handler restored")
+            except Exception as exc:
+                logger.debug(f"Failed to restore SIGWINCH handler: {exc}")
+
     def on_unmount(self) -> None:
         """Called when app is unmounted."""
+        # Restore original SIGWINCH handler
+        self._restore_sigwinch()
+
         # Restore garbage collection
         if self._gc_frozen:
             try:
@@ -602,14 +397,69 @@ class NexusApp(App):
     # Log viewer
 
     def action_show_logs(self) -> None:
-        """Show the log viewer modal with search, filter, and page controls."""
+        """Show the log viewer modal."""
         if self.telemetry:
-            self.push_screen(LogViewerScreen(self.telemetry))
+            # Create a modal screen with log viewer
+            class LogViewerScreen(ModalScreen):
+                BINDINGS = [
+                    ("j", "scroll_down", "Scroll down"),
+                    ("k", "scroll_up", "Scroll up"),
+                    ("escape", "dismiss", "Close"),
+                ]
+
+                def compose(self) -> ComposeResult:
+                    yield Grid(
+                        Label("NexusAgent Log Viewer", id="title"),
+                        LogViewer(self.app.telemetry),
+                        Button("Close", variant="primary", id="close"),
+                        id="dialog",
+                    )
+
+                def on_button_pressed(self, event: Button.Pressed) -> None:
+                    if event.button.id == "close":
+                        self.app.pop_screen()
+
+                def action_scroll_down(self) -> None:
+                    self.query_one(LogViewer).action_scroll_down()
+
+                def action_scroll_up(self) -> None:
+                    self.query_one(LogViewer).action_scroll_up()
+
+            self.push_screen(LogViewerScreen())
 
     # Help screen
 
     def action_show_help(self) -> None:
-        """Show the searchable help screen with categories and vim nav."""
+        """Show help screen."""
+        class HelpScreen(ModalScreen):
+            def compose(self) -> ComposeResult:
+                yield Vertical(
+                    Label("NexusAgent Help", classes="title"),
+                    Label(""),
+                    Label("Key Bindings:", classes="subtitle"),
+                    Label("  Enter      Submit message"),
+                    Label("  Ctrl+C     Interrupt / Exit"),
+                    Label("  F1         Show this help"),
+                    Label("  F2         Show logs"),
+                    Label("  F3         Switch theme"),
+                    Label("  F12        Toggle devtools"),
+                    Label("  Up/Down    Command history"),
+                    Label("  Shift+Enter New line in input"),
+                    Label(""),
+                    Label("Slash Commands:", classes="subtitle"),
+                    Label("  /help      Show this help"),
+                    Label("  /logs      Show log viewer"),
+                    Label("  /theme     Switch theme"),
+                    Label("  /clear     Clear chat"),
+                    Label("  /model     Show current model"),
+                    Label(""),
+                    Button("Close", variant="primary", id="close"),
+                )
+
+            def on_button_pressed(self, event: Button.Pressed) -> None:
+                if event.button.id == "close":
+                    self.app.pop_screen()
+
         self.push_screen(HelpScreen())
 
     # Clear chat
@@ -682,22 +532,15 @@ class NexusApp(App):
                     args_str = ", ".join(f"{k}={v!r}" for k, v in args.items()) if isinstance(args, dict) else str(args)
                     tool_msg = ToolCallMessage(tool=tool, args=args_str)
                     messages.mount(tool_msg)
-                    self._current_tool = tool_msg
                     self._scroll_to_bottom()
 
                 elif etype == "tool_result":
-                    # Update the current tool call with result
+                    # Update tool call with result (simplified: just append result)
                     output = event.get("output", "")
-                    status = event.get("status", "success")
-                    if self._current_tool is not None:
-                        self._current_tool.update_output(output)
-                        self._current_tool.update_status(status)
-                        self._current_tool = None
-                    elif output:
-                        # Fallback: show as app message if no tool is tracked
+                    if output:
                         result_msg = AppMessage(f"  ↳ {output[:200]}")
                         messages.mount(result_msg)
-                    self._scroll_to_bottom()
+                        self._scroll_to_bottom()
 
                 elif etype == "error":
                     error_msg = ErrorMessage(event.get("message", "Unknown error"))

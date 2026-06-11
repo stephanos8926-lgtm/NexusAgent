@@ -15,6 +15,7 @@ Design: Linear-inspired, uses $surface background, semantic colors.
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -218,3 +219,149 @@ class StatusBar(Horizontal):
                 spinner.update(self.SPINNER_CHARS[self._spinner_idx % len(self.SPINNER_CHARS)])
             except NoMatches:
                 pass
+
+
+# ── NO_COLOR Detection ────────────────────────────────────────────────────
+
+NO_COLOR: bool = bool(os.environ.get("NO_COLOR"))
+
+
+# ── Git Status ────────────────────────────────────────────────────────────
+
+
+def _run_git(*args: str) -> str | None:
+    """Run a git command and return stdout, or None on failure."""
+    import subprocess
+    try:
+        result = subprocess.run(
+            ["git", *args],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if result.returncode != 0:
+            return None
+        return result.stdout
+    except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+        return None
+
+
+class GitStatus:
+    """Detect and display git working tree status.
+
+    States:
+    - "clean"  — no changes
+    - "dirty"  — unstaged or untracked changes
+    - "staged" — staged changes (may also have dirty)
+    - None     — not in a git repo
+    """
+
+    @staticmethod
+    def detect() -> str | None:
+        """Detect the current git status.
+        Returns 'clean', 'dirty', 'staged', or None.
+        """
+        output = _run_git("status", "--porcelain")
+        if output is None:
+            return None
+        if not output.strip():
+            return "clean"
+        # Check for staged changes (lines starting with [MADRC])
+        has_staged = False
+        has_dirty = False
+        for line in output.splitlines():
+            if len(line) >= 3:
+                index_status = line[0]
+                work_status = line[1]
+                if index_status in "MADRC":
+                    has_staged = True
+                if work_status in "MADRC?":
+                    has_dirty = True
+        if has_staged:
+            return "staged"
+        if has_dirty:
+            return "dirty"
+        return "clean"
+
+    @staticmethod
+    def label(status: str | None) -> str:
+        """Return a display label for the status."""
+        if status is None:
+            return ""
+        labels = {
+            "clean": "✓ clean",
+            "dirty": "✗ dirty",
+            "staged": "✔ staged",
+        }
+        return labels.get(status, "")
+
+
+# ── Context Window Bar ─────────────────────────────────────────────────────
+
+
+class ContextWindowBar:
+    """Shows context window usage as a percentage with color coding.
+
+    Color thresholds:
+    - < 70%: success (green)
+    - 70–90%: warning (amber)
+    - > 90%: danger (red)
+    """
+
+    # Color thresholds (match the default theme's status colors)
+    SAFE_COLOR = "#10B981"
+    WARN_COLOR = "#EB8B46"
+    DANGER_COLOR = "#F7768E"
+
+    def __init__(self, used: int, total: int) -> None:
+        self.used = used
+        self.total = total
+
+    @property
+    def percentage(self) -> int:
+        """Context usage as integer percentage (0–100)."""
+        if self.total <= 0:
+            return 0
+        return min(100, int(self.used / self.total * 100))
+
+    @property
+    def color(self) -> str:
+        """Color code based on usage level."""
+        pct = self.percentage
+        if pct > 90:
+            return self.DANGER_COLOR
+        elif pct >= 70:
+            return self.WARN_COLOR
+        return self.SAFE_COLOR
+
+    def bar(self, width: int = 10) -> str:
+        """Render a textual bar string showing usage."""
+        pct = self.percentage
+        filled = int(width * pct / 100)
+        empty = width - filled
+        bar_char = "█" * filled + "░" * empty
+        return f"{bar_char} {pct}%"
+
+
+# ── Braille Spinner ────────────────────────────────────────────────────────
+
+
+class BrailleSpinner:
+    """Braille dot spinner animation frames."""
+
+    CHARS = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
+
+    def __init__(self) -> None:
+        self.frame = 0
+
+    def tick(self) -> None:
+        """Advance to the next frame."""
+        self.frame = (self.frame + 1) % len(self.CHARS)
+
+    def current(self) -> str:
+        """Return the current braille character."""
+        return self.CHARS[self.frame]
+
+    def reset(self) -> None:
+        """Reset to the first frame."""
+        self.frame = 0

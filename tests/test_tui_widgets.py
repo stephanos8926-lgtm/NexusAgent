@@ -142,6 +142,69 @@ class TestAssistantMessage:
         result = msg.render()
         assert isinstance(result, Content)
 
+    def test_bold_markdown_renders(self):
+        """**bold** text is rendered with bold style."""
+        from textual.content import Content
+        msg = AssistantMessage()
+        msg.finalize("This is **bold** text")
+        content = msg.render()
+        assert isinstance(content, Content)
+        rendered = str(content)
+        assert "bold" in rendered
+        assert "This is" in rendered
+        assert "text" in rendered
+
+    def test_italic_markdown_renders(self):
+        """*italic* text is rendered with italic style."""
+        from textual.content import Content
+        msg = AssistantMessage()
+        msg.finalize("This is *italic* text")
+        content = msg.render()
+        assert isinstance(content, Content)
+        rendered = str(content)
+        assert "italic" in rendered
+        assert "This is" in rendered
+        assert "text" in rendered
+
+    def test_inline_code_markdown_renders(self):
+        """`code` text is rendered with muted style."""
+        from textual.content import Content
+        msg = AssistantMessage()
+        msg.finalize("Use `git status` to check")
+        content = msg.render()
+        assert isinstance(content, Content)
+        rendered = str(content)
+        assert "git status" in rendered
+
+    def test_mixed_markdown_renders(self):
+        """Mixed **bold**, *italic*, and `code` all render correctly."""
+        from textual.content import Content
+        msg = AssistantMessage()
+        msg.finalize("**Bold** and *italic* and `code`")
+        content = msg.render()
+        assert isinstance(content, Content)
+        rendered = str(content)
+        assert "Bold" in rendered
+        assert "italic" in rendered
+        assert "code" in rendered
+
+    def test_plain_text_passthrough(self):
+        """Text without markdown renders as plain Content."""
+        from textual.content import Content
+        msg = AssistantMessage()
+        msg.finalize("Just plain text here")
+        content = msg.render()
+        assert isinstance(content, Content)
+        rendered = str(content)
+        assert "Just plain text here" in rendered
+
+    def test_empty_content_renders(self):
+        """Empty content renders as empty Content."""
+        from textual.content import Content
+        msg = AssistantMessage()
+        content = msg.render()
+        assert isinstance(content, Content)
+
 
 # ---------------------------------------------------------------------------
 # ToolCallMessage tests
@@ -436,6 +499,12 @@ class TestErrorMessage:
         assert "line1" in rendered
         assert "line2" in rendered
 
+    def test_error_has_border_style(self):
+        """ErrorMessage CSS includes left-border accent."""
+        css = ErrorMessage.DEFAULT_CSS
+        assert "border-left" in css
+        assert "$error" in css
+
 
 # ---------------------------------------------------------------------------
 # WelcomeBanner tests
@@ -477,6 +546,29 @@ class TestWelcomeBanner:
         rendered = str(banner.render())
         import re
         assert re.search(r'\d{2}:\d{2}', rendered)
+
+    def test_render_returns_content(self):
+        """Welcome banner render() returns a Content object."""
+        from textual.content import Content
+        banner = WelcomeBanner(session_id="test")
+        result = banner.render()
+        assert isinstance(result, Content)
+
+    def test_session_id_stored(self):
+        """Session ID is stored as attribute."""
+        banner = WelcomeBanner(session_id="sess-abc")
+        assert banner._session_id == "sess-abc"
+
+    def test_banner_uses_content_assemble(self):
+        """Welcome banner uses Content.assemble (not raw markup string)."""
+        banner = WelcomeBanner(session_id="test")
+        content = banner.render()
+        # Content.assemble produces Content with spans, not raw markup
+        raw = str(content)
+        # Should contain the actual text, not markup tags like [bold]
+        assert "NexusAgent" in raw
+        assert "[b " not in raw
+        assert "[/b]" not in raw
 
 
 # ---------------------------------------------------------------------------
