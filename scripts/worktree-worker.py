@@ -8,11 +8,14 @@ isolated Hermes configuration.
 
 Usage:
     python3 worktree-worker.py create --name <name> [--task <task>] [--base-branch <branch>]
-    python3 worktree-worker.py list
+    python3 worktree-worker.py list [--json]
     python3 worktree-worker.py collect --name <name>
     python3 worktree-worker.py destroy --name <name> [--force]
     python3 worktree-worker.py remote --name <name> --server <server> --task <task> [--repo <path>]
     python3 worktree-worker.py status --name <name>
+    python3 worktree-worker.py sync --server <server>
+    python3 worktree-worker.py doctor
+    python3 worktree-worker.py init --name <name> [--model <model>]
 
 Author: OWL (Lucien) for NexusAgent
 License: MIT
@@ -44,7 +47,8 @@ def run(cmd: str, cwd: str | None = None, check: bool = True) -> subprocess.Comp
     )
     if check and result.returncode != 0:
         print(f"  ✗ Command failed: {cmd}", file=sys.stderr)
-        print(f"    stderr: {result.stderr.strip()}", file=sys.stderr)
+        if result.stderr.strip():
+            print(f"    stderr: {result.stderr.strip()}", file=sys.stderr)
         sys.exit(1)
     return result
 
@@ -52,7 +56,12 @@ def run(cmd: str, cwd: str | None = None, check: bool = True) -> subprocess.Comp
 def load_state() -> dict:
     """Load the worktree state file."""
     if STATE_FILE.exists():
-        return json.loads(STATE_FILE.read_text())
+        try:
+            return json.loads(STATE_FILE.read_text())
+        except json.JSONDecodeError as e:
+            print(f"  ✗ Failed to parse state file {STATE_FILE}: {e}", file=sys.stderr)
+            print(f"  → Fix the file or delete it to start fresh.", file=sys.stderr)
+            sys.exit(1)
     return {"worktrees": {}}
 
 
@@ -68,6 +77,16 @@ def get_worktree_path(name: str) -> Path:
 
 def worktree_exists(name: str) -> bool:
     return get_worktree_path(name).exists()
+
+
+def check_git_repo():
+    """Ensure we're in a git repository, with a clear error message if not."""
+    git_dir = REPO_ROOT / ".git"
+    if not git_dir.exists() and not git_dir.is_file():
+        print("  ✗ Not in a git repository.", file=sys.stderr)
+        print(f"  → Current directory: {REPO_ROOT}", file=sys.stderr)
+        print("  → Run this command from the NexusAgent repo root.", file=sys.stderr)
+        sys.exit(1)
 
 
 # ── Commands ──────────────────────────────────────────────────────────────────
@@ -116,6 +135,8 @@ def cmd_create(args):
             if main_config.exists():
                 config_file.write_text(main_config.read_text())
                 print(f"    Isolated Hermes config created")
+            else:
+                print(f"  ⚠ No main .hermes/config.yaml found to copy as template")
 
     # Update state
     state = load_state()
@@ -140,16 +161,15 @@ def cmd_list(args):
     worktrees = state.get("worktrees", {})
 
     if not worktrees:
-        print("  No worktrees found.")
-        print(f"  → Create one: python3 {sys.argv[0]} create --name <name>")
+        if getattr(args, 'json', False):
+            print(json.dumps({"worktrees": [], "count": 0}, indent=2))
+        else:
+            print("  No worktrees found.")
+            print(f"  → Create one: python3 {sys.argv[0]} create --name <name>")
         return
 
-    # Also get git's view
-    result = run("git worktree list", check=False)
-
-    print(f"\n  {'Name':<30} {'Branch':<30} {'Status':<12} {'Path'}")
-    print(f"  {'─' * 30} {'─' * 30} {'─' * 12} {'─' * 30}")
-
+    # Build structured data
+    entries = []
     for name, info in worktrees.items():
         path = Path(info["path"])
         exists = path.exists()
@@ -165,7 +185,32 @@ def cmd_list(args):
             if dirty:
                 status = "dirty"
 
-        print(f"  {name:<30} {branch:<30} {status:<12} {info['path']}")
+        entries.append({
+            "name": name,
+            "branch": branch,
+            "status": status,
+            "path": info["path"],
+            "task": info.get("task", ""),
+            "created": info.get("created", ""),
+            "exists": exists,
+        })
+
+    # JSON output mode
+    if getattr(args, 'json', False):
+        output = {
+            "worktrees": entries,
+            "count": len(entries),
+            "generated_at": datetime.now().isoformat(),
+        }
+        print(json.dumps(output, indent=2))
+        return
+
+    # Human-readable table
+    print(f"\n  {'Name':<30} {'Branch':<30} {'Status':<12} {'Path'}")
+    print(f"  {'─' * 30} {'─' * 30} {'─' * 12} {'─' * 30}")
+
+    for entry in entries:
+        print(f"  {entry['name']:<30} {entry['branch']:<30} {entry['status']:<12} {entry['path']}")
 
     print()
 
@@ -175,7 +220,8 @@ def cmd_collect(args):
     name = args.name
 
     if not worktree_exists(name):
-        print(f"  ✗ Worktree '{name}' not found")
+        print(f"  ✗ Worktree '{name}' not found at {get_worktree_path(name)}", file=sys.stderr)
+        print(f"  → Run 'list' to see available worktrees.", file=sys.stderr)
         sys.exit(1)
 
     worktree_path = get_worktree_path(name)
@@ -233,7 +279,7 @@ def cmd_destroy(args):
     branch = info.get("branch", name)
 
     if not worktree_exists(name):
-        print(f"  ✗ Worktree '{name}' not found at {get_worktree_path(name)}")
+        print(f"  ✗ Worktree '{name}' not found at {get_worktree_path(name)}", file=sys.stderr)
         # Clean up state anyway
         if name in state.get("worktrees", {}):
             del state["worktrees"][name]
@@ -295,8 +341,11 @@ def cmd_remote(args):
 
     result = run(ssh_cmd, check=False)
     if result.returncode != 0:
-        print(f"  ✗ SSH dispatch failed")
-        print(f"    {result.stderr}")
+        print(f"  ✗ SSH dispatch failed", file=sys.stderr)
+        if result.stderr.strip():
+            print(f"    stderr: {result.stderr.strip()}", file=sys.stderr)
+        print(f"  → Check SSH connectivity: ssh {server} 'echo ok'", file=sys.stderr)
+        print(f"  → Verify the repo path exists on the remote: {repo}", file=sys.stderr)
         sys.exit(1)
 
     # Update state
@@ -322,7 +371,8 @@ def cmd_status(args):
     name = args.name
 
     if not worktree_exists(name):
-        print(f"  ✗ Worktree '{name}' not found")
+        print(f"  ✗ Worktree '{name}' not found at {get_worktree_path(name)}", file=sys.stderr)
+        print(f"  → Run 'list' to see available worktrees.", file=sys.stderr)
         sys.exit(1)
 
     worktree_path = get_worktree_path(name)
@@ -357,6 +407,309 @@ def cmd_status(args):
     print()
 
 
+def cmd_sync(args):
+    """Sync worktree state between local and remote server."""
+    server = args.server
+    repo = args.repo or "/home/sysop/Workspaces/NexusAgent"
+
+    print(f"  → Syncing worktree state with {server}...")
+    print(f"    Remote repo: {repo}")
+    print()
+
+    # Step 1: Fetch remote worktree list
+    print("  ── Fetching remote worktrees ──")
+    result = run(f"ssh {server} 'cd {repo} && git worktree list'", check=False)
+    if result.returncode != 0:
+        print(f"  ✗ Failed to connect to {server}", file=sys.stderr)
+        print(f"  → Check SSH: ssh {server} 'echo ok'", file=sys.stderr)
+        sys.exit(1)
+
+    remote_worktrees = result.stdout.strip()
+    if remote_worktrees:
+        for line in remote_worktrees.split("\n"):
+            print(f"    {line}")
+    else:
+        print("    (no remote worktrees)")
+
+    # Step 2: Fetch remote state file
+    print("\n  ── Fetching remote state ──")
+    result = run(f"ssh {server} 'cat {repo}/.hermes/worktree-state.json 2>/dev/null || echo \"{{\"' ", check=False)
+    try:
+        remote_state = json.loads(result.stdout.strip())
+    except json.JSONDecodeError:
+        print("    (no valid remote state found)")
+        remote_state = {"worktrees": {}}
+
+    # Step 3: Merge states
+    local_state = load_state()
+    local_worktrees = local_state.get("worktrees", {})
+    remote_worktrees_dict = remote_state.get("worktrees", {})
+
+    merged = dict(local_worktrees)
+    added = []
+    updated = []
+    for name, info in remote_worktrees_dict.items():
+        if name not in merged:
+            merged[name] = info
+            added.append(name)
+        else:
+            # Keep the newer entry
+            remote_created = info.get("created", "")
+            local_created = merged[name].get("created", "")
+            if remote_created > local_created:
+                merged[name] = info
+                updated.append(name)
+
+    local_state["worktrees"] = merged
+    save_state(local_state)
+
+    if added:
+        print(f"  → Added from remote: {', '.join(added)}")
+    if updated:
+        print(f"  → Updated from remote: {', '.join(updated)}")
+    if not added and not updated:
+        print("  → Local state is already in sync")
+
+    # Step 4: Push local state to remote
+    print("\n  ── Pushing local state to remote ──")
+    state_json = json.dumps(local_state)
+    result = run(f"ssh {server} 'cat > {repo}/.hermes/worktree-state.json << \'EOF\'\n{state_json}\nEOF\n'", check=False)
+    if result.returncode != 0:
+        print(f"  ✗ Failed to push state to {server}", file=sys.stderr)
+        print(f"  → Check write permissions on remote: {repo}/.hermes/", file=sys.stderr)
+        sys.exit(1)
+
+    print(f"  ✓ Sync complete — {len(merged)} worktrees tracked locally")
+
+
+def cmd_doctor(args):
+    """Diagnose common worktree issues."""
+    print("\n═══ Worktree Doctor ═══\n")
+    issues = 0
+    warnings = 0
+
+    # Check 1: Git repository
+    print("  ── Check: Git Repository ──")
+    git_dir = REPO_ROOT / ".git"
+    if git_dir.exists() or git_dir.is_file():
+        print("    ✓ In a git repository")
+    else:
+        print("    ✗ NOT in a git repository")
+        print(f"      CWD: {REPO_ROOT}")
+        issues += 1
+
+    # Check 2: Git worktree list
+    print("\n  ── Check: Git Worktrees ──")
+    result = run("git worktree list", check=False)
+    if result.returncode == 0:
+        worktree_lines = [l for l in result.stdout.strip().split("\n") if l]
+        print(f"    ✓ {len(worktree_lines)} worktree(s) registered")
+        for line in worktree_lines:
+            print(f"      {line}")
+    else:
+        print("    ✗ Failed to list worktrees")
+        issues += 1
+
+    # Check 3: Branch status
+    print("\n  ── Check: Branch Status ──")
+    result = run("git branch -a", check=False)
+    if result.returncode == 0:
+        branches = [l.strip().strip("* ").strip() for l in result.stdout.strip().split("\n") if l.strip()]
+        print(f"    ✓ {len(branches)} branch(es) found")
+        # Show worktree branches
+        state = load_state()
+        for name, info in state.get("worktrees", {}).items():
+            branch = info.get("branch", "?")
+            branch_result = run(f"git rev-parse --verify {branch}", check=False)
+            if branch_result.returncode == 0:
+                print(f"      ✓ {branch} (exists)")
+            else:
+                print(f"      ✗ {branch} (MISSING)")
+                issues += 1
+    else:
+        print("    ✗ Failed to list branches")
+        issues += 1
+
+    # Check 4: Uncommitted changes in worktrees
+    print("\n  ── Check: Uncommitted Changes ──")
+    state = load_state()
+    worktrees = state.get("worktrees", {})
+    if not worktrees:
+        print("    (no worktrees tracked)")
+    else:
+        for name, info in worktrees.items():
+            path = Path(info["path"])
+            if not path.exists():
+                print(f"      ✗ {name}: path does not exist ({path})")
+                issues += 1
+                continue
+            dirty = run("git status --porcelain", cwd=str(path), check=False).stdout.strip()
+            if dirty:
+                changed_count = len(dirty.split("\n"))
+                print(f"      ⚠ {name}: {changed_count} uncommitted change(s)")
+                warnings += 1
+            else:
+                print(f"      ✓ {name}: clean")
+
+    # Check 5: Remote connectivity
+    print("\n  ── Check: Remote Connectivity ──")
+    result = run("git remote -v", check=False)
+    if result.returncode == 0:
+        remotes = result.stdout.strip().split("\n")
+        remotes = [r for r in remotes if r.strip()]
+        if remotes:
+            for r in remotes:
+                parts = r.split("\t")
+                if len(parts) >= 1:
+                    remote_name = parts[0].split()[0]
+                    ls_result = run(f"git ls-remote --heads {remote_name}", check=False)
+                    if ls_result.returncode == 0:
+                        head_count = len([l for l in ls_result.stdout.strip().split("\n") if l.strip()])
+                        print(f"      ✓ {remote_name}: reachable ({head_count} heads)")
+                    else:
+                        print(f"      ⚠ {remote_name}: UNREACHABLE")
+                        warnings += 1
+        else:
+            print("      (no remotes configured)")
+            warnings += 1
+    else:
+        print("    ✗ Failed to check remotes")
+        issues += 1
+
+    # Check 6: State file integrity
+    print("\n  ── Check: State File ──")
+    if STATE_FILE.exists():
+        try:
+            data = json.loads(STATE_FILE.read_text())
+            count = len(data.get("worktrees", {}))
+            print(f"    ✓ State file valid ({count} worktrees tracked)")
+        except json.JSONDecodeError as e:
+            print(f"    ✗ State file corrupted: {e}")
+            issues += 1
+    else:
+        print("    (no state file yet — will be created on first worktree)")
+
+    # Check 7: Disk usage
+    print("\n  ── Check: Disk Usage ──")
+    if worktrees:
+        for name, info in worktrees.items():
+            path = Path(info["path"])
+            if path.exists():
+                du_result = run(f"du -sh {path}", check=False)
+                if du_result.returncode == 0:
+                    size = du_result.stdout.strip().split()[0]
+                    print(f"      {name}: {size}")
+    else:
+        print("    (no worktrees to check)")
+
+    # Summary
+    print(f"\n═══ Summary ═══")
+    if issues == 0 and warnings == 0:
+        print("  ✓ All checks passed — system healthy")
+    else:
+        if issues:
+            print(f"  ✗ {issues} issue(s) found — needs attention")
+        if warnings:
+            print(f"  ⚠ {warnings} warning(s) — review recommended")
+    print()
+
+
+def cmd_init(args):
+    """Initialize a new worktree with proper configuration."""
+    name = args.name
+    model = args.model or "openrouter/owl-alpha"
+    base_branch = args.base_branch or "master"
+    task = args.task or ""
+
+    print(f"  → Initializing worktree '{name}'...")
+    print(f"    Model: {model}")
+    print(f"    Base branch: {base_branch}")
+
+    if worktree_exists(name):
+        print(f"  ✗ Worktree '{name}' already exists at {get_worktree_path(name)}")
+        print(f"  → Use 'destroy' first if you want to recreate it.")
+        sys.exit(1)
+
+    worktree_path = get_worktree_path(name)
+    WORKTREE_BASE.mkdir(parents=True, exist_ok=True)
+
+    # Create the worktree
+    run(f"git worktree add {worktree_path} -b {name} {base_branch}")
+    print(f"  ✓ Worktree created at {worktree_path}")
+
+    # Write task description
+    if task:
+        task_file = worktree_path / "WORKTREE_TASK.md"
+        task_file.write_text(
+            f"# Worktree Task: {name}\n\n"
+            f"**Created:** {datetime.now().isoformat()}\n"
+            f"**Branch:** {name}\n"
+            f"**Base:** {base_branch}\n"
+            f"**Model:** {model}\n\n"
+            f"## Task\n\n{task}\n"
+        )
+        print(f"  ✓ Task written to WORKTREE_TASK.md")
+
+    # Create isolated Hermes config with model
+    hermes_dir = worktree_path / ".hermes"
+    hermes_dir.mkdir(exist_ok=True)
+    config_file = hermes_dir / "config.yaml"
+
+    # Try to copy from main config as template, or create minimal
+    main_config = REPO_ROOT / ".hermes" / "config.yaml"
+    if main_config.exists():
+        config_content = main_config.read_text()
+        # Update model if present in config
+        if "model:" in config_content:
+            lines = config_content.split("\n")
+            new_lines = []
+            for line in lines:
+                if line.strip().startswith("model:"):
+                    new_lines.append(f"model: {model}")
+                else:
+                    new_lines.append(line)
+            config_content = "\n".join(new_lines)
+        config_file.write_text(config_content)
+    else:
+        # Create minimal config
+        config_file.write_text(
+            f"# Hermes config for worktree: {name}\n"
+            f"model: {model}\n"
+            f"worktree: {name}\n"
+        )
+    print(f"  ✓ Hermes config created (model: {model})")
+
+    # Create a NEXUS.md marker for the worktree
+    nexus_file = worktree_path / "NEXUS_WORKTREE.md"
+    nexus_file.write_text(
+        f"# Worktree: {name}\n\n"
+        f"- **Model:** {model}\n"
+        f"- **Branch:** {name}\n"
+        f"- **Base:** {base_branch}\n"
+        f"- **Created:** {datetime.now().isoformat()}\n"
+        f"- **Status:** active\n"
+    )
+    print(f"  ✓ Worktree marker created (NEXUS_WORKTREE.md)")
+
+    # Update state
+    state = load_state()
+    state["worktrees"][name] = {
+        "name": name,
+        "path": str(worktree_path),
+        "branch": name,
+        "base_branch": base_branch,
+        "model": model,
+        "created": datetime.now().isoformat(),
+        "task": task,
+        "status": "active",
+    }
+    save_state(state)
+
+    print(f"\n  ✓ Worktree '{name}' initialized and ready")
+    print(f"  → cd {worktree_path}")
+    print(f"  → Start working with model: {model}")
+
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def main():
@@ -368,10 +721,14 @@ Examples:
   %(prog)s create --name fix-streaming --task "Fix TUI streaming bug" --base-branch master
   %(prog)s create --name research-tui --task "Research TUI aesthetics" --branch research/tui-aesthetics
   %(prog)s list
+  %(prog)s list --json
   %(prog)s status --name fix-streaming
   %(prog)s collect --name fix-streaming
   %(prog)s destroy --name fix-streaming
   %(prog)s remote --name heavy-research --server rapidwebs-01 --task "Deep research"
+  %(prog)s sync --server rapidwebs-01
+  %(prog)s doctor
+  %(prog)s init --name worker-foo --model openrouter/owl-alpha
         """
     )
 
@@ -386,7 +743,8 @@ Examples:
     p_create.add_argument("--isolated-hermes", action="store_true", help="Create isolated Hermes config")
 
     # list
-    subparsers.add_parser("list", help="List all worktrees")
+    p_list = subparsers.add_parser("list", help="List all worktrees")
+    p_list.add_argument("--json", action="store_true", help="Output as JSON for machine readability")
 
     # collect
     p_collect = subparsers.add_parser("collect", help="Collect results from a worktree")
@@ -408,6 +766,21 @@ Examples:
     p_status = subparsers.add_parser("status", help="Show worktree status")
     p_status.add_argument("--name", required=True, help="Worktree name")
 
+    # sync
+    p_sync = subparsers.add_parser("sync", help="Sync worktree state with a remote server")
+    p_sync.add_argument("--server", required=True, help="SSH server alias to sync with")
+    p_sync.add_argument("--repo", default="/home/sysop/Workspaces/NexusAgent", help="Remote repo path")
+
+    # doctor
+    subparsers.add_parser("doctor", help="Diagnose common worktree issues")
+
+    # init
+    p_init = subparsers.add_parser("init", help="Initialize a worktree with full configuration")
+    p_init.add_argument("--name", required=True, help="Worktree name")
+    p_init.add_argument("--model", default="openrouter/owl-alpha", help="Model to use (default: openrouter/owl-alpha)")
+    p_init.add_argument("--base-branch", default="master", help="Base branch (default: master)")
+    p_init.add_argument("--task", default="", help="Task description")
+
     args = parser.parse_args()
 
     if not args.command:
@@ -415,12 +788,7 @@ Examples:
         sys.exit(1)
 
     # Ensure we're in a git repo
-    if not (REPO_ROOT / ".git").exists():
-        # Check if we're in a worktree (git file instead of dir)
-        git_file = REPO_ROOT / ".git"
-        if not git_file.is_file():
-            print("  ✗ Not in a git repository. Run from the NexusAgent repo root.")
-            sys.exit(1)
+    check_git_repo()
 
     commands = {
         "create": cmd_create,
@@ -429,6 +797,9 @@ Examples:
         "destroy": cmd_destroy,
         "remote": cmd_remote,
         "status": cmd_status,
+        "sync": cmd_sync,
+        "doctor": cmd_doctor,
+        "init": cmd_init,
     }
 
     commands[args.command](args)
