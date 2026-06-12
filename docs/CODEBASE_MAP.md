@@ -1,9 +1,9 @@
 # NexusAgent Codebase Map
 
 > Generated: 2026-07-18
-> Total source files: 107 (tests: 30)
-> Total lines: ~7,200 (src), ~2,100 (tests)
-> Last refactoring: Phase 6 — memory_index.py extracted into memory/index/ subpackage
+> Total source files: 108 (tests: 31)
+> Total lines: ~7,200 (src), ~2,400 (tests)
+> Last refactoring: Phases 1-7 complete + yolo config fix
 > Structure pattern: Domain-based subpackages with compat shims
 
 ---
