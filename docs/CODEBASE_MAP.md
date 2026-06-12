@@ -196,6 +196,7 @@ NexusAgent/
 | File | Lines | Classes | Functions | Purpose |
 |------|-------|---------|-----------|---------|
 | `utils/` | — | — | — | **Utils subpackage** (extracted 2026-07-18): `retry.py` (retry_with_backoff, retry_on_false), `circuit.py` (CircuitState, CircuitBreakerError, CircuitBreaker). Old `utils.py` kept as compat shim. |
+| `theme/` | — | — | — | **Theme subpackage** (extracted 2026-07-18): `colors.py` (7 palettes, ThemeColors), `registry.py` (CSS vars, register_themes). Old `theme.py` kept as compat shim. |
 
 ## Complete Tool Inventory (33 tools)
 
