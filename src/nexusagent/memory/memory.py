@@ -6,6 +6,7 @@ Uses SQLite for storage with sqlite-vec for vector similarity search on embeddin
 import hashlib
 import json
 import logging
+import math
 import struct
 import uuid
 from datetime import UTC, datetime
@@ -16,9 +17,11 @@ from pydantic import BaseModel, Field
 
 from nexusagent.llm.models import MemoryScope
 
+# Consolidate DRY: import shared constants and helpers from memory.index
+from nexusagent.memory.index import EMBED_DIM, _vec_to_blob as _embed_to_blob
+
 logger = logging.getLogger(__name__)
 
-EMBED_DIM = 3072  # Must match memory_index.py for cross-compatibility
 
 # ---------------------------------------------------------------------------
 # Deterministic hash-based embedding (placeholder)
@@ -32,25 +35,18 @@ def _hash_embed(text: str) -> list[float]:
     Produces a unit-normalised vector of dimension EMBED_DIM from the input text.
     This is a placeholder — replace with a proper embedding model in production.
     """
-    import struct as _struct
-
     vec = [0.0] * EMBED_DIM
     # Fill dims in batches of 32 using SHA256
     for batch_idx, batch_start in enumerate(range(0, EMBED_DIM, 32)):
         h = hashlib.sha256(f"{text}|{batch_idx}".encode()).digest()
         for j in range(min(32, EMBED_DIM - batch_start)):
-            vec[batch_start + j] = _struct.unpack("b", bytes([h[j]]))[0] / 128.0
+            vec[batch_start + j] = struct.unpack("b", bytes([h[j]]))[0] / 128.0
 
     # Normalise to unit length
-    norm = sum(v * v for v in vec) ** 0.5
+    norm = math.sqrt(sum(v * v for v in vec))
     if norm > 0:
         vec = [v / norm for v in vec]
     return vec
-
-
-def _embed_to_blob(vec: list[float]) -> bytes:
-    """Pack a float32 vector into a BLOB for sqlite-vec storage."""
-    return struct.pack(f"{len(vec)}f", *vec)
 
 
 # ---------------------------------------------------------------------------

@@ -1,10 +1,64 @@
 """Tests for the scoped memory system."""
 
+import math
+import struct
 from pathlib import Path
 
 import pytest
 
 from nexusagent.memory.memory import MemoryManager, MemoryScope
+
+
+# ---------------------------------------------------------------------------
+# DRY-consolidation tests — verify memory.py imports from memory.index
+# instead of duplicating constants and functions.
+# ---------------------------------------------------------------------------
+
+
+def test_embed_dim_imported_not_duplicated():
+    """EMBED_DIM must be imported from memory.index, not hardcoded."""
+    import nexusagent.memory.memory as mem_mod
+    import nexusagent.memory.index as idx_mod
+
+    # The value must match
+    assert mem_mod.EMBED_DIM == idx_mod.EMBED_DIM == 3072
+
+
+def test_embed_to_blob_shared():
+    """_embed_to_blob must be the same function object as memory.index._vec_to_blob."""
+    from nexusagent.memory.memory import _embed_to_blob
+    from nexusagent.memory.index import _vec_to_blob
+
+    # Must be the same function (imported, not duplicated)
+    assert _embed_to_blob is _vec_to_blob
+
+    # Verify it works
+    vec = [1.0, 2.0, 3.0]
+    blob = _embed_to_blob(vec)
+    assert len(blob) == len(vec) * 4  # float32 = 4 bytes
+    unpacked = struct.unpack(f"{len(vec)}f", blob)
+    assert unpacked == (1.0, 2.0, 3.0)
+
+
+def test_hash_embed_uses_shared_helpers():
+    """_hash_embed must use the shared EMBED_DIM and struct (not local import)."""
+    import inspect
+    import nexusagent.memory.memory as mem_mod
+
+    source = inspect.getsource(mem_mod._hash_embed)
+
+    # Should NOT have local "import struct as _struct"
+    assert "import struct as _struct" not in source, (
+        "_hash_embed should use module-level struct import, not local alias"
+    )
+
+    # Should produce correct dimension
+    vec = mem_mod._hash_embed("test")
+    assert len(vec) == mem_mod.EMBED_DIM
+
+    # Should be unit-normalized
+    norm = math.sqrt(sum(v * v for v in vec))
+    assert abs(norm - 1.0) < 0.01, f"Vector not unit-normalized: norm={norm}"
 
 
 @pytest.fixture
