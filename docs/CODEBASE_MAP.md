@@ -3,7 +3,7 @@
 > Generated: 2026-07-18
 > Total source files: 107 (tests: 30)
 > Total lines: ~7,200 (src), ~2,100 (tests)
-> Last refactoring: Phase 3 — db.py extracted into db/ subpackage
+> Last refactoring: Phase 4 — messages.py extracted into messages/ subpackage
 > Structure pattern: Domain-based subpackages with compat shims
 
 ---
@@ -94,7 +94,13 @@ nexusagent/
 │   └── compaction.py (233L)     # Context compaction pipeline
 │
 ├── widgets/                     # UI widgets
-│   ├── messages.py (472L)       # 6 message widget classes ← MONOLITH
+│   ├── messages/                  # Messages subpackage ✅ EXTRACTED Phase 4
+│   │   ├── user.py (42L)          # UserMessage
+│   │   ├── assistant.py (128L)      # AssistantMessage (streaming, markdown)
+│   │   ├── tool.py (171L)         # ToolCallMessage (collapsible, status)
+│   │   ├── app.py (33L)           # AppMessage (system messages)
+│   │   ├── error.py (33L)         # ErrorMessage
+│   │   └── welcome.py (52L)       # WelcomeBanner
 │   ├── chat_input.py (215L)     # ChatInput widget
 │   ├── status.py (367L)         # StatusBar + helpers ← POSSIBLY DEAD CODE
 │   └── theme/                   # Theme subpackage ✅ EXTRACTED Phase 2
@@ -205,6 +211,12 @@ nexusagent/
 - Old file: Compat shim
 - Commit: `83aef0f`
 - Fixes: `reinit()` now recreates engine + session (was silently using old engine)
+
+### Phase 4: `widgets/messages.py` → `widgets/messages/` ✅
+- Extracted: `user.py` (42L), `assistant.py` (128L), `tool.py` (171L), `app.py` (33L), `error.py` (33L), `welcome.py` (52L)
+- Old file: Compat shim
+- Commit: `10e76dc`
+- Cleaned: Removed 3 dead regex constants, dead Vertical import, redundant datetime import
 
 ---
 
