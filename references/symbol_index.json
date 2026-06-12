@@ -1,0 +1,1494 @@
+{
+  "load_config": {
+    "file": "src/nexusagent/infrastructure/config.py",
+    "type": "function"
+  },
+  "resolve_server": {
+    "file": "scripts/sync-secrets.py",
+    "type": "function"
+  },
+  "ssh_run": {
+    "file": "scripts/sync-secrets.py",
+    "type": "function"
+  },
+  "ssh_upload_string": {
+    "file": "scripts/sync-secrets.py",
+    "type": "function"
+  },
+  "sync": {
+    "file": "scripts/sync-secrets.py",
+    "type": "function"
+  },
+  "main": {
+    "file": "src/nexusagent/interfaces/tui.py",
+    "type": "function"
+  },
+  "run": {
+    "file": "src/nexusagent/server/server.py",
+    "type": "function"
+  },
+  "load_state": {
+    "file": "scripts/worktree-worker.py",
+    "type": "function"
+  },
+  "save_state": {
+    "file": "scripts/worktree-worker.py",
+    "type": "function"
+  },
+  "get_worktree_path": {
+    "file": "scripts/worktree-worker.py",
+    "type": "function"
+  },
+  "worktree_exists": {
+    "file": "scripts/worktree-worker.py",
+    "type": "function"
+  },
+  "check_git_repo": {
+    "file": "scripts/worktree-worker.py",
+    "type": "function"
+  },
+  "cmd_create": {
+    "file": "scripts/worktree-worker.py",
+    "type": "function"
+  },
+  "cmd_list": {
+    "file": "scripts/worktree-worker.py",
+    "type": "function"
+  },
+  "cmd_collect": {
+    "file": "scripts/worktree-worker.py",
+    "type": "function"
+  },
+  "cmd_destroy": {
+    "file": "scripts/worktree-worker.py",
+    "type": "function"
+  },
+  "cmd_remote": {
+    "file": "scripts/worktree-worker.py",
+    "type": "function"
+  },
+  "cmd_status": {
+    "file": "scripts/worktree-worker.py",
+    "type": "function"
+  },
+  "cmd_sync": {
+    "file": "scripts/worktree-worker.py",
+    "type": "function"
+  },
+  "cmd_doctor": {
+    "file": "scripts/worktree-worker.py",
+    "type": "function"
+  },
+  "cmd_init": {
+    "file": "scripts/worktree-worker.py",
+    "type": "function"
+  },
+  "Agent": {
+    "file": "src/nexusagent/core/agent.py",
+    "type": "class"
+  },
+  "run_agent_task": {
+    "file": "src/nexusagent/core/agent.py",
+    "type": "function"
+  },
+  "ResearchGraphState": {
+    "file": "src/nexusagent/core/graph.py",
+    "type": "class"
+  },
+  "route_after_execute": {
+    "file": "src/nexusagent/core/graph.py",
+    "type": "function"
+  },
+  "create_research_graph": {
+    "file": "src/nexusagent/core/graph.py",
+    "type": "function"
+  },
+  "SearchResult": {
+    "file": "src/nexusagent/core/orchestration.py",
+    "type": "class"
+  },
+  "ResearchPlan": {
+    "file": "src/nexusagent/core/orchestration.py",
+    "type": "class"
+  },
+  "ResearchState": {
+    "file": "src/nexusagent/core/orchestration.py",
+    "type": "class"
+  },
+  "DeepResearchOrchestrator": {
+    "file": "src/nexusagent/core/orchestration.py",
+    "type": "class"
+  },
+  "Session": {
+    "file": "src/nexusagent/core/session.py",
+    "type": "class"
+  },
+  "SessionManager": {
+    "file": "src/nexusagent/core/session.py",
+    "type": "class"
+  },
+  "SubAgentStatus": {
+    "file": "src/nexusagent/core/subagent.py",
+    "type": "class"
+  },
+  "SubAgentHandle": {
+    "file": "src/nexusagent/core/subagent.py",
+    "type": "class"
+  },
+  "NexusWorker": {
+    "file": "src/nexusagent/core/worker.py",
+    "type": "class"
+  },
+  "WorkerPool": {
+    "file": "src/nexusagent/core/worker.py",
+    "type": "class"
+  },
+  "HookEvent": {
+    "file": "src/nexusagent/hooks/__init__.py",
+    "type": "class"
+  },
+  "HookRegistration": {
+    "file": "src/nexusagent/hooks/__init__.py",
+    "type": "class"
+  },
+  "HookManager": {
+    "file": "src/nexusagent/hooks/__init__.py",
+    "type": "class"
+  },
+  "get_hook_manager": {
+    "file": "src/nexusagent/hooks/__init__.py",
+    "type": "function"
+  },
+  "reset_hook_manager": {
+    "file": "src/nexusagent/hooks/__init__.py",
+    "type": "function"
+  },
+  "register_hook": {
+    "file": "src/nexusagent/hooks/__init__.py",
+    "type": "function"
+  },
+  "AuthManager": {
+    "file": "src/nexusagent/infrastructure/auth.py",
+    "type": "class"
+  },
+  "NATSJSONEncoder": {
+    "file": "src/nexusagent/infrastructure/bus.py",
+    "type": "class"
+  },
+  "AgentBus": {
+    "file": "src/nexusagent/infrastructure/bus.py",
+    "type": "class"
+  },
+  "get_bus": {
+    "file": "src/nexusagent/infrastructure/bus.py",
+    "type": "function"
+  },
+  "set_bus": {
+    "file": "src/nexusagent/infrastructure/bus.py",
+    "type": "function"
+  },
+  "ServerConfig": {
+    "file": "src/nexusagent/infrastructure/config.py",
+    "type": "class"
+  },
+  "ClientConfig": {
+    "file": "src/nexusagent/infrastructure/config.py",
+    "type": "class"
+  },
+  "AuthConfig": {
+    "file": "src/nexusagent/infrastructure/config.py",
+    "type": "class"
+  },
+  "AgentConfig": {
+    "file": "src/nexusagent/infrastructure/config.py",
+    "type": "class"
+  },
+  "PromptConfig": {
+    "file": "src/nexusagent/infrastructure/config.py",
+    "type": "class"
+  },
+  "LoggingConfig": {
+    "file": "src/nexusagent/infrastructure/config.py",
+    "type": "class"
+  },
+  "HooksConfig": {
+    "file": "src/nexusagent/infrastructure/config.py",
+    "type": "class"
+  },
+  "ConfigSchema": {
+    "file": "src/nexusagent/infrastructure/config.py",
+    "type": "class"
+  },
+  "get_project_root": {
+    "file": "src/nexusagent/infrastructure/config.py",
+    "type": "function"
+  },
+  "Base": {
+    "file": "src/nexusagent/infrastructure/db/base.py",
+    "type": "class"
+  },
+  "DatabaseManager": {
+    "file": "src/nexusagent/infrastructure/db/manager.py",
+    "type": "class"
+  },
+  "TaskModel": {
+    "file": "src/nexusagent/infrastructure/db/models.py",
+    "type": "class"
+  },
+  "ResultModel": {
+    "file": "src/nexusagent/infrastructure/db/models.py",
+    "type": "class"
+  },
+  "SessionModel": {
+    "file": "src/nexusagent/infrastructure/db/models.py",
+    "type": "class"
+  },
+  "MessageModel": {
+    "file": "src/nexusagent/infrastructure/db/models.py",
+    "type": "class"
+  },
+  "SessionRepository": {
+    "file": "src/nexusagent/infrastructure/db/session_repo.py",
+    "type": "class"
+  },
+  "TaskRepository": {
+    "file": "src/nexusagent/infrastructure/db/task_repo.py",
+    "type": "class"
+  },
+  "PromptLoadError": {
+    "file": "src/nexusagent/infrastructure/prompt_loader.py",
+    "type": "class"
+  },
+  "CircularChainError": {
+    "file": "src/nexusagent/infrastructure/prompt_loader.py",
+    "type": "class"
+  },
+  "resolve_path": {
+    "file": "src/nexusagent/infrastructure/prompt_loader.py",
+    "type": "function"
+  },
+  "load_prompt_content": {
+    "file": "src/nexusagent/infrastructure/prompt_loader.py",
+    "type": "function"
+  },
+  "load_nexus_prompt": {
+    "file": "src/nexusagent/infrastructure/prompt_loader.py",
+    "type": "function"
+  },
+  "inject_file_at_reference": {
+    "file": "src/nexusagent/infrastructure/prompt_loader.py",
+    "type": "function"
+  },
+  "get_file_info_placeholder": {
+    "file": "src/nexusagent/infrastructure/prompt_loader.py",
+    "type": "function"
+  },
+  "TelemetryManager": {
+    "file": "src/nexusagent/infrastructure/telemetry.py",
+    "type": "class"
+  },
+  "LogViewer": {
+    "file": "src/nexusagent/infrastructure/telemetry.py",
+    "type": "class"
+  },
+  "setup_telemetry": {
+    "file": "src/nexusagent/infrastructure/telemetry.py",
+    "type": "function"
+  },
+  "CircuitState": {
+    "file": "src/nexusagent/infrastructure/utils/circuit.py",
+    "type": "class"
+  },
+  "CircuitBreakerError": {
+    "file": "src/nexusagent/infrastructure/utils/circuit.py",
+    "type": "class"
+  },
+  "CircuitBreaker": {
+    "file": "src/nexusagent/infrastructure/utils/circuit.py",
+    "type": "class"
+  },
+  "retry_with_backoff": {
+    "file": "src/nexusagent/infrastructure/utils/retry.py",
+    "type": "function"
+  },
+  "retry_on_false": {
+    "file": "src/nexusagent/infrastructure/utils/retry.py",
+    "type": "function"
+  },
+  "get_version": {
+    "file": "src/nexusagent/interfaces/cli.py",
+    "type": "function"
+  },
+  "submit": {
+    "file": "src/nexusagent/interfaces/cli.py",
+    "type": "function"
+  },
+  "session_cmd": {
+    "file": "src/nexusagent/interfaces/cli.py",
+    "type": "function"
+  },
+  "hooks_cmd": {
+    "file": "src/nexusagent/interfaces/cli.py",
+    "type": "function"
+  },
+  "hooks_list": {
+    "file": "src/nexusagent/interfaces/cli.py",
+    "type": "function"
+  },
+  "hooks_enable": {
+    "file": "src/nexusagent/interfaces/cli.py",
+    "type": "function"
+  },
+  "hooks_disable": {
+    "file": "src/nexusagent/interfaces/cli.py",
+    "type": "function"
+  },
+  "NexusApp": {
+    "file": "src/nexusagent/interfaces/tui.py",
+    "type": "class"
+  },
+  "contextlib_suppress": {
+    "file": "src/nexusagent/interfaces/tui_formatters.py",
+    "type": "class"
+  },
+  "render_markdown": {
+    "file": "src/nexusagent/interfaces/tui_formatters.py",
+    "type": "function"
+  },
+  "format_tool_result_for_display": {
+    "file": "src/nexusagent/interfaces/tui_formatters.py",
+    "type": "function"
+  },
+  "format_shell_output": {
+    "file": "src/nexusagent/interfaces/tui_formatters.py",
+    "type": "function"
+  },
+  "format_read_file_output": {
+    "file": "src/nexusagent/interfaces/tui_formatters.py",
+    "type": "function"
+  },
+  "format_write_file_output": {
+    "file": "src/nexusagent/interfaces/tui_formatters.py",
+    "type": "function"
+  },
+  "format_git_output": {
+    "file": "src/nexusagent/interfaces/tui_formatters.py",
+    "type": "function"
+  },
+  "format_search_output": {
+    "file": "src/nexusagent/interfaces/tui_formatters.py",
+    "type": "function"
+  },
+  "format_subagent_output": {
+    "file": "src/nexusagent/interfaces/tui_formatters.py",
+    "type": "function"
+  },
+  "format_tool_output_generic": {
+    "file": "src/nexusagent/interfaces/tui_formatters.py",
+    "type": "function"
+  },
+  "truncate_output": {
+    "file": "src/nexusagent/interfaces/tui_formatters.py",
+    "type": "function"
+  },
+  "truncate": {
+    "file": "src/nexusagent/interfaces/tui_formatters.py",
+    "type": "function"
+  },
+  "format_arg_value": {
+    "file": "src/nexusagent/interfaces/tui_formatters.py",
+    "type": "function"
+  },
+  "SpinnerLabel": {
+    "file": "src/nexusagent/interfaces/tui_widgets.py",
+    "type": "class"
+  },
+  "Breakpoint": {
+    "file": "src/nexusagent/interfaces/tui_widgets.py",
+    "type": "class"
+  },
+  "ApprovalModal": {
+    "file": "src/nexusagent/interfaces/tui_widgets.py",
+    "type": "class"
+  },
+  "ErrorModal": {
+    "file": "src/nexusagent/interfaces/tui_widgets.py",
+    "type": "class"
+  },
+  "classify_breakpoint": {
+    "file": "src/nexusagent/interfaces/tui_widgets.py",
+    "type": "function"
+  },
+  "is_no_color": {
+    "file": "src/nexusagent/interfaces/tui_widgets.py",
+    "type": "function"
+  },
+  "debounce_resize": {
+    "file": "src/nexusagent/interfaces/tui_widgets.py",
+    "type": "function"
+  },
+  "create_ui": {
+    "file": "src/nexusagent/interfaces/web_ui.py",
+    "type": "function"
+  },
+  "run_ui": {
+    "file": "src/nexusagent/interfaces/web_ui.py",
+    "type": "function"
+  },
+  "LLMResponse": {
+    "file": "src/nexusagent/llm/llm.py",
+    "type": "class"
+  },
+  "LLMProvider": {
+    "file": "src/nexusagent/llm/llm.py",
+    "type": "class"
+  },
+  "TaskStatus": {
+    "file": "src/nexusagent/llm/models.py",
+    "type": "class"
+  },
+  "TaskSchema": {
+    "file": "tests/contract_verification/verify_tui_logic.py",
+    "type": "class"
+  },
+  "MemoryScope": {
+    "file": "src/nexusagent/llm/models.py",
+    "type": "class"
+  },
+  "TaskContract": {
+    "file": "src/nexusagent/llm/models.py",
+    "type": "class"
+  },
+  "ResultSchema": {
+    "file": "src/nexusagent/llm/models.py",
+    "type": "class"
+  },
+  "AgentEvent": {
+    "file": "src/nexusagent/llm/models.py",
+    "type": "class"
+  },
+  "ThinkingEvent": {
+    "file": "src/nexusagent/llm/models.py",
+    "type": "class"
+  },
+  "ToolCallEvent": {
+    "file": "src/nexusagent/llm/models.py",
+    "type": "class"
+  },
+  "ToolResultEvent": {
+    "file": "src/nexusagent/llm/models.py",
+    "type": "class"
+  },
+  "ApprovalRequestEvent": {
+    "file": "src/nexusagent/llm/models.py",
+    "type": "class"
+  },
+  "ResponseEvent": {
+    "file": "src/nexusagent/llm/models.py",
+    "type": "class"
+  },
+  "ErrorEvent": {
+    "file": "src/nexusagent/llm/models.py",
+    "type": "class"
+  },
+  "ImageAttachment": {
+    "file": "src/nexusagent/llm/models.py",
+    "type": "class"
+  },
+  "encode_image_to_content": {
+    "file": "src/nexusagent/llm/models.py",
+    "type": "function"
+  },
+  "CompactionPipeline": {
+    "file": "src/nexusagent/memory/compaction.py",
+    "type": "class"
+  },
+  "EmbeddingProvider": {
+    "file": "src/nexusagent/memory/index/embeddings.py",
+    "type": "class"
+  },
+  "HybridMemoryIndex": {
+    "file": "src/nexusagent/memory/index/index.py",
+    "type": "class"
+  },
+  "MemoryItem": {
+    "file": "src/nexusagent/memory/memory.py",
+    "type": "class"
+  },
+  "Memory": {
+    "file": "src/nexusagent/memory/memory.py",
+    "type": "class"
+  },
+  "MemoryManager": {
+    "file": "src/nexusagent/memory/memory.py",
+    "type": "class"
+  },
+  "HybridMemoryManager": {
+    "file": "src/nexusagent/memory/memory.py",
+    "type": "class"
+  },
+  "MemoryEntryType": {
+    "file": "src/nexusagent/memory/memory_files.py",
+    "type": "class"
+  },
+  "FileMemory": {
+    "file": "src/nexusagent/memory/memory_files.py",
+    "type": "class"
+  },
+  "NexusSDK": {
+    "file": "src/nexusagent/server/sdk.py",
+    "type": "class"
+  },
+  "SubmitTaskRequest": {
+    "file": "src/nexusagent/server/server.py",
+    "type": "class"
+  },
+  "SkillLoadError": {
+    "file": "src/nexusagent/skills.py",
+    "type": "class"
+  },
+  "Skill": {
+    "file": "src/nexusagent/skills.py",
+    "type": "class"
+  },
+  "load_skill": {
+    "file": "src/nexusagent/skills.py",
+    "type": "function"
+  },
+  "load_all_skills": {
+    "file": "src/nexusagent/skills.py",
+    "type": "function"
+  },
+  "get_skills_summary": {
+    "file": "src/nexusagent/skills.py",
+    "type": "function"
+  },
+  "get_skill_content": {
+    "file": "src/nexusagent/skills.py",
+    "type": "function"
+  },
+  "TaskReaper": {
+    "file": "src/nexusagent/task_reaper.py",
+    "type": "class"
+  },
+  "Issue": {
+    "file": "src/nexusagent/tools/code_review.py",
+    "type": "class"
+  },
+  "ReviewResult": {
+    "file": "src/nexusagent/tools/code_review.py",
+    "type": "class"
+  },
+  "review_code": {
+    "file": "src/nexusagent/tools/code_review.py",
+    "type": "function"
+  },
+  "search_code": {
+    "file": "src/nexusagent/tools/code_search.py",
+    "type": "function"
+  },
+  "find_symbol": {
+    "file": "src/nexusagent/tools/code_search.py",
+    "type": "function"
+  },
+  "find_references": {
+    "file": "src/nexusagent/tools/code_search.py",
+    "type": "function"
+  },
+  "set_workspace_root": {
+    "file": "src/nexusagent/tools/fs.py",
+    "type": "function"
+  },
+  "read_file": {
+    "file": "src/nexusagent/tools/fs.py",
+    "type": "function"
+  },
+  "read_multiple_files": {
+    "file": "src/nexusagent/tools/fs.py",
+    "type": "function"
+  },
+  "write_file": {
+    "file": "src/nexusagent/tools/fs.py",
+    "type": "function"
+  },
+  "edit_file": {
+    "file": "src/nexusagent/tools/fs.py",
+    "type": "function"
+  },
+  "list_directory": {
+    "file": "src/nexusagent/tools/fs.py",
+    "type": "function"
+  },
+  "write_multiple_files": {
+    "file": "src/nexusagent/tools/fs.py",
+    "type": "function"
+  },
+  "get_read_files": {
+    "file": "src/nexusagent/tools/fs.py",
+    "type": "function"
+  },
+  "reset_read_tracking": {
+    "file": "src/nexusagent/tools/fs.py",
+    "type": "function"
+  },
+  "git_status": {
+    "file": "src/nexusagent/tools/git.py",
+    "type": "function"
+  },
+  "git_diff": {
+    "file": "src/nexusagent/tools/git.py",
+    "type": "function"
+  },
+  "git_log": {
+    "file": "src/nexusagent/tools/git.py",
+    "type": "function"
+  },
+  "git_branch": {
+    "file": "src/nexusagent/tools/git.py",
+    "type": "function"
+  },
+  "git_show": {
+    "file": "src/nexusagent/tools/git.py",
+    "type": "function"
+  },
+  "git_stash_list": {
+    "file": "src/nexusagent/tools/git.py",
+    "type": "function"
+  },
+  "git_stash_push": {
+    "file": "src/nexusagent/tools/git.py",
+    "type": "function"
+  },
+  "git_stash_pop": {
+    "file": "src/nexusagent/tools/git.py",
+    "type": "function"
+  },
+  "git_commit": {
+    "file": "src/nexusagent/tools/git.py",
+    "type": "function"
+  },
+  "git_checkout_branch": {
+    "file": "src/nexusagent/tools/git.py",
+    "type": "function"
+  },
+  "apply_patch": {
+    "file": "src/nexusagent/tools/patch.py",
+    "type": "function"
+  },
+  "ask_user": {
+    "file": "src/nexusagent/tools/register_all.py",
+    "type": "function"
+  },
+  "memory_get": {
+    "file": "src/nexusagent/tools/register_all.py",
+    "type": "function"
+  },
+  "memory_write": {
+    "file": "src/nexusagent/tools/register_all.py",
+    "type": "function"
+  },
+  "register_tool": {
+    "file": "src/nexusagent/tools/registry/core.py",
+    "type": "function"
+  },
+  "get_tool_info": {
+    "file": "src/nexusagent/tools/registry/core.py",
+    "type": "function"
+  },
+  "list_all_tools": {
+    "file": "src/nexusagent/tools/registry/core.py",
+    "type": "function"
+  },
+  "auto_correct": {
+    "file": "src/nexusagent/tools/registry/core.py",
+    "type": "function"
+  },
+  "set_policy_context": {
+    "file": "src/nexusagent/tools/registry/policy.py",
+    "type": "function"
+  },
+  "get_policy_context": {
+    "file": "src/nexusagent/tools/registry/policy.py",
+    "type": "function"
+  },
+  "clear_policy_context": {
+    "file": "src/nexusagent/tools/registry/policy.py",
+    "type": "function"
+  },
+  "get_manifest": {
+    "file": "src/nexusagent/tools/registry/policy.py",
+    "type": "function"
+  },
+  "require_policy": {
+    "file": "src/nexusagent/tools/registry/policy.py",
+    "type": "function"
+  },
+  "check_tool_access": {
+    "file": "src/nexusagent/tools/registry/policy.py",
+    "type": "function"
+  },
+  "tool_search": {
+    "file": "src/nexusagent/tools/registry/search.py",
+    "type": "function"
+  },
+  "ToolInfo": {
+    "file": "src/nexusagent/tools/registry/types.py",
+    "type": "class"
+  },
+  "_HTMLToText": {
+    "file": "src/nexusagent/tools/research.py",
+    "type": "class"
+  },
+  "search_web": {
+    "file": "src/nexusagent/tools/research.py",
+    "type": "function"
+  },
+  "search_local_docs": {
+    "file": "src/nexusagent/tools/research.py",
+    "type": "function"
+  },
+  "fetch_url": {
+    "file": "src/nexusagent/tools/research.py",
+    "type": "function"
+  },
+  "run_shell": {
+    "file": "src/nexusagent/tools/shell.py",
+    "type": "function"
+  },
+  "run_shell_streaming": {
+    "file": "src/nexusagent/tools/shell.py",
+    "type": "function"
+  },
+  "run_tests": {
+    "file": "src/nexusagent/tools/test_runner.py",
+    "type": "function"
+  },
+  "run_single_test": {
+    "file": "src/nexusagent/tools/test_runner.py",
+    "type": "function"
+  },
+  "write_todos": {
+    "file": "src/nexusagent/tools/write_todos.py",
+    "type": "function"
+  },
+  "read_todos": {
+    "file": "src/nexusagent/tools/write_todos.py",
+    "type": "function"
+  },
+  "ChatInput": {
+    "file": "src/nexusagent/widgets/chat_input.py",
+    "type": "class"
+  },
+  "AppMessage": {
+    "file": "src/nexusagent/widgets/messages/app.py",
+    "type": "class"
+  },
+  "AssistantMessage": {
+    "file": "src/nexusagent/widgets/messages/assistant.py",
+    "type": "class"
+  },
+  "ErrorMessage": {
+    "file": "src/nexusagent/widgets/messages/error.py",
+    "type": "class"
+  },
+  "ToolCallMessage": {
+    "file": "src/nexusagent/widgets/messages/tool.py",
+    "type": "class"
+  },
+  "UserMessage": {
+    "file": "src/nexusagent/widgets/messages/user.py",
+    "type": "class"
+  },
+  "WelcomeBanner": {
+    "file": "src/nexusagent/widgets/messages/welcome.py",
+    "type": "class"
+  },
+  "ModelLabel": {
+    "file": "src/nexusagent/widgets/status.py",
+    "type": "class"
+  },
+  "StatusBar": {
+    "file": "src/nexusagent/widgets/status.py",
+    "type": "class"
+  },
+  "GitStatus": {
+    "file": "src/nexusagent/widgets/status.py",
+    "type": "class"
+  },
+  "ContextWindowBar": {
+    "file": "src/nexusagent/widgets/status.py",
+    "type": "class"
+  },
+  "BrailleSpinner": {
+    "file": "src/nexusagent/widgets/status.py",
+    "type": "class"
+  },
+  "register_themes": {
+    "file": "src/nexusagent/widgets/theme/registry.py",
+    "type": "function"
+  },
+  "ThemeColors": {
+    "file": "src/nexusagent/widgets/theme/colors.py",
+    "type": "class"
+  },
+  "get_theme_colors": {
+    "file": "src/nexusagent/widgets/theme/registry.py",
+    "type": "function"
+  },
+  "get_theme_css": {
+    "file": "src/nexusagent/widgets/theme/registry.py",
+    "type": "function"
+  },
+  "get_css_variable_defaults": {
+    "file": "src/nexusagent/widgets/theme/registry.py",
+    "type": "function"
+  },
+  "mock_sdk": {
+    "file": "tests/contract_verification/conftest.py",
+    "type": "function"
+  },
+  "test_mock_sdk_fixture": {
+    "file": "tests/contract_verification/test_fixture.py",
+    "type": "function"
+  },
+  "TaskResponse": {
+    "file": "tests/contract_verification/verify_tui_logic.py",
+    "type": "class"
+  },
+  "MockSDK": {
+    "file": "tests/contract_verification/verify_tui_logic.py",
+    "type": "class"
+  },
+  "TestChaosContract": {
+    "file": "tests/contract_verification/verify_chaos.py",
+    "type": "class"
+  },
+  "ui_handle_submit": {
+    "file": "tests/contract_verification/verify_chaos.py",
+    "type": "function"
+  },
+  "handle_submit_logic": {
+    "file": "tests/contract_verification/verify_logic.py",
+    "type": "function"
+  },
+  "test_success": {
+    "file": "tests/contract_verification/verify_logic.py",
+    "type": "function"
+  },
+  "test_failure": {
+    "file": "tests/contract_verification/verify_logic.py",
+    "type": "function"
+  },
+  "test_empty": {
+    "file": "tests/contract_verification/verify_logic.py",
+    "type": "function"
+  },
+  "TestTUIContract": {
+    "file": "tests/contract_verification/verify_tui_logic.py",
+    "type": "class"
+  },
+  "tui_handle_input": {
+    "file": "tests/contract_verification/verify_tui_logic.py",
+    "type": "function"
+  },
+  "TestWebUIContract": {
+    "file": "tests/contract_verification/verify_web_ui.py",
+    "type": "class"
+  },
+  "test_thinking_event": {
+    "file": "tests/test_agent_events.py",
+    "type": "function"
+  },
+  "test_thinking_event_default": {
+    "file": "tests/test_agent_events.py",
+    "type": "function"
+  },
+  "test_tool_call_event": {
+    "file": "tests/test_agent_events.py",
+    "type": "function"
+  },
+  "test_tool_call_event_default_call_id": {
+    "file": "tests/test_agent_events.py",
+    "type": "function"
+  },
+  "test_tool_result_event": {
+    "file": "tests/test_agent_events.py",
+    "type": "function"
+  },
+  "test_tool_result_event_defaults": {
+    "file": "tests/test_agent_events.py",
+    "type": "function"
+  },
+  "test_approval_request_event": {
+    "file": "tests/test_agent_events.py",
+    "type": "function"
+  },
+  "test_approval_request_event_defaults": {
+    "file": "tests/test_agent_events.py",
+    "type": "function"
+  },
+  "test_response_event": {
+    "file": "tests/test_agent_events.py",
+    "type": "function"
+  },
+  "test_response_event_default": {
+    "file": "tests/test_agent_events.py",
+    "type": "function"
+  },
+  "test_error_event": {
+    "file": "tests/test_agent_events.py",
+    "type": "function"
+  },
+  "test_error_event_default": {
+    "file": "tests/test_agent_events.py",
+    "type": "function"
+  },
+  "test_event_serialization": {
+    "file": "tests/test_agent_events.py",
+    "type": "function"
+  },
+  "test_run_command_exists": {
+    "file": "tests/test_cli_run.py",
+    "type": "function"
+  },
+  "TestEstimateTokens": {
+    "file": "tests/test_compaction.py",
+    "type": "class"
+  },
+  "TestShouldCompact": {
+    "file": "tests/test_compaction.py",
+    "type": "class"
+  },
+  "TestClearToolResults": {
+    "file": "tests/test_compaction.py",
+    "type": "class"
+  },
+  "TestMicrocompact": {
+    "file": "tests/test_compaction.py",
+    "type": "class"
+  },
+  "TestSummarizeOldMessages": {
+    "file": "tests/test_compaction.py",
+    "type": "class"
+  },
+  "TestEmergencyTruncate": {
+    "file": "tests/test_compaction.py",
+    "type": "class"
+  },
+  "TestCompactionPipeline": {
+    "file": "tests/test_compaction.py",
+    "type": "class"
+  },
+  "TestPreCompactionFlush": {
+    "file": "tests/test_compaction.py",
+    "type": "class"
+  },
+  "test_load_config_success": {
+    "file": "tests/test_config.py",
+    "type": "function"
+  },
+  "test_llm_timeout_default": {
+    "file": "tests/test_config.py",
+    "type": "function"
+  },
+  "TestGraphRouting": {
+    "file": "tests/test_graph.py",
+    "type": "class"
+  },
+  "TestGraphConstruction": {
+    "file": "tests/test_graph.py",
+    "type": "class"
+  },
+  "MockResponse": {
+    "file": "tests/test_orchestration.py",
+    "type": "class"
+  },
+  "TestPlanNode": {
+    "file": "tests/test_graph_nodes.py",
+    "type": "class"
+  },
+  "TestRefineNode": {
+    "file": "tests/test_graph_nodes.py",
+    "type": "class"
+  },
+  "TestExecuteNode": {
+    "file": "tests/test_graph_nodes.py",
+    "type": "class"
+  },
+  "TestSynthesizeNode": {
+    "file": "tests/test_graph_nodes.py",
+    "type": "class"
+  },
+  "TestHookEvent": {
+    "file": "tests/test_hooks.py",
+    "type": "class"
+  },
+  "TestHookRegistration": {
+    "file": "tests/test_hooks.py",
+    "type": "class"
+  },
+  "TestHookManager": {
+    "file": "tests/test_hooks.py",
+    "type": "class"
+  },
+  "TestRunHooks": {
+    "file": "tests/test_hooks.py",
+    "type": "class"
+  },
+  "TestGlobalFunctions": {
+    "file": "tests/test_hooks.py",
+    "type": "class"
+  },
+  "TestBuiltinHooks": {
+    "file": "tests/test_hooks.py",
+    "type": "class"
+  },
+  "TestHooksConfig": {
+    "file": "tests/test_hooks.py",
+    "type": "class"
+  },
+  "TestHooksCLI": {
+    "file": "tests/test_hooks.py",
+    "type": "class"
+  },
+  "manager": {
+    "file": "tests/test_hooks.py",
+    "type": "function"
+  },
+  "tmp_project": {
+    "file": "tests/test_hooks.py",
+    "type": "function"
+  },
+  "TestImageAttachment": {
+    "file": "tests/test_image_input.py",
+    "type": "class"
+  },
+  "TestEncodeImageToContent": {
+    "file": "tests/test_image_input.py",
+    "type": "class"
+  },
+  "TestBuildUserMessage": {
+    "file": "tests/test_image_input.py",
+    "type": "class"
+  },
+  "TestImageConfig": {
+    "file": "tests/test_image_input.py",
+    "type": "class"
+  },
+  "test_embed_dim_imported_not_duplicated": {
+    "file": "tests/test_memory.py",
+    "type": "function"
+  },
+  "test_embed_to_blob_shared": {
+    "file": "tests/test_memory.py",
+    "type": "function"
+  },
+  "test_hash_embed_uses_shared_helpers": {
+    "file": "tests/test_memory.py",
+    "type": "function"
+  },
+  "tmp_workspace": {
+    "file": "tests/test_memory_tools.py",
+    "type": "function"
+  },
+  "test_create_workspace": {
+    "file": "tests/test_memory_files.py",
+    "type": "function"
+  },
+  "test_write_and_read_entry": {
+    "file": "tests/test_memory_files.py",
+    "type": "function"
+  },
+  "test_daily_log": {
+    "file": "tests/test_memory_files.py",
+    "type": "function"
+  },
+  "test_memory_index_truncation": {
+    "file": "tests/test_memory_files.py",
+    "type": "function"
+  },
+  "test_frontmatter_format": {
+    "file": "tests/test_memory_files.py",
+    "type": "function"
+  },
+  "test_entity_pages": {
+    "file": "tests/test_memory_files.py",
+    "type": "function"
+  },
+  "test_get_daily_logs": {
+    "file": "tests/test_memory_files.py",
+    "type": "function"
+  },
+  "tmp_index_dir": {
+    "file": "tests/test_memory_index.py",
+    "type": "function"
+  },
+  "populated_index": {
+    "file": "tests/test_memory_index.py",
+    "type": "function"
+  },
+  "test_citation_format": {
+    "file": "tests/test_memory_index.py",
+    "type": "function"
+  },
+  "test_rebuild_index": {
+    "file": "tests/test_memory_index.py",
+    "type": "function"
+  },
+  "test_memory_search_tool_registered": {
+    "file": "tests/test_memory_tools.py",
+    "type": "function"
+  },
+  "test_memory_get_tool_registered": {
+    "file": "tests/test_memory_tools.py",
+    "type": "function"
+  },
+  "test_memory_write_tool_registered": {
+    "file": "tests/test_memory_tools.py",
+    "type": "function"
+  },
+  "TestTaskContractDefaults": {
+    "file": "tests/test_models.py",
+    "type": "class"
+  },
+  "TestTaskContractCustomBounds": {
+    "file": "tests/test_models.py",
+    "type": "class"
+  },
+  "TestMemoryScopeValues": {
+    "file": "tests/test_models.py",
+    "type": "class"
+  },
+  "TestReviewCode": {
+    "file": "tests/test_new_tools.py",
+    "type": "class"
+  },
+  "TestWriteTodos": {
+    "file": "tests/test_new_tools.py",
+    "type": "class"
+  },
+  "TestReadTodos": {
+    "file": "tests/test_new_tools.py",
+    "type": "class"
+  },
+  "tmp_todos_file": {
+    "file": "tests/test_new_tools.py",
+    "type": "function"
+  },
+  "sample_python_code": {
+    "file": "tests/test_new_tools.py",
+    "type": "function"
+  },
+  "TestParsePlanResponse": {
+    "file": "tests/test_orchestration.py",
+    "type": "class"
+  },
+  "TestRefinePlan": {
+    "file": "tests/test_orchestration.py",
+    "type": "class"
+  },
+  "TestRunDeepResearch": {
+    "file": "tests/test_orchestration.py",
+    "type": "class"
+  },
+  "TestSearchAndFetch": {
+    "file": "tests/test_orchestration.py",
+    "type": "class"
+  },
+  "TestSynthesizeReport": {
+    "file": "tests/test_orchestration.py",
+    "type": "class"
+  },
+  "TestEdgeCases": {
+    "file": "tests/test_orchestration.py",
+    "type": "class"
+  },
+  "TestSDKConstruction": {
+    "file": "tests/test_sdk.py",
+    "type": "class"
+  },
+  "TestSDKMethodSignatures": {
+    "file": "tests/test_sdk.py",
+    "type": "class"
+  },
+  "TestSubmitTaskNoMutation": {
+    "file": "tests/test_sdk.py",
+    "type": "class"
+  },
+  "mock_agent": {
+    "file": "tests/test_session.py",
+    "type": "function"
+  },
+  "mock_memory": {
+    "file": "tests/test_session.py",
+    "type": "function"
+  },
+  "mock_session": {
+    "file": "tests/test_session_memory.py",
+    "type": "function"
+  },
+  "TestLoadSkill": {
+    "file": "tests/test_skills.py",
+    "type": "class"
+  },
+  "TestLoadAllSkills": {
+    "file": "tests/test_skills.py",
+    "type": "class"
+  },
+  "TestGetSkillsSummary": {
+    "file": "tests/test_skills.py",
+    "type": "class"
+  },
+  "TestGetSkillContent": {
+    "file": "tests/test_skills.py",
+    "type": "class"
+  },
+  "TestSkillRepr": {
+    "file": "tests/test_skills.py",
+    "type": "class"
+  },
+  "sample_skill_dir": {
+    "file": "tests/test_skills.py",
+    "type": "function"
+  },
+  "sample_skills_dir": {
+    "file": "tests/test_skills.py",
+    "type": "function"
+  },
+  "test_handle_creation": {
+    "file": "tests/test_subagent.py",
+    "type": "function"
+  },
+  "test_handle_status_transitions": {
+    "file": "tests/test_subagent.py",
+    "type": "function"
+  },
+  "test_handle_is_done": {
+    "file": "tests/test_subagent.py",
+    "type": "function"
+  },
+  "test_cancel": {
+    "file": "tests/test_subagent.py",
+    "type": "function"
+  },
+  "test_mark_failed": {
+    "file": "tests/test_subagent.py",
+    "type": "function"
+  },
+  "TestStreamingDoubleWrite": {
+    "file": "tests/test_tui_bug_fixes.py",
+    "type": "class"
+  },
+  "TestToolCallDisplay": {
+    "file": "tests/test_tui_bug_fixes.py",
+    "type": "class"
+  },
+  "TestWordWrapping": {
+    "file": "tests/test_tui_bug_fixes.py",
+    "type": "class"
+  },
+  "TestGreetingRendering": {
+    "file": "tests/test_tui_bug_fixes.py",
+    "type": "class"
+  },
+  "TestMarkdownConsistency": {
+    "file": "tests/test_tui_bug_fixes.py",
+    "type": "class"
+  },
+  "TestActionQuit": {
+    "file": "tests/test_tui_bug_fixes.py",
+    "type": "class"
+  },
+  "TestSpinnerCharsDuplication": {
+    "file": "tests/test_tui_bug_fixes.py",
+    "type": "class"
+  },
+  "TestHelpScreenData": {
+    "file": "tests/test_tui_help_input.py",
+    "type": "class"
+  },
+  "TestLogViewerScreenData": {
+    "file": "tests/test_tui_help_input.py",
+    "type": "class"
+  },
+  "TestChatInputHintDropdown": {
+    "file": "tests/test_tui_help_input.py",
+    "type": "class"
+  },
+  "TestBreakpointClassification": {
+    "file": "tests/test_tui_responsive.py",
+    "type": "class"
+  },
+  "TestNoColorDetection": {
+    "file": "tests/test_tui_responsive.py",
+    "type": "class"
+  },
+  "TestAsciiTerminalDetection": {
+    "file": "tests/test_tui_responsive.py",
+    "type": "class"
+  },
+  "TestDebounceResize": {
+    "file": "tests/test_tui_responsive.py",
+    "type": "class"
+  },
+  "TestConfigResponsive": {
+    "file": "tests/test_tui_responsive.py",
+    "type": "class"
+  },
+  "TestNexusAppResponsive": {
+    "file": "tests/test_tui_responsive.py",
+    "type": "class"
+  },
+  "TestSigwinchHandler": {
+    "file": "tests/test_tui_responsive.py",
+    "type": "class"
+  },
+  "TestTuiCompose": {
+    "file": "tests/test_tui_streaming.py",
+    "type": "class"
+  },
+  "TestApprovalModal": {
+    "file": "tests/test_tui_streaming.py",
+    "type": "class"
+  },
+  "TestThemeColors": {
+    "file": "tests/test_tui_theme.py",
+    "type": "class"
+  },
+  "TestThemeTokens": {
+    "file": "tests/test_tui_theme.py",
+    "type": "class"
+  },
+  "TestThemeRegistry": {
+    "file": "tests/test_tui_theme.py",
+    "type": "class"
+  },
+  "TestTokyoNight": {
+    "file": "tests/test_tui_theme.py",
+    "type": "class"
+  },
+  "TestRosePine": {
+    "file": "tests/test_tui_theme.py",
+    "type": "class"
+  },
+  "TestSolarizedDark": {
+    "file": "tests/test_tui_theme.py",
+    "type": "class"
+  },
+  "TestNoColor": {
+    "file": "tests/test_tui_theme.py",
+    "type": "class"
+  },
+  "TestGitStatus": {
+    "file": "tests/test_tui_theme.py",
+    "type": "class"
+  },
+  "TestContextWindowBar": {
+    "file": "tests/test_tui_theme.py",
+    "type": "class"
+  },
+  "TestBrailleSpinner": {
+    "file": "tests/test_tui_theme.py",
+    "type": "class"
+  },
+  "TestUserMessage": {
+    "file": "tests/test_tui_widgets.py",
+    "type": "class"
+  },
+  "TestAssistantMessage": {
+    "file": "tests/test_tui_widgets.py",
+    "type": "class"
+  },
+  "TestToolCallMessage": {
+    "file": "tests/test_tui_widgets.py",
+    "type": "class"
+  },
+  "TestAppMessage": {
+    "file": "tests/test_tui_widgets.py",
+    "type": "class"
+  },
+  "TestErrorMessage": {
+    "file": "tests/test_tui_widgets.py",
+    "type": "class"
+  },
+  "TestWelcomeBanner": {
+    "file": "tests/test_tui_widgets.py",
+    "type": "class"
+  },
+  "TestSlashCommands": {
+    "file": "tests/test_tui_widgets.py",
+    "type": "class"
+  },
+  "TestHistoryPersistence": {
+    "file": "tests/test_tui_widgets.py",
+    "type": "class"
+  },
+  "test_websocket_route_exists": {
+    "file": "tests/test_websocket.py",
+    "type": "function"
+  },
+  "contract": {
+    "file": "tests/test_worker_pool.py",
+    "type": "function"
+  },
+  "test_pool_creation": {
+    "file": "tests/test_worker_pool.py",
+    "type": "function"
+  },
+  "temp_workspace": {
+    "file": "tests/tools/test_fs.py",
+    "type": "function"
+  },
+  "test_fs_tools": {
+    "file": "tests/tools/test_fs.py",
+    "type": "function"
+  },
+  "test_list_directory_recursive_true": {
+    "file": "tests/tools/test_fs.py",
+    "type": "function"
+  },
+  "test_list_directory_recursive_false": {
+    "file": "tests/tools/test_fs.py",
+    "type": "function"
+  },
+  "test_read_multiple_files": {
+    "file": "tests/tools/test_fs.py",
+    "type": "function"
+  },
+  "test_safety_check": {
+    "file": "tests/tools/test_fs.py",
+    "type": "function"
+  },
+  "test_write_after_read_success": {
+    "file": "tests/tools/test_fs.py",
+    "type": "function"
+  },
+  "test_write_multiple_files_with_safety": {
+    "file": "tests/tools/test_fs.py",
+    "type": "function"
+  },
+  "test_apply_patch": {
+    "file": "tests/tools/test_patch.py",
+    "type": "function"
+  },
+  "test_apply_patch_failure": {
+    "file": "tests/tools/test_patch.py",
+    "type": "function"
+  },
+  "test_search_web": {
+    "file": "tests/tools/test_research.py",
+    "type": "function"
+  },
+  "test_search_local_docs": {
+    "file": "tests/tools/test_research.py",
+    "type": "function"
+  },
+  "test_shell_tool": {
+    "file": "tests/tools/test_shell.py",
+    "type": "function"
+  },
+  "test_spawn_subagent_registered": {
+    "file": "tests/tools/test_spawn_subagent.py",
+    "type": "function"
+  }
+}
