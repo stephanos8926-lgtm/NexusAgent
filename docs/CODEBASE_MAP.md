@@ -3,7 +3,7 @@
 > Generated: 2026-07-18
 > Total source files: 107 (tests: 30)
 > Total lines: ~7,200 (src), ~2,100 (tests)
-> Last refactoring: Phase 5 — registry.py extracted into registry/ subpackage
+> Last refactoring: Phase 6 — memory_index.py extracted into memory/index/ subpackage
 > Structure pattern: Domain-based subpackages with compat shims
 
 ---
@@ -89,7 +89,9 @@ nexusagent/
 │
 ├── memory/                      # Hybrid memory system
 │   ├── memory.py (440L)        # HybridMemoryManager ← MONOLITH
-│   ├── memory_index.py (717L)   # FTS5 + sqlite-vec index ← MONOLITH
+│   ├── memory/                  # Memory index subpackage ✅ EXTRACTED Phase 6
+│   │   ├── embeddings.py (133L)  # EmbeddingProvider + helpers
+│   │   └── index.py (569L)      # HybridMemoryIndex (FTS5 + sqlite-vec)
 │   ├── memory_files.py (264L)   # File-based canonical memory
 │   └── compaction.py (233L)     # Context compaction pipeline
 │
@@ -217,6 +219,16 @@ nexusagent/
 - Old file: Compat shim
 - Commit: `10e76dc`
 - Cleaned: Removed 3 dead regex constants, dead Vertical import, redundant datetime import
+
+### Phase 5: `tools/registry.py` → `tools/registry/` ✅
+- Extracted: `types.py` (35L), `core.py` (107L), `policy.py` (215L), `search.py` (162L)
+- Old file: Compat shim
+- Commit: `a076952`
+
+### Phase 6: `memory/memory_index.py` → `memory/index/` ✅
+- Extracted: `embeddings.py` (133L), `index.py` (569L)
+- Old file: Compat shim
+- Commit: `db21f4c`
 
 ---
 
