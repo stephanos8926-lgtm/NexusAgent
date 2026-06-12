@@ -1,9 +1,9 @@
 # NexusAgent Codebase Map
 
-> Generated: 2026-07-16
-> Total source files: 33 (excluding venv/tests)
-> Total test files: 28
-> Merged from: CODEBASE_MAP.md, CODEBASE_MAP_CORE.md, CODEBASE_MAP_TOOLS_API.md, CODEBASE_MAP_TUI.md
+> Generated: 2026-07-18
+> Total source files: 35 (excluding venv/tests)
+> Total test files: 30
+> Last refactoring: src/ reorganization into domain subpackages
 
 ## Project Root
 

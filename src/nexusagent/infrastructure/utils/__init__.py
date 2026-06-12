@@ -1,11 +1,4 @@
-"""Utility functions for NexusAgent framework.
-
-This module is a compatibility shim. The actual implementations live in:
-- ``nexusagent.infrastructure.utils.retry`` — retry decorators
-- ``nexusagent.infrastructure.utils.circuit`` — circuit breaker
-
-All public symbols are re-exported here for backward compatibility.
-"""
+"""Utility functions for NexusAgent framework."""
 
 from nexusagent.infrastructure.utils.circuit import (
     CircuitBreaker,

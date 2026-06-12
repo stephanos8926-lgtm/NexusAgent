@@ -14,7 +14,8 @@ from nexusagent.infrastructure.bus import AgentBus, get_bus
 from nexusagent.infrastructure.db import TaskModel, task_repo
 from nexusagent.llm.models import ResultSchema, TaskContract, TaskSchema, TaskStatus
 from nexusagent.core.subagent import SubAgentHandle
-from nexusagent.infrastructure.utils import CircuitBreaker, retry_with_backoff
+from nexusagent.infrastructure.utils.circuit import CircuitBreaker
+from nexusagent.infrastructure.utils.retry import retry_with_backoff
 
 logger = logging.getLogger(__name__)
 
