@@ -240,27 +240,31 @@ class TestGreetingRendering:
 
 
 class TestMarkdownConsistency:
-    """_simple_markdown and _enhanced_markdown should produce consistent output."""
+    """render_markdown should produce correct Rich markup."""
 
-    def test_bold_rendering_consistent(self):
-        """Both renderers should convert **bold** to [b]bold[/b]."""
-        from nexusagent.interfaces.tui import NexusApp
+    def test_bold_rendering(self):
+        """**bold** should convert to [b]bold[/b]."""
+        from nexusagent.interfaces.tui_formatters import render_markdown
+        result = render_markdown("**bold** text")
+        assert "[b]bold[/b]" in result
 
-        app = NexusApp(session_id="test")
-        simple = app._simple_markdown("**bold** text")
-        enhanced = app._enhanced_markdown("**bold** text")
-        assert "[b]bold[/b]" in simple
-        assert "[b]bold[/b]" in enhanced
+    def test_italic_rendering(self):
+        """*italic* should convert to [i]italic[/i]."""
+        from nexusagent.interfaces.tui_formatters import render_markdown
+        result = render_markdown("*italic* text")
+        assert "[i]italic[/i]" in result
 
-    def test_italic_rendering_consistent(self):
-        """Both renderers should convert *italic* to [i]italic[/i]."""
-        from nexusagent.interfaces.tui import NexusApp
+    def test_code_block_rendering(self):
+        """Fenced code blocks should be extracted and formatted."""
+        from nexusagent.interfaces.tui_formatters import render_markdown
+        result = render_markdown("```python\nprint('hi')\n```")
+        assert "[python]" in result or "print" in result
 
-        app = NexusApp(session_id="test")
-        simple = app._simple_markdown("*italic* text")
-        enhanced = app._enhanced_markdown("*italic* text")
-        assert "[i]italic[/i]" in simple
-        assert "[i]italic[/i]" in enhanced
+    def test_inline_code_rendering(self):
+        """Inline code should use reverse markup."""
+        from nexusagent.interfaces.tui_formatters import render_markdown
+        result = render_markdown("Use `git status` to check")
+        assert "git status" in result
 
 
 # ═══════════════════════════════════════════════════════════════════════

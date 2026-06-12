@@ -16,14 +16,12 @@ Features:
 """
 
 import asyncio
-import contextlib
-import enum
 import json
 import logging
 import os
 import re
+import signal as _signal
 import textwrap
-import time
 import uuid
 from datetime import datetime
 from typing import Any, ClassVar
@@ -49,6 +47,31 @@ from textual.widgets import (
 
 from nexusagent.infrastructure.config import settings
 
+# Import extracted widgets
+from nexusagent.interfaces.tui_widgets import (
+    ApprovalModal,
+    Breakpoint,
+    ErrorModal,
+    SpinnerLabel,
+    NO_COLOR,
+    _get_terminal_size,
+    _sigwinch_handler,
+    classify_breakpoint,
+    debounce_resize,
+    is_no_color,
+)
+
+# Import extracted formatters
+from nexusagent.interfaces.tui_formatters import (
+    format_arg_value,
+    format_tool_output_generic,
+    format_tool_result_for_display,
+    render_markdown,
+    truncate,
+    truncate_output,
+    _escape,
+)
+
 # Color themes for /theme cycling
 NEXUS_THEMES = [
     {"name": "midnight", "header_bg": "#1f2937", "accent": "#10b981", "bg": "#111827"},
@@ -57,238 +80,6 @@ NEXUS_THEMES = [
     {"name": "sunset", "header_bg": "#7c2d12", "accent": "#fb923c", "bg": "#1c1010"},
     {"name": "lavender", "header_bg": "#3b3864", "accent": "#a78bfa", "bg": "#1a1830"},
 ]
-
-
-# ═══════════════════════════════════════════════════════════════════════════
-# SpinnerLabel — animated spinner + text
-# ═══════════════════════════════════════════════════════════════════════════
-
-class SpinnerLabel(Horizontal):
-    """Label with an animated spinner prefix."""
-    spinner_chars = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
-    tick = reactive(0)
-
-    def __init__(self, text: str = "Ready", **kwargs):
-        super().__init__(**kwargs)
-        self._text = text
-        self._timer: Timer | None = None
-        self._spinning = False
-
-    def compose(self) -> ComposeResult:
-        yield Static("", id="spinner-icon")
-        yield Static("", id="spinner-text")
-
-    def on_mount(self) -> None:
-        self.update_display()
-
-    def set_text(self, text: str, spinning: bool = False):
-        self._text = text
-        if spinning and not self._spinning:
-            self._spinning = True
-            self._timer = self.set_interval(0.1, self._tick_spinner)
-        elif not spinning and self._spinning:
-            self._spinning = False
-            if self._timer:
-                self._timer.stop()
-                self._timer = None
-        self.update_display()
-
-    def _tick_spinner(self):
-        self.tick += 1
-
-    def watch_tick(self):
-        self.update_display()
-
-    def update_display(self):
-        try:
-            spinner = ""
-            if self._spinning:
-                spinner = self.spinner_chars[int(self.tick) % len(self.spinner_chars)]
-            self.query_one("#spinner-icon", Static).update(spinner)
-            self.query_one("#spinner-text", Static).update(self._text)
-        except Exception:
-            pass
-
-    def on_unmount(self):
-        if self._timer:
-            self._timer.stop()
-
-
-# ═══════════════════════════════════════════════════════════════════════════
-# Responsive breakpoints
-# ═══════════════════════════════════════════════════════════════════════════
-
-
-class Breakpoint(enum.Enum):
-    """Terminal width breakpoints for responsive layout."""
-    WIDE = "wide"           # > 120 cols
-    STANDARD = "standard"   # 80-120 cols
-    NARROW = "narrow"         # 60-79 cols
-    TOO_SMALL = "too_small" # < 60 cols
-
-
-# Width thresholds
-_WIDE_THRESHOLD = 120
-_STANDARD_THRESHOLD = 80
-_NARROW_THRESHOLD = 60
-
-
-def classify_breakpoint(width: int) -> Breakpoint:
-    """Classify a terminal width into a responsive breakpoint.
-
-    Args:
-        width: Terminal width in columns.
-
-    Returns:
-        The corresponding Breakpoint enum value.
-    """
-    if width > _WIDE_THRESHOLD:
-        return Breakpoint.WIDE
-    if width >= _STANDARD_THRESHOLD:
-        return Breakpoint.STANDARD
-    if width >= _NARROW_THRESHOLD:
-        return Breakpoint.NARROW
-    return Breakpoint.TOO_SMALL
-
-
-# ── Accessibility: NO_COLOR + monochrome fallback ---------------------------
-
-# https://no-color.org — check at module load time
-NO_COLOR: bool = "NO_COLOR" in os.environ
-
-
-def is_no_color() -> bool:
-    """Check if NO_COLOR is set (respects https://no-color.org spec).
-
-    Returns True if the NO_COLOR environment variable is present
-    (even if empty string), indicating the user wants monochrome output.
-    """
-    return "NO_COLOR" in os.environ
-
-
-# ── Debounced resize (SIGWINCH) ---------------------------------------------
-
-_DEFAULT_DEBOUNCE_SECONDS = 0.2
-
-
-def debounce_resize(
-    state: dict[str, float],
-    current_time: float,
-    debounce_seconds: float = _DEFAULT_DEBOUNCE_SECONDS,
-) -> bool:
-    """Debounce resize events to avoid excessive re-renders.
-
-    Args:
-        state: Mutable dict tracking last resize time.
-               Must contain "last_resize_time" key after first call.
-        current_time: Current monotonic time (e.g., from time.monotonic()).
-        debounce_seconds: Minimum seconds between resize handling.
-
-    Returns:
-        True if the resize should be handled, False if debounced.
-    """
-    last = state.get("last_resize_time")
-    if last is None:
-        state["last_resize_time"] = current_time
-        return True
-    if current_time - last >= debounce_seconds:
-        state["last_resize_time"] = current_time
-        return True
-    return False
-
-
-def _sigwinch_handler(app: "NexusApp") -> None:
-    """Handle SIGWINCH (window resize signal) with debounce.
-
-    Updates the app's breakpoint classification and notifies the user
-    when the terminal is too small.
-    """
-    try:
-        now = time.monotonic()
-        if not debounce_resize(app._resize_state, now):
-            return
-
-        cols, _ = _get_terminal_size()
-        new_bp = classify_breakpoint(cols)
-        old_bp = app._breakpoint
-        app._breakpoint = new_bp
-
-        if new_bp != old_bp:
-            logger.debug(f"Breakpoint changed: {old_bp.value} -> {new_bp.value} ({cols} cols)")
-
-        if new_bp == Breakpoint.TOO_SMALL:
-            app.notify(
-                f"Terminal too small ({cols} cols). Minimum 60 cols recommended.",
-                severity="warning",
-                timeout=3,
-            )
-    except Exception as exc:
-        logger.debug(f"SIGWINCH handler error: {exc}")
-
-
-def _get_terminal_size() -> tuple[int, int]:
-    """Get terminal size as (columns, rows).
-
-    Returns:
-        Tuple of (columns, rows). Falls back to (80, 24) on error.
-    """
-    import shutil
-    try:
-        size = shutil.get_terminal_size()
-        return (size.columns, size.lines)
-    except OSError:
-        return (80, 24)
-
-
-# ═══════════════════════════════════════════════════════════════════════════
-# ApprovalModal — tool call approval dialog
-# ═══════════════════════════════════════════════════════════════════════════
-
-class ApprovalModal(ModalScreen[bool]):
-    def __init__(self, tool_name: str, tool_args: dict, call_id: str = "") -> None:
-        super().__init__()
-        self.tool_name = tool_name
-        self.tool_args = tool_args
-        self.call_id = call_id
-
-    def compose(self) -> ComposeResult:
-        with Vertical(id="approval-dialog"):
-            yield Static(f"⚡ Approval Required: {self.tool_name}", id="approval-title")
-            with ScrollableContainer(id="approval-scroll"):
-                args_str = "\n".join(f"  {k}: {v}" for k, v in self.tool_args.items())
-                yield Static(args_str, id="approval-args")
-            with Horizontal(id="approval-buttons"):
-                yield Button("✓ Approve", id="approve", variant="success")
-                yield Button("✗ Reject", id="reject", variant="error")
-                yield Button("Cancel", id="cancel")
-
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        if event.button.id == "approve":
-            self.dismiss(True)
-        else:
-            self.dismiss(False)
-
-
-# ═══════════════════════════════════════════════════════════════════════════
-# ErrorModal — error display dialog
-# ═══════════════════════════════════════════════════════════════════════════
-
-class ErrorModal(ModalScreen[None]):
-    """Modal dialog for displaying errors."""
-
-    def __init__(self, error_message: str) -> None:
-        super().__init__()
-        self.error_message = error_message
-
-    def compose(self) -> ComposeResult:
-        with Vertical(id="approval-dialog"):
-            yield Static("⚠ Error", id="approval-title")
-            yield Static(self.error_message, id="approval-args")
-            with Horizontal(id="approval-buttons"):
-                yield Button("OK", id="ok", variant="primary")
-
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        self.dismiss(None)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -503,16 +294,8 @@ class NexusApp(App):
     # ── SIGWINCH (responsive resize) ────────────────────────────────────
 
     def _install_sigwinch(self) -> None:
-        """Install SIGWINCH signal handler for responsive terminal resizing.
-
-        Uses signal.SIGWINCH on Unix systems. The handler is a closure
-        that captures the app instance and delegates to _sigwinch_handler.
-        Gracefully skips on platforms where SIGWINCH is not available
-        (e.g., Windows).
-        """
+        """Install SIGWINCH signal handler for responsive terminal resizing."""
         try:
-            import signal as _signal
-
             sig = _signal.SIGWINCH
         except AttributeError:
             logger.debug("SIGWINCH not available on this platform")
@@ -527,19 +310,13 @@ class NexusApp(App):
         logger.debug("SIGWINCH handler installed")
 
     def _check_sigwinch(self) -> None:
-        """Check if a SIGWINCH was received and process it.
-
-        This is called periodically from the event loop to handle
-        pending resize events with debouncing.
-        """
+        """Check if a SIGWINCH was received and process it."""
         if getattr(self, "_sigwinch_pending", False):
             self._sigwinch_pending = False
             _sigwinch_handler(self)
 
     def _restore_sigwinch(self) -> None:
         """Restore the original SIGWINCH signal handler."""
-        import signal as _signal
-
         if hasattr(self, "_original_sigwinch"):
             try:
                 _signal.signal(_signal.SIGWINCH, self._original_sigwinch)
@@ -548,14 +325,7 @@ class NexusApp(App):
                 logger.debug(f"Failed to restore SIGWINCH handler: {exc}")
 
     def _is_ascii_terminal(self) -> bool:
-        """Detect if we're in an ASCII-only terminal (no color support).
-
-        Checks (in order):
-        - NO_COLOR environment variable (https://no-color.org)
-        - TERM=dumb
-        - COLORTERM unset or empty
-        """
-        # NO_COLOR takes precedence per https://no-color.org
+        """Detect if we're in an ASCII-only terminal (no color support)."""
         if is_no_color():
             return True
         if os.environ.get("TERM") == "dumb":
@@ -653,7 +423,7 @@ class NexusApp(App):
             content = event.get("content", "")
             if content and content != "Processing...":
                 self.log_widget.write(
-                    f"[dim italic]  ⟶ {self._escape(content)}[/dim italic]",
+                    f"[dim italic]  ⟶ {_escape(content)}[/dim italic]",
                     shrink=False,
                 )
 
@@ -663,11 +433,11 @@ class NexusApp(App):
             self._last_tool_name = tool  # store for per-tool result formatting
             if isinstance(args, dict):
                 args_str = ", ".join(
-                    f"[yellow]{k}[/yellow]=[white]{self._truncate(self._format_arg_value(v), 60)}[/white]"
+                    f"[yellow]{k}[/yellow]=[white]{truncate(format_arg_value(v), 60)}[/white]"
                     for k, v in args.items()
                 )
             else:
-                args_str = self._truncate(self._format_arg_value(args), 80)
+                args_str = truncate(format_arg_value(args), 80)
             self.log_widget.write(
                 f"[dim]⚙[/dim] [b orange]{tool}[/b orange]({args_str})",
                 shrink=False,
@@ -690,7 +460,7 @@ class NexusApp(App):
             tool = event.get("tool", "?")
             error = event.get("error", "Unknown error")
             self.log_widget.write(
-                f"[red]✗ {tool} failed: {self._escape(error)}[/red]",
+                f"[red]✗ {tool} failed: {_escape(error)}[/red]",
                 shrink=False,
             )
             self.status_widget.set_text(f"Error in {tool}")
@@ -725,7 +495,7 @@ class NexusApp(App):
 
         elif etype == "error":
             message = event.get("message", "Unknown error")
-            self.log_widget.write(f"[red][b]✗ Error:[/b] {self._escape(message)}[/red]", shrink=False)
+            self.log_widget.write(f"[red][b]✗ Error:[/b] {_escape(message)}[/red]", shrink=False)
             self._busy = False
             self._process_next_in_queue()
             self.status_widget.set_text("Error")
@@ -739,16 +509,11 @@ class NexusApp(App):
     # ── Display helpers ──────────────────────────────────────────────
 
     def _write_tool_result(self, success: bool, output: str, call_id: str):
-        """Write a tool result — short results inline, long results collapsible.
-
-        Uses per-tool formatters via dispatch table for specialized output.
-        """
-        # Determine tool name from context (last tool_call event)
+        """Write a tool result — short results inline, long results collapsible."""
         tool_name = getattr(self, "_last_tool_name", "")
-
-        # Use per-tool formatter if available
-        display = self._format_tool_result_for_display(tool_name, success, output)
         max_chars = settings.agent.max_tool_output_chars
+
+        display = format_tool_result_for_display(tool_name, success, output, max_chars)
 
         if len(display) <= max_chars:
             icon = "✓" if success else "✗"
@@ -758,7 +523,7 @@ class NexusApp(App):
                 shrink=False,
             )
         else:
-            truncated = self._truncate_output(display)
+            truncated = truncate_output(display, max_chars)
             icon = "✓" if success else "✗"
             color = "green" if success else "red"
             collapsible = Collapsible(
@@ -770,175 +535,10 @@ class NexusApp(App):
             self.log_widget.mount(collapsible)
             self.log_widget.scroll_end(animate=False)
 
-    def _format_tool_result_for_display(self, tool_name: str, success: bool, output: str) -> str:
-        """Dispatch table for per-tool output formatting."""
-        if not output or not output.strip():
-            return "[dim](empty)[/dim]"
-
-        # Shell tools: show command + exit code + truncated output
-        if tool_name in ("run_shell", "run_shell_streaming", "shell"):
-            return self._format_shell_output(output)
-        # File read: show path + line count + content preview
-        elif tool_name in ("read_file", "read_multiple_files"):
-            return self._format_read_file_output(output)
-        # File write/edit: show path + success
-        elif tool_name in ("write_file", "write_multiple_files", "edit_file", "apply_patch"):
-            return self._format_write_file_output(output, tool_name)
-        # Git tools: show command + result summary
-        elif tool_name.startswith("git_"):
-            return self._format_git_output(output, tool_name)
-        # Search web: show query + result count + top URLs
-        elif tool_name in ("search_web", "search_local_docs"):
-            return self._format_search_output(output)
-        # Subagent: show task + status
-        elif tool_name == "spawn_subagent":
-            return self._format_subagent_output(output)
-        # Default: use existing generic JSON/smart formatter
-        else:
-            return self._format_tool_output(output)
-
-    def _format_shell_output(self, output: str) -> str:
-        """Format shell command output: show exit code + truncated stdout."""
-        lines = output.strip().split("\n")
-        # Try to find exit code indicator
-        exit_code = None
-        clean_lines = []
-        for line in lines:
-            if line.startswith("Exit code:") or line.startswith("exit code:"):
-                with contextlib.suppress(ValueError):
-                    exit_code = int(line.split(":")[-1].strip())
-            elif not line.startswith("Error:"):
-                clean_lines.append(line)
-
-        result = "\n".join(clean_lines[:15])
-        suffix = ""
-        if len(clean_lines) > 15:
-            suffix = f"\n[dim]... +{len(clean_lines) - 15} more lines[/dim]"
-
-        code_str = ""
-        if exit_code is not None:
-            code_color = "green" if exit_code == 0 else "red"
-            code_str = f"[{code_color}]exit {exit_code}[/{code_color}] "
-
-        return f"{code_str}{result}{suffix}"
-
-    def _format_read_file_output(self, output: str) -> str:
-        """Format read_file output: show file path + line count + content preview."""
-        lines = output.strip().split("\n")
-        # Count content lines (skip line-number prefixed ones like "1|content")
-        content_lines = [line for line in lines if not re.match(r'^\d+\|', line)]
-        line_count = len(content_lines)
-
-        preview_lines = content_lines[:12]
-        preview = "\n".join(preview_lines)
-        suffix = ""
-        if line_count > 12:
-            suffix = f"\n[dim]... +{line_count - 12} more lines[/dim]"
-
-        return f"[b cyan]({line_count} lines)[/b cyan] {preview}{suffix}"
-
-    def _format_write_file_output(self, output: str, tool_name: str) -> str:
-        """Format write_file/edit_file output: show success indicator."""
-        cleaned = output.strip()
-        # Try to extract file path from output
-        path_match = re.search(r'(?:written|saved|patched)\s+(?:to\s+)?["\']?([\w./~_-]+)["\']?', cleaned, re.IGNORECASE)
-        path = path_match.group(0) if path_match else cleaned[:80]
-        return f"[green]✓ {tool_name}[/green] → {path}"
-
-    def _format_git_output(self, output: str, tool_name: str) -> str:
-        """Format git tool output: show git command + result summary."""
-        lines = output.strip().split("\n")
-        # Show first 10 meaningful lines
-        meaningful = [line for line in lines if line.strip()][:10]
-        result = "\n".join(meaningful)
-        suffix = ""
-        if len(lines) > 10:
-            suffix = f"\n[dim]... +{len(lines) - 10} more lines[/dim]"
-        return f"[b orange]git {tool_name[4:]}[/b orange] {result}{suffix}"
-
-    def _format_search_output(self, output: str) -> str:
-        """Format search_web output: show result count + top URLs."""
-        # Count Title: occurrences as proxy for result count
-        result_count = output.count("Title:")
-        urls = re.findall(r'URL:\s*(\S+)', output)
-        url_preview = "\n".join(f"  🔗 {u}" for u in urls[:3])
-        suffix = ""
-        if len(urls) > 3:
-            suffix = f"\n[dim]  ... +{len(urls) - 3} more URLs[/dim]"
-        return f"[b cyan]({result_count} results)[/b cyan]\n{url_preview}{suffix}"
-
-    def _format_subagent_output(self, output: str) -> str:
-        """Format spawn_subagent output: show task + status."""
-        cleaned = output.strip()
-        # Extract worker ID and status
-        id_match = re.search(r'worker\s+(\S+)', cleaned)
-        status_match = re.search(r'status:\s*(\w+)', cleaned)
-        worker_id = id_match.group(1) if id_match else "?"
-        status = status_match.group(1) if status_match else "?"
-        return f"[b purple]subagent {worker_id}[/b purple] status: [yellow]{status}[/yellow]"
-
-    def _format_tool_output(self, output: str) -> str:
-        """Format tool output for display — parse JSON into human-readable form."""
-        if not output or not output.strip():
-            return "[dim](empty)[/dim]"
-
-        # Try to parse as JSON
-        try:
-            data = json.loads(output)
-            if isinstance(data, dict):
-                # Common tool output patterns — extract meaningful content
-                for key in ("content", "result", "output", "stdout", "text", "message", "data"):
-                    if data.get(key):
-                        val = data[key]
-                        if isinstance(val, str):
-                            return self._escape(val.strip())
-                        return self._escape(json.dumps(val, indent=2, default=str))
-                # Show key-value summary for dicts
-                preview = {}
-                for k, v in list(data.items())[:6]:
-                    v_str = str(v)
-                    if len(v_str) > 120:
-                        v_str = v_str[:117] + "..."
-                    preview[k] = v_str
-                lines = [f"[b]{k}[/b]: {v}" for k, v in preview.items()]
-                if len(data) > 6:
-                    lines.append(f"[dim]... +{len(data) - 6} more keys[/dim]")
-                return "\n".join(lines)
-            if isinstance(data, list):
-                if len(data) == 0:
-                    return "[dim](empty list)[/dim]"
-                if len(data) <= 5:
-                    items = []
-                    for item in data:
-                        s = str(item)
-                        if len(s) > 200:
-                            s = s[:197] + "..."
-                        items.append(f"  • {s}")
-                    return "\n".join(items)
-                # Large list: show first 5 + count
-                items = []
-                for item in data[:5]:
-                    s = str(item)
-                    if len(s) > 200:
-                        s = s[:197] + "..."
-                    items.append(f"  • {s}")
-                items.append(f"[dim]  ... +{len(data) - 5} more items[/dim]")
-                return "\n".join(items)
-            # Primitive JSON value
-            return self._escape(str(data))
-        except (json.JSONDecodeError, TypeError):
-            pass
-
-        # Not JSON — show as-is, cleaned up
-        cleaned = output.strip()
-        # Collapse excessive blank lines
-        cleaned = re.sub(r'\n{3,}', '\n\n', cleaned)
-        return self._escape(cleaned)
-
     def _write_response(self, content: str):
         """Write the final agent response with markdown formatting."""
         ts = datetime.now().strftime("%H:%M")
-        formatted = self._simple_markdown(content)
+        formatted = render_markdown(content, code_blocks=True)
         self.log_widget.write("", shrink=False)
         self.log_widget.write(
             f"[b green][{ts}] Agent:[/b green] {formatted}",
@@ -1144,7 +744,7 @@ class NexusApp(App):
 
             skills = load_all_skills()
             if skills:
-                summary = get_skills_summary(skills)
+                get_skills_summary(skills)
                 self.log_widget.write("[b cyan]Available Skills[/b cyan]", shrink=False)
                 for name, skill in sorted(skills.items()):
                     desc = skill.description or "No description"
@@ -1182,7 +782,6 @@ class NexusApp(App):
     def _apply_theme(self, theme: dict) -> None:
         """Apply a color theme by updating CSS."""
         self.styles.background = theme["bg"]
-        # Update header styles
         self.query_one(Header).styles.background = theme["header_bg"]
         self.query_one(Header).styles.color = theme["accent"]
 
@@ -1218,28 +817,18 @@ class NexusApp(App):
     # ── Streaming response ───────────────────────────────────────────
 
     def _write_response_chunk(self, content: str) -> None:
-        """Append a streaming token to the in-progress response.
-
-        Updates the streaming-response Static widget in-place so the user
-        sees text appearing token-by-token, similar to deepagents' MarkdownStream.
-        """
+        """Append a streaming token to the in-progress response."""
         self._streaming_response += content
         self._streaming_widget.update(
             f"[b green]Agent:[/b green] {self._streaming_response}"
         )
 
     def _finalize_response(self, content: str) -> None:
-        """Finalize the streaming response.
-
-        Parses and formats the response with:
-        - Syntax highlighting for code blocks (heuristic: detect ``` markers)
-        - URL auto-detection (Textual RichLog auto-links URLs)
-        - Clear separator between turns
-        """
+        """Finalize the streaming response."""
         if self._streaming_response:
             final = content if content else self._streaming_response
             ts = datetime.now().strftime("%H:%M")
-            formatted = self._enhanced_markdown(final)
+            formatted = render_markdown(final, code_blocks=True)
             self.log_widget.write("", shrink=False)
             self.log_widget.write(
                 f"[b green][{ts}] Agent:[/b green]",
@@ -1253,39 +842,6 @@ class NexusApp(App):
         # Clear the streaming widget
         self._streaming_widget.update("")
         self._streaming_response = ""
-
-    def _enhanced_markdown(self, text: str) -> str:
-        """Enhanced markdown: syntax highlighting for code blocks, bold, italic, inline code."""
-        # Extract code blocks first, replace with placeholders
-        code_blocks = []
-        def replace_code_block(m):
-            lang = m.group(1) or ""
-            code = m.group(2)
-            idx = len(code_blocks)
-            code_blocks.append((lang, code))
-            return f"__CODE_BLOCK_{idx}__"
-
-        # Handle fenced code blocks  ```lang\n...\n```
-        text = re.sub(r'```(\w*)\n(.*?)```', replace_code_block, text, flags=re.DOTALL)
-
-        # Handle inline code `...`
-        text = re.sub(r'`([^`]+)`', r'[reverse]\1[/reverse]', text)
-
-        # Bold and italic
-        text = re.sub(r'\*\*(.+?)\*\*', r'[b]\1[/b]', text)
-        text = re.sub(r'(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)', r'[i]\1[/i]', text)
-
-        # Restore code blocks with dim/styled formatting
-        for i, (lang, code) in enumerate(code_blocks):
-            lang_label = f"[dim]({lang})[/dim] " if lang else ""
-            # Truncate very long code blocks
-            code_lines = code.split("\n")
-            if len(code_lines) > 20:
-                code = "\n".join(code_lines[:20]) + f"\n[dim]... +{len(code_lines) - 20} more lines[/dim]"
-            styled = f"{lang_label}[dim]{code}[/dim]"
-            text = text.replace(f"__CODE_BLOCK_{i}__", styled)
-
-        return text
 
     # ── Queue management ────────────────────────────────────────────
 
@@ -1386,42 +942,6 @@ class NexusApp(App):
                 "[dim]⟶ Auto-approve disabled — tool calls require manual approval.[/dim]",
                 shrink=False,
             )
-
-    # ── Helpers ─────────────────────────────────────────────────────
-
-    def _truncate_output(self, output: str) -> str:
-        max_chars = settings.agent.max_tool_output_chars
-        if len(output) <= max_chars:
-            return output
-        head = output[:max_chars // 2]
-        tail = output[-(max_chars // 2):]
-        return f"{head}\n[dim]... ({len(output):,} chars total) ...[/dim]\n{tail}"
-
-    def _truncate(self, text: str, max_len: int) -> str:
-        if len(text) <= max_len:
-            return text
-        return text[:max_len - 3] + "..."
-
-    def _format_arg_value(self, value) -> str:
-        """Format a tool argument value for display — dicts as JSON, strings escaped."""
-        if isinstance(value, dict):
-            return json.dumps(value, ensure_ascii=False)
-        if isinstance(value, list):
-            return json.dumps(value, ensure_ascii=False)
-        if isinstance(value, str) and len(value) > 200:
-            return textwrap.shorten(value, width=200, placeholder="...")
-        return self._escape(str(value))
-
-    def _escape(self, text: str) -> str:
-        return text.replace("[", "\\[").replace("]", "\\]")
-
-    def _simple_markdown(self, text: str) -> str:
-        text = re.sub(r'\*\*(.+?)\*\*', r'[b]\1[/b]', text)
-        text = re.sub(r'(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)', r'[i]\1[/i]', text)
-        text = re.sub(r'`(.+?)`', r'[reverse]\1[/reverse]', text)
-        text = re.sub(r'```\w*\n?', '', text)
-        text = re.sub(r'```', '', text)
-        return text
 
 
 def main(yolo: bool = False) -> None:
