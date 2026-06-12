@@ -1,9 +1,9 @@
 # NexusAgent Codebase Map
 
 > Generated: 2026-07-18
-> Total source files: 108 (tests: 31)
-> Total lines: ~7,200 (src), ~2,400 (tests)
-> Last refactoring: Phases 1-7 complete + yolo config fix
+> Total source files: 81 (tests: 45)
+> Total lines: ~13,400 (src), ~3,100 (tests)
+> Last refactoring: Phases 1-7 complete + yolo config fix + TUI split
 > Structure pattern: Domain-based subpackages with compat shims
 
 ---
@@ -22,7 +22,7 @@ NexusAgent/
 ├── deployment/            # Deployment scripts
 ├── scripts/               # CLI tools (worktree-worker.py)
 ├── src/nexusagent/        # Main source package
-└── tests/                 # 30 test files, 453 pass / 20 fail baseline
+└── tests/                 # 45 test files
 ```
 
 ---
@@ -63,19 +63,21 @@ NexusAgent/
 
 ```
 nexusagent/
-├── skills.py                    # Tool skill dispatch (127L)
-├── task_reaper.py               # Stale task cleanup (59L)
+├── __init__.py                  # Package init (0L)
+├── skills.py (127L)             # Skill system — load/inject skills from .hermes/skills/
+├── task_reaper.py (59L)         # Stale task cleanup
 │
 ├── core/                        # Agent core (session, agent, orchestration, graph)
-│   ├── session.py (677L)        # Session + SessionManager ← MONOLITH
+│   ├── __init__.py (6L)         # Re-exports Session, SessionManager, SubAgentStatus, WorkerPool
 │   ├── agent.py (134L)          # Agent wrapper (role-based, policy)
-│   ├── worker.py (304L)         # NexusWorker + WorkerPool ← LARGE
+│   ├── worker.py (304L)         # NexusWorker + WorkerPool
+│   ├── session.py (677L)        # Session + SessionManager ← MONOLITH
 │   ├── orchestration.py (193L)  # DeepResearchOrchestrator
 │   ├── graph.py (250L)          # LangGraph research graph
 │   └── subagent.py (161L)       # SubAgentHandle tracking
 │
 ├── tools/                       # Tool implementations
-│   ├── registry.py (623L)       # ToolInfo + @register + policy ← MONOLITH
+│   ├── registry.py (39L)        # Compat shim → registry/ subpackage
 │   ├── register_all.py (728L)   # Registration calls ← MONOLITH
 │   ├── fs.py (343L)             # Filesystem tools
 │   ├── git.py (169L)            # Git tools
@@ -85,62 +87,86 @@ nexusagent/
 │   ├── research.py (204L)       # Web research
 │   ├── test_runner.py (216L)    # Test execution
 │   ├── patch.py (17L)           # File patching
-│   └── write_todos.py (118L)    # Todo write tool
+│   ├── write_todos.py (118L)    # Todo write tool
+│   └── registry/                # Registry subpackage ✅ EXTRACTED Phase 5
+│       ├── __init__.py (62L)    # Re-exports from types, core, policy, search
+│       ├── types.py (35L)       # ToolInfo dataclass
+│       ├── core.py (113L)       # register_tool, get_tool_info, list_all_tools, auto_correct
+│       ├── policy.py (285L)     # ROLE_MANIFESTS, policy enforcement
+│       └── search.py (181L)     # tool_search, _format_tool_list
 │
 ├── memory/                      # Hybrid memory system
-│   ├── memory.py (440L)        # HybridMemoryManager ← MONOLITH
-│   ├── memory/                  # Memory index subpackage ✅ EXTRACTED Phase 6
-│   │   ├── embeddings.py (133L)  # EmbeddingProvider + helpers
-│   │   └── index.py (569L)      # HybridMemoryIndex (FTS5 + sqlite-vec)
+│   ├── __init__.py (4L)         # Re-exports HybridMemoryManager
+│   ├── memory.py (436L)         # Memory, MemoryManager, HybridMemoryManager
+│   ├── memory_index.py (34L)    # Compat shim → index/ subpackage
 │   ├── memory_files.py (264L)   # File-based canonical memory
-│   └── compaction.py (233L)     # Context compaction pipeline
+│   ├── compaction.py (233L)     # Context compaction pipeline
+│   └── index/                   # Memory index subpackage ✅ EXTRACTED Phase 6
+│       ├── __init__.py (32L)    # Re-exports EmbeddingProvider, HybridMemoryIndex
+│       ├── embeddings.py (133L) # EmbeddingProvider + helpers
+│       └── index.py (613L)      # HybridMemoryIndex (FTS5 + sqlite-vec)
 │
 ├── widgets/                     # UI widgets
-│   ├── messages/                  # Messages subpackage ✅ EXTRACTED Phase 4
-│   │   ├── user.py (42L)          # UserMessage
-│   │   ├── assistant.py (128L)      # AssistantMessage (streaming, markdown)
-│   │   ├── tool.py (171L)         # ToolCallMessage (collapsible, status)
-│   │   ├── app.py (33L)           # AppMessage (system messages)
-│   │   ├── error.py (33L)         # ErrorMessage
-│   │   └── welcome.py (52L)       # WelcomeBanner
+│   ├── __init__.py (32L)        # Widgets package init
+│   ├── messages.py (25L)        # Compat shim → messages/ subpackage
 │   ├── chat_input.py (215L)     # ChatInput widget
-│   ├── status.py (367L)         # StatusBar + helpers ← POSSIBLY DEAD CODE
+│   ├── status.py (367L)         # StatusBar + helpers
+│   ├── theme.py (38L)           # Compat shim → theme/ subpackage
+│   ├── messages/                # Messages subpackage ✅ EXTRACTED Phase 4
+│   │   ├── __init__.py (25L)    # Re-exports all message classes
+│   │   ├── user.py (41L)        # UserMessage
+│   │   ├── assistant.py (130L)  # AssistantMessage (streaming, markdown)
+│   │   ├── tool.py (192L)       # ToolCallMessage (collapsible, status)
+│   │   ├── app.py (34L)         # AppMessage (system messages)
+│   │   ├── error.py (34L)       # ErrorMessage
+│   │   └── welcome.py (47L)     # WelcomeBanner
 │   └── theme/                   # Theme subpackage ✅ EXTRACTED Phase 2
-│       ├── colors.py (273L)     # 7 themes, ThemeColors
+│       ├── __init__.py (43L)    # Re-exports ThemeColors, register_themes
+│       ├── colors.py (273L)    # 7 themes, ThemeColors
 │       └── registry.py (68L)   # CSS vars, register_themes
 │
 ├── interfaces/                  # External interfaces
-│   ├── tui.py (1433L)           # Textual TUI — NexusApp ← BIGGEST MONOLITH
+│   ├── __init__.py (4L)         # Interfaces package init
+│   ├── tui.py (953L)            # Textual TUI — NexusApp (split from 1433L)
+│   ├── tui_widgets.py (231L)   # SpinnerLabel, modals, SIGWINCH ✅ EXTRACTED Phase 7
+│   ├── tui_formatters.py (296L)# render_markdown, all formatters ✅ EXTRACTED Phase 7
 │   ├── cli.py (248L)            # Click CLI
 │   └── web_ui.py (90L)          # Gradio web UI
 │
 ├── server/                      # Server layer
-│   ├── server.py (354L)         # FastAPI + WebSocket ← LARGE
-│   └── sdk.py (210L)          # NexusSDK
+│   ├── __init__.py (1L)         # Server package init
+│   ├── server.py (354L)         # FastAPI + WebSocket
+│   └── sdk.py (210L)            # NexusSDK
 │
 ├── infrastructure/              # Infrastructure
-│   ├── db/                        # Database subpackage ✅ EXTRACTED Phase 3
-│   │   ├── base.py (25L)          # DeclarativeBase
-│   │   ├── models.py (73L)        # TaskModel, ResultModel, SessionModel, MessageModel
-│   │   ├── manager.py (134L)      # DatabaseManager (engine + session factory)
-│   │   ├── task_repo.py (128L)    # TaskRepository (task/result CRUD)
-│   │   └── session_repo.py (171L) # SessionRepository (session/message CRUD)
-│   ├── config.py (184L)         # Settings (3-tier loading)
+│   ├── __init__.py (1L)         # Infrastructure package init
+│   ├── config.py (185L)         # Settings (3-tier loading)
 │   ├── prompt_loader.py (240L)  # NEXUS.md + @file injection
 │   ├── bus.py (172L)            # NATS event bus
 │   ├── auth.py (129L)           # Fernet keystore
 │   ├── telemetry.py (160L)      # Telemetry
 │   ├── api_auth.py (53L)        # FastAPI security
+│   ├── db.py (35L)              # Compat shim → db/ subpackage
+│   ├── utils.py (23L)           # Compat shim → utils/ subpackage
+│   ├── db/                      # Database subpackage ✅ EXTRACTED Phase 3
+│   │   ├── __init__.py (31L)    # Re-exports Base, models, repos
+│   │   ├── base.py (9L)         # DeclarativeBase
+│   │   ├── models.py (58L)      # TaskModel, ResultModel, SessionModel, MessageModel
+│   │   ├── manager.py (98L)     # DatabaseManager (engine + session factory)
+│   │   ├── task_repo.py (128L)  # TaskRepository (task/result CRUD)
+│   │   └── session_repo.py (199L) # SessionRepository (session/message CRUD)
 │   └── utils/                   # Utils subpackage ✅ EXTRACTED Phase 1
+│       ├── __init__.py (16L)    # Re-exports retry, circuit
 │       ├── retry.py (231L)      # retry_with_backoff, retry_on_false
 │       └── circuit.py (140L)    # Circuit breaker
 │
 ├── llm/                         # LLM abstraction
+│   ├── __init__.py (1L)         # LLM package init
 │   ├── llm.py (129L)            # LLMProvider (Gemini + OpenRouter)
 │   └── models.py (175L)         # LLM request/response models
 │
 └── hooks/                       # Pre/post execution hooks
-    ├── __init__.py (176L)       # Hook registry
+    ├── __init__.py (176L)       # HookManager, HookEvent, register_hook
     └── builtins.py (224L)       # Built-in hook functions
 ```
 
@@ -163,27 +189,37 @@ nexusagent/
 
 | File | Lines | Fan-In | Fan-Out | Risk | Contains |
 |------|-------|--------|---------|------|----------|
-| `interfaces/tui` | 1433 | 0 | 1 | **LOW** | NexusApp, Modals, SpinnerLabel, formatters, commands |
 | `tools/register_all` | 728 | 0 | 1 | **LOW** | Tool registration calls |
-| `memory/memory_index` | 717 | 0 | 1 | **LOW** | FTS5+sqlite-vec index |
-| `tools/registry` | 623 | 0 | 0 | **LOW** | ToolInfo, @register, policy |
-| `widgets/messages` | 472 | 0 | 0 | **LOW** | 6 message widget classes |
-| `memory/memory` | 440 | 0 | 1 | **LOW** | HybridMemoryManager |
-| `infrastructure/db` | 416 | 0 | 1 | **LOW** | Models + repositories |
-| `tools/code_review` | 367 | 0 | 0 | **LOW** | Code review tools |
-| `widgets/status` | 367 | 0 | 0 | **LOW** | StatusBar (verify dead code) |
-| `tools/fs` | 343 | 0 | 0 | **LOW** | Filesystem tools |
-| `memory/memory_files` | 264 | 0 | 0 | **LOW** | FileMemory |
-| `core/graph` | 250 | 0 | 0 | **LOW** | LangGraph state machine |
-| `infrastructure/prompt_loader` | 240 | 0 | 0 | **LOW** | Prompt loading |
-| `memory/compaction` | 233 | 0 | 0 | **LOW** | Compaction pipeline |
-| `core/worker` | 304 | 0 | 3 | **MED** | NexusWorker + WorkerPool |
+| `memory/index/index` | 613 | 0 | 1 | **LOW** | FTS5+sqlite-vec index |
 | `core/session` | 677 | 0 | 3 | **MED** | Session + SessionManager |
+| `tools/code_review` | 367 | 0 | 0 | **LOW** | Code review tools |
+| `widgets/status` | 367 | 0 | 0 | **LOW** | StatusBar + helpers |
 | `server/server` | 354 | 0 | 3 | **MED** | FastAPI + WebSocket |
+| `tools/fs` | 343 | 0 | 0 | **LOW** | Filesystem tools |
+| `interfaces/tui_formatters` | 296 | 0 | 0 | **LOW** | All formatters, markdown renderers |
+| `core/worker` | 304 | 0 | 3 | **MED** | NexusWorker + WorkerPool |
+| `interfaces/tui_widgets` | 231 | 0 | 0 | **LOW** | SpinnerLabel, modals, SIGWINCH |
+| `memory/compaction` | 233 | 0 | 0 | **LOW** | Compaction pipeline |
 | `tools/research` | 204 | 0 | 0 | **LOW** | Research tools |
 | `tools/test_runner` | 216 | 0 | 0 | **LOW** | Test runner |
 | `widgets/chat_input` | 215 | 0 | 0 | **LOW** | ChatInput widget |
 | `server/sdk` | 210 | 0 | 2 | **LOW** | NexusSDK |
+| `memory/memory_files` | 264 | 0 | 0 | **LOW** | FileMemory |
+| `core/graph` | 250 | 0 | 0 | **LOW** | LangGraph state machine |
+| `infrastructure/prompt_loader` | 240 | 0 | 0 | **LOW** | Prompt loading |
+| `infrastructure/db/session_repo` | 199 | 0 | 0 | **LOW** | SessionRepository |
+| `tools/registry/policy` | 285 | 0 | 0 | **LOW** | Policy enforcement |
+| `hooks/builtins` | 224 | 0 | 0 | **LOW** | Built-in hooks |
+| `hooks/__init__` | 176 | 0 | 1 | **LOW** | HookManager, HookEvent |
+| `llm/models` | 175 | 0 | 0 | **LOW** | Pydantic models |
+| `core/subagent` | 161 | 0 | 0 | **LOW** | SubAgentHandle |
+| `infrastructure/telemetry` | 160 | 0 | 0 | **LOW** | TelemetryManager |
+| `tools/code_search` | 158 | 0 | 0 | **LOW** | Code search |
+| `infrastructure/utils/circuit` | 140 | 0 | 0 | **LOW** | Circuit breaker |
+| `core/agent` | 134 | 0 | 2 | **MED** | Agent wrapper |
+| `llm/llm` | 129 | 0 | 0 | **LOW** | LLMProvider |
+| `tools/write_todos` | 118 | 0 | 0 | **LOW** | Todo tools |
+| `tools/registry/core` | 113 | 0 | 0 | **LOW** | register_tool, list_all_tools |
 
 ### Higher Risk (fan-out > 3 — many modules depend on these)
 
@@ -200,39 +236,48 @@ nexusagent/
 
 ### Phase 1: `infrastructure/utils.py` → `infrastructure/utils/` ✅
 - Extracted: `retry.py` (231L), `circuit.py` (140L)
-- Old file: Compat shim
+- Old file: Compat shim (23L)
 - Commit: `f260eee`
 
 ### Phase 2: `widgets/theme.py` → `widgets/theme/` ✅
 - Extracted: `colors.py` (273L), `registry.py` (68L)
-- Old file: Compat shim
+- Old file: Compat shim (38L)
 - Commit: `bfe2723`
 
 ### Phase 3: `infrastructure/db.py` → `infrastructure/db/` ✅
-- Extracted: `base.py` (25L), `models.py` (73L), `manager.py` (134L), `task_repo.py` (128L), `session_repo.py` (171L)
-- Old file: Compat shim
+- Extracted: `base.py` (9L), `models.py` (58L), `manager.py` (98L), `task_repo.py` (128L), `session_repo.py` (199L)
+- Old file: Compat shim (35L)
 - Commit: `83aef0f`
 - Fixes: `reinit()` now recreates engine + session (was silently using old engine)
 
 ### Phase 4: `widgets/messages.py` → `widgets/messages/` ✅
-- Extracted: `user.py` (42L), `assistant.py` (128L), `tool.py` (171L), `app.py` (33L), `error.py` (33L), `welcome.py` (52L)
-- Old file: Compat shim
+- Extracted: `user.py` (41L), `assistant.py` (130L), `tool.py` (192L), `app.py` (34L), `error.py` (34L), `welcome.py` (47L)
+- Old file: Compat shim (25L)
 - Commit: `10e76dc`
 - Cleaned: Removed 3 dead regex constants, dead Vertical import, redundant datetime import
 
 ### Phase 5: `tools/registry.py` → `tools/registry/` ✅
-- Extracted: `types.py` (35L), `core.py` (107L), `policy.py` (215L), `search.py` (162L)
-- Old file: Compat shim
+- Extracted: `types.py` (35L), `core.py` (113L), `policy.py` (285L), `search.py` (181L)
+- Old file: Compat shim (39L)
 - Commit: `a076952`
 
 ### Phase 6: `memory/memory_index.py` → `memory/index/` ✅
-- Extracted: `embeddings.py` (133L), `index.py` (569L)
-- Old file: Compat shim
+- Extracted: `embeddings.py` (133L), `index.py` (613L)
+- Old file: Compat shim (34L)
 - Commit: `db21f4c`
+
+### Phase 7: `interfaces/tui.py` split ✅
+- Extracted: `tui_widgets.py` (231L), `tui_formatters.py` (296L)
+- Old file: Reduced from 1433L → 953L
+- Commit: `74fe4f9`
+
+### Config Fix: `yolo` field added ✅
+- Added missing `yolo` field to `AgentConfig`
+- Commit: `a290c93`
 
 ---
 
-## Refactoring Refactoring Pattern (Established)
+## Refactoring Pattern (Established)
 
 For each extraction:
 1. Read target file completely (all lines)
