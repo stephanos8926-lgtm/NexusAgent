@@ -1,9 +1,9 @@
 # NexusAgent Codebase Map
 
 > Generated: 2026-07-18
-> Total source files: 35 (excluding venv/tests)
+> Total source files: 38 (excluding venv/tests)
 > Total test files: 30
-> Last refactoring: src/ reorganization into domain subpackages
+> Last refactoring: Phase 1 — utils.py extracted into utils/ subpackage
 
 ## Project Root
 
@@ -195,7 +195,7 @@ NexusAgent/
 
 | File | Lines | Classes | Functions | Purpose |
 |------|-------|---------|-----------|---------|
-| `utils.py` | 354 | 3 | 2 | **Utils**: retry_with_backoff, retry_on_false decorators. CircuitBreaker (CLOSED/OPEN/HALF_OPEN). |
+| `utils/` | — | — | — | **Utils subpackage** (extracted 2026-07-18): `retry.py` (retry_with_backoff, retry_on_false), `circuit.py` (CircuitState, CircuitBreakerError, CircuitBreaker). Old `utils.py` kept as compat shim. |
 
 ## Complete Tool Inventory (33 tools)
 
