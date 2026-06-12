@@ -3,7 +3,7 @@
 > Generated: 2026-07-18
 > Total source files: 107 (tests: 30)
 > Total lines: ~7,200 (src), ~2,100 (tests)
-> Last refactoring: Phase 2 — theme.py extracted into theme/ subpackage
+> Last refactoring: Phase 3 — db.py extracted into db/ subpackage
 > Structure pattern: Domain-based subpackages with compat shims
 
 ---
@@ -111,7 +111,12 @@ nexusagent/
 │   └── sdk.py (210L)          # NexusSDK
 │
 ├── infrastructure/              # Infrastructure
-│   ├── db.py (416L)             # SQLAlchemy ORM ← MONOLITH
+│   ├── db/                        # Database subpackage ✅ EXTRACTED Phase 3
+│   │   ├── base.py (25L)          # DeclarativeBase
+│   │   ├── models.py (73L)        # TaskModel, ResultModel, SessionModel, MessageModel
+│   │   ├── manager.py (134L)      # DatabaseManager (engine + session factory)
+│   │   ├── task_repo.py (128L)    # TaskRepository (task/result CRUD)
+│   │   └── session_repo.py (171L) # SessionRepository (session/message CRUD)
 │   ├── config.py (184L)         # Settings (3-tier loading)
 │   ├── prompt_loader.py (240L)  # NEXUS.md + @file injection
 │   ├── bus.py (172L)            # NATS event bus
@@ -194,6 +199,12 @@ nexusagent/
 - Extracted: `colors.py` (273L), `registry.py` (68L)
 - Old file: Compat shim
 - Commit: `bfe2723`
+
+### Phase 3: `infrastructure/db.py` → `infrastructure/db/` ✅
+- Extracted: `base.py` (25L), `models.py` (73L), `manager.py` (134L), `task_repo.py` (128L), `session_repo.py` (171L)
+- Old file: Compat shim
+- Commit: `83aef0f`
+- Fixes: `reinit()` now recreates engine + session (was silently using old engine)
 
 ---
 
