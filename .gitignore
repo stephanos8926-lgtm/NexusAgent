@@ -37,3 +37,5 @@ test_loop.db*
 
 # Git worktrees
 .hermes/worktrees/
+.hermes/sprints/
+.hermes/sprint-state.json
