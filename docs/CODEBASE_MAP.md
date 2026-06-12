@@ -3,7 +3,7 @@
 > Generated: 2026-07-18
 > Total source files: 107 (tests: 30)
 > Total lines: ~7,200 (src), ~2,100 (tests)
-> Last refactoring: Phase 4 — messages.py extracted into messages/ subpackage
+> Last refactoring: Phase 5 — registry.py extracted into registry/ subpackage
 > Structure pattern: Domain-based subpackages with compat shims
 
 ---
