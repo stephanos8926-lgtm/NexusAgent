@@ -14,7 +14,7 @@ from typing import Any
 import sqlite_vec
 from pydantic import BaseModel, Field
 
-from nexusagent.models import MemoryScope
+from nexusagent.llm.models import MemoryScope
 
 logger = logging.getLogger(__name__)
 
@@ -361,8 +361,8 @@ class HybridMemoryManager:
     """
 
     def __init__(self, workspace_dir: str):
-        from nexusagent.memory_files import FileMemory
-        from nexusagent.memory_index import HybridMemoryIndex
+        from nexusagent.memory.memory_files import FileMemory
+        from nexusagent.memory.memory_index import HybridMemoryIndex
 
         self.workspace_dir = workspace_dir
         self.file_memory = FileMemory(workspace_dir)
@@ -384,7 +384,7 @@ class HybridMemoryManager:
 
         Returns the file path of the written entry.
         """
-        from nexusagent.memory_files import MemoryEntryType
+        from nexusagent.memory.memory_files import MemoryEntryType
 
         entry_type = MemoryEntryType(type)
         filepath = self.file_memory.write_entry(

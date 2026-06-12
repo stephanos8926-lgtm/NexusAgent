@@ -1,7 +1,7 @@
 import inspect
 
-from nexusagent.config import load_config
-from nexusagent.llm import LLMProvider
+from nexusagent.infrastructure.config import load_config
+from nexusagent.llm.llm import LLMProvider
 
 
 def test_load_config_success(tmp_path, monkeypatch):

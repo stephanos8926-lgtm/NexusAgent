@@ -20,7 +20,7 @@ async def verify_api_key(api_key: str = Security(api_key_header)) -> str:
 
     # Try to validate against the keystore if auth is initialized
     try:
-        from nexusagent.auth import auth_manager
+        from nexusagent.infrastructure.auth import auth_manager
 
         stored_key = auth_manager.get_key("api")
         if stored_key is not None:

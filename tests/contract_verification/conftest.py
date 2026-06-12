@@ -2,7 +2,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from nexusagent.sdk import NexusSDK
+from nexusagent.server.sdk import NexusSDK
 
 
 @pytest.fixture

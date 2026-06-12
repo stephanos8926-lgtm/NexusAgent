@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from nexusagent.models import ImageAttachment, encode_image_to_content
+from nexusagent.llm.models import ImageAttachment, encode_image_to_content
 
 
 # ── ImageAttachment ──────────────────────────────────────────────────────
@@ -173,7 +173,7 @@ class TestBuildUserMessage:
         img_path.write_bytes(png_data)
 
         # Build the message using the actual function logic
-        from nexusagent.models import encode_image_to_content
+        from nexusagent.llm.models import encode_image_to_content
 
         content_blocks = [{"type": "text", "text": "What's in this image?"}]
         content_blocks.append(encode_image_to_content(str(img_path)))
@@ -189,7 +189,7 @@ class TestBuildUserMessage:
     def test_multimodal_message_with_multiple_images(self, tmp_path):
         """Test building a multimodal message with text + multiple images."""
         from langchain_core.messages import HumanMessage
-        from nexusagent.models import encode_image_to_content
+        from nexusagent.llm.models import encode_image_to_content
 
         # Create test images
         png_data = base64.b64decode(
@@ -213,7 +213,7 @@ class TestBuildUserMessage:
     def test_multimodal_message_with_url(self):
         """Test building a multimodal message with a URL image."""
         from langchain_core.messages import HumanMessage
-        from nexusagent.models import encode_image_to_content
+        from nexusagent.llm.models import encode_image_to_content
 
         content_blocks = [{"type": "text", "text": "Describe this image"}]
         content_blocks.append(encode_image_to_content("https://example.com/photo.png"))
@@ -225,7 +225,7 @@ class TestBuildUserMessage:
     def test_multimodal_message_with_missing_image_fallback(self, tmp_path):
         """Test that a missing image produces a text fallback block."""
         from langchain_core.messages import HumanMessage
-        from nexusagent.models import encode_image_to_content
+        from nexusagent.llm.models import encode_image_to_content
 
         content_blocks = [{"type": "text", "text": "What's this?"}]
         # Try to encode a non-existent file
@@ -248,14 +248,14 @@ class TestBuildUserMessage:
 class TestImageConfig:
     def test_default_max_image_size(self):
         """Test default max image size is 10MB."""
-        from nexusagent.config import AgentConfig
+        from nexusagent.infrastructure.config import AgentConfig
 
         config = AgentConfig()
         assert config.max_image_size_mb == 10
 
     def test_default_supported_image_types(self):
         """Test default supported image types."""
-        from nexusagent.config import AgentConfig
+        from nexusagent.infrastructure.config import AgentConfig
 
         config = AgentConfig()
         assert ".png" in config.supported_image_types
@@ -267,7 +267,7 @@ class TestImageConfig:
 
     def test_custom_image_config(self):
         """Test custom image config values."""
-        from nexusagent.config import AgentConfig
+        from nexusagent.infrastructure.config import AgentConfig
 
         config = AgentConfig(max_image_size_mb=20)
         assert config.max_image_size_mb == 20

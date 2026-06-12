@@ -364,14 +364,14 @@ class TestBuiltinHooks:
 
 class TestHooksConfig:
     def test_hooks_config_defaults(self):
-        from nexusagent.config import ConfigSchema
+        from nexusagent.infrastructure.config import ConfigSchema
 
         schema = ConfigSchema()
         assert schema.hooks.hooks_enabled is True
         assert schema.hooks.hooks_dir == ".nexusagent/hooks"
 
     def test_hooks_config_custom(self):
-        from nexusagent.config import ConfigSchema
+        from nexusagent.infrastructure.config import ConfigSchema
 
         schema = ConfigSchema(hooks={"hooks_enabled": False, "hooks_dir": "custom/hooks"})
         assert schema.hooks.hooks_enabled is False
@@ -386,7 +386,7 @@ class TestHooksCLI:
         """nexus hooks list should show registered hooks."""
         from click.testing import CliRunner
 
-        from nexusagent.cli import main
+        from nexusagent.interfaces.cli import main
 
         runner = CliRunner()
         result = runner.invoke(main, ["hooks", "list"])
@@ -397,7 +397,7 @@ class TestHooksCLI:
     def test_hooks_enable_command(self):
         from click.testing import CliRunner
 
-        from nexusagent.cli import main
+        from nexusagent.interfaces.cli import main
 
         runner = CliRunner()
         result = runner.invoke(main, ["hooks", "enable", "my_hook"])
@@ -407,7 +407,7 @@ class TestHooksCLI:
     def test_hooks_disable_command(self):
         from click.testing import CliRunner
 
-        from nexusagent.cli import main
+        from nexusagent.interfaces.cli import main
 
         runner = CliRunner()
         result = runner.invoke(main, ["hooks", "disable", "my_hook"])

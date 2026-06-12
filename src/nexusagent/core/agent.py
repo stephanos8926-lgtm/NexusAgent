@@ -7,7 +7,7 @@ from deepagents import create_deep_agent
 
 # Run registration (populates _REGISTRY)
 import nexusagent.tools.register_all  # noqa: F401
-from nexusagent.config import settings
+from nexusagent.infrastructure.config import settings
 
 # Import tool modules
 # Import registry + discovery

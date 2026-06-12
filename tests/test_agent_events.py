@@ -2,7 +2,7 @@
 
 import json
 
-from nexusagent.models import (
+from nexusagent.llm.models import (
     ApprovalRequestEvent,
     ErrorEvent,
     ResponseEvent,

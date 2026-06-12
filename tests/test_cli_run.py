@@ -3,7 +3,7 @@
 
 from click.testing import CliRunner
 
-from nexusagent.cli import main
+from nexusagent.interfaces.cli import main
 
 
 def test_run_command_exists():

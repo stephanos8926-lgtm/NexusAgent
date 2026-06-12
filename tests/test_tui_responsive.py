@@ -16,8 +16,8 @@ from unittest.mock import patch
 
 import pytest
 
-from nexusagent.config import ClientConfig, ConfigSchema, load_config
-from nexusagent.tui import (
+from nexusagent.infrastructure.config import ClientConfig, ConfigSchema, load_config
+from nexusagent.interfaces.tui import (
     NO_COLOR,
     Breakpoint,
     NexusApp,
@@ -310,7 +310,7 @@ class TestSigwinchHandler:
         app._resize_state = {}
 
         with patch("nexusagent.tui._get_terminal_size", return_value=(160, 24)):
-            from nexusagent.tui import _sigwinch_handler
+            from nexusagent.interfaces.tui import _sigwinch_handler
             _sigwinch_handler(app)
             assert app._breakpoint == Breakpoint.WIDE
 
@@ -323,7 +323,7 @@ class TestSigwinchHandler:
         app._resize_state = {}
 
         with patch("nexusagent.tui._get_terminal_size", return_value=(160, 24)):
-            from nexusagent.tui import _sigwinch_handler
+            from nexusagent.interfaces.tui import _sigwinch_handler
             _sigwinch_handler(app)
             first_bp = app._breakpoint
 
@@ -342,7 +342,7 @@ class TestSigwinchHandler:
 
         with patch("nexusagent.tui._get_terminal_size", return_value=(50, 24)):
             with patch.object(app, "notify") as mock_notify:
-                from nexusagent.tui import _sigwinch_handler
+                from nexusagent.interfaces.tui import _sigwinch_handler
                 _sigwinch_handler(app)
                 assert app._breakpoint == Breakpoint.TOO_SMALL
                 mock_notify.assert_called_once()
@@ -355,7 +355,7 @@ class TestSigwinchHandler:
         app._resize_state = {}
 
         with patch("nexusagent.tui._get_terminal_size", side_effect=OSError("test")):
-            from nexusagent.tui import _sigwinch_handler
+            from nexusagent.interfaces.tui import _sigwinch_handler
             # Should not raise
             _sigwinch_handler(app)
 

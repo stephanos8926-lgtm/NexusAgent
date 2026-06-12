@@ -9,7 +9,7 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
 
-from nexusagent.models import TaskContract
+from nexusagent.llm.models import TaskContract
 
 
 class SubAgentStatus(StrEnum):

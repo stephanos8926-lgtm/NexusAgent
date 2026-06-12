@@ -9,12 +9,12 @@ from typing import Any
 
 from sqlalchemy import select
 
-from nexusagent.agent import run_agent_task
-from nexusagent.bus import AgentBus, get_bus
-from nexusagent.db import TaskModel, task_repo
-from nexusagent.models import ResultSchema, TaskContract, TaskSchema, TaskStatus
-from nexusagent.subagent import SubAgentHandle
-from nexusagent.utils import CircuitBreaker, retry_with_backoff
+from nexusagent.core.agent import run_agent_task
+from nexusagent.infrastructure.bus import AgentBus, get_bus
+from nexusagent.infrastructure.db import TaskModel, task_repo
+from nexusagent.llm.models import ResultSchema, TaskContract, TaskSchema, TaskStatus
+from nexusagent.core.subagent import SubAgentHandle
+from nexusagent.infrastructure.utils import CircuitBreaker, retry_with_backoff
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +55,7 @@ async def _run_agent_task(task: TaskSchema) -> str:
 
 async def _run_research_workflow(task: TaskSchema) -> str:
     """Execute a research task through the LangGraph state machine."""
-    from nexusagent.graph import create_research_graph
+    from nexusagent.core.graph import create_research_graph
 
     graph = create_research_graph()
     config = {"configurable": {"thread_id": task.id}}

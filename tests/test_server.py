@@ -3,7 +3,7 @@
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from nexusagent.server import app
+from nexusagent.server.server import app
 
 # All non-health endpoints require X-API-Key
 API_HEADERS = {"X-API-Key": "test-key"}

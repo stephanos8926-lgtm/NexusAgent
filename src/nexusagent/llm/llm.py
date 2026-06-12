@@ -6,8 +6,8 @@ import google.generativeai as genai
 from openai import AsyncOpenAI
 from pydantic import BaseModel
 
-from nexusagent.config import settings
-from nexusagent.utils import retry_with_backoff
+from nexusagent.infrastructure.config import settings
+from nexusagent.infrastructure.utils import retry_with_backoff
 
 logger = logging.getLogger(__name__)
 

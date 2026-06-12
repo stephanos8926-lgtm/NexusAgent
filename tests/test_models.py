@@ -1,6 +1,6 @@
 """Tests for TaskContract and MemoryScope models."""
 
-from nexusagent.models import MemoryScope, TaskContract
+from nexusagent.llm.models import MemoryScope, TaskContract
 
 
 class TestTaskContractDefaults:

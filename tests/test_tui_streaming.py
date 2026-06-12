@@ -1,6 +1,6 @@
 """Tests for the conversational TUI."""
 
-from nexusagent.tui import ApprovalModal, ErrorModal, NexusApp
+from nexusagent.interfaces.tui import ApprovalModal, ErrorModal, NexusApp
 
 
 class TestTuiCompose:

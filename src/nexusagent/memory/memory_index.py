@@ -27,7 +27,7 @@ from typing import Any
 
 import sqlite_vec
 
-from nexusagent.config import settings
+from nexusagent.infrastructure.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -79,7 +79,7 @@ class EmbeddingProvider:
             api_key = os.environ.get("GEMINI_API_KEY")
         if not api_key:
             # Try loading from .env file in project root
-            from nexusagent.config import get_project_root
+            from nexusagent.infrastructure.config import get_project_root
 
             env_path = get_project_root() / ".env"
             if env_path.exists():

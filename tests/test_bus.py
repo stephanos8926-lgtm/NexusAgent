@@ -1,6 +1,6 @@
 import pytest
 
-from nexusagent.bus import AgentBus
+from nexusagent.infrastructure.bus import AgentBus
 
 
 # Mocking connection for test

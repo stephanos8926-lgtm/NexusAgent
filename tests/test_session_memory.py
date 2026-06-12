@@ -6,14 +6,14 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from nexusagent.session import Session
+from nexusagent.core.session import Session
 
 
 @pytest.fixture
 def mock_session():
     """Create a session with mocked dependencies."""
     with (
-        patch("nexusagent.session.SessionManager"),
+        patch("nexusagent.core.session.SessionManager"),
         patch("nexusagent.memory.HybridMemoryManager") as mock_hmm,
     ):
         mock_hybrid = MagicMock()

@@ -10,7 +10,7 @@ from nats.aio.client import Client as NATSClient
 from nats.aio.subscription import Subscription
 from nats.errors import Error as NATSError
 
-from nexusagent.config import settings
+from nexusagent.infrastructure.config import settings
 
 logger = logging.getLogger(__name__)
 

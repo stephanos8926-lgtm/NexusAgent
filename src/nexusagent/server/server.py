@@ -7,11 +7,11 @@ from fastapi import Depends, FastAPI, HTTPException, WebSocket, WebSocketDisconn
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from nexusagent.api_auth import verify_api_key
-from nexusagent.bus import get_bus
-from nexusagent.config import settings
-from nexusagent.sdk import sdk
-from nexusagent.worker import worker
+from nexusagent.infrastructure.api_auth import verify_api_key
+from nexusagent.infrastructure.bus import get_bus
+from nexusagent.infrastructure.config import settings
+from nexusagent.server.sdk import sdk
+from nexusagent.core.worker import worker
 
 # Setup logging
 logging.basicConfig(
@@ -28,7 +28,7 @@ async def lifespan(app: FastAPI):
     logger.info("Starting NexusAgent Backend...")
     try:
         # 1. Initialize DB
-        from nexusagent.db import db_manager
+        from nexusagent.infrastructure.db import db_manager
 
         await db_manager.init_db()
         logger.info("Database initialized.")
@@ -88,7 +88,7 @@ async def create_task(request: SubmitTaskRequest):
         # Let's ensure the task is in the DB before it hits NATS
         import uuid
 
-        from nexusagent.db import task_repo
+        from nexusagent.infrastructure.db import task_repo
 
         task_id = str(uuid.uuid4())
 
@@ -147,7 +147,7 @@ async def health_check():
 @app.get("/tasks", dependencies=[Depends(verify_api_key)])
 async def list_tasks(status: str | None = None, limit: int = 50, offset: int = 0):
     """List tasks with optional status filter and pagination."""
-    from nexusagent.db import task_repo
+    from nexusagent.infrastructure.db import task_repo
 
     tasks = await task_repo.list_tasks(status=status, limit=limit, offset=offset)
     return {"tasks": tasks, "count": len(tasks)}
@@ -159,7 +159,7 @@ async def list_tasks(status: str | None = None, limit: int = 50, offset: int = 0
 @app.post("/tasks/{task_id}/cancel", dependencies=[Depends(verify_api_key)])
 async def cancel_task(task_id: str):
     """Cancel a pending or processing task."""
-    from nexusagent.db import task_repo
+    from nexusagent.infrastructure.db import task_repo
 
     cancelled = await task_repo.cancel_task(task_id)
     if not cancelled:
@@ -173,7 +173,7 @@ async def cancel_task(task_id: str):
 @app.post("/tasks/{task_id}/retry", dependencies=[Depends(verify_api_key)])
 async def retry_task(task_id: str):
     """Retry a failed task."""
-    from nexusagent.db import task_repo
+    from nexusagent.infrastructure.db import task_repo
 
     new_id = await task_repo.retry_task(task_id)
     if not new_id:
@@ -192,7 +192,7 @@ async def retry_task(task_id: str):
 @app.get("/workers", dependencies=[Depends(verify_api_key)])
 async def list_workers():
     """List worker status including circuit breaker state."""
-    from nexusagent.worker import _agent_breaker, _nats_breaker
+    from nexusagent.core.worker import _agent_breaker, _nats_breaker
 
     return {
         "workers": [
@@ -247,7 +247,7 @@ async def session_websocket(
     Requires API key via query parameter: ?api_key=xxx
     """
     # Verify API key before accepting the connection
-    from nexusagent.api_auth import verify_api_key
+    from nexusagent.infrastructure.api_auth import verify_api_key
     try:
         verify_api_key(api_key)
     except HTTPException:
@@ -256,9 +256,9 @@ async def session_websocket(
 
     await websocket.accept()
 
-    from nexusagent.agent import Agent
-    from nexusagent.db import session_repo
-    from nexusagent.session import session_manager
+    from nexusagent.core.agent import Agent
+    from nexusagent.infrastructure.db import session_repo
+    from nexusagent.core.session import session_manager
 
     # Create a real agent for this interactive session
     agent = Agent(role="full", policy="permissive")

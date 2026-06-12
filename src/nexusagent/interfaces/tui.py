@@ -47,7 +47,7 @@ from textual.widgets import (
     Static,
 )
 
-from nexusagent.config import settings
+from nexusagent.infrastructure.config import settings
 
 # Color themes for /theme cycling
 NEXUS_THEMES = [

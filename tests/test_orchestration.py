@@ -16,7 +16,7 @@ import pytest
 # Ensure src is on the path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from nexusagent.orchestration import (
+from nexusagent.core.orchestration import (
     DeepResearchOrchestrator,
     ResearchPlan,
     ResearchState,

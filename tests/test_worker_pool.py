@@ -5,9 +5,9 @@ from unittest.mock import patch
 
 import pytest
 
-from nexusagent.models import TaskContract
-from nexusagent.subagent import SubAgentStatus
-from nexusagent.worker import WorkerPool
+from nexusagent.llm.models import TaskContract
+from nexusagent.core.subagent import SubAgentStatus
+from nexusagent.core.worker import WorkerPool
 
 
 @pytest.fixture
@@ -45,7 +45,7 @@ async def test_spawn_returns_handle(contract):
 
     with (
         patch.object(WorkerPool, "_execute_bounded", _fake_execute_bounded),
-        patch("nexusagent.worker.asyncio.sleep", _short_sleep),
+        patch("nexusagent.core.worker.asyncio.sleep", _short_sleep),
     ):
         handle = await pool.spawn(contract)
         assert handle.worker_id.startswith("worker-")
@@ -74,7 +74,7 @@ async def test_spawn_and_cancel(contract):
 
     with (
         patch.object(WorkerPool, "_execute_bounded", _long_execute_bounded),
-        patch("nexusagent.worker.asyncio.sleep", _short_sleep),
+        patch("nexusagent.core.worker.asyncio.sleep", _short_sleep),
     ):
         handle = await pool.spawn(contract)
         handle.cancel()

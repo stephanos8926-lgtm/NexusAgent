@@ -9,7 +9,7 @@ Delegates to the Click CLI in ``nexusagent.cli``.  Supports::
 
 import sys
 
-from nexusagent.cli import main
+from nexusagent.interfaces.cli import main
 
 if __name__ == "__main__":
     main()

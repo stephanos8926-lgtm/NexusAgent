@@ -19,7 +19,7 @@ from sqlalchemy import (
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
-from nexusagent.config import settings
+from nexusagent.infrastructure.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -212,7 +212,7 @@ class TaskRepository:
 
     async def cancel_task(self, task_id: str) -> bool:
         """Cancel a task. Returns True if cancelled, False if not found or already terminal."""
-        from nexusagent.models import TaskStatus
+        from nexusagent.llm.models import TaskStatus
 
         async with self.db_manager.get_session() as session:
             result = await session.execute(select(TaskModel).where(TaskModel.id == task_id))
@@ -226,7 +226,7 @@ class TaskRepository:
 
     async def retry_task(self, task_id: str) -> str | None:
         """Retry a failed task. Returns task ID or None if not eligible."""
-        from nexusagent.models import TaskStatus
+        from nexusagent.llm.models import TaskStatus
 
         async with self.db_manager.get_session() as session:
             result = await session.execute(select(TaskModel).where(TaskModel.id == task_id))

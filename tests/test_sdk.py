@@ -2,7 +2,7 @@
 
 import pytest
 
-from nexusagent.sdk import NexusSDK
+from nexusagent.server.sdk import NexusSDK
 
 
 class TestSDKConstruction:

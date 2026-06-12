@@ -8,7 +8,7 @@ import pytest
 
 # Import register_all to populate the tool registry
 import nexusagent.tools.register_all  # noqa: F401
-from nexusagent.memory import HybridMemoryManager
+from nexusagent.memory.memory import HybridMemoryManager
 from nexusagent.tools.registry import get_tool_info
 
 

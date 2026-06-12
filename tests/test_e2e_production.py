@@ -6,11 +6,11 @@ import pytest
 import pytest_asyncio
 from httpx import AsyncClient
 
-from nexusagent.bus import AgentBus, get_bus
-from nexusagent.db import db_manager
-from nexusagent.models import ResultSchema, TaskStatus
-from nexusagent.sdk import sdk
-from nexusagent.server import app
+from nexusagent.infrastructure.bus import AgentBus, get_bus
+from nexusagent.infrastructure.db import db_manager
+from nexusagent.llm.models import ResultSchema, TaskStatus
+from nexusagent.server.sdk import sdk
+from nexusagent.server.server import app
 
 # Test configuration
 TEST_DB_PATH = "/tmp/nexus_e2e_test.db"
@@ -22,7 +22,7 @@ async def setup_system():
     Initialize the system for E2E testing.
     Overwrites the db path for testing.
     """
-    from nexusagent.config import settings
+    from nexusagent.infrastructure.config import settings
 
     settings.server.nats_url = "nats://localhost:4222"
     settings.server.db_path = TEST_DB_PATH
@@ -46,7 +46,7 @@ async def setup_system():
     await _bus.connect()
 
     # Start the worker (normally started by server lifespan, but we need it for SDK tests)
-    from nexusagent.worker import worker
+    from nexusagent.core.worker import worker
 
     worker_task = asyncio.create_task(worker.start())
     # Allow worker to subscribe and be ready to receive messages
@@ -100,7 +100,7 @@ async def test_sdk_end_to_end_flow():
     async with db_manager.get_session() as session:
         from sqlalchemy import select
 
-        from nexusagent.db import ResultModel, TaskModel
+        from nexusagent.infrastructure.db import ResultModel, TaskModel
 
         task_res = await session.execute(select(TaskModel).where(TaskModel.id == task_id))
         task = task_res.scalar_one_or_none()

@@ -17,10 +17,10 @@ from typing import Any
 
 from langchain_core.messages import AIMessage, SystemMessage
 
-from nexusagent.config import settings
+from nexusagent.infrastructure.config import settings
 from nexusagent.hooks import HookEvent, get_hook_manager
-from nexusagent.models import ErrorEvent, ResponseEvent, ThinkingEvent
-from nexusagent.prompt_loader import inject_file_at_reference, load_nexus_prompt
+from nexusagent.llm.models import ErrorEvent, ResponseEvent, ThinkingEvent
+from nexusagent.infrastructure.prompt_loader import inject_file_at_reference, load_nexus_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -187,7 +187,7 @@ class Session:
         self.memory_dir.mkdir(parents=True, exist_ok=True)
 
         # Hybrid memory manager (file + index)
-        from nexusagent.memory import HybridMemoryManager
+        from nexusagent.memory.memory import HybridMemoryManager
 
         self.hybrid_memory = HybridMemoryManager(str(self.memory_dir))
         self.hybrid_memory.initialize()
@@ -279,7 +279,7 @@ class Session:
             (multimodal with images).
         """
         from langchain_core.messages import HumanMessage
-        from nexusagent.models import encode_image_to_content
+        from nexusagent.llm.models import encode_image_to_content
 
         if not images:
             return HumanMessage(content=user_message)
@@ -364,7 +364,7 @@ class Session:
         messages.append(user_msg)
 
         # Compaction: if messages exceed context window, compact before model call
-        from nexusagent.compaction import CompactionPipeline, pre_compaction_flush
+        from nexusagent.memory.compaction import CompactionPipeline, pre_compaction_flush
 
         _compaction = CompactionPipeline()
         if settings.agent.compaction_enabled and _compaction.should_compact(

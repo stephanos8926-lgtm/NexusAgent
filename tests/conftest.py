@@ -16,7 +16,7 @@ except ImportError:
 import os
 import tempfile
 from pathlib import Path as _Path
-from nexusagent.auth import AuthManager
+from nexusagent.infrastructure.auth import AuthManager
 
 _test_auth_dir = tempfile.mkdtemp()
 _test_master = _Path(_test_auth_dir) / ".master.secret"
@@ -38,12 +38,12 @@ _test_auth.initialize_wizard(force=True)
 _test_auth.save_key("api", "test-key")
 
 # Patch the global auth_manager to use test keystore
-import nexusagent.auth as _auth_module
+import nexusagent.infrastructure.auth as _auth_module
 _auth_module.auth_manager = _test_auth
 
 # Initialize test database for server/session tests that need it
 import asyncio as _asyncio
-from nexusagent.db import DatabaseManager as _DBM
+from nexusagent.infrastructure.db import DatabaseManager as _DBM
 
 async def _init_test_db():
     _db = _DBM("data/nexus.db")

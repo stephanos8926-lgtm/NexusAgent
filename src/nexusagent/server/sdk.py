@@ -3,8 +3,8 @@ import asyncio
 import logging
 import uuid
 
-from nexusagent.bus import AgentBus, get_bus
-from nexusagent.models import ResultSchema, TaskSchema, TaskStatus
+from nexusagent.infrastructure.bus import AgentBus, get_bus
+from nexusagent.llm.models import ResultSchema, TaskSchema, TaskStatus
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +69,7 @@ class NexusSDK:
 
     async def get_task_status(self, task_id: str) -> TaskStatus | None:
         """Query the current status of a task from the database."""
-        from nexusagent.db import task_repo
+        from nexusagent.infrastructure.db import task_repo
 
         status_str = await task_repo.get_task_status(task_id)
         if status_str:
@@ -101,19 +101,19 @@ class NexusSDK:
         offset: int = 0,
     ) -> list[dict]:
         """List tasks with optional status filter and pagination."""
-        from nexusagent.db import task_repo
+        from nexusagent.infrastructure.db import task_repo
 
         return await task_repo.list_tasks(status=status, limit=limit, offset=offset)
 
     async def cancel_task(self, task_id: str) -> bool:
         """Cancel a pending or processing task. Returns True if cancelled."""
-        from nexusagent.db import task_repo
+        from nexusagent.infrastructure.db import task_repo
 
         return await task_repo.cancel_task(task_id)
 
     async def retry_task(self, task_id: str) -> str | None:
         """Retry a failed task. Returns task ID or None if not eligible."""
-        from nexusagent.db import task_repo
+        from nexusagent.infrastructure.db import task_repo
 
         new_id = await task_repo.retry_task(task_id)
         if new_id:
@@ -167,7 +167,7 @@ class NexusSDK:
 
     async def list_workers(self) -> dict:
         """List worker status including circuit breaker state."""
-        from nexusagent.worker import _agent_breaker, _nats_breaker
+        from nexusagent.core.worker import _agent_breaker, _nats_breaker
 
         return {
             "workers": [

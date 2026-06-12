@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from nexusagent.compaction import CompactionPipeline, pre_compaction_flush
+from nexusagent.memory.compaction import CompactionPipeline, pre_compaction_flush
 
 # ---------------------------------------------------------------------------
 # Helpers

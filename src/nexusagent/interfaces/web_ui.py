@@ -2,7 +2,7 @@ import uuid
 
 import gradio as gr
 
-from nexusagent.sdk import NexusSDK
+from nexusagent.server.sdk import NexusSDK
 
 # Aesthetic Constants (Industrial/Utilitarian Direction)
 THEME_COLOR = "#FF4B2B"  # Industrial Orange-Red

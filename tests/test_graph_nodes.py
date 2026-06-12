@@ -13,13 +13,13 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from nexusagent.graph import (
+from nexusagent.core.graph import (
     execute_node,
     plan_node,
     refine_node,
     synthesize_node,
 )
-from nexusagent.orchestration import (
+from nexusagent.core.orchestration import (
     DeepResearchOrchestrator,
     ResearchPlan,
     ResearchState,

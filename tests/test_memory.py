@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from nexusagent.memory import MemoryManager, MemoryScope
+from nexusagent.memory.memory import MemoryManager, MemoryScope
 
 
 @pytest.fixture

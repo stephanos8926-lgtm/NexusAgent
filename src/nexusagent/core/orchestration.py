@@ -11,7 +11,7 @@ import re
 
 from pydantic import BaseModel
 
-from nexusagent.llm import llm
+from nexusagent.llm.llm import llm
 
 logger = logging.getLogger(__name__)
 

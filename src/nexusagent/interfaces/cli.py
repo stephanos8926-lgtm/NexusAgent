@@ -33,14 +33,14 @@ def submit(task):
     Example:
         nexus-client submit "Fix the auth bug in server.py"
     """
-    from nexusagent.config import settings
+    from nexusagent.infrastructure.config import settings
 
     logging.basicConfig(level=settings.log_level, format="%(levelname)s: %(message)s")
     logger = logging.getLogger(__name__)
 
     async def run_client() -> None:
         try:
-            from nexusagent.sdk import sdk
+            from nexusagent.server.sdk import sdk
 
             task_id = await sdk.submit_task({"description": task})
             logger.info(f"Task submitted successfully. Task ID: {task_id}")
@@ -75,8 +75,8 @@ def run(task, working_dir, max_turns, wall_time, memory_mode, acceptance, model,
         nexus run "Fix the auth bug in server.py" -d /project -t 20 -a "Tests pass"
         nexus run "Research X" --model gemini-3.1-flash-lite --max-depth 5 --summary-only
     """
-    from nexusagent.models import MemoryScope, TaskContract
-    from nexusagent.worker import worker_pool
+    from nexusagent.llm.models import MemoryScope, TaskContract
+    from nexusagent.core.worker import worker_pool
 
     contract = TaskContract(
         task_id=f"cli-{task[:20]}",
@@ -133,7 +133,7 @@ def session_cmd(action, session_id, new_id, working_dir, status, limit):
         nexus session rename abc123 --new-id xyz789
         nexus session delete abc123
     """
-    from nexusagent.db import session_repo
+    from nexusagent.infrastructure.db import session_repo
 
     async def _run():
         if action == "list":

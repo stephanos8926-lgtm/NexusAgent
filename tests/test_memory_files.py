@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from nexusagent.memory_files import FileMemory, MemoryEntryType
+from nexusagent.memory.memory_files import FileMemory, MemoryEntryType
 
 
 @pytest.fixture

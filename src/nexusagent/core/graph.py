@@ -60,7 +60,7 @@ class ResearchGraphState(TypedDict, total=False):
 
 async def plan_node(state: dict) -> dict:
     """Async node: Generate a research plan using the LLM."""
-    from nexusagent.orchestration import DeepResearchOrchestrator
+    from nexusagent.core.orchestration import DeepResearchOrchestrator
 
     query = state.get("query", "")
     orchestrator = DeepResearchOrchestrator()
@@ -81,7 +81,7 @@ async def plan_node(state: dict) -> dict:
 
 async def refine_node(state: dict) -> dict:
     """Async node: Refine the research plan for blind spots."""
-    from nexusagent.orchestration import DeepResearchOrchestrator, ResearchPlan
+    from nexusagent.core.orchestration import DeepResearchOrchestrator, ResearchPlan
 
     plan_dict = state.get("plan")
     if not plan_dict:
@@ -105,7 +105,7 @@ async def refine_node(state: dict) -> dict:
 
 async def execute_node(state: dict) -> dict:
     """Async node: Execute one research step (search + fetch)."""
-    from nexusagent.orchestration import DeepResearchOrchestrator
+    from nexusagent.core.orchestration import DeepResearchOrchestrator
 
     plan_dict = state.get("plan", {})
     steps = plan_dict.get("steps", [])
@@ -159,7 +159,7 @@ async def execute_node(state: dict) -> dict:
 
 async def synthesize_node(state: dict) -> dict:
     """Async node: Synthesize all gathered evidence into a final report."""
-    from nexusagent.orchestration import (
+    from nexusagent.core.orchestration import (
         DeepResearchOrchestrator,
         ResearchPlan,
         ResearchState,

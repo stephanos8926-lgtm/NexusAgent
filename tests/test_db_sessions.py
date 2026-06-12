@@ -3,7 +3,7 @@ import tempfile
 
 import pytest
 
-from nexusagent.db import DatabaseManager, SessionRepository
+from nexusagent.infrastructure.db import DatabaseManager, SessionRepository
 
 
 @pytest.fixture

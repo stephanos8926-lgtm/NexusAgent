@@ -2,7 +2,7 @@
 
 from starlette.routing import WebSocketRoute
 
-from nexusagent.server import app
+from nexusagent.server.server import app
 
 
 def test_websocket_route_exists():

@@ -7,7 +7,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from sqlalchemy import select
 
-from nexusagent.db import TaskModel, db_manager
+from nexusagent.infrastructure.db import TaskModel, db_manager
 from nexusagent.task_reaper import TaskReaper
 
 

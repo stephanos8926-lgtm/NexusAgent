@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from nexusagent.memory_index import HybridMemoryIndex
+from nexusagent.memory.memory_index import HybridMemoryIndex
 
 
 @pytest.fixture
