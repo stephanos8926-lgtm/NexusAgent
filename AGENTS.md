@@ -24,9 +24,8 @@ NexusAgent is a production-grade AI coding agent platform. It combines an LLM-po
 | **State** | `docs/STATE.md` | Module-by-module inventory (⚠️ partially outdated) |
 | **Compliance** | `docs/DOC_COMPLIANCE.md` | Documentation audit and gap analysis |
 | **Version** | `src/nexusagent/version.py` | Single source of truth (importlib.metadata) |
-| **ADRs** | `docs/adrs/` | Architecture decision records (0001-0005) |
+|| **ADRs** | `docs/adrs/` | Architecture decision records (0001-0005) |
 | **Config** | `config/nexusagent.yaml` | Runtime configuration |
-| **Tools** | `docs/TOOLS.md` | AST-tools MCP integration reference |
 
 ---
 
@@ -205,17 +204,6 @@ Phases 1-7 completed the initial structural refactoring:
 ---
 
 ## Tool-Specific Notes
-
-### AST Tools (ast-tools MCP)
-- Use `ast_read` before modifying unfamiliar code
-- Use `ast_grep` for structural search (not text grep)
-- Use `ast_edit` for surgical edits preserving formatting
-- Use `structural_analysis` for call graphs and references
-
-### TokRepo (MCP)
-- Search before building: `tokrepo_search(query)` for existing assets
-- Install: `tokrepo_codex_install(uuid)` for vetted assets
-- Harvest after tasks: `tokrepo_harvest(paths)` to contribute back
 
 ### Sequential Thinking (MCP)
 - Use for complex multi-step tasks to avoid missing steps
