@@ -52,14 +52,9 @@ from nexusagent.interfaces.tui_widgets import (  # noqa: F401
     NO_COLOR,
     SpinnerLabel,
     is_no_color,
-    _get_terminal_size,
     debounce_resize,
     classify_breakpoint,
 )
-from nexusagent.interfaces.tui_widgets import ErrorModal as _ErrorModal  # noqa: F401
-
-# Alias for test compatibility
-ErrorModal = _ErrorModal
 from nexusagent.interfaces.tui_widgets import (
     ApprovalModal,
     Breakpoint,
