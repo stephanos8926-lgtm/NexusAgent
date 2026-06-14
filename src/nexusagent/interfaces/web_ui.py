@@ -82,8 +82,35 @@ def create_ui():
 
 def run_ui() -> None:
     """Entry point for the nexus-web command."""
+    import os
     demo = create_ui()
-    demo.launch(server_name="0.0.0.0", server_port=7860)
+    # SECURITY: bind to localhost by default, require token auth
+    demo.launch(
+        server_name=os.getenv("NEXUS_WEB_HOST", "127.0.0.1"),
+        server_port=int(os.getenv("NEXUS_WEB_PORT", "7860")),
+        auth=_check_web_auth if os.getenv("NEXUS_WEB_AUTH", "1") == "1" else None,
+        auth_message="Enter the Nexus Agent API key",
+    )
+
+
+def _check_web_auth(username: str, password: str) -> bool:
+    """Check web UI auth against the configured API key."""
+    import os
+    # Use the API key from environment or config as the password
+    # Username is ignored — only the password (API key) is checked
+    api_key = os.getenv("NEXUS_API_KEY", "")
+    if not api_key:
+        # If no API key configured, check against auth manager
+        try:
+            from nexusagent.infrastructure.auth import auth_manager
+            stored = auth_manager.get_key("api")
+            if stored is None:
+                return False  # No key configured, deny
+            api_key = stored
+        except Exception:
+            return False
+    import hmac
+    return hmac.compare_digest(password, api_key)
 
 
 if __name__ == "__main__":

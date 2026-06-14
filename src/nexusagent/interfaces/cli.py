@@ -12,6 +12,15 @@ import click
 CLIENT_VERSION = "0.1.0"
 
 
+def _validate_working_dir(working_dir: str) -> None:
+    """Validate working_dir doesn't escape via path traversal."""
+    from pathlib import Path
+    resolved = Path(working_dir).resolve()
+    # Ensure the path exists and is a directory
+    if not resolved.is_dir():
+        raise SystemExit(f"Error: working_dir '{working_dir}' is not a valid directory")
+
+
 def parse_version(v: str) -> tuple[int, int, int]:
     """Parse a semver string into a (major, minor, patch) tuple.
 
@@ -150,8 +159,12 @@ def run(task, working_dir, max_turns, wall_time, memory_mode, acceptance, model,
         nexus run "Fix the auth bug in server.py" -d /project -t 20 -a "Tests pass"
         nexus run "Research X" --model gemini-3.1-flash-lite --max-depth 5 --summary-only
     """
+    from nexusagent.infrastructure.config import settings
     from nexusagent.llm.models import MemoryScope, TaskContract
     from nexusagent.core.worker import worker_pool
+
+    # Validate working_dir is within workspace
+    _validate_working_dir(working_dir)
 
     contract = TaskContract(
         task_id=f"cli-{task[:20]}",

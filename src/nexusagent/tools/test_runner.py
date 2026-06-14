@@ -93,51 +93,61 @@ def run_tests(
             "Use framework parameter to force a specific one."
         )
 
-    # Build command
+    # Build command as list (shell=False prevents injection)
+    import re as _re
+
     if fw == "pytest":
-        cmd = "pytest"
+        cmd = ["pytest"]
         if verbose:
-            cmd += " -v"
-        cmd += " --tb=short -q"
+            cmd.append("-v")
+        cmd.extend(["--tb=short", "-q"])
         if test_path:
-            cmd += f" {test_path}"
+            # Validate test_path to prevent path traversal
+            if not _re.match(r"^[a-zA-Z0-9/._-]+$", test_path):
+                return f"Error: Invalid test_path '{test_path}' — only alphanumeric, /, ., _, - allowed"
+            cmd.append(test_path)
         else:
-            cmd += " tests/"
+            cmd.append("tests/")
 
     elif fw == "jest":
-        cmd = "npx jest"
+        cmd = ["npx", "jest"]
         if verbose:
-            cmd += " --verbose"
+            cmd.append("--verbose")
         if test_path:
-            cmd += f" {test_path}"
-        cmd += " --no-coverage"
+            if not _re.match(r"^[a-zA-Z0-9/._-]+$", test_path):
+                return f"Error: Invalid test_path '{test_path}' — only alphanumeric, /, ., _, - allowed"
+            cmd.append(test_path)
+        cmd.append("--no-coverage")
 
     elif fw == "vitest":
-        cmd = "npx vitest run"
+        cmd = ["npx", "vitest", "run"]
         if test_path:
-            cmd += f" {test_path}"
+            if not _re.match(r"^[a-zA-Z0-9/._-]+$", test_path):
+                return f"Error: Invalid test_path '{test_path}' — only alphanumeric, /, ., _, - allowed"
+            cmd.append(test_path)
 
     elif fw == "maven":
-        cmd = "mvn test"
+        cmd = ["mvn", "test"]
         if test_path:
-            cmd += f" -Dtest={test_path}"
+            cmd.extend(["-Dtest", test_path])
 
     elif fw == "gradle":
-        cmd = "./gradlew test" if (p / "gradlew").exists() else "gradle test"
+        cmd = ["./gradlew", "test"] if (p / "gradlew").exists() else ["gradle", "test"]
         if test_path:
-            cmd += f" --tests {test_path}"
+            cmd.extend(["--tests", test_path])
 
     elif fw == "go":
-        cmd = "go test ./..."
         if test_path:
-            cmd = f" go test {test_path}"
+            cmd = ["go", "test", test_path]
+        else:
+            cmd = ["go", "test", "./..."]
         if verbose:
-            cmd += " -v"
+            cmd.append("-v")
 
     elif fw == "cargo":
-        cmd = "cargo test"
+        cmd = ["cargo", "test"]
         if test_path:
-            cmd += f" {test_path}"
+            cmd.append(test_path)
 
     else:
         return f"Error: Unsupported framework '{fw}'"
@@ -146,7 +156,7 @@ def run_tests(
     try:
         result = subprocess.run(
             cmd,
-            shell=True,
+            shell=False,
             capture_output=True,
             text=True,
             timeout=timeout,

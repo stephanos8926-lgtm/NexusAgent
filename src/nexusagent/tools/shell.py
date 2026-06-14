@@ -11,8 +11,35 @@ Commands are split into argument arrays, not passed to a shell interpreter.
 import os
 import shlex
 import subprocess
+from pathlib import Path
+
+# Workspace root for path jail — all shell commands must run within this directory
+_SHELL_WORKSPACE_ROOT: Path | None = None
 
 MAX_OUTPUT_BYTES = 1024 * 1024  # 1MB output cap to prevent memory exhaustion
+
+def set_shell_workspace_root(path: str) -> None:
+    """Set the workspace root directory for shell command path jail."""
+    global _SHELL_WORKSPACE_ROOT
+    import pathlib
+    _SHELL_WORKSPACE_ROOT = pathlib.Path(path).resolve()
+
+def _validate_workdir(workdir: str | None) -> str | None:
+    """Validate workdir is within workspace root if set."""
+    if workdir is None:
+        return None
+    if _SHELL_WORKSPACE_ROOT is None:
+        return workdir
+    import pathlib
+    resolved = pathlib.Path(workdir).resolve()
+    try:
+        resolved.relative_to(_SHELL_WORKSPACE_ROOT)
+    except ValueError:
+        raise PermissionError(
+            f"SAFETY: workdir '{workdir}' resolves to '{resolved}' which is outside "
+            f"the workspace root '{_SHELL_WORKSPACE_ROOT}'"
+        )
+    return str(resolved)
 
 
 def _split_command(command: str) -> list[str]:
@@ -67,7 +94,7 @@ def run_shell(
             if k.replace("_", "").replace("-", "").isalnum():
                 cmd_env[k] = str(v)
 
-    cwd = workdir if workdir else None
+    cwd = _validate_workdir(workdir)
 
     try:
         result = subprocess.run(
@@ -126,7 +153,7 @@ def run_shell_streaming(
             if k.replace("_", "").replace("-", "").isalnum():
                 cmd_env[k] = str(v)
 
-    cwd = workdir if workdir else None
+    cwd = _validate_workdir(workdir)
 
     try:
         process = subprocess.Popen(

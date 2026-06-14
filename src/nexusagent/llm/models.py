@@ -11,6 +11,7 @@ class TaskStatus(StrEnum):
     PROCESSING = "processing"
     COMPLETED = "completed"
     FAILED = "failed"
+    CANCELLED = "cancelled"
 
 
 class TaskSchema(BaseModel):

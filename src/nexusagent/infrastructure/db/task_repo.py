@@ -52,6 +52,25 @@ class TaskRepository:
             task = result.scalar_one_or_none()
             return task.status if task else None
 
+    async def get_task(self, task_id: str) -> dict | None:
+        """Get a full task record by ID."""
+        async with self.db_manager.get_session() as session:
+            result = await session.execute(
+                select(TaskModel).where(TaskModel.id == task_id)
+            )
+            task = result.scalar_one_or_none()
+            if not task:
+                return None
+            return {
+                "id": task.id,
+                "description": task.description,
+                "priority": task.priority,
+                "status": task.status,
+                "metadata": task.metadata_json,
+                "created_at": task.created_at.isoformat() if task.created_at else None,
+                "updated_at": task.updated_at.isoformat() if task.updated_at else None,
+            }
+
     async def save_result(
         self,
         task_id: str,
@@ -108,9 +127,9 @@ class TaskRepository:
             task = result.scalar_one_or_none()
             if not task:
                 return False
-            if task.status in (TaskStatus.COMPLETED, TaskStatus.FAILED):
+            if task.status in (TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.CANCELLED):
                 return False
-            task.status = TaskStatus.FAILED
+            task.status = TaskStatus.CANCELLED
             return True
 
     async def retry_task(self, task_id: str) -> str | None:

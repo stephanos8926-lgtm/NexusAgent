@@ -84,6 +84,35 @@ app.add_middleware(
 )
 
 
+# ─── Rate Limiting Middleware ──────────────────────────────────────────
+
+@app.middleware("http")
+async def rate_limit_middleware(request, call_next):
+    """Apply rate limiting to all API endpoints."""
+    from nexusagent.infrastructure.rate_limit import check_rate_limit
+
+    # Skip rate limiting for health/version endpoints
+    if request.url.path in ("/health", "/version"):
+        return await call_next(request)
+
+    # Identify client by API key header or fallback to IP
+    client_id = request.headers.get("x-api-key") or request.client.host
+
+    allowed, headers = await check_rate_limit(client_id)
+    if not allowed:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(
+            status_code=429,
+            content={"detail": "Rate limit exceeded. Try again later."},
+            headers=headers,
+        )
+
+    response = await call_next(request)
+    for k, v in headers.items():
+        response.headers[k] = v
+    return response
+
+
 class SubmitTaskRequest(BaseModel):
     description: str
     priority: int = 1
@@ -96,17 +125,14 @@ async def create_task(request: SubmitTaskRequest):
     Submit a new task to the orchestrator.
     """
     try:
-        # In a production system, we would save the task to DB here before publishing to NATS
-        # but for simplicity, we let the worker handle the first 'create' or
-        # we can add a call to task_repo.create_task here.
-
-        # Let's ensure the task is in the DB before it hits NATS
         import uuid
 
         from nexusagent.infrastructure.db import task_repo
+        from nexusagent.llm.models import TaskStatus
 
         task_id = str(uuid.uuid4())
 
+        # Create task in DB first (status=pending_nats indicates not yet on bus)
         await task_repo.create_task(
             task_id=task_id,
             description=request.description,
@@ -114,16 +140,42 @@ async def create_task(request: SubmitTaskRequest):
             metadata=request.metadata,
         )
 
-        task_id = await sdk.submit_task(
-            {
-                "id": task_id,
-                "description": request.description,
-                "priority": request.priority,
-                "metadata": request.metadata,
-            }
-        )
+        # Publish to NATS — with retry on failure
+        nats_error = None
+        for attempt in range(3):
+            try:
+                await sdk.submit_task(
+                    {
+                        "id": task_id,
+                        "description": request.description,
+                        "priority": request.priority,
+                        "metadata": request.metadata,
+                    }
+                )
+                nats_error = None
+                break
+            except Exception as nats_exc:
+                nats_error = nats_exc
+                logger.warning(f"NATS publish attempt {attempt + 1} failed: {nats_exc}")
+                if attempt < 2:
+                    import asyncio
+                    await asyncio.sleep(0.5 * (attempt + 1))
+
+        if nats_error:
+            # NATS publish failed after retries — mark task as failed, not orphaned
+            await task_repo.update_task_status(task_id, TaskStatus.FAILED)
+            logger.error(f"Task {task_id}: NATS publish failed after 3 attempts")
+            raise HTTPException(
+                status_code=503,
+                detail="Task queue unavailable. Please try again later.",
+            ) from nats_error
+
+        # NATS publish succeeded — update status to pending
+        await task_repo.update_task_status(task_id, TaskStatus.PENDING)
 
         return {"task_id": task_id, "status": "submitted"}
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error submitting task: {e}")
         raise HTTPException(status_code=500, detail=str(e)) from e
@@ -206,12 +258,21 @@ async def retry_task(task_id: str):
     """Retry a failed task."""
     from nexusagent.infrastructure.db import task_repo
 
+    # Fetch original task to preserve description
+    original = await task_repo.get_task(task_id)
+    if not original:
+        raise HTTPException(status_code=404, detail="Task not found")
+
     new_id = await task_repo.retry_task(task_id)
     if not new_id:
         raise HTTPException(status_code=400, detail="Task not found or not in failed state")
 
-    # Re-publish to NATS
-    task_data = {"id": new_id, "description": "retried", "priority": 1}
+    # Re-publish to NATS with original description preserved
+    task_data = {
+        "id": new_id,
+        "description": original.get("description", "retried"),
+        "priority": original.get("priority", 1),
+    }
     await sdk.submit_task(task_data)
 
     return {"task_id": new_id, "status": "re-queued"}
@@ -275,15 +336,19 @@ async def session_websocket(
 ):
     """Real-time interactive session via WebSocket.
 
-    Requires API key via query parameter: ?api_key=xxx
+    Requires API key via X-API-Key header (preferred) or ?api_key= query param.
+    Query param is supported for browser compatibility (browsers cannot set
+    custom headers on WebSocket connections).
     """
     # Verify API key before accepting the connection
-    from nexusagent.infrastructure.api_auth import verify_api_key
-    if not api_key:
+    # Prefer header auth; fall back to query param for browser clients
+    header_key = websocket.headers.get("x-api-key")
+    effective_key = header_key or api_key
+    if not effective_key:
         await websocket.close(code=4001, reason="Missing API key")
         return
     try:
-        await verify_api_key(api_key)
+        await verify_api_key(effective_key)
     except HTTPException:
         await websocket.close(code=4001, reason="Invalid or missing API key")
         return
@@ -318,18 +383,23 @@ async def session_websocket(
 
         async def receive_messages():
             while True:
-                msg = await websocket.receive_json()
+                try:
+                    msg = await websocket.receive_json()
+                except Exception:
+                    break
                 msg_type = msg.get("type")
 
                 if msg_type == "user_input":
                     content = msg.get("content", "")
-                    images = msg.get("images", [])
+                    images = msg.get("images", []) or []
                     if images:
                         await session.send(content, images=images)
                     else:
                         await session.send(content)
                 elif msg_type == "approval":
-                    await session.approve(msg["call_id"], msg.get("approved", False))
+                    call_id = msg.get("call_id", "")
+                    approved = msg.get("approved", False)
+                    await session.approve(call_id, approved)
                 elif msg_type == "interrupt":
                     await session.interrupt()
                 elif msg_type == "list_sessions":
