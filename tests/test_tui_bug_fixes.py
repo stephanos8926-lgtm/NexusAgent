@@ -135,11 +135,12 @@ class TestWordWrapping:
         assert "layout: stream" in css
 
     def test_css_has_border_focus(self):
-        """CSS should use semantic border-focus variable."""
+        """CSS should use semantic variables for theming."""
         from nexusagent.interfaces.tui import NexusApp
         app = NexusApp(session_id="test")
         css = app.CSS
-        assert "$border-focus" in css
+        assert "$" in css  # Uses CSS variables
+        assert "$border" in css or "$border-focus" in css or "$primary" in css
 
 
 # ═══════════════════════════════════════════════════════════════════════

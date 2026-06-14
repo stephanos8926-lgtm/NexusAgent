@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any
 
 from textual.binding import Binding
+from textual.events import Key as KeyEvent
 from textual.widgets import TextArea
 
 logger = logging.getLogger(__name__)
@@ -161,6 +162,25 @@ class ChatInput(TextArea):
             self.text = ""
         else:
             self.text = self._history[self._history_idx]
+
+    def on_key(self, event: KeyEvent) -> None:
+        """Intercept Enter before TextArea's internal handler.
+
+        TextArea._on_key() inserts '\\n' on Enter and stops the event,
+        preventing our Binding("enter", "submit") from ever firing.
+        We handle Enter/Shift+Enter here instead.
+        """
+        if event.key == "enter" and not event.shift:
+            # Submit on Enter (without Shift)
+            event.stop()
+            event.prevent_default()
+            self.action_submit()
+        elif event.key == "enter" and event.shift:
+            # Allow newline on Shift+Enter (let TextArea handle it)
+            pass
+        else:
+            # Delegate everything else to TextArea
+            super().on_key(event)
 
     def action_submit(self) -> None:
         """Submit the current input."""
