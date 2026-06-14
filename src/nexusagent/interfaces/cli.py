@@ -1,11 +1,65 @@
 # src/nexusagent/cli.py
 import asyncio
 import logging
+import re
 import tomllib
 from importlib.metadata import version as pkg_version
 from pathlib import Path
 
 import click
+
+
+CLIENT_VERSION = "0.1.0"
+
+
+def parse_version(v: str) -> tuple[int, int, int]:
+    """Parse a semver string into a (major, minor, patch) tuple.
+
+    Strips pre-release suffixes like '-rc1', '+build123'.
+    Missing segments default to 0.
+    """
+    # Strip pre-release and build metadata
+    clean = re.split(r"[+-]", v)[0]
+    parts = clean.split(".")
+    nums = [int(p) for p in parts if p.isdigit()]
+    while len(nums) < 3:
+        nums.append(0)
+    return (nums[0], nums[1], nums[2])
+
+
+def is_compatible(server_ver: str, client_ver: str) -> bool:
+    """Check compatibility: same MAJOR.MINOR, ignoring patch."""
+    s = parse_version(server_ver)
+    c = parse_version(client_ver)
+    return s[0] == c[0] and s[1] == c[1]
+
+
+async def preflight() -> bool:
+    """Run preflight version check against the server.
+
+    Returns True if server is reachable (version mismatch is a warning, not fatal).
+    Returns False if server is unreachable.
+    """
+    from nexusagent.server.sdk import sdk
+
+    try:
+        health = await sdk.health_check()
+    except Exception:
+        click.echo(
+            "Warning: Unable to reach server. "
+            "Use --skip-version-check to bypass.",
+            err=True,
+        )
+        return False
+
+    server_ver = health.get("version", "unknown")
+    if not is_compatible(server_ver, CLIENT_VERSION):
+        click.echo(
+            f"Warning: Server version {server_ver} may be incompatible "
+            f"with client version {CLIENT_VERSION}.",
+            err=True,
+        )
+    return True
 
 
 def get_version() -> str:
@@ -21,13 +75,18 @@ def get_version() -> str:
 
 @click.group()
 @click.version_option(version=f"nexusagent {get_version()}")
-def main() -> None:
+@click.option("--check-server", is_flag=True, default=False, help="Check server version and exit.")
+@click.pass_context
+def main(ctx, check_server) -> None:
     """NexusAgent CLI Client."""
+    ctx.ensure_object(dict)
+    ctx.obj["check_server"] = check_server
 
 
 @main.command()
 @click.argument("task")
-def submit(task):
+@click.option("--skip-version-check", is_flag=True, default=False, help="Skip preflight version check.")
+def submit(task, skip_version_check):
     """Submit a coding task to the agent service.
 
     Example:
@@ -35,10 +94,21 @@ def submit(task):
     """
     from nexusagent.infrastructure.config import settings
 
+    # Handle --check-server
+    # (check_server is accessed via the parent context in click)
     logging.basicConfig(level=settings.log_level, format="%(levelname)s: %(message)s")
     logger = logging.getLogger(__name__)
 
     async def run_client() -> None:
+        if not skip_version_check:
+            ok = await preflight()
+            if not ok:
+                click.echo(
+                    "Preflight failed. Use --skip-version-check to proceed anyway.",
+                    err=True,
+                )
+                raise SystemExit(1)
+
         try:
             from nexusagent.server.sdk import sdk
 
@@ -68,7 +138,8 @@ def submit(task):
 @click.option("--model", "-M", default=None, help="Model override for this agent")
 @click.option("--max-depth", default=3, help="Max sub-agent nesting depth")
 @click.option("--summary-only", is_flag=True, default=False, help="Return only summary (not full output)")
-def run(task, working_dir, max_turns, wall_time, memory_mode, acceptance, model, max_depth, summary_only):
+@click.option("--skip-version-check", is_flag=True, default=False, help="Skip preflight version check.")
+def run(task, working_dir, max_turns, wall_time, memory_mode, acceptance, model, max_depth, summary_only, skip_version_check):
     """Spawn an isolated worker to complete a task.
 
     Example:
@@ -93,6 +164,15 @@ def run(task, working_dir, max_turns, wall_time, memory_mode, acceptance, model,
     )
 
     async def _run():
+        if not skip_version_check:
+            ok = await preflight()
+            if not ok:
+                click.echo(
+                    "Preflight failed. Use --skip-version-check to proceed anyway.",
+                    err=True,
+                )
+                raise SystemExit(1)
+
         handle = await worker_pool.spawn(contract, depth=0)
         click.echo(f"Spawned worker {handle.worker_id}")
 
