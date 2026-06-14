@@ -33,8 +33,8 @@ from pathlib import Path
 # ── Configuration ──────────────────────────────────────────────────────────────
 
 REPO_ROOT = Path.cwd()
-WORKTREE_BASE = REPO_ROOT / ".hermes" / "worktrees"
-STATE_FILE = REPO_ROOT / ".hermes" / "worktree-state.json"
+WORKTREE_BASE = Path.home() / ".nexusagent" / "worktrees"
+STATE_FILE = Path.home() / ".nexusagent" / "worktree-state.json"
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────

@@ -1,7 +1,7 @@
 """
 Skills system for NexusAgent.
 
-Loads skills from .hermes/skills/ directory. Each skill is a directory
+Loads skills from ~/.nexusagent/skills/ directory. Each skill is a directory
 containing a SKILL.md file with YAML frontmatter and markdown content.
 
 Skills are injected into the system prompt so the agent can reference them.
@@ -80,7 +80,7 @@ def load_all_skills(skills_dir: Path | None = None) -> dict[str, Skill]:
     Returns a dict of skill_name -> Skill.
     """
     if skills_dir is None:
-        skills_dir = Path.home() / ".hermes" / "skills"
+        skills_dir = Path.home() / ".nexusagent" / "skills"
 
     skills: dict[str, Skill] = {}
 

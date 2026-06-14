@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 class ServerConfig(BaseModel):
     nats_url: str = Field(default="nats://localhost:4222")
-    db_path: str = Field(default="nexus.db")
+    db_path: str = Field(default="~/.nexusagent/data/nexus.db")
     api_port: int = Field(default=8000, ge=1, le=65535)
     worker_threads: int = Field(default=4, ge=1)
     nats_reconnect_wait: int = Field(default=2, ge=0)
@@ -31,9 +31,9 @@ class ClientConfig(BaseModel):
 
 
 class AuthConfig(BaseModel):
-    master_secret_path: str = Field(default=".master.secret")
-    keystore_path: str = Field(default="keystore.json")
-    salt_path: str = Field(default=".master.salt")
+    master_secret_path: str = Field(default="~/.nexusagent/auth/.master.secret")
+    keystore_path: str = Field(default="~/.nexusagent/auth/keystore.json")
+    salt_path: str = Field(default="~/.nexusagent/auth/.master.salt")
     kdf_iterations: int = Field(default=100000, ge=1000)
 
 
@@ -59,8 +59,8 @@ class AgentConfig(BaseModel):
 
 class PromptConfig(BaseModel):
     """Configuration for the NEXUS.md prompt system."""
-    # Path to the base prompt file (relative to project root)
-    base_prompt_file: str = Field(default="config/NEXUS.md")
+    # Path to the base prompt file (defaults to ~/.nexusagent/NEXUS.md)
+    base_prompt_file: str = Field(default="~/.nexusagent/NEXUS.md")
     # Whether to look for a project-specific NEXUS.md in CWD
     load_cwd_prompt: bool = Field(default=True)
     # Maximum @file chain depth (prevents infinite recursion)
@@ -86,7 +86,7 @@ class HooksConfig(BaseModel):
     """Configuration for the hooks system."""
 
     hooks_enabled: bool = Field(default=True)
-    hooks_dir: str = Field(default=".nexusagent/hooks")
+    hooks_dir: str = Field(default="~/.nexusagent/hooks")
 
 
 class ConfigSchema(BaseModel):
@@ -101,6 +101,13 @@ class ConfigSchema(BaseModel):
     log_level: str = Field(default="INFO")
 
 
+def get_nexus_home() -> Path:
+    """Return the NexusAgent home directory (~/.nexusagent/), creating it if needed."""
+    home = Path.home() / ".nexusagent"
+    home.mkdir(parents=True, exist_ok=True)
+    return home
+
+
 def get_project_root() -> Path:
     # The config file is located at <root>/config/nexusagent.yaml
     # The file this function is in is <root>/src/nexusagent/infrastructure/config.py
@@ -108,8 +115,9 @@ def get_project_root() -> Path:
     return Path(__file__).parent.parent.parent.parent.absolute()
 
 
-def load_config(config_file: str = "config/nexusagent.yaml") -> ConfigSchema:
-    config_path = get_project_root() / config_file
+def load_config(config_file: str = "~/.nexusagent/config/nexusagent.yaml") -> ConfigSchema:
+    # Resolve ~ in config file path
+    config_path = Path(config_file).expanduser()
 
     raw_data = {}
     if config_path.exists():
@@ -155,28 +163,21 @@ def load_config(config_file: str = "config/nexusagent.yaml") -> ConfigSchema:
     try:
         config = ConfigSchema(**raw_data)
 
-        # Resolve relative paths to absolute paths
-        root = get_project_root()
-        config.server.db_path = (
-            str(root / config.server.db_path)
-            if not Path(config.server.db_path).is_absolute()
-            else config.server.db_path
-        )
-        config.auth.master_secret_path = (
-            str(root / config.auth.master_secret_path)
-            if not Path(config.auth.master_secret_path).is_absolute()
-            else config.auth.master_secret_path
-        )
-        config.auth.keystore_path = (
-            str(root / config.auth.keystore_path)
-            if not Path(config.auth.keystore_path).is_absolute()
-            else config.auth.keystore_path
-        )
-        config.auth.salt_path = (
-            str(root / config.auth.salt_path)
-            if not Path(config.auth.salt_path).is_absolute()
-            else config.auth.salt_path
-        )
+        # Resolve relative server/auth paths against nexusagent home
+        nexus_home = get_nexus_home()
+        if not Path(config.server.db_path).is_absolute():
+            config.server.db_path = str(nexus_home / config.server.db_path)
+        if not Path(config.auth.master_secret_path).is_absolute():
+            config.auth.master_secret_path = str(nexus_home / config.auth.master_secret_path)
+        if not Path(config.auth.keystore_path).is_absolute():
+            config.auth.keystore_path = str(nexus_home / config.auth.keystore_path)
+        if not Path(config.auth.salt_path).is_absolute():
+            config.auth.salt_path = str(nexus_home / config.auth.salt_path)
+
+        # Ensure data subdirectories exist
+        for path_str in (config.server.db_path, config.auth.master_secret_path,
+                         config.auth.keystore_path, config.auth.salt_path):
+            Path(path_str).parent.mkdir(parents=True, exist_ok=True)
 
         return config
     except ValidationError as e:

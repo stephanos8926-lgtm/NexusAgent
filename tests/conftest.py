@@ -45,8 +45,10 @@ _auth_module.auth_manager = _test_auth
 import asyncio as _asyncio
 from nexusagent.infrastructure.db import DatabaseManager as _DBM
 
+_test_db_dir = tempfile.mkdtemp(prefix="nexus_test_")
+
 async def _init_test_db():
-    _db = _DBM("data/nexus.db")
+    _db = _DBM(os.path.join(_test_db_dir, "nexus.db"))
     await _db.init_db()
 
 _asyncio.run(_init_test_db())

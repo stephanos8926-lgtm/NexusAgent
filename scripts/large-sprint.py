@@ -32,8 +32,8 @@ from pathlib import Path
 # ── Configuration ──────────────────────────────────────────────────────────────
 
 REPO_ROOT = Path.cwd()
-SPRINT_BASE = REPO_ROOT / ".hermes" / "sprints"
-STATE_FILE = REPO_ROOT / ".hermes" / "sprint-state.json"
+SPRINT_BASE = Path.home() / ".nexusagent" / "sprints"
+STATE_FILE = Path.home() / ".nexusagent" / "sprint-state.json"
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────

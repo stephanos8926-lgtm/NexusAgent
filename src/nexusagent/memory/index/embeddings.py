@@ -12,6 +12,7 @@ import math
 import os
 import struct
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 from typing import Any
 
 import sqlite_vec
@@ -67,10 +68,11 @@ class EmbeddingProvider:
         if not api_key:
             api_key = os.environ.get("GEMINI_API_KEY")
         if not api_key:
-            # Try loading from .env file in project root
-            from nexusagent.infrastructure.config import get_project_root
-
-            env_path = get_project_root() / ".env"
+            # Try loading from ~/.nexusagent/.env first, then project root .env
+            env_path = Path.home() / ".nexusagent" / ".env"
+            if not env_path.exists():
+                from nexusagent.infrastructure.config import get_project_root
+                env_path = get_project_root() / ".env"
             if env_path.exists():
                 for line in env_path.read_text().splitlines():
                     line = line.strip()

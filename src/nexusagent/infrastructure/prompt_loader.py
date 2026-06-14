@@ -1,9 +1,10 @@
 """NEXUS.md prompt file loader with @ chaining and circular detection.
 
 Resolution order:
-  1. config/NEXUS.md (package base) — always loaded first
-  2. CWD/NEXUS.md (project-specific) — appended if present
-  3. Any @file chains discovered during loading
+  1. ~/.nexusagent/NEXUS.md (home directory) — always loaded first
+  2. config/NEXUS.md (package base) — fallback if home file missing
+  3. CWD/NEXUS.md (project-specific) — appended if present
+  4. Any @file chains discovered during loading
 
 For chat-time injection:
   Type @<path> on its own line in chat to inline a file's content.
@@ -139,8 +140,9 @@ def load_nexus_prompt(
     """Load the complete NEXUS.md prompt.
 
     Resolution order:
-      1. config/NEXUS.md from package root (base prompt)
-      2. NEXUS.md from current working directory (project overrides)
+      1. ~/.nexusagent/NEXUS.md from home directory (base prompt)
+      2. config/NEXUS.md from package root (fallback)
+      3. NEXUS.md from current working directory (project overrides)
     """
     if package_root is None:
         package_root = Path(__file__).parent.parent.parent
@@ -152,8 +154,10 @@ def load_nexus_prompt(
 
     parts: list[str] = []
 
-    # 1. Base prompt from package config
-    base_prompt_file = package_root / "config" / "NEXUS.md"
+    # 1. Base prompt from ~/.nexusagent/NEXUS.md (home directory)
+    base_prompt_file = Path.home() / ".nexusagent" / "NEXUS.md"
+    if not base_prompt_file.exists():
+        base_prompt_file = package_root / "config" / "NEXUS.md"
     if base_prompt_file.exists():
         try:
             base_content = base_prompt_file.read_text(encoding="utf-8")
