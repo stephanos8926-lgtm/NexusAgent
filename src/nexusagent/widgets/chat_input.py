@@ -27,10 +27,23 @@ logger = logging.getLogger(__name__)
 # Known slash commands for autocomplete
 SLASH_COMMANDS: list[str] = sorted([
     "/help",
-    "/logs",
-    "/theme",
+    "/new",
     "/clear",
+    "/status",
+    "/version",
+    "/tokens",
     "/model",
+    "/theme",
+    "/auto",
+    "/compact",
+    "/skills",
+    "/skill",
+    "/sessions",
+    "/threads",
+    "/interrupt",
+    "/undo",
+    "/redo",
+    "/quit",
 ])
 
 # History file path
@@ -76,6 +89,8 @@ class ChatInput(TextArea):
         Binding("enter", "submit", "Submit", show=False),
         Binding("escape", "cancel", "Cancel", show=False),
         Binding("tab", "autocomplete", "Autocomplete", show=False),
+        Binding("up", "history_prev", "History ↑", show=False),
+        Binding("down", "history_next", "History ↓", show=False),
     ]
 
     DEFAULT_CSS = """
@@ -115,6 +130,32 @@ class ChatInput(TextArea):
             self.border_subtitle = self._hint
         else:
             self.border_subtitle = ""
+
+    def action_history_prev(self) -> None:
+        """Navigate to the previous history entry."""
+        if not self._history:
+            return
+        # Only navigate history when on a single-line input (first row)
+        row, _ = self.cursor_location
+        if row != 0:
+            return
+        if self._history_idx > 0:
+            self._history_idx -= 1
+            self.text = self._history[self._history_idx]
+            # Move cursor to end
+            self.move_cursor_relative(columns=len(self.text))
+
+    def action_history_next(self) -> None:
+        """Navigate to the next history entry (or blank if at end)."""
+        row, _ = self.cursor_location
+        if row != 0 and self._history_idx < len(self._history) - 1:
+            return
+        if self._history_idx < len(self._history):
+            self._history_idx += 1
+        if self._history_idx >= len(self._history):
+            self.text = ""
+        else:
+            self.text = self._history[self._history_idx]
 
     def action_submit(self) -> None:
         """Submit the current input."""
@@ -209,7 +250,16 @@ class ChatInput(TextArea):
     class Submitted(TextArea.Changed):
         """Message posted when input is submitted."""
 
+        # NOTE: We extend TextArea.Changed only to reuse Textual's message routing.
+        # The `text` and `images` attributes below are the only fields callers
+        # should use; the inherited Changed state is irrelevant.
+        BUBBLE = True
+
         def __init__(self, text: str, images: list[str]) -> None:
-            super().__init__()
+            # TextArea.Changed requires a TextArea instance; pass None and let
+            # Textual set `control` via the normal message routing machinery.
+            # We call Message.__init__ directly to avoid the Changed contract.
+            from textual.message import Message
+            Message.__init__(self)
             self.text = text
             self.images = images

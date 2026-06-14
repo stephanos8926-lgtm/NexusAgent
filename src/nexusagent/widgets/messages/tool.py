@@ -153,6 +153,11 @@ class ToolCallMessage(Static):
         self._collapsed = not self._collapsed
         self.refresh()
 
+    def on_click(self) -> None:
+        """Click anywhere on the widget to toggle output collapse."""
+        if self._output:
+            self.toggle_collapse()
+
     def render(self) -> Content:
         icon = self._STATUS_ICONS.get(self._status, "⚙")
         style = self._STATUS_STYLES.get(self._status, "bold warning")

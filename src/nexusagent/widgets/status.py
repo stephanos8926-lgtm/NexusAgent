@@ -134,6 +134,8 @@ class StatusBar(Horizontal):
         self._model_name = ""
         self._spinning = False
         self._spinner_idx = 0
+        self._context_used = 0
+        self._context_limit = 0
 
     def compose(self) -> ComposeResult:
         yield Static("", id="status-spinner")
@@ -141,10 +143,24 @@ class StatusBar(Horizontal):
         yield Static("", id="status-cwd")
         yield Static("", id="status-branch")
         yield Static("", id="status-tokens")
+        yield Static("", id="status-context")
         yield ModelLabel(id="status-model")
 
     def on_mount(self) -> None:
         self._update_widgets()
+        # Drive spinner animation at 100ms intervals
+        self.set_interval(0.1, self._animate_spinner)
+
+    def _animate_spinner(self) -> None:
+        """Advance the spinner on each timer tick."""
+        if self._spinning:
+            self._spinner_idx += 1
+            try:
+                self.query_one("#status-spinner", Static).update(
+                    self.SPINNER_CHARS[self._spinner_idx % len(self.SPINNER_CHARS)]
+                )
+            except NoMatches:
+                pass
 
     def _update_widgets(self) -> None:
         try:
@@ -180,6 +196,24 @@ class StatusBar(Horizontal):
                 tokens.update("")
 
             model.set_model(self._model_provider, self._model_name)
+
+            # Context window bar
+            try:
+                ctx_widget = self.query_one("#status-context", Static)
+                if self._context_limit > 0:
+                    pct = min(100, int(self._context_used / self._context_limit * 100))
+                    if pct >= 90:
+                        ctx_color = "red"
+                    elif pct >= 70:
+                        ctx_color = "yellow"
+                    else:
+                        ctx_color = "green"
+                    ctx_widget.update(f"[{ctx_color}]ctx {pct}%[/{ctx_color}]")
+                else:
+                    ctx_widget.update("")
+            except NoMatches:
+                pass
+
         except NoMatches:
             pass
 
@@ -202,6 +236,12 @@ class StatusBar(Horizontal):
     def set_model(self, provider: str, model: str) -> None:
         self._model_provider = provider
         self._model_name = model
+        self._update_widgets()
+
+    def set_context(self, used: int, total: int) -> None:
+        """Update context window usage display."""
+        self._context_used = used
+        self._context_limit = total
         self._update_widgets()
 
     def set_spinner(self, spinning: bool) -> None:

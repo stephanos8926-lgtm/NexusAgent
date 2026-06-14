@@ -87,14 +87,19 @@ class NexusApp(App):
     SUB_TITLE = "AI Coding Agent"
 
     BINDINGS: ClassVar = [
-        Binding("q", "quit", "Quit", priority=True, show=True),
-        Binding("escape", "quit", "Quit", priority=True, show=False),
-        Binding("c", "clear", "Clear", show=True),
+        Binding("ctrl+q", "quit", "Quit", priority=True, show=True),
         Binding("ctrl+c", "interrupt", "Interrupt", show=True),
-        Binding("ctrl+u", "interrupt", "Interrupt", show=True),
-        Binding("e", "expand_all", "Expand", show=True),
-        Binding("a", "collapse_all", "Collapse", show=True),
+        Binding("ctrl+l", "clear", "Clear", show=True),
+        Binding("ctrl+t", "cycle_theme", "Theme", show=True),
         Binding("ctrl+underscore", "toggle_auto_approve", "Auto-approve", show=False),
+        Binding("f1", "show_help", "Help", show=True),
+        # Legacy single-key bindings (lower priority so they don't eat input)
+        Binding("q", "quit", "Quit", priority=False, show=False),
+        Binding("escape", "quit", "Quit", priority=False, show=False),
+        Binding("c", "clear", "Clear", show=False),
+        Binding("ctrl+u", "interrupt", "Interrupt", show=False),
+        Binding("e", "expand_all", "Expand", show=False),
+        Binding("a", "collapse_all", "Collapse", show=False),
     ]
 
     CSS = """
@@ -158,6 +163,8 @@ class NexusApp(App):
         self._total_tokens_used = 0
         self._request_count = 0
         self._last_tool_name = ""
+        self._context_used = 0
+        self._context_limit = 0
 
     def on_mount(self) -> None:
         self._input_queue: asyncio.Queue[str | None] = asyncio.Queue()
@@ -178,11 +185,29 @@ class NexusApp(App):
         self._show_greeting()
         self._ws_task = asyncio.create_task(self._ws_loop())
         self._install_sigwinch()
+        self._refresh_git_branch()
 
         if not self._gc_frozen:
             import gc
             gc.freeze()
             self._gc_frozen = True
+
+    # ── Git branch detection ────────────────────────────────────────────
+
+    def _refresh_git_branch(self) -> None:
+        """Detect git branch and update the status bar."""
+        import subprocess
+        try:
+            result = subprocess.run(
+                ["git", "branch", "--show-current"],
+                capture_output=True, text=True, timeout=3,
+                cwd=str(pathlib.Path.cwd()),
+            )
+            branch = result.stdout.strip() if result.returncode == 0 else ""
+            if branch:
+                self.status_bar.set_branch(branch)
+        except Exception:
+            pass
 
     # ── Greeting ──────────────────────────────────────────────────────
 
@@ -229,44 +254,80 @@ class NexusApp(App):
     async def _ws_loop(self) -> None:
         api_key = settings.client.api_key
         ws_url = f"ws://127.0.0.1:{settings.server.api_port}/sessions/{self.session_id}/ws"
+        extra_headers: dict[str, str] = {}
         if api_key:
-            ws_url += f"?api_key={api_key}"
-        try:
-            async with websockets.connect(ws_url, ping_interval=20, ping_timeout=10) as ws:
-                self._ws = ws
-                self.status_bar.set_status("Connected")
-                self.status_bar.set_spinner(False)
+            extra_headers["Authorization"] = f"Bearer {api_key}"
 
-                async def send_messages():
-                    while True:
-                        msg = await self._input_queue.get()
-                        if msg is None:
-                            break
-                        await ws.send(json.dumps({"type": "user_input", "content": msg}))
+        _MAX_RETRIES = 6
+        _BASE_DELAY = 1.0  # seconds
 
-                async def receive_events():
-                    async for raw in ws:
-                        try:
-                            event = json.loads(raw)
-                        except json.JSONDecodeError:
-                            continue
-                        await self._handle_event(event)
+        for attempt in range(_MAX_RETRIES):
+            try:
+                async with websockets.connect(
+                    ws_url,
+                    ping_interval=20,
+                    ping_timeout=10,
+                    additional_headers=extra_headers,
+                ) as ws:
+                    self._ws = ws
+                    self.status_bar.set_status("Connected")
+                    self.status_bar.set_spinner(False)
 
-                await asyncio.gather(send_messages(), receive_events())
+                    async def send_messages():
+                        while True:
+                            msg = await self._input_queue.get()
+                            if msg is None:
+                                break
+                            await ws.send(json.dumps({"type": "user_input", "content": msg}))
 
-        except ConnectionRefusedError:
-            self.status_bar.set_status("Connection refused")
-            self._mount_error(f"Cannot connect to server at port {settings.server.api_port}")
-        except websockets.exceptions.ConnectionClosedOK:
-            self.status_bar.set_status("Disconnected")
-        except websockets.exceptions.ConnectionClosedError as e:
-            self.status_bar.set_status("Connection lost")
-            self._mount_error(f"Connection lost: {e}")
-        except Exception as e:
-            self.status_bar.set_status("Error")
-            self._mount_error(f"Error: {e}")
-        finally:
-            self._ws = None
+                    async def receive_events():
+                        async for raw in ws:
+                            try:
+                                event = json.loads(raw)
+                            except json.JSONDecodeError:
+                                continue
+                            await self._handle_event(event)
+
+                    await asyncio.gather(send_messages(), receive_events())
+                    # Clean close — no retry needed
+                    return
+
+            except ConnectionRefusedError:
+                delay = _BASE_DELAY * (2 ** attempt)
+                remaining = _MAX_RETRIES - attempt - 1
+                if remaining == 0:
+                    self.status_bar.set_status("Connection refused")
+                    self._mount_error(
+                        f"Cannot connect to server at port {settings.server.api_port} "
+                        f"after {_MAX_RETRIES} attempts."
+                    )
+                    return
+                self.status_bar.set_status(f"Reconnecting ({remaining} left)…")
+                await asyncio.sleep(delay)
+                continue
+
+            except websockets.exceptions.ConnectionClosedOK:
+                self.status_bar.set_status("Disconnected")
+                return
+
+            except websockets.exceptions.ConnectionClosedError as e:
+                delay = _BASE_DELAY * (2 ** attempt)
+                remaining = _MAX_RETRIES - attempt - 1
+                if remaining == 0:
+                    self.status_bar.set_status("Connection lost")
+                    self._mount_error(f"Connection lost: {e}")
+                    return
+                self.status_bar.set_status(f"Reconnecting ({remaining} left)…")
+                await asyncio.sleep(delay)
+                continue
+
+            except Exception as e:
+                self.status_bar.set_status("Error")
+                self._mount_error(f"Error: {e}")
+                return
+
+            finally:
+                self._ws = None
 
     # ── Event handling ──────────────────────────────────────────────
 
@@ -279,7 +340,7 @@ class NexusApp(App):
         elif etype == "thinking":
             content = event.get("content", "")
             if content and content != "Processing...":
-                thinking = AppMessage(content=content)
+                thinking = AppMessage(message=content)
                 self.messages_container.mount(thinking)
                 self.status_bar.set_status("Thinking...")
 
@@ -372,6 +433,13 @@ class NexusApp(App):
             if tokens:
                 self._total_tokens_used += tokens
                 self.status_bar.set_tokens(self._total_tokens_used)
+            # Update context window display if server reports usage
+            ctx_used = event.get("context_used", 0)
+            ctx_limit = event.get("context_limit", 0)
+            if ctx_used and ctx_limit:
+                self._context_used = ctx_used
+                self._context_limit = ctx_limit
+                self.status_bar.set_context(ctx_used, ctx_limit)
 
             self._process_next_in_queue()
             self.status_bar.set_status("Ready")
@@ -600,8 +668,8 @@ class NexusApp(App):
 
     # ── Input handling ──────────────────────────────────────────────
 
-    async def on_input_submitted(self, event: Input.Submitted) -> None:
-        message = event.value.strip()
+    async def on_chat_input_submitted(self, event: ChatInput.Submitted) -> None:
+        message = event.text.strip()
         if not message:
             return
 
@@ -621,7 +689,7 @@ class NexusApp(App):
         self._busy = True
         user_msg = UserMessage(content=message)
         self.messages_container.mount(user_msg)
-        event.input.value = ""
+        self.chat_input.text = ""
         self.status_bar.set_status("Thinking...")
         self.status_bar.set_spinner(True)
         await self._input_queue.put(message)
@@ -648,10 +716,26 @@ class NexusApp(App):
             self.messages_container.mount(msg)
 
     def action_expand_all(self) -> None:
-        pass  # Widgets auto-expand
+        """Expand all collapsed tool call outputs."""
+        from nexusagent.widgets.messages.tool import ToolCallMessage
+        for widget in self.messages_container.query(ToolCallMessage):
+            if widget._collapsed:
+                widget.toggle_collapse()
 
     def action_collapse_all(self) -> None:
-        pass  # TODO: collapse all tool outputs
+        """Collapse all expanded tool call outputs."""
+        from nexusagent.widgets.messages.tool import ToolCallMessage
+        for widget in self.messages_container.query(ToolCallMessage):
+            if not widget._collapsed and widget._output:
+                widget.toggle_collapse()
+
+    def action_cycle_theme(self) -> None:
+        """Cycle through available themes (Ctrl+T)."""
+        self._cycle_theme()
+
+    def action_show_help(self) -> None:
+        """Show help panel (F1)."""
+        self._show_help()
 
     def action_toggle_auto_approve(self) -> None:
         self._auto_approve = not self._auto_approve

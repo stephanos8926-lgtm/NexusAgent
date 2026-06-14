@@ -60,12 +60,22 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# SECURITY: restrict CORS to localhost only.
+# allow_credentials=True is incompatible with allow_origins=["*"] in browsers
+# and exposes cookies/auth headers to any origin. Localhost-only origins are
+# safe for the local TUI/web-UI use-case.
+_ALLOWED_ORIGINS = [
+    "http://localhost",
+    "http://localhost:8000",
+    "http://127.0.0.1",
+    "http://127.0.0.1:8000",
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 
