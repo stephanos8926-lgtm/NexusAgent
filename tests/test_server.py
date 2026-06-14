@@ -61,11 +61,11 @@ async def test_cancel_task_not_found():
 
 @pytest.mark.asyncio
 async def test_retry_task_not_found():
-    """POST /tasks/{id}/retry for nonexistent task should return 400."""
+    """POST /tasks/{id}/retry for nonexistent task should return 404."""
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         response = await client.post("/tasks/nonexistent/retry", headers=API_HEADERS)
-        assert response.status_code == 400
+        assert response.status_code == 404
 
 
 @pytest.mark.asyncio
