@@ -1,6 +1,7 @@
 # src/nexusagent/server.py
 import asyncio
 import logging
+import time
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, HTTPException, WebSocket, WebSocketDisconnect
@@ -8,6 +9,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from nexusagent.infrastructure.api_auth import verify_api_key
+from nexusagent.version import VERSION, MIN_CLIENT_VERSION
+
+# Track server start time for uptime reporting
+_SERVER_START_TIME = time.monotonic()
 from nexusagent.infrastructure.bus import get_bus
 from nexusagent.infrastructure.config import settings
 from nexusagent.server.sdk import sdk
@@ -25,7 +30,7 @@ async def lifespan(app: FastAPI):
     """
     FastAPI Lifespan: Handles startup and shutdown.
     """
-    logger.info("Starting NexusAgent Backend...")
+    logger.info(f"NexusAgent Server v{VERSION} starting on port {settings.server.api_port}...")
     try:
         # 1. Initialize DB
         from nexusagent.infrastructure.db import db_manager
@@ -148,7 +153,23 @@ async def get_task_result(task_id: str):
 @app.get("/health")
 async def health_check():
     _bus = get_bus()
-    return {"status": "ok", "nats": "connected" if _bus.nc else "disconnected"}
+    return {
+        "status": "ok",
+        "version": VERSION,
+        "nats": "connected" if _bus.nc else "disconnected",
+    }
+
+
+@app.get("/version")
+async def version_endpoint():
+    _bus = get_bus()
+    return {
+        "version": VERSION,
+        "minClient": MIN_CLIENT_VERSION,
+        "server": "nexus-server",
+        "uptime": round(time.monotonic() - _SERVER_START_TIME, 1),
+        "nats": "connected" if _bus.nc else "disconnected",
+    }
 
 
 # ─── Task Listing ──────────────────────────────────────────────────────
@@ -353,12 +374,26 @@ async def session_websocket(
         await websocket.close(code=1011)
 
 
-def run() -> None:
+def run(reload: bool = False) -> None:
     """Entry point for the nexus-server command."""
     import uvicorn
 
-    uvicorn.run(app, host="0.0.0.0", port=settings.server.api_port)
+    uvicorn.run(
+        app,
+        host="0.0.0.0",
+        port=settings.server.api_port,
+        reload=settings.server.reload,
+    )
 
 
 if __name__ == "__main__":
-    run()
+    import argparse
+
+    parser = argparse.ArgumentParser(description="NexusAgent Server")
+    parser.add_argument(
+        "--reload",
+        action="store_true",
+        help="Enable auto-reload on code changes (development mode)",
+    )
+    args = parser.parse_args()
+    run(reload=args.reload)

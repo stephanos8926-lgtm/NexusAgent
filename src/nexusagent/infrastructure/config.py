@@ -16,6 +16,7 @@ class ServerConfig(BaseModel):
     worker_threads: int = Field(default=4, ge=1)
     nats_reconnect_wait: int = Field(default=2, ge=0)
     nats_max_reconnects: int = Field(default=60, ge=0)
+    reload: bool = Field(default=False, description="Enable uvicorn --reload for development")
 
 
 class ClientConfig(BaseModel):

@@ -5,8 +5,13 @@ import uuid
 
 from nexusagent.infrastructure.bus import AgentBus, get_bus
 from nexusagent.llm.models import ResultSchema, TaskSchema, TaskStatus
+from nexusagent.version import VERSION, MIN_CLIENT_VERSION
 
 logger = logging.getLogger(__name__)
+
+# Version constants — single source of truth is nexusagent.version
+SERVER_VERSION = VERSION
+
 
 
 class NexusSDK:
@@ -162,8 +167,13 @@ class NexusSDK:
     # ─── Status Helpers ──────────────────────────────────────────────────
 
     async def health_check(self) -> dict:
-        """Check system health (NATS connection status)."""
-        return {"status": "ok", "nats": "connected" if self.bus.nc else "disconnected"}
+        """Check system health (NATS connection status + version)."""
+        return {
+            "status": "ok",
+            "version": SERVER_VERSION,
+            "minClient": MIN_CLIENT_VERSION,
+            "nats": "connected" if self.bus.nc else "disconnected",
+        }
 
     async def list_workers(self) -> dict:
         """List worker status including circuit breaker state."""
