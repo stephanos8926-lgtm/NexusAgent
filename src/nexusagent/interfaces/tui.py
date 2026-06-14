@@ -187,7 +187,7 @@ class NexusApp(App):
     # ── Greeting ──────────────────────────────────────────────────────
 
     def _show_greeting(self) -> None:
-        """Show welcome banner as a persistent widget."""
+        """Show welcome banner at top of message stream (scrolls away as chat grows)."""
         welcome = WelcomeBanner(session_id=self.session_id)
         self.messages_container.mount(welcome)
 
