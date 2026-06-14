@@ -37,12 +37,38 @@ CATEGORY_KEYBINDINGS = {
 }
 
 CATEGORY_SLASH_COMMANDS = {
-    "Commands": [
+    "Session": [
         ("/help", "Show this help screen"),
-        ("/logs", "Open log viewer"),
-        ("/theme", "Cycle through themes"),
+        ("/new", "Start new conversation"),
         ("/clear", "Clear chat history"),
+        ("/resume", "Resume session"),
+        ("/status", "Show session status"),
+        ("/version", "Show version info"),
+        ("/compact", "Trigger context compaction"),
+        ("/context", "Show context window usage"),
+        ("/sessions", "List sessions"),
+        ("/threads", "List threads"),
+    ],
+    "Model & Tokens": [
         ("/model", "Show current model"),
+        ("/tokens", "Show token usage"),
+    ],
+    "Theme": [
+        ("/theme", "Cycle through themes"),
+        ("/theme-preview", "Preview theme colors"),
+    ],
+    "Tools & Navigation": [
+        ("/auto", "Toggle auto-approve"),
+        ("/interrupt", "Interrupt running task"),
+        ("/undo", "Undo last action"),
+        ("/redo", "Redo last action"),
+        ("/copy", "Copy to clipboard"),
+        ("/logs", "Open log viewer"),
+        ("/quit", "Exit application"),
+    ],
+    "Skills": [
+        ("/skills", "List available skills"),
+        ("/skill", "Show skill details"),
     ],
 }
 

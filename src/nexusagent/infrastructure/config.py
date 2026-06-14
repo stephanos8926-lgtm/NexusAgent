@@ -101,8 +101,10 @@ class ConfigSchema(BaseModel):
 
 
 def get_project_root() -> Path:
-    # Resolve root relative to this file: src/nexusagent/config.py -> project_root
-    return Path(__file__).parent.parent.parent.absolute()
+    # The config file is located at <root>/config/nexusagent.yaml
+    # The file this function is in is <root>/src/nexusagent/infrastructure/config.py
+    # To get to <root> from here: infrastructure -> nexusagent -> src -> (root)
+    return Path(__file__).parent.parent.parent.parent.absolute()
 
 
 def load_config(config_file: str = "config/nexusagent.yaml") -> ConfigSchema:

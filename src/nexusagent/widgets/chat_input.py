@@ -29,13 +29,17 @@ SLASH_COMMANDS: list[str] = sorted([
     "/help",
     "/new",
     "/clear",
+    "/resume",
     "/status",
     "/version",
     "/tokens",
     "/model",
     "/theme",
+    "/theme-preview",
     "/auto",
     "/compact",
+    "/context",
+    "/logs",
     "/skills",
     "/skill",
     "/sessions",
@@ -43,9 +47,9 @@ SLASH_COMMANDS: list[str] = sorted([
     "/interrupt",
     "/undo",
     "/redo",
+    "/copy",
     "/quit",
 ])
-
 # History file path
 _HISTORY_DIR = Path.home() / ".nexusagent"
 _HISTORY_FILE = _HISTORY_DIR / "history.json"
@@ -87,6 +91,7 @@ class ChatInput(TextArea):
 
     BINDINGS: list[Binding] = [
         Binding("enter", "submit", "Submit", show=False),
+        Binding("shift+enter", "newline", "Newline", show=False),
         Binding("escape", "cancel", "Cancel", show=False),
         Binding("tab", "autocomplete", "Autocomplete", show=False),
         Binding("up", "history_prev", "History ↑", show=False),
@@ -104,7 +109,7 @@ class ChatInput(TextArea):
         text-wrap: wrap;
     }
     ChatInput:focus {
-        border: solid $border-focus;
+        border: solid $primary;
     }
     ChatInput .hint {
         color: $text-muted;

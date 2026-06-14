@@ -41,6 +41,7 @@ from nexusagent.interfaces.tui_widgets import (  # noqa: F401
     NO_COLOR,
     ApprovalModal,
     Breakpoint,
+    ErrorModal,
     SpinnerLabel,
     _sigwinch_handler,
     classify_breakpoint,
@@ -111,7 +112,7 @@ class NexusApp(App):
         padding: 0 1;
     }
     #input-area:focus {
-        border: solid $border-focus;
+        border: solid $primary;
     }
     #status-bar {
         height: 1;
@@ -639,7 +640,7 @@ class NexusApp(App):
             self.status_bar.set_status(f"{count} queued")
 
     async def _send_approval(self, call_id: str, approved: bool) -> None:
-        if self._ws and self._ws.open:
+        if self._ws:
             await self._ws.send(json.dumps({
                 "type": "approval",
                 "call_id": call_id,
@@ -687,7 +688,7 @@ class NexusApp(App):
         self.exit()
 
     def action_interrupt(self) -> None:
-        if self._ws and self._ws.open:
+        if self._ws:
             self._interrupt_task = asyncio.create_task(
                 self._ws.send(json.dumps({"type": "interrupt"}))
             )

@@ -63,6 +63,7 @@ def register_themes(app: "App") -> None:
     from nexusagent.widgets.theme.colors import ALL_THEMES, THEME_REGISTRY
 
     for name in ALL_THEMES:
-        theme = Theme(name=name, variables=get_theme_css(name))
+        colors = get_theme_colors(name)
+        theme = Theme(primary=colors.accent, name=name, variables=get_theme_css(name))
         app.register_theme(theme)
         logger.debug(f"Registered theme: {name}")
