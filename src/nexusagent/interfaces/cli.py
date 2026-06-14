@@ -28,10 +28,14 @@ def parse_version(v: str) -> tuple[int, int, int]:
 
 
 def is_compatible(server_ver: str, client_ver: str) -> bool:
-    """Check compatibility: same MAJOR.MINOR, ignoring patch."""
+    """Check compatibility: same MAJOR version.
+
+    Compatible if major versions match. Client newer than server can degrade.
+    Server newer than client supports more features. Different major = breaking.
+    """
     s = parse_version(server_ver)
     c = parse_version(client_ver)
-    return s[0] == c[0] and s[1] == c[1]
+    return s[0] == c[0]
 
 
 async def preflight() -> bool:

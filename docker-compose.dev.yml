@@ -1,0 +1,27 @@
+services:
+  nexus:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    env_file:
+      - .env
+    network_mode: host
+    environment:
+      - NEXUS_SERVER__NATS_URL=nats://127.0.0.1:4222
+      - NEXUS_SERVER__DB_PATH=/data/nexus.db
+      - NEXUS_SERVER__API_PORT=8000
+      - NEXUS_SERVER__RELOAD=true
+      - NEXUS_LOG_LEVEL=DEBUG
+    volumes:
+      - nexus-data:/data
+      - ./src:/app/src:delegated
+      - ./config:/app/config:delegated
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  nexus-data:

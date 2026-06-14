@@ -237,11 +237,10 @@ class NexusApp(App):
 
     # ── Pre-connect version check ────────────────────────────────────
 
-    async def _check_server_version(self) -> bool:
-        """Fetch server version via HTTP before WebSocket connect.
+    async def _fetch_server_version(self) -> dict | None:
+        """Fetch server version data from /version endpoint.
 
-        Returns True if server is reachable (version mismatch is non-blocking).
-        Returns False if server is unreachable.
+        Returns parsed JSON dict on success, None on failure.
         """
         url = f"http://127.0.0.1:{settings.server.api_port}/version"
         try:
@@ -250,25 +249,34 @@ class NexusApp(App):
                 None,
                 lambda: urllib.request.urlopen(url, timeout=5).read(),
             )
-            data = json.loads(raw)
-            server_ver = data.get("version", "unknown")
-            if not is_compatible(server_ver, CLIENT_VERSION):
-                msg = AppMessage(
-                    f"⚠ Version mismatch: server={server_ver} "
-                    f"client={CLIENT_VERSION}. Consider upgrading."
-                )
-                self.messages_container.mount(msg)
-                logger.warning(
-                    "Version mismatch: server=%s client=%s",
-                    server_ver, CLIENT_VERSION,
-                )
-        except Exception as exc:
+            return json.loads(raw)
+        except Exception:
+            return None
+
+    async def _check_server_version(self) -> bool:
+        """Fetch server version via HTTP before WebSocket connect.
+
+        Returns True if server is reachable (version mismatch is non-blocking).
+        Returns False if server is unreachable.
+        """
+        data = await self._fetch_server_version()
+        if data is None:
+            msg = AppMessage("⚠ Server unreachable. Retrying…")
+            self.messages_container.mount(msg)
+            logger.warning("Version check failed: server unreachable")
+            return False
+
+        server_ver = data.get("version", "unknown")
+        if not is_compatible(server_ver, CLIENT_VERSION):
             msg = AppMessage(
-                f"⚠ Server unreachable: {exc}. Retrying…"
+                f"⚠ Version mismatch: server={server_ver} "
+                f"client={CLIENT_VERSION}. Consider upgrading."
             )
             self.messages_container.mount(msg)
-            logger.warning("Version check failed: %s", exc)
-            return False
+            logger.warning(
+                "Version mismatch: server=%s client=%s",
+                server_ver, CLIENT_VERSION,
+            )
         return True
 
     # ── WebSocket loop ──────────────────────────────────────────────

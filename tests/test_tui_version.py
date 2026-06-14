@@ -75,18 +75,14 @@ class TestTuiVersionCheck:
     async def test_tui_shows_version_mismatch_warning(self):
         """When server version mismatches, show AppMessage warning (non-blocking)."""
         app = self._make_app()
+        app.messages_container = AsyncMock()
 
-        fake_response = MagicMock()
-        fake_response.read.return_value = json.dumps({
-            "version": "0.2.0",
-            "minClient": "0.1.0",
-            "server": "nexusagent-server",
-            "uptime": 100,
-        }).encode()
-        fake_response.__enter__ = MagicMock(return_value=fake_response)
-        fake_response.__exit__ = MagicMock(return_value=False)
+        fake_data = {"version": "5.0.0", "minClient": "5.0.0", "server": "nexus-server"}
 
-        with patch("urllib.request.urlopen", return_value=fake_response):
+        async def fake_fetch(_self):
+            return fake_data
+
+        with patch.object(NexusApp, "_fetch_server_version", fake_fetch):
             result = await app._check_server_version()
 
         # Mismatch is non-blocking: returns True (don't block connect)
@@ -95,7 +91,7 @@ class TestTuiVersionCheck:
         app.messages_container.mount.assert_called_once()
         mounted_msg = app.messages_container.mount.call_args[0][0]
         assert "version" in mounted_msg._message.lower()
-        assert "0.2.0" in mounted_msg._message
+        assert "5.0.0" in mounted_msg._message
 
     @pytest.mark.asyncio
     async def test_tui_shows_unreachable_message(self):

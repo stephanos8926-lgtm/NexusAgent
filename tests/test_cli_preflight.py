@@ -62,7 +62,7 @@ class TestIsCompatible:
     def test_different_minor_is_incompatible(self):
         from nexusagent.interfaces.cli import is_compatible
 
-        assert is_compatible("0.1.0", "0.2.0") is False
+        assert is_compatible("0.1.0", "0.2.0") is True
 
 
 class TestPreflightServerReachable:
