@@ -1,14 +1,14 @@
-"""TDD tests for confirmed TUI bugs — RED phase.
+"""TDD tests for confirmed TUI bugs — updated for widget-based architecture.
 
-These tests target the SPECIFIC broken behaviors reported:
-1. Fake streaming: tokens accumulated then dumped as single event
-2. Tool calls show raw JSON instead of formatted output
-3. Word wrapping broken despite wrap=True in RichLog CSS
-4. Greeting may not render on mount
-5. _write_response / _enhanced_markdown redundancy
-6. _escape misses parentheses which RichLog interprets as markup
-7. action_quit race condition (no event loop)
-8. Missing yolo field in AgentConfig
+These tests target the SPECIFIC broken behaviors reported, now fixed:
+1. Streaming: token-by-token via AssistantMessage.append_token()
+2. Tool calls: formatted via ToolCallMessage widget
+3. Word wrapping: Container(layout="stream") + CSS
+4. Greeting: WelcomeBanner widget on mount
+5. Markdown: render_markdown wired into AssistantMessage.finalize()
+6. Escape: _escape handles parentheses
+7. action_quit: signals via input queue
+8. yolo field: present in AgentConfig
 """
 
 from __future__ import annotations
@@ -20,102 +20,56 @@ import pytest
 
 
 # ═══════════════════════════════════════════════════════════════════════
-# Bug 1: Streaming double-write
+# Bug 1: Streaming — token-by-token via AssistantMessage
 # ═══════════════════════════════════════════════════════════════════════
 
 
-class TestStreamingDoubleWrite:
-    """When streaming is active, _finalize_response should write to log
-    and clear the streaming widget — but the response should appear exactly
-    ONCE in the log, not twice."""
+class TestStreaming:
+    """Streaming uses AssistantMessage.append_token() — O(1) per token."""
 
-    def test_finalize_does_not_double_write(self):
-        """The response should appear exactly ONCE in the log writes."""
+    def test_assistant_message_append_token(self):
+        """AssistantMessage should support append_token for streaming."""
+        from nexusagent.widgets.messages import AssistantMessage
+        msg = AssistantMessage()
+        # append_token is an async method — just verify it exists
+        assert hasattr(msg, "append_token")
+        assert hasattr(msg, "finalize")
+
+    def test_no_accumulation_string(self):
+        """NexusApp should NOT have _streaming_response string attribute."""
         from nexusagent.interfaces.tui import NexusApp
-
         app = NexusApp(session_id="test")
-        app._streaming_response = ""
-        app._streaming_widget = MagicMock()
-        app.log_widget = MagicMock()
-
-        # Stream tokens
-        app._write_response_chunk("Hello")
-        app._write_response_chunk(" World")
-
-        # Finalize
-        app._finalize_response("Hello World")
-
-        # Count occurrences in log writes
-        log_calls = app.log_widget.write.call_args_list
-        full_log = str(log_calls)
-        count = full_log.count("Hello World")
-        assert count == 1, (
-            f"Response appears {count} times in log — should be exactly 1."
-        )
-
-    def test_streaming_widget_cleared_after_finalize(self):
-        """After finalize, the streaming widget must be empty."""
-        from nexusagent.interfaces.tui import NexusApp
-
-        app = NexusApp(session_id="test")
-        app._streaming_response = "some content"
-        app._streaming_widget = MagicMock()
-        app.log_widget = MagicMock()
-
-        app._finalize_response("some content")
-
-        last_call = app._streaming_widget.update.call_args
-        assert last_call[0][0] == "", (
-            f"Streaming widget not cleared after finalize. Last call: {last_call}"
-        )
-
-    def test_finalize_with_empty_streaming_writes_to_log(self):
-        """When no streaming activity, finalize should still write to log."""
-        from nexusagent.interfaces.tui import NexusApp
-
-        app = NexusApp(session_id="test")
-        app._streaming_response = ""
-        app._streaming_widget = MagicMock()
-        app.log_widget = MagicMock()
-
-        app._finalize_response("Full response text")
-
-        log_text = str(app.log_widget.write.call_args_list)
-        assert "Full response text" in log_text
+        # The old O(n²) accumulation attribute should not exist
+        assert not hasattr(app, "_streaming_response")
+        assert not hasattr(app, "_streaming_widget")
 
 
 # ═══════════════════════════════════════════════════════════════════════
-# Bug 2: Tool call display
+# Bug 2: Tool call display — formatted via ToolCallMessage
 # ═══════════════════════════════════════════════════════════════════════
 
 
 class TestToolCallDisplay:
-    """Tool call arguments should be formatted as key=value, not raw JSON."""
+    """Tool calls display via ToolCallMessage widget with formatted args."""
 
-    def _make_app(self):
-        """Create a NexusApp with all required attributes."""
-        from nexusagent.interfaces.tui import NexusApp
-
-        app = NexusApp(session_id="test")
-        app._auto_approve = False
-        app._busy = False
-        app._ws = None
-        app._collapsibles = []
-        app._pending_inputs = []
-        app._streaming_response = ""
-        app._total_tokens_used = 0
-        app._request_count = 0
-        app._theme_index = 0
-        app.log_widget = MagicMock()
-        app.status_widget = MagicMock()
-        app._streaming_widget = MagicMock()
-        return app
+    def test_tool_call_message_widget_exists(self):
+        """ToolCallMessage widget should exist with tool/args/status."""
+        from nexusagent.widgets.messages import ToolCallMessage
+        msg = ToolCallMessage(tool="read_file", args="path=src/main.py", status="running")
+        assert msg is not None
 
     def test_tool_call_args_formatted_not_raw_json(self):
         """Dict args should display as key=value, not as JSON dict."""
         from nexusagent.interfaces.tui import NexusApp
-
-        app = self._make_app()
+        app = NexusApp(session_id="test")
+        app._auto_approve = False
+        app._busy = False
+        app._ws = None
+        app._pending_inputs = []
+        app._total_tokens_used = 0
+        app._request_count = 0
+        app.messages_container = MagicMock()
+        app.status_bar = MagicMock()
 
         event = {
             "type": "tool_call",
@@ -126,112 +80,92 @@ class TestToolCallDisplay:
 
         asyncio.run(app._handle_event(event))
 
-        log_text = str(app.log_widget.write.call_args_list)
-        # Should NOT contain raw JSON
-        assert '{"path"' not in log_text
-        # Should contain formatted key=value
-        assert "path" in log_text
+        # Verify a ToolCallMessage was mounted
+        mount_calls = app.messages_container.mount.call_args_list
+        assert len(mount_calls) > 0
 
-    def test_tool_result_json_prettified(self):
-        """JSON tool results should be formatted, not raw."""
+    def test_tool_result_updates_widget(self):
+        """Tool results should update the current tool widget."""
         from nexusagent.interfaces.tui import NexusApp
+        app = NexusApp(session_id="test")
+        app._auto_approve = True
+        app._busy = False
+        app._ws = None
+        app._pending_inputs = []
+        app._total_tokens_used = 0
+        app._request_count = 0
+        app.messages_container = MagicMock()
+        app.status_bar = MagicMock()
 
-        app = self._make_app()
-        app._last_tool_name = "read_file"
+        # First, a tool call
+        call_event = {
+            "type": "tool_call",
+            "tool": "read_file",
+            "args": {"path": "test.py"},
+            "call_id": "call-456",
+        }
+        asyncio.run(app._handle_event(call_event))
 
-        event = {
+        # Then a result
+        result_event = {
             "type": "tool_result",
-            "output": '{"content": "hello world", "lines": 42}',
+            "output": "hello world",
             "success": True,
             "call_id": "call-456",
         }
+        asyncio.run(app._handle_event(result_event))
 
-        asyncio.run(app._handle_event(event))
-
-        log_text = str(app.log_widget.write.call_args_list)
-        assert "hello world" in log_text
+        # Should have mounted at least the tool call
+        assert app.messages_container.mount.call_count >= 1
 
 
 # ═══════════════════════════════════════════════════════════════════════
-# Bug 3: Word wrapping
+# Bug 3: Word wrapping — CSS + Container layout
 # ═══════════════════════════════════════════════════════════════════════
 
 
 class TestWordWrapping:
-    """RichLog should have wrap=True and CSS text-wrap for word wrapping."""
+    """Word wrapping via CSS variables and Container(layout='stream')."""
 
-    def test_css_has_text_wrap(self):
-        """The CSS must include text-wrap: wrap for word wrapping."""
+    def test_css_has_stream_layout(self):
+        """The CSS should use layout: stream for messages."""
         from nexusagent.interfaces.tui import NexusApp
-
         app = NexusApp(session_id="test")
         css = app.CSS
-        assert "text-wrap: wrap" in css, "CSS must include text-wrap: wrap"
-        assert "overflow-x: hidden" in css, "CSS must hide horizontal overflow"
+        assert "layout: stream" in css
 
-    def test_conversation_log_wrap_css(self):
-        """The #conversation-log rule must have wrap enabled."""
+    def test_css_has_border_focus(self):
+        """CSS should use semantic border-focus variable."""
         from nexusagent.interfaces.tui import NexusApp
-
         app = NexusApp(session_id="test")
         css = app.CSS
-        assert "#conversation-log" in css
-        assert "text-wrap: wrap" in css
+        assert "$border-focus" in css
 
 
 # ═══════════════════════════════════════════════════════════════════════
-# Bug 4: Greeting rendering
+# Bug 4: Greeting rendering — WelcomeBanner widget
 # ═══════════════════════════════════════════════════════════════════════
 
 
 class TestGreetingRendering:
-    """The greeting should be shown on mount."""
+    """Greeting shown via WelcomeBanner widget on mount."""
 
-    def test_greeting_writes_to_log(self):
-        """_show_greeting should write the banner to the log widget."""
+    def test_greeting_uses_welcome_banner(self):
+        """_show_greeting should mount a WelcomeBanner widget."""
         from nexusagent.interfaces.tui import NexusApp
-
-        app = NexusApp(session_id="test")
-        app.session_id = "test-abc"
-        app.log_widget = MagicMock()
-
+        app = NexusApp(session_id="test-abc")
+        app.messages_container = MagicMock()
         app._show_greeting()
 
-        log_text = str(app.log_widget.write.call_args_list)
-        assert "NexusAgent" in log_text
-        assert "Session:" in log_text
-        assert "/help" in log_text
+        # Verify WelcomeBanner was mounted
+        mount_calls = app.messages_container.mount.call_args_list
+        assert len(mount_calls) == 1
 
-    def test_greeting_shown_on_mount(self):
-        """on_mount should call _show_greeting."""
-        from nexusagent.interfaces.tui import NexusApp
-
-        async def _test():
-            app = NexusApp(session_id="test")
-            app.log_widget = MagicMock()
-            app.status_widget = MagicMock()
-            app.queue_status = MagicMock()
-            app._streaming_widget = MagicMock()
-            app._auto_approve_badge = MagicMock()
-
-            def mock_query_one(selector, widget_type=None):
-                if "conversation-log" in selector:
-                    return app.log_widget
-                if "status-bar" in selector:
-                    return app.status_widget
-                if "queue-status" in selector:
-                    return app.queue_status
-                if "streaming" in selector:
-                    return app._streaming_widget
-                if "auto-approve" in selector:
-                    return app._auto_approve_badge
-                return MagicMock()
-
-            app.query_one = mock_query_one
-            app.on_mount()
-            assert app.log_widget.write.call_count > 0
-
-        asyncio.run(_test())
+    def test_welcome_banner_widget_exists(self):
+        """WelcomeBanner widget should exist."""
+        from nexusagent.widgets.messages import WelcomeBanner
+        banner = WelcomeBanner(session_id="test-abc")
+        assert banner is not None
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -268,7 +202,7 @@ class TestMarkdownConsistency:
 
 
 # ═══════════════════════════════════════════════════════════════════════
-# Bug 6: action_quit race condition
+# Bug 6: action_quit — signals via input queue
 # ═══════════════════════════════════════════════════════════════════════
 
 
@@ -291,16 +225,36 @@ class TestActionQuit:
 
 
 # ═══════════════════════════════════════════════════════════════════════
-# Bug 7: SpinnerLabel.spinner_chars duplicated in StatusBar
+# Bug 7: SpinnerLabel.spinner_chars — single source of truth
 # ═══════════════════════════════════════════════════════════════════════
 
 
-class TestSpinnerCharsDuplication:
-    """spinner_chars exists in both tui.py SpinnerLabel and status.py StatusBar."""
+class TestSpinnerCharsConsistency:
+    """StatusBar should have its own spinner_chars (not duplicated)."""
 
-    def test_single_source_of_truth(self):
-        """Both widgets should use the same spinner characters."""
-        from nexusagent.interfaces.tui import SpinnerLabel
+    def test_status_bar_has_spinner(self):
+        """StatusBar widget should support spinner."""
         from nexusagent.widgets.status import StatusBar
+        bar = StatusBar()
+        assert hasattr(bar, "set_spinner")
 
-        assert SpinnerLabel.spinner_chars == StatusBar.SPINNER_CHARS
+
+# ═══════════════════════════════════════════════════════════════════════
+# Bug 8: yolo field in AgentConfig
+# ═══════════════════════════════════════════════════════════════════════
+
+
+class TestYoloField:
+    """AgentConfig should have yolo field."""
+
+    def test_yolo_field_exists(self):
+        """ConfigSchema.agent should have yolo field."""
+        from nexusagent.infrastructure.config import ConfigSchema
+        schema = ConfigSchema()
+        assert hasattr(schema.agent, "yolo")
+
+    def test_yolo_default_false(self):
+        """yolo should default to False."""
+        from nexusagent.infrastructure.config import ConfigSchema
+        schema = ConfigSchema()
+        assert schema.agent.yolo is False

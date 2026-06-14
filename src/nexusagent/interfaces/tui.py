@@ -1,67 +1,72 @@
-"""Terminal UI for NexusAgent — real-time streaming chat interface.
+"""NexusAgent Terminal User Interface (TUI).
 
 Features:
-- Word-wrapped conversation log (no horizontal scroll)
-- Real-time tool call/result streaming with collapsible output
-- Greeting screen with help on login
-- Slash commands: /new, /sessions, /help, /clear, /expand, /collapse, /quit, /compact, /copy, /version, /tokens, /model, /threads, /theme
-- Markdown rendering for agent responses
-- Status bar with spinner, state, and queued message count
-- Interrupt support (Ctrl+C, Ctrl+U) — cancels running agent turn
-- Error display when tools fail (web search, subagent, etc.)
-- Auto-scroll with manual override
-- Per-tool output formatters for shell, read_file, write_file/edit_file, git_*, search_web, spawn_subagent
-- Session metadata tracking (tokens)
-- Auto-approve mode toggle (Ctrl+_)
+- Individual message widgets in Container(layout="stream") for O(1) append
+- Semantic color system with Linear-inspired dark theme + 6 community themes
+- VerticalScroll for chat area with smart auto-scroll
+- Compact status bar with model, CWD, branch, tokens, spinner
+- Chat input with history and image detection
+- Token-by-token streaming via AssistantMessage.append_token()
+- Welcome banner that doesn't scroll away
+- Responsive design with 4 breakpoints
+- NO_COLOR + ASCII fallback support
+- gc.freeze() before first paint
+- 7 themes: nexus-dark, tokyo-night, rose-pine, solarized-dark, catppuccin-mocha, gruvbox-dark, nord
 """
+
+from __future__ import annotations
 
 import asyncio
 import json
 import logging
 import os
-import re
+import pathlib
 import signal as _signal
-import textwrap
 import uuid
 from datetime import datetime
 from typing import Any, ClassVar
 
-logger = logging.getLogger(__name__)
-
 import websockets
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Horizontal, ScrollableContainer, Vertical
-from textual.reactive import reactive
+from textual.containers import Container, Horizontal, VerticalScroll
+from textual.events import Resize
 from textual.screen import ModalScreen
-from textual.timer import Timer
-from textual.widgets import (
-    Button,
-    Collapsible,
-    Footer,
-    Header,
-    Input,
-    RichLog,
-    Static,
-)
+from textual.widgets import Button, Input, Static
 
 from nexusagent.infrastructure.config import settings
 
-# Import extracted widgets
+from nexusagent.widgets.messages import (
+    AssistantMessage,
+    ErrorMessage,
+    ToolCallMessage,
+    UserMessage,
+    WelcomeBanner,
+)
+from nexusagent.widgets.status import StatusBar
+from nexusagent.widgets.theme import get_css_variable_defaults, register_themes
+from nexusagent.widgets.chat_input import ChatInput
+
+# ── Re-exports for backward compatibility (tests import from tui.py) ──
+from nexusagent.interfaces.tui_widgets import (  # noqa: F401
+    NO_COLOR,
+    SpinnerLabel,
+    is_no_color,
+    _get_terminal_size,
+    debounce_resize,
+    classify_breakpoint,
+)
+from nexusagent.interfaces.tui_widgets import ErrorModal as _ErrorModal  # noqa: F401
+
+# Alias for test compatibility
+ErrorModal = _ErrorModal
 from nexusagent.interfaces.tui_widgets import (
     ApprovalModal,
     Breakpoint,
-    ErrorModal,
-    SpinnerLabel,
-    NO_COLOR,
-    _get_terminal_size,
     _sigwinch_handler,
     classify_breakpoint,
     debounce_resize,
-    is_no_color,
 )
-
-# Import extracted formatters
 from nexusagent.interfaces.tui_formatters import (
     format_arg_value,
     format_tool_output_generic,
@@ -72,21 +77,15 @@ from nexusagent.interfaces.tui_formatters import (
     _escape,
 )
 
-# Color themes for /theme cycling
-NEXUS_THEMES = [
-    {"name": "midnight", "header_bg": "#1f2937", "accent": "#10b981", "bg": "#111827"},
-    {"name": "ocean", "header_bg": "#0e4d6e", "accent": "#38bdf8", "bg": "#0c1929"},
-    {"name": "forest", "header_bg": "#14532d", "accent": "#4ade80", "bg": "#052e16"},
-    {"name": "sunset", "header_bg": "#7c2d12", "accent": "#fb923c", "bg": "#1c1010"},
-    {"name": "lavender", "header_bg": "#3b3864", "accent": "#a78bfa", "bg": "#1a1830"},
-]
+logger = logging.getLogger(__name__)
 
-
-# ═══════════════════════════════════════════════════════════════════════════
-# NexusApp — main TUI application
-# ═══════════════════════════════════════════════════════════════════════════
 
 class NexusApp(App):
+    """Main NexusAgent TUI application."""
+
+    TITLE = "NexusAgent"
+    SUB_TITLE = "AI Coding Agent"
+
     BINDINGS: ClassVar = [
         Binding("q", "quit", "Quit", priority=True, show=True),
         Binding("escape", "quit", "Quit", priority=True, show=False),
@@ -100,196 +99,97 @@ class NexusApp(App):
 
     CSS = """
     Screen {
+        layout: vertical;
         layers: base overlay;
-        background: #111827;
+        background: $background;
     }
-
-    /* ── Conversation log ── */
-    #log-container {
-        width: 100%;
+    * {
+        scrollbar-size-vertical: 1;
+    }
+    #chat {
         height: 1fr;
-        border: solid #1f2937;
-        margin: 0 1;
-    }
-
-    #conversation-log {
-        width: 100%;
-        max-width: 100%;
-        height: auto;
-        min-height: 100%;
-        background: #111827;
-        padding: 1 2;
-        overflow-y: auto;
-        overflow-x: hidden;
-        text-wrap: wrap;
-        word-wrap: break-word;
-    }
-
-    /* ── Streaming response ── */
-    #streaming-response {
-        height: auto;
-        min-height: 1;
-        width: 100%;
-        max-width: 100%;
-        color: #93c5fd;
-        padding: 1 2;
-        margin: 0 1;
-        background: #1f2937;
-        border-left: wide #3b82f6;
-        overflow-x: hidden;
-        text-wrap: wrap;
-        word-wrap: break-word;
-    }
-
-    /* ── Input area ── */
-    #input-area {
-        border: solid #374151;
-        height: 3;
-        margin: 0 1;
         padding: 0 1;
-        background: #1f2937;
+        background: $background;
+    }
+    #messages {
+        layout: stream;
+        height: auto;
+    }
+    #input-area {
+        height: auto;
+        min-height: 3;
+        max-height: 15;
+        background: $surface;
+        border: solid $border;
+        padding: 0 1;
     }
     #input-area:focus {
-        border: solid #10b981;
+        border: solid $border-focus;
     }
-
-    /* ── Status bar ── */
     #status-bar {
         height: 1;
-        background: #1f2937;
-        color: #9ca3af;
-        padding: 0 2;
-    }
-    #status-bar SpinnerLabel { width: 100%; }
-
-    /* ── Auto-approve indicator ── */
-    #auto-approve-badge {
-        height: 1;
-        background: #1f2937;
-        color: #fbbf24;
-        text-style: bold;
-        padding: 0 2;
-    }
-
-    /* ── Queue status ── */
-    #queue-status {
-        color: #6b7280;
-        text-style: italic;
-        height: 1;
-        padding: 0 2;
-    }
-
-    /* ── Collapsible tool results ── */
-    Collapsible {
-        border-left: wide #fbbf24;
-        margin: 1 2;
-        padding: 0 0 0 1;
-        background: #1f2937;
-    }
-    Collapsible > .collapsible--content {
-        padding: 1 2;
-        color: #d1d5db;
-    }
-    Collapsible > .collapsible--header {
-        color: #fbbf24;
-        text-style: bold;
-        padding: 0 1;
-    }
-    Collapsible.-collapsed > .collapsible--header {
-        color: #6b7280;
-    }
-
-    /* ── Approval / Error modal ── */
-    #approval-dialog {
-        width: 80%;
-        height: auto;
-        max-height: 20;
-        border: solid #fbbf24;
-        background: #1f2937;
-        padding: 1 2;
-    }
-    #approval-title {
-        text-style: bold;
-        color: #fbbf24;
-        padding: 0 0 1 0;
-    }
-    #approval-args {
-        color: #d1d5db;
-        padding: 0 0 1 0;
-    }
-    #approval-buttons {
-        height: 3;
-        align: right middle;
-    }
-    #approval-buttons Button {
-        margin-left: 1;
-    }
-    #approval-scroll {
-        max-height: 12;
-    }
-
-    /* ── Header / Footer ── */
-    Header {
-        background: #1f2937;
-        color: #10b981;
-        text-style: bold;
-    }
-    Footer {
-        background: #1f2937;
-        color: #6b7280;
+        dock: bottom;
+        background: $surface;
     }
     """
 
     def compose(self) -> ComposeResult:
-        yield Header()
-        yield ScrollableContainer(
-            RichLog(id="conversation-log", markup=True, auto_scroll=True, wrap=True),
-            id="log-container",
-        )
-        yield Static("", id="streaming-response")
-        yield SpinnerLabel("Ready", id="status-bar")
-        yield Static("", id="auto-approve-badge")
-        yield Static("", id="queue-status")
-        yield Input(
-            placeholder="Type a message, @file to inject, or /help for commands...",
-            id="input-area",
-        )
-        yield Footer()
+        register_themes(self)
+        self.theme = self._theme_name
 
-    def __init__(self, session_id: str | None = None, yolo: bool = False, **kwargs) -> None:
+        with VerticalScroll(id="chat"):
+            yield Container(id="messages")
+        yield ChatInput(id="input-area")
+        yield StatusBar(id="status-bar")
+
+    def __init__(self, session_id: str | None = None, yolo: bool = False, **kwargs: Any) -> None:
         super().__init__(**kwargs)
+        self.session_id = session_id or str(uuid.uuid4())[:8]
         self._yolo_default = yolo
+        self._busy = False
+        self._pending_inputs: list[str] = []
+        self._current_assistant: AssistantMessage | None = None
+        self._current_tool: ToolCallMessage | None = None
+        self._theme_name = "nexus-dark"
+        self._gc_frozen = False
         self._breakpoint: Breakpoint = Breakpoint.STANDARD
         self._resize_state: dict[str, float] = {}
-        self._no_color: bool = NO_COLOR
-
-    def on_mount(self) -> None:
-        self.session_id = str(uuid.uuid4())[:8]
-        self.log_widget = self.query_one("#conversation-log", RichLog)
-        self.status_widget = self.query_one("#status-bar", SpinnerLabel)
-        self.queue_status = self.query_one("#queue-status", Static)
-        self._streaming_widget = self.query_one("#streaming-response", Static)
-        self._streaming_response: str = ""  # accumulated streaming text
-        self._input_queue: asyncio.Queue[str | None] = asyncio.Queue()
-        self._busy = False
-        self._ws: websockets.WebSocketClientProtocol | None = None
-        self._collapsibles: list[Collapsible] = []
-        self._pending_inputs: list[str] = []
-        self._current_task: asyncio.Task | None = None  # for interrupt
         self._auto_approve = self._yolo_default or settings.agent.yolo
-        self._auto_approve_task: asyncio.Task | None = None
-        self._interrupt_task: asyncio.Task | None = None
-        self._theme_index = 0
         self._total_tokens_used = 0
         self._request_count = 0
-        self._auto_approve_badge = self.query_one("#auto-approve-badge", Static)
-        self._auto_approve_badge.update("")
+        self._last_tool_name = ""
+
+    def on_mount(self) -> None:
+        self._input_queue: asyncio.Queue[str | None] = asyncio.Queue()
+        self._ws: websockets.WebSocketClientProtocol | None = None
+        self._ws_task: asyncio.Task | None = None
+        self._auto_approve_task: asyncio.Task | None = None
+        self._interrupt_task: asyncio.Task | None = None
+
+        self.messages_container = self.query_one("#messages", Container)
+        self.status_bar = self.query_one("#status-bar", StatusBar)
+        self.chat_input = self.query_one("#input-area", ChatInput)
+
+        self.status_bar.set_status("Connecting...")
+        self.status_bar.set_cwd(str(pathlib.Path.cwd()))
+        self.status_bar.set_model(settings.agent.primary_provider, settings.agent.default_model)
+        self.status_bar.set_spinner(True)
 
         self._show_greeting()
         self._ws_task = asyncio.create_task(self._ws_loop())
-
-        # Install SIGWINCH handler for responsive layout
         self._install_sigwinch()
+
+        if not self._gc_frozen:
+            import gc
+            gc.freeze()
+            self._gc_frozen = True
+
+    # ── Greeting ──────────────────────────────────────────────────────
+
+    def _show_greeting(self) -> None:
+        """Show welcome banner as a persistent widget."""
+        welcome = WelcomeBanner(session_id=self.session_id)
+        self.messages_container.mount(welcome)
 
     # ── SIGWINCH (responsive resize) ────────────────────────────────────
 
@@ -324,48 +224,6 @@ class NexusApp(App):
             except Exception as exc:
                 logger.debug(f"Failed to restore SIGWINCH handler: {exc}")
 
-    def _is_ascii_terminal(self) -> bool:
-        """Detect if we're in an ASCII-only terminal (no color support)."""
-        if is_no_color():
-            return True
-        if os.environ.get("TERM") == "dumb":
-            return True
-        if not os.environ.get("COLORTERM"):
-            return True
-        return False
-
-    # ── Greeting ──────────────────────────────────────────────────────
-
-    def _show_greeting(self):
-        ts = datetime.now().strftime("%H:%M")
-        self.log_widget.write("", shrink=False)
-        self.log_widget.write(
-            "[b cyan]╔══════════════════════════════════════════╗[/b cyan]",
-            shrink=False,
-        )
-        self.log_widget.write(
-            "[b cyan]║[/b cyan]  [b white]NexusAgent[/b white] — Interactive AI Agent    [b cyan]║[/b cyan]",
-            shrink=False,
-        )
-        self.log_widget.write(
-            f"[b cyan]║[/b cyan]  Session: [yellow]{self.session_id}[/yellow]  {ts}              [b cyan]║[/b cyan]",
-            shrink=False,
-        )
-        self.log_widget.write(
-            "[b cyan]╚══════════════════════════════════════════╝[/b cyan]",
-            shrink=False,
-        )
-        self.log_widget.write("", shrink=False)
-        self.log_widget.write(
-            "[dim]Commands: [b]/help[/b]  [b]/new[/b]  [b]/clear[/b]  [b]/expand[/b]  [b]/collapse[/b]  [b]/quit[/b][/dim]",
-            shrink=False,
-        )
-        self.log_widget.write(
-            "[dim]Keys: [b]Ctrl+C[/b]=interrupt  [b]Q[/b]=quit  [b]C[/b]=clear  [b]E[/b]=expand  [b]A[/b]=collapse[/dim]",
-            shrink=False,
-        )
-        self.log_widget.write("", shrink=False)
-
     # ── WebSocket loop ──────────────────────────────────────────────
 
     async def _ws_loop(self) -> None:
@@ -376,8 +234,8 @@ class NexusApp(App):
         try:
             async with websockets.connect(ws_url, ping_interval=20, ping_timeout=10) as ws:
                 self._ws = ws
-                self.log_widget.write("[green]● Connected to server[/green]", shrink=False)
-                self.status_widget.set_text("Ready")
+                self.status_bar.set_status("Connected")
+                self.status_bar.set_spinner(False)
 
                 async def send_messages():
                     while True:
@@ -397,17 +255,16 @@ class NexusApp(App):
                 await asyncio.gather(send_messages(), receive_events())
 
         except ConnectionRefusedError:
-            self.log_widget.write(f"[red][b]✗ Cannot connect to server at port {settings.server.api_port}[/b][/red]", shrink=False)
-            self.status_widget.set_text("Disconnected")
+            self.status_bar.set_status("Connection refused")
+            self._mount_error(f"Cannot connect to server at port {settings.server.api_port}")
         except websockets.exceptions.ConnectionClosedOK:
-            self.log_widget.write("[dim]Session closed.[/dim]", shrink=False)
-            self.status_widget.set_text("Disconnected")
+            self.status_bar.set_status("Disconnected")
         except websockets.exceptions.ConnectionClosedError as e:
-            self.log_widget.write(f"[red]Connection lost: {e}[/red]", shrink=False)
-            self.status_widget.set_text("Disconnected")
+            self.status_bar.set_status("Connection lost")
+            self._mount_error(f"Connection lost: {e}")
         except Exception as e:
-            self.log_widget.write(f"[red]Error: {e}[/red]", shrink=False)
-            self.status_widget.set_text("Error")
+            self.status_bar.set_status("Error")
+            self._mount_error(f"Error: {e}")
         finally:
             self._ws = None
 
@@ -422,465 +279,332 @@ class NexusApp(App):
         elif etype == "thinking":
             content = event.get("content", "")
             if content and content != "Processing...":
-                self.log_widget.write(
-                    f"[dim italic]  ⟶ {_escape(content)}[/dim italic]",
-                    shrink=False,
-                )
+                thinking = AppMessage(content=content)
+                self.messages_container.mount(thinking)
+                self.status_bar.set_status("Thinking...")
 
         elif etype == "tool_call":
             tool = event.get("tool", "?")
             args = event.get("args", {})
-            self._last_tool_name = tool  # store for per-tool result formatting
+            self._last_tool_name = tool
+
+            args_str = self._format_args_str(args)
+
             if isinstance(args, dict):
-                args_str = ", ".join(
-                    f"[yellow]{k}[/yellow]=[white]{truncate(format_arg_value(v), 60)}[/white]"
+                args_display = ", ".join(
+                    f"{k}={truncate(format_arg_value(v), 60)}"
                     for k, v in args.items()
                 )
             else:
-                args_str = truncate(format_arg_value(args), 80)
-            self.log_widget.write(
-                f"[dim]⚙[/dim] [b orange]{tool}[/b orange]({args_str})",
-                shrink=False,
+                args_display = truncate(format_arg_value(args), 80)
+
+            msg = ToolCallMessage(
+                tool=tool,
+                args=args_display,
+                status="running",
             )
-            # Auto-approve check: if auto-approve is on, send approval immediately
+            self._current_tool = msg
+            self.messages_container.mount(msg)
+
             if self._auto_approve and tool != "tool_search":
                 call_id = event.get("call_id", "")
                 self._auto_approve_task = asyncio.create_task(self._send_approval(call_id, True))
-            self.status_widget.set_text(f"Running: {tool}", spinning=True)
+
+            self.status_bar.set_status(f"Running: {tool}")
 
         elif etype == "tool_result":
             output = event.get("output", "")
             success = event.get("success", True)
-            call_id = event.get("call_id", "")
-            self._write_tool_result(success, output, call_id)
-            self.status_widget.set_text("Processing response...", spinning=True)
+
+            if self._current_tool:
+                self._current_tool.update_output(output)
+                self._current_tool.update_status("success" if success else "failed")
+            else:
+                msg = ToolCallMessage(
+                    tool=self._last_tool_name,
+                    args="",
+                    output=output,
+                    status="success" if success else "failed",
+                )
+                self.messages_container.mount(msg)
+
+            self.status_bar.set_status("Processing response...")
 
         elif etype == "tool_error":
-            """Server-emitted event when a tool fails."""
             tool = event.get("tool", "?")
             error = event.get("error", "Unknown error")
-            self.log_widget.write(
-                f"[red]✗ {tool} failed: {_escape(error)}[/red]",
-                shrink=False,
-            )
-            self.status_widget.set_text(f"Error in {tool}")
+            err_msg = ErrorMessage(message=f"{tool}: {error}")
+            self.messages_container.mount(err_msg)
+            self.status_bar.set_status(f"Error in {tool}")
 
         elif etype == "approval_request":
             tool = event.get("tool", "?")
             args = event.get("args", {})
             call_id = event.get("call_id", "")
-            self.status_widget.set_text("Awaiting approval...", spinning=False)
+            self.status_bar.set_status("Awaiting approval...")
             approved = await self.push_screen_wait(ApprovalModal(tool, args, call_id))
             await self._send_approval(call_id, approved)
-            self.status_widget.set_text("Ready")
+            self.status_bar.set_status("Ready")
 
         elif etype == "response_chunk":
-            # Streaming token — append to the current response in-place
             content = event.get("content", "")
-            self._write_response_chunk(content)
+            if self._current_assistant is None:
+                self._current_assistant = AssistantMessage()
+                self.messages_container.mount(self._current_assistant)
+            await self._current_assistant.append_token(content)
+            self.status_bar.set_status("Streaming...")
 
         elif etype == "response":
-            # Final response event — if streaming was active, the last chunk
-            # already updated the display. This event confirms completion.
             content = event.get("content", "")
-            self._finalize_response(content)
+            if self._current_assistant:
+                final = render_markdown(content) if content else None
+                if final:
+                    self._current_assistant.finalize(final)
+                self._current_assistant = None
+            elif content:
+                msg = AssistantMessage()
+                msg.finalize(render_markdown(content))
+                self.messages_container.mount(msg)
+
             self._busy = False
             self._request_count += 1
-            # Track token usage if provided by server
             tokens = event.get("tokens_used", 0)
             if tokens:
                 self._total_tokens_used += tokens
+                self.status_bar.set_tokens(self._total_tokens_used)
+
             self._process_next_in_queue()
-            self.status_widget.set_text("Ready")
+            self.status_bar.set_status("Ready")
+            self._current_tool = None
 
         elif etype == "error":
             message = event.get("message", "Unknown error")
-            self.log_widget.write(f"[red][b]✗ Error:[/b] {_escape(message)}[/red]", shrink=False)
+            self._mount_error(message)
             self._busy = False
             self._process_next_in_queue()
-            self.status_widget.set_text("Error")
+            self.status_bar.set_status("Error")
 
         elif etype == "session_closed":
-            self.log_widget.write("[dim]Session closed by server.[/dim]", shrink=False)
+            self.status_bar.set_status("Disconnected")
             self._busy = False
             self._ws = None
-            self.status_widget.set_text("Disconnected")
 
-    # ── Display helpers ──────────────────────────────────────────────
+    def _format_args_str(self, args: dict) -> str:
+        if not isinstance(args, dict):
+            return truncate(format_arg_value(args), 80)
+        parts = []
+        for k, v in args.items():
+            parts.append(f"{k}={truncate(format_arg_value(v), 60)}")
+        return ", ".join(parts)
 
-    def _write_tool_result(self, success: bool, output: str, call_id: str):
-        """Write a tool result — short results inline, long results collapsible."""
-        tool_name = getattr(self, "_last_tool_name", "")
-        max_chars = settings.agent.max_tool_output_chars
-
-        display = format_tool_result_for_display(tool_name, success, output, max_chars)
-
-        if len(display) <= max_chars:
-            icon = "✓" if success else "✗"
-            color = "green" if success else "red"
-            self.log_widget.write(
-                f"   [{color}]{icon}[/{color}] {display}",
-                shrink=False,
-            )
-        else:
-            truncated = truncate_output(display, max_chars)
-            icon = "✓" if success else "✗"
-            color = "green" if success else "red"
-            collapsible = Collapsible(
-                Static(truncated),
-                title=f"[{color}]{icon}[/{color}] Tool result ({len(output):,} chars)",
-                collapsed=True,
-            )
-            self._collapsibles.append(collapsible)
-            self.log_widget.mount(collapsible)
-            self.log_widget.scroll_end(animate=False)
-
-    def _write_response(self, content: str):
-        """Write the final agent response with markdown formatting."""
-        ts = datetime.now().strftime("%H:%M")
-        formatted = render_markdown(content, code_blocks=True)
-        self.log_widget.write("", shrink=False)
-        self.log_widget.write(
-            f"[b green][{ts}] Agent:[/b green] {formatted}",
-            shrink=False,
-        )
-        self.log_widget.write("", shrink=False)
+    def _mount_error(self, message: str) -> None:
+        err = ErrorMessage(message=message)
+        self.messages_container.mount(err)
 
     # ── Slash commands ───────────────────────────────────────────────
 
     async def _handle_slash_command(self, cmd: str) -> bool:
-        """Handle slash commands. Returns True if handled."""
         parts = cmd.strip().lower().split()
         command = parts[0] if parts else ""
-        parts[1:] if len(parts) > 1 else []
+        rest = parts[1:] if len(parts) > 1 else []
 
-        if command == "/help" or command == "/h":
+        if command in ("/help", "/h"):
             self._show_help()
             return True
-
-        elif command == "/new" or command == "/n":
-            self._show_greeting()
-            self.log_widget.write(
-                "[yellow]⟶ New conversation started. Previous context cleared.[/yellow]",
-                shrink=False,
-            )
-            self.log_widget.clear()
-            self._collapsibles.clear()
+        if command in ("/new", "/n"):
+            self.messages_container.clear()
             self._show_greeting()
             return True
-
-        elif command == "/clear":
-            self.log_widget.clear()
-            self._collapsibles.clear()
-            self._streaming_response = ""
-            self._streaming_widget.update("")
+        if command == "/clear":
+            self.messages_container.clear()
             self._show_greeting()
             return True
-
-        elif command == "/expand" or command == "/e":
-            for c in self._collapsibles:
-                c.collapsed = False
-            return True
-
-        elif command == "/collapse" or command == "/a":
-            for c in self._collapsibles:
-                c.collapsed = True
-            return True
-
-        elif command == "/quit" or command == "/q":
+        if command in ("/expand", "/e"):
+            return True  # Widgets auto-expand
+        if command in ("/collapse", "/a"):
+            return True  # TODO: collapse all
+        if command in ("/quit", "/q"):
             self.action_quit()
             return True
-
-        elif command == "/sessions":
-            self.log_widget.write(
-                "[dim]Session management coming soon. Current session: "
-                f"{self.session_id}[/dim]",
-                shrink=False,
-            )
-            return True
-
-        elif command == "/status":
+        if command == "/status":
             status = "busy" if self._busy else "ready"
             auto = "ON" if self._auto_approve else "OFF"
-            self.log_widget.write(
-                f"[dim]Status: {status} | Session: {self.session_id} | "
-                f"Queued: {len(self._pending_inputs)} | "
-                f"Auto-approve: {auto} | "
-                f"Tokens: {self._total_tokens_used:,} | "
-                f"Requests: {self._request_count}[/dim]",
-                shrink=False,
+            msg = AppMessage(
+                f"Status: {status} | Session: {self.session_id} | "
+                f"Queued: {len(self._pending_inputs)} | Auto-approve: {auto} | "
+                f"Tokens: {self._total_tokens_used:,} | Requests: {self._request_count}"
             )
+            self.messages_container.mount(msg)
             return True
-
-        elif command == "/interrupt":
-            self.action_interrupt()
-            return True
-
-        elif command == "/compact":
-            self.log_widget.write(
-                "[yellow]⟶ Context compaction requested.[/yellow]",
-                shrink=False,
+        if command == "/version":
+            msg = AppMessage(
+                f"NexusAgent v0.1.0 | Model: {settings.agent.default_model} | "
+                f"Session: {self.session_id} | Theme: {self._theme_name}"
             )
-            if self._ws and self._ws.open:
-                await self._ws.send(json.dumps({"type": "compact"}))
-                self.status_widget.set_text("Compacting...", spinning=True)
-            else:
-                self.log_widget.write(
-                    "[red]Cannot compact — not connected to server.[/red]",
-                    shrink=False,
-                )
+            self.messages_container.mount(msg)
             return True
-
-        elif command == "/copy":
-            self.log_widget.write(
-                "[dim]Copy is not available in the TUI. Use your terminal's "
-                "selection mechanism.[/dim]",
-                shrink=False,
+        if command == "/tokens":
+            avg = self._total_tokens_used // self._request_count if self._request_count > 0 else 0
+            msg = AppMessage(
+                f"Token Usage\n"
+                f"  Total: {self._total_tokens_used:,}\n"
+                f"  Requests: {self._request_count}\n"
+                f"  Avg/request: {avg:,}\n"
+                f"  Model: {settings.agent.default_model}"
             )
+            self.messages_container.mount(msg)
             return True
-
-        elif command == "/version":
-            model = settings.agent.default_model
-            self.log_widget.write(
-                f"[dim]NexusAgent v0.1.0 | Model: {model} | "
-                f"Session: {self.session_id} | "
-                f"Theme: {NEXUS_THEMES[self._theme_index]['name']}[/dim]",
-                shrink=False,
+        if command == "/model":
+            msg = AppMessage(
+                f"Model: {settings.agent.default_model}\n"
+                f"Provider: {settings.agent.primary_provider}\n"
+                f"Session: {self.session_id}"
             )
+            self.messages_container.mount(msg)
             return True
-
-        elif command == "/auto":
+        if command == "/theme":
+            self._cycle_theme()
+            return True
+        if command == "/auto":
             self.action_toggle_auto_approve()
             return True
-
-        elif command == "/tokens":
-            model = settings.agent.default_model
-            self.log_widget.write("[b cyan]Token Usage[/b cyan]", shrink=False)
-            self.log_widget.write(
-                f"  Total tokens used: [yellow]{self._total_tokens_used:,}[/yellow]",
-                shrink=False,
-            )
-            self.log_widget.write(
-                f"  Requests made: [yellow]{self._request_count}[/yellow]",
-                shrink=False,
-            )
-            self.log_widget.write(
-                f"  Model: [yellow]{model}[/yellow]",
-                shrink=False,
-            )
-            self.log_widget.write(
-                f"  Session: [yellow]{self.session_id}[/yellow]",
-                shrink=False,
-            )
-            if self._request_count > 0 and self._total_tokens_used > 0:
-                avg = self._total_tokens_used // self._request_count
-                self.log_widget.write(
-                    f"  Avg tokens/request: [yellow]{avg:,}[/yellow]",
-                    shrink=False,
-                )
+        if command == "/compact":
+            if self._ws and self._ws.open:
+                await self._ws.send(json.dumps({"type": "compact"}))
+                self.status_bar.set_status("Compacting...")
             return True
-
-        elif command == "/model":
-            model = settings.agent.default_model
-            provider = settings.agent.primary_provider
-            self.log_widget.write("[b cyan]Model Info[/b cyan]", shrink=False)
-            self.log_widget.write(f"  Model: [yellow]{model}[/yellow]", shrink=False)
-            self.log_widget.write(
-                f"  Provider: [yellow]{provider}[/yellow]", shrink=False
-            )
-            self.log_widget.write(
-                f"  Session: [yellow]{self.session_id}[/yellow]", shrink=False
-            )
+        if command == "/copy":
+            msg = AppMessage("Copy not available — use terminal selection")
+            self.messages_container.mount(msg)
             return True
-
-        elif command == "/threads":
-            self.log_widget.write(
-                "[dim]Recent sessions (via server):[/dim]",
-                shrink=False,
-            )
+        if command == "/sessions":
+            msg = AppMessage(f"Session: {self.session_id}")
+            self.messages_container.mount(msg)
+            return True
+        if command == "/threads":
             if self._ws and self._ws.open:
                 await self._ws.send(json.dumps({"type": "list_sessions"}))
-            else:
-                self.log_widget.write(
-                    f"[dim]  Current session: {self.session_id}[/dim]",
-                    shrink=False,
-                )
             return True
-
-        elif command == "/theme":
-            self._theme_index = (self._theme_index + 1) % len(NEXUS_THEMES)
-            theme = NEXUS_THEMES[self._theme_index]
-            self._apply_theme(theme)
-            self.log_widget.write(
-                f"[yellow]⟶ Theme switched to: {theme['name']}[/yellow]",
-                shrink=False,
-            )
+        if command == "/interrupt":
+            self.action_interrupt()
             return True
-
-        elif command == "/undo":
+        if command == "/undo":
             if self._ws and self._ws.open:
                 await self._ws.send(json.dumps({"type": "undo"}))
-                self.log_widget.write(
-                    "[yellow]⟶ Undo requested.[/yellow]",
-                    shrink=False,
-                )
-            else:
-                self.log_widget.write("[dim]Not connected — cannot undo.[/dim]", shrink=False)
             return True
-
-        elif command == "/redo":
+        if command == "/redo":
             if self._ws and self._ws.open:
                 await self._ws.send(json.dumps({"type": "redo"}))
-                self.log_widget.write(
-                    "[yellow]⟶ Redo requested.[/yellow]",
-                    shrink=False,
-                )
-            else:
-                self.log_widget.write("[dim]Not connected — cannot redo.[/dim]", shrink=False)
             return True
-
-        elif command == "/skills":
+        if command == "/skills":
             from nexusagent.skills import load_all_skills, get_skills_summary
-
             skills = load_all_skills()
             if skills:
                 get_skills_summary(skills)
-                self.log_widget.write("[b cyan]Available Skills[/b cyan]", shrink=False)
+                lines = [f"Available Skills ({len(skills)})"]
                 for name, skill in sorted(skills.items()):
                     desc = skill.description or "No description"
-                    self.log_widget.write(f"  [yellow]{name}[/white]: {desc}", shrink=False)
-            else:
-                self.log_widget.write("[dim]No skills found in ~/.hermes/skills/[/dim]", shrink=False)
+                    lines.append(f"  {name}: {desc}")
+                msg = AppMessage("\n".join(lines))
+                self.messages_container.mount(msg)
             return True
-
-        elif command == "/skill":
-            skill_name = parts[1] if len(parts) > 1 else ""
+        if command.startswith("/skill"):
+            skill_name = rest[0] if rest else ""
             if not skill_name:
-                self.log_widget.write("[yellow]Usage: /skill <name>[/yellow]", shrink=False)
+                msg = AppMessage("Usage: /skill <name>")
+                self.messages_container.mount(msg)
                 return True
             from nexusagent.skills import load_all_skills, get_skill_content
-
             skills = load_all_skills()
-            content = get_skill_content(skills, skill_name)
-            if content:
-                self.log_widget.write(f"[b cyan]Skill: {skill_name}[/b cyan]", shrink=False)
-                for line in content.split("\n")[:20]:
-                    self.log_widget.write(f"  {line}", shrink=False)
-                if len(content.split("\n")) > 20:
-                    self.log_widget.write(f"  [dim]... ({len(content.split(chr(10)))} lines total)[/dim]", shrink=False)
-            else:
-                self.log_widget.write(f"[red]Skill '{skill_name}' not found.[/red]", shrink=False)
+            skill_content = get_skill_content(skills, skill_name)
+            if skill_content:
+                lines = [f"Skill: {skill_name}"]
+                for line in skill_content.split("\n")[:20]:
+                    lines.append(f"  {line}")
+                if len(skill_content.split("\n")) > 20:
+                    lines.append(f"  ... ({len(skill_content.split(chr(10)))} lines total)")
+                msg = AppMessage("\n".join(lines))
+                self.messages_container.mount(msg)
             return True
 
-        else:
-            self.log_widget.write(
-                f"[red]Unknown command: {command}. Type /help for available commands.[/red]",
-                shrink=False,
-            )
-            return True
+        msg = AppMessage(f"Unknown command: {command}. Type /help for available commands.")
+        self.messages_container.mount(msg)
+        return True
 
-    def _apply_theme(self, theme: dict) -> None:
-        """Apply a color theme by updating CSS."""
-        self.styles.background = theme["bg"]
-        self.query_one(Header).styles.background = theme["header_bg"]
-        self.query_one(Header).styles.color = theme["accent"]
+    def _cycle_theme(self) -> None:
+        from nexusagent.widgets.theme.colors import ALL_THEMES
+        try:
+            idx = ALL_THEMES.index(self._theme_name)
+            self._theme_name = ALL_THEMES[(idx + 1) % len(ALL_THEMES)]
+        except ValueError:
+            self._theme_name = "nexus-dark"
+        self.theme = self._theme_name
+        msg = AppMessage(f"Theme: {self._theme_name}")
+        self.messages_container.mount(msg)
 
-    def _show_help(self):
-        self.log_widget.write("", shrink=False)
-        self.log_widget.write("[b cyan]Available Commands:[/b cyan]", shrink=False)
-        self.log_widget.write("  [b]/help[/b]      Show this help message", shrink=False)
-        self.log_widget.write("  [b]/new[/b]       Start a new conversation", shrink=False)
-        self.log_widget.write("  [b]/clear[/b]     Clear the conversation log + greeting", shrink=False)
-        self.log_widget.write("  [b]/expand[/b]    Expand all tool results", shrink=False)
-        self.log_widget.write("  [b]/collapse[/b]  Collapse all tool results", shrink=False)
-        self.log_widget.write("  [b]/status[/b]    Show session status", shrink=False)
-        self.log_widget.write("  [b]/compact[/b]   Trigger context compaction", shrink=False)
-        self.log_widget.write("  [b]/copy[/b]      Copy placeholder", shrink=False)
-        self.log_widget.write("  [b]/version[/b]   Show version info", shrink=False)
-        self.log_widget.write("  [b]/tokens[/b]    Show token usage", shrink=False)
-        self.log_widget.write("  [b]/model[/b]     Show current model info", shrink=False)
-        self.log_widget.write("  [b]/threads[/b]   List recent sessions", shrink=False)
-        self.log_widget.write("  [b]/theme[/b]     Cycle color theme", shrink=False)
-        self.log_widget.write("  [b]/interrupt[/b] Cancel current agent turn", shrink=False)
-        self.log_widget.write("  [b]/quit[/b]      Exit the application", shrink=False)
-        self.log_widget.write("", shrink=False)
-        self.log_widget.write("[b cyan]Keyboard Shortcuts:[/b cyan]", shrink=False)
-        self.log_widget.write("  [b]Ctrl+C[/b]  Interrupt current turn", shrink=False)
-        self.log_widget.write("  [b]Ctrl+U[/b]  Interrupt current turn", shrink=False)
-        self.log_widget.write("  [b]Q[/b]       Quit", shrink=False)
-        self.log_widget.write("  [b]C[/b]       Clear log", shrink=False)
-        self.log_widget.write("  [b]E[/b]       Expand all", shrink=False)
-        self.log_widget.write("  [b]A[/b]       Collapse all", shrink=False)
-        self.log_widget.write("  [b]Ctrl+_[/b]  Toggle auto-approve", shrink=False)
-        self.log_widget.write("", shrink=False)
-
-    # ── Streaming response ───────────────────────────────────────────
-
-    def _write_response_chunk(self, content: str) -> None:
-        """Append a streaming token to the in-progress response."""
-        self._streaming_response += content
-        self._streaming_widget.update(
-            f"[b green]Agent:[/b green] {self._streaming_response}"
-        )
-
-    def _finalize_response(self, content: str) -> None:
-        """Finalize the streaming response."""
-        if self._streaming_response:
-            final = content if content else self._streaming_response
-            ts = datetime.now().strftime("%H:%M")
-            formatted = render_markdown(final, code_blocks=True)
-            self.log_widget.write("", shrink=False)
-            self.log_widget.write(
-                f"[b green][{ts}] Agent:[/b green]",
-                shrink=False,
-            )
-            self.log_widget.write(formatted, shrink=False)
-            self.log_widget.write("", shrink=False)
-        elif content:
-            self._write_response(content)
-
-        # Clear the streaming widget
-        self._streaming_widget.update("")
-        self._streaming_response = ""
+    def _show_help(self) -> None:
+        lines = [
+            "Available Commands",
+            "  /help      Show this help",
+            "  /new       New conversation",
+            "  /clear     Clear messages",
+            "  /expand    Expand all",
+            "  /collapse  Collapse all",
+            "  /status    Session status",
+            "  /compact   Trigger compaction",
+            "  /version   Version info",
+            "  /tokens    Token usage",
+            "  /model     Model info",
+            "  /theme     Cycle theme",
+            "  /auto      Toggle auto-approve",
+            "  /skills    List skills",
+            "  /skill <n> Show skill",
+            "  /quit      Exit",
+            "",
+            "Keyboard Shortcuts",
+            "  Ctrl+C  Interrupt",
+            "  Q       Quit",
+            "  C       Clear",
+            "  E       Expand",
+            "  A       Collapse",
+        ]
+        msg = AppMessage("\n".join(lines))
+        self.messages_container.mount(msg)
 
     # ── Queue management ────────────────────────────────────────────
 
-    def _process_next_in_queue(self):
+    def _process_next_in_queue(self) -> None:
         if not self._pending_inputs:
             return
         next_msg = self._pending_inputs.pop(0)
         self._busy = True
-        self.log_widget.write(f"[b cyan]You:[/b cyan] {next_msg}", shrink=False)
-        self.status_widget.set_text("Thinking...", spinning=True)
+        user_msg = UserMessage(content=next_msg)
+        self.messages_container.mount(user_msg)
+        self.status_bar.set_status("Thinking...")
+        self.status_bar.set_spinner(True)
         asyncio.create_task(self._input_queue.put(next_msg))  # noqa: RUF006
         self._update_queue_status()
 
-    def _update_queue_status(self):
+    def _update_queue_status(self) -> None:
         count = len(self._pending_inputs)
         if count > 0:
-            self.queue_status.update(f"⏳ {count} message{'s' if count > 1 else ''} queued")
-        else:
-            self.queue_status.update("")
+            self.status_bar.set_status(f"{count} queued")
 
-    async def _send_approval(self, call_id: str, approved: bool):
+    async def _send_approval(self, call_id: str, approved: bool) -> None:
         if self._ws and self._ws.open:
             await self._ws.send(json.dumps({
                 "type": "approval",
                 "call_id": call_id,
                 "approved": approved,
             }))
-        else:
-            self.log_widget.write("[red]Failed to send approval (disconnected)[/red]", shrink=False)
 
     # ── Input handling ──────────────────────────────────────────────
 
     async def on_input_submitted(self, event: Input.Submitted) -> None:
-        # Accept input from any Input widget (the chat input has id="input-area")
         message = event.value.strip()
         if not message:
             return
 
-        # Slash commands
         if message.startswith("/"):
             event.input.value = ""
             await self._handle_slash_command(message)
@@ -888,22 +612,24 @@ class NexusApp(App):
 
         if self._busy:
             self._pending_inputs.append(message)
-            self.log_widget.write(f"[dim]⏳ Queued:[/dim] {message}", shrink=False)
+            msg = AppMessage(f"Queued: {message}")
+            self.messages_container.mount(msg)
             self._update_queue_status()
             event.input.value = ""
             return
 
         self._busy = True
-        self.log_widget.write(f"[b cyan]You:[/b cyan] {message}", shrink=False)
+        user_msg = UserMessage(content=message)
+        self.messages_container.mount(user_msg)
         event.input.value = ""
-        self.status_widget.set_text("Thinking...", spinning=True)
+        self.status_bar.set_status("Thinking...")
+        self.status_bar.set_spinner(True)
         await self._input_queue.put(message)
 
     # ── Actions ─────────────────────────────────────────────────────
 
     def action_clear(self) -> None:
-        self.log_widget.clear()
-        self._collapsibles.clear()
+        self.messages_container.clear()
         self._show_greeting()
 
     def action_quit(self) -> None:
@@ -917,31 +643,24 @@ class NexusApp(App):
             self._interrupt_task = asyncio.create_task(
                 self._ws.send(json.dumps({"type": "interrupt"}))
             )
-            self.status_widget.set_text("Interrupting...", spinning=True)
-            self.log_widget.write("[yellow]⏹ Interrupt sent — waiting for agent to stop...[/yellow]", shrink=False)
+            self.status_bar.set_status("Interrupting...")
+            msg = AppMessage("Interrupt sent — waiting for agent to stop...")
+            self.messages_container.mount(msg)
 
     def action_expand_all(self) -> None:
-        for c in self._collapsibles:
-            c.collapsed = False
+        pass  # Widgets auto-expand
 
     def action_collapse_all(self) -> None:
-        for c in self._collapsibles:
-            c.collapsed = True
+        pass  # TODO: collapse all tool outputs
 
     def action_toggle_auto_approve(self) -> None:
         self._auto_approve = not self._auto_approve
         if self._auto_approve:
-            self._auto_approve_badge.update("[bold yellow]⚡ AUTO-APPROVE ON[/bold yellow]")
-            self.log_widget.write(
-                "[yellow]⟶ Auto-approve enabled — tool calls will be approved automatically.[/yellow]",
-                shrink=False,
-            )
+            msg = AppMessage("Auto-approve enabled")
+            self.messages_container.mount(msg)
         else:
-            self._auto_approve_badge.update("")
-            self.log_widget.write(
-                "[dim]⟶ Auto-approve disabled — tool calls require manual approval.[/dim]",
-                shrink=False,
-            )
+            msg = AppMessage("Auto-approve disabled")
+            self.messages_container.mount(msg)
 
 
 def main(yolo: bool = False) -> None:
