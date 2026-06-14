@@ -10,7 +10,7 @@
 
 NexusAgent is a production-grade AI coding agent platform. It combines an LLM-powered agent (via `deepagents` / LangGraph) with a NATS-backed task orchestration system, a Textual TUI, a FastAPI WebSocket server, and a hybrid file+vector memory system.
 
-**Language:** Python 3.13+ | **Package:** `nexusagent` (src layout) | **Tests:** pytest (475 pass / 19 pre-existing fail)
+**Language:** Python 3.13+ | **Package:** `nexusagent` (src layout) | **Tests:** pytest (528 pass / 15 pre-existing fail)
 
 ---
 
@@ -23,8 +23,10 @@ NexusAgent is a production-grade AI coding agent platform. It combines an LLM-po
 | **Refactoring Plan** | `docs/REFACTORING_PLAN.md` | 14-item prioritized refactoring roadmap |
 | **State** | `docs/STATE.md` | Module-by-module inventory (⚠️ partially outdated) |
 | **Compliance** | `docs/DOC_COMPLIANCE.md` | Documentation audit and gap analysis |
+| **Version** | `src/nexusagent/version.py` | Single source of truth (importlib.metadata) |
 | **ADRs** | `docs/adrs/` | Architecture decision records (0001-0005) |
 | **Config** | `config/nexusagent.yaml` | Runtime configuration |
+| **Tools** | `docs/TOOLS.md` | AST-tools MCP integration reference |
 
 ---
 
@@ -48,10 +50,10 @@ NexusAgent/
 │   │   ├── chat_input.py    # ChatInput widget
 │   │   └── status.py        # StatusBar, ModelLabel
 │   ├── interfaces/          # External interfaces
-│   │   ├── tui.py           # NexusApp (953L, refactored 2026-07-18)
+│   │   ├── tui.py           # NexusApp (787L, widget-based arch, version preflight)
 │   │   ├── tui_widgets.py   # SpinnerLabel, modals, SIGWINCH (extracted)
 │   │   ├── tui_formatters.py # render_markdown, all formatters (extracted)
-│   │   ├── cli.py           # Click CLI
+│   │   ├── cli.py           # Click CLI (--check-server, --skip-version-check)
 │   │   └── web_ui.py        # Gradio web UI
 │   ├── infrastructure/      # Config, DB, bus, auth, utilities
 │   │   ├── config.py        # ConfigSchema (Pydantic settings)
@@ -60,10 +62,13 @@ NexusAgent/
 │   │   ├── bus.py           # NATS JetStream
 │   │   ├── auth.py          # Fernet keystore
 │   │   └── prompt_loader.py # NEXUS.md loader
-│   ├── server/              # FastAPI + WebSocket
+│   ├── server/              # FastAPI + WebSocket + SDK + Version
+│   │   ├── server.py        # FastAPI + WebSocket (/version endpoint)
+│   │   ├── sdk.py           # NexusSDK (SERVER_VERSION, MIN_CLIENT_VERSION)
+│   │   └── version.py       # Single source of truth via importlib.metadata
 │   ├── llm/                 # Multi-provider LLM bridge
 │   └── hooks/               # Pre/post execution hooks
-├── tests/                   # 31 test files
+├── tests/                   # 38 test files
 ├── docs/                    # Documentation (see reference docs above)
 ├── scripts/                 # CLI tools (worktree-worker.py)
 ├── config/
@@ -88,6 +93,8 @@ Phases 1-7 completed the initial structural refactoring:
 | 7 | `memory/memory.py` DRY fix | `7bdb142` | Import shared constants from memory.index |
 | — | `interfaces/tui.py` split | `74fe4f9` | tui.py + tui_widgets.py + tui_formatters.py |
 | — | `yolo` field added to AgentConfig | `a290c93` | Fix missing config field |
+| 4D | TUI bug fixes | — | Widget-based arch, Enter key fix, httpx version preflight |
+| — | Version system | — | version.py, /version endpoint, SDK versions, CLI flags |
 
 **Established pattern:** Extract to subpackage → old file becomes compat shim → test → commit → update CODEBASE_MAP.md
 
@@ -105,6 +112,15 @@ Phases 1-7 completed the initial structural refactoring:
 - **Env var format**: `NEXUS_AGENT__DEFAULT_MODEL=...` (double underscore = nested key)
 - **`yolo` field**: Added 2026-07-18. `settings.agent.yolo` controls auto-approve default in TUI.
 
+### Version
+- **Single source of truth**: `version.py` reads from `importlib.metadata` (pyproject.toml at install time)
+- **Centralized**: `VERSION` and `MIN_CLIENT_VERSION` constants in `version.py`
+- **Server endpoint**: `GET /version` returns `{"version": "...", "min_client": "..."}`
+- **SDK**: `NexusSDK.health_check()` returns `SERVER_VERSION` and `MIN_CLIENT_VERSION`
+- **CLI**: Use `--check-server` to verify compatibility; `--skip-version-check` to bypass
+- **TUI**: Performs async version preflight via httpx before WebSocket connect (non-blocking on mismatch)
+- **Version changes**: Always update `pyproject.toml` first, run version-sync test
+
 ### TUI
 - **Textual framework**: Uses Textual (not Rich directly). Widgets extend `Static`, `Horizontal`, etc.
 - **CSS variables**: Theme colors use `$surface`, `$text`, `$primary` etc. defined by `register_themes()`.
@@ -118,14 +134,17 @@ Phases 1-7 completed the initial structural refactoring:
 - **sqlite-vec**: Virtual table for vector search. Requires `sqlite_vec.load(conn)` at startup.
 
 ### Testing
-- **Baseline**: 475 pass / 19 fail (all pre-existing). Zero regressions allowed.
+- **Baseline**: 528 pass / 15 fail (all pre-existing). Zero regressions allowed.
 - **Run command**: `PYTHONPATH=src python3 -m pytest tests/ -q --tb=short`
 - **Timeout**: Full suite takes ~100s. Use `timeout 120` for safety.
 - **Pre-existing failures**: `test_orchestration.py` (module path issues), `test_tui_responsive.py` (wrong mock paths), `test_e2e_production.py` (WebSocket dependency)
+- **New tests**: `test_version.py` (8), `test_server_version.py` (5) — version system coverage
 
 ### Build & Deploy
 - **No pyproject.toml build config**: Uses setuptools with `src/` layout.
 - **Dependencies**: See `pyproject.toml`. Key: `textual`, `fastapi`, `sqlalchemy[asyncio]`, `sqlite-vec`, `nats-py`, `deepagents`, `langgraph`.
+- **Dev server**: `uvicorn nexusagent.server.server:app --reload --port 8000` (auto-reload on code changes)
+- **Docker dev**: `docker-compose -f docker-compose.dev.yml up` for containerized development
 - **No CI/CD**: No GitHub Actions or similar. Tests run manually.
 
 ---
@@ -158,6 +177,7 @@ Phases 1-7 completed the initial structural refactoring:
 - **Test location**: `tests/` mirrors `src/nexusagent/` structure.
 - **Async tests**: Use `@pytest.mark.asyncio` or `asyncio.run()`.
 - **Mocking**: `unittest.mock.patch` for external dependencies (WebSocket, DB, NATS).
+- **Version changes**: Always update `pyproject.toml` first, then run version-sync test to ensure consistency.
 
 ---
 

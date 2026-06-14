@@ -1,8 +1,9 @@
 # NexusAgent Semantic Codebase Index
 
-> Generated: 2026-06-12
-> Source files: 71 Python modules (excluding `__pycache__`)
-> Total lines: ~10,125
+> Generated: 2026-07-18
+> Source files: 73 Python modules (excluding `__pycache__`)
+> Total lines: ~11,000
+> Test baseline: 528 pass / 15 fail
 
 ---
 
@@ -70,12 +71,13 @@
 | `infrastructure/utils/circuit.py` | (none internal) | `core/worker.py` | **LOW** |
 | `infrastructure/utils/retry.py` | (none internal) | `core/worker.py`, `llm/llm.py` | **MED** |
 
-### Package: `server/` — API and SDK
+### Package: `server/` — API, SDK, and Version
 
 | Module | Imports From (fan-in) | Imported By (fan-out) | Risk |
 |---|---|---|---|
-| `server/server.py` | `infrastructure.config`, `infrastructure.bus`, `infrastructure.api_auth`, `server.sdk`, `core.worker`, `core.agent`, `core.session`, `infrastructure.db`, `tools.registry`, `tools.fs` | (entry point) | **HIGH** |
-| `server/sdk.py` | `infrastructure.bus`, `llm.models`, `core.worker`, `tools.registry` | `server/server.py` | **HIGH** |
+| `server/server.py` | `infrastructure.config`, `infrastructure.bus`, `infrastructure.api_auth`, `server.sdk`, `server.version`, `core.worker`, `core.agent`, `core.session`, `infrastructure.db`, `tools.registry`, `tools.fs` | (entry point) | **HIGH** |
+| `server/sdk.py` | `infrastructure.bus`, `llm.models`, `core.worker`, `tools.registry`, `server.version` | `server/server.py` | **HIGH** |
+| `server/version.py` | (none internal) | `server/server.py`, `server/sdk.py`, `interfaces/cli.py`, `interfaces/tui.py` | **HIGH** |
 
 ### Package: `llm/` — LLM Provider
 
@@ -88,8 +90,8 @@
 
 | Module | Imports From (fan-in) | Imported By (fan-out) | Risk |
 |---|---|---|---|
-| `interfaces/tui.py` | `infrastructure.config` | (entry point) | **LOW** |
-| `interfaces/cli.py` | `infrastructure.config`, `server.sdk`, `llm.models`, `core.worker` | (entry point) | **MED** |
+| `interfaces/tui.py` | `infrastructure.config`, `server.version` | (entry point) | **LOW** |
+| `interfaces/cli.py` | `infrastructure.config`, `server.sdk`, `llm.models`, `core.worker`, `server.version` | (entry point) | **MED** |
 | `interfaces/web_ui.py` | — | — | **LOW** |
 
 ### Package: `hooks/` — Event Hooks
@@ -284,6 +286,79 @@ Compaction flush:
   HybridMemoryIndex.async_index_file() re-indexes daily log
 ```
 
+### 2.5 CLI Preflight Version Check Flow
+
+```
+CLI starts with --check-server (or default preflight)
+       │
+       ▼
+┌─────────────────────────────────────────┐
+│  cli.py: _preflight_version_check()     │
+│  HTTP GET http://host:port/version       │
+└──────────────────┬──────────────────────┘
+                   │ httpx.AsyncClient
+                   ▼
+┌─────────────────────────────────────────┐
+│  server.py: /version endpoint            │
+│  Returns {"version": "...",             │
+│           "min_client": "..."}           │
+└──────────────────┬──────────────────────┘
+                   │
+                   ▼
+┌─────────────────────────────────────────┐
+│  cli.py: is_compatible(client, server)  │
+│  Uses version.py: parse_version()       │
+│  Major must match; minor/patch mismatch │
+│  is non-blocking with warning           │
+└─────────────────────────────────────────┘
+
+Flags:
+  --check-server: Run preflight and exit
+  --skip-version-check: Skip preflight entirely
+```
+
+### 2.6 TUI Preflight Version Check Flow
+
+```
+TUI mounts → NexusApp.on_mount()
+       │
+       ▼
+┌─────────────────────────────────────────┐
+│  tui.py: _check_server_version()        │
+│  Uses httpx AsyncClient                 │
+│  HTTP GET /version before WS connect    │
+└──────────────────┬──────────────────────┘
+                   │ httpx.AsyncClient
+                   ▼
+┌─────────────────────────────────────────┐
+│  server.py: /version endpoint            │
+│  Returns version data                   │
+└──────────────────┬──────────────────────┘
+                   │
+                   ▼
+┌─────────────────────────────────────────┐
+│  tui.py: Compatibility check            │
+│  server_ver = data["version"]           │
+│  Mismatch → warning banner (non-blocking)│
+│  Connection refused → proceed anyway    │
+└─────────────────────────────────────────┘
+```
+
+### 2.7 SDK Version Check Flow
+
+```
+NexusSDK.health_check()
+       │
+       ▼
+┌─────────────────────────────────────────┐
+│  sdk.py: SERVER_VERSION +               │
+│  MIN_CLIENT_VERSION from version.py     │
+│  Returns:                               │
+│  {"version": SERVER_VERSION,            │
+│   "minClient": MIN_CLIENT_VERSION}      │
+└─────────────────────────────────────────┘
+```
+
 ---
 
 ## 3. State Management
@@ -455,13 +530,21 @@ Compaction flush:
 - **File**: `server/server.py`
 - **Pattern**: Add FastAPI route decorators (`@app.get`, `@app.post`, etc.)
 - **Auth**: Use `dependencies=[Depends(verify_api_key)]` for protected endpoints
+- **Existing**: `/version` (public), `/sessions/{id}/ws` (WebSocket), task CRUD endpoints
 
 ### 4.9 New CLI Commands
 - **File**: `interfaces/cli.py`
 - **Pattern**: Add `@main.command()` or `@main.group()` decorated functions
 - **Existing groups**: `main`, `hooks` (with `hooks list`, `hooks enable`, `hooks disable`)
+- **Version flags**: `--check-server`, `--skip-version-check` on `run` command
 
-### 4.10 Skills
+### 4.10 Version Management
+- **File**: `server/version.py` — single source of truth via `importlib.metadata`
+- **Pattern**: `VERSION` and `MIN_CLIENT_VERSION` are constants; update `pyproject.toml` to change
+- **Generated**: VERSION file is validated against pyproject.toml at test time
+- **Functions**: `get_version()`, `parse_version()`, `is_compatible()`
+
+### 4.11 Skills
 - **File**: `skills.py`
 - **Pattern**: Add `Skill` subclass or extend `load_all_skills()` to scan additional directories
 - **SKILL.md format**: YAML frontmatter with `name` and `description`, then markdown body
@@ -495,7 +578,7 @@ Compaction flush:
 || `register_tool` compat | `tools/registry.py` re-exports everything from `tools/registry/` subpackage | Unnecessary compat shim — migrate all imports to subpackage directly |
 || Tool output formatting | `_format_tool_output()` in `tui.py:880-936` duplicates logic from `register_all.py` examples | Formatter reconstructs display from raw tool output strings |
 || Frontend rendering | `tui.py` has inline Rich markup rendering; `widgets/messages/` has separate renderers | Two rendering approaches exist. TUI handles messages inline but widgets exist for modular rendering |
-|| Config loading | `config.py` loads YAML; `cli.py` loads `pyproject.toml` via `tomllib` | Version info duplicated across config.yaml and pyproject.toml |
+||| Config loading | `config.py` loads YAML; `cli.py` loads `pyproject.toml` via `tomllib` | Version info now centralized in `version.py` via `importlib.metadata`; VERSION file is generated and validated at test time |
 || Embedding fallback | `_hash_embed()` in `memory/memory.py:32` and `_embed_hash()` in `memory/index/embeddings.py:112` are nearly identical | Both produce SHA256-based deterministic vectors |
 
 ### 5.3 Missing Error Handling
@@ -530,7 +613,7 @@ Compaction flush:
 |---|---|
 | **Circular compat shims** | `tools/registry.py` and `memory/memory_index.py` are compat shims that re-export from subpackages. This creates confusing import paths and should be cleaned up |
 | **Two memory systems** | `memory/memory.py` (old SQLite `Memory` class) vs `memory/memory_files.py` + `memory/index/` (new file-based hybrid). Session.py imports `HybridMemoryManager` from `memory/memory.py` which internally imports from `memory/memory_files.py` — the old `Memory`/`MemoryManager` classes are dead code |
-| **TUI monolith** | `tui.py` at 1433 lines handles WebSocket, event dispatch, display formatting, slash commands, theming, responsive layout, and modal dialogs. Should be split into separate modules |
+|| **TUI monolith** | `tui.py` at 787 lines handles WebSocket, event dispatch, display formatting, slash commands, theming, responsive layout, and modal dialogs. Split into tui_widgets.py + tui_formatters.py but main app still large. |
 | **Missing `/theme` command** | `/theme` cycling is mentioned in docs but not implemented in `_handle_slash_command()` only `/version` shows theme |
 | **No connection retry in TUI** | Unlike `AgentBus.subscribe()` which retries 3x, the TUI WebSocket gives up after one `ConnectionRefusedError` |
 | **Global mutable singletons** | `settings`, `sdk`, `worker`, `worker_pool`, `llm`, `db_manager`, `task_repo`, `session_repo`, `auth_manager`, `_manager` (hooks), `_default_bus` are all module-level mutable singletons — makes testing and concurrent use difficult |

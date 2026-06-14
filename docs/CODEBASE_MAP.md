@@ -1,10 +1,11 @@
 # NexusAgent Codebase Map
 
 > Generated: 2026-07-18
-> Total source files: 81 (tests: 45)
-> Total lines: ~13,400 (src), ~3,100 (tests)
-> Last refactoring: Phases 1-7 complete + yolo config fix + TUI split
+> Total source files: 82 (tests: 38)
+> Total lines: ~13,400 (src), ~3,300 (tests)
+> Last refactoring: Phases 1-7 complete + yolo config fix + TUI split + Phase 4D TUI bug fixes + version system
 > Structure pattern: Domain-based subpackages with compat shims
+> Test baseline: 528 pass / 15 fail (all pre-existing)
 
 ---
 
@@ -127,16 +128,17 @@ nexusagent/
 │
 ├── interfaces/                  # External interfaces
 │   ├── __init__.py (4L)         # Interfaces package init
-│   ├── tui.py (953L)            # Textual TUI — NexusApp (split from 1433L)
+│   ├── tui.py (787L)            # Textual TUI — NexusApp (widget-based arch, version preflight)
 │   ├── tui_widgets.py (231L)   # SpinnerLabel, modals, SIGWINCH ✅ EXTRACTED Phase 7
 │   ├── tui_formatters.py (296L)# render_markdown, all formatters ✅ EXTRACTED Phase 7
-│   ├── cli.py (248L)            # Click CLI
+│   ├── cli.py (332L)            # Click CLI (--check-server, --skip-version-check)
 │   └── web_ui.py (90L)          # Gradio web UI
 │
-├── server/                      # Server layer
+│   ├── server/              # Server layer
 │   ├── __init__.py (1L)         # Server package init
-│   ├── server.py (354L)         # FastAPI + WebSocket
-│   └── sdk.py (210L)            # NexusSDK
+│   ├── server.py (354L)         # FastAPI + WebSocket (/version endpoint)
+│   ├── sdk.py (210L)            # NexusSDK (SERVER_VERSION, MIN_CLIENT_VERSION)
+│   └── version.py (42L)         # Single source of truth via importlib.metadata
 │
 ├── infrastructure/              # Infrastructure
 │   ├── __init__.py (1L)         # Infrastructure package init
@@ -194,18 +196,14 @@ nexusagent/
 | `core/session` | 677 | 0 | 3 | **MED** | Session + SessionManager |
 | `tools/code_review` | 367 | 0 | 0 | **LOW** | Code review tools |
 | `widgets/status` | 367 | 0 | 0 | **LOW** | StatusBar + helpers |
-| `server/server` | 354 | 0 | 3 | **MED** | FastAPI + WebSocket |
-| `tools/fs` | 343 | 0 | 0 | **LOW** | Filesystem tools |
-| `interfaces/tui_formatters` | 296 | 0 | 0 | **LOW** | All formatters, markdown renderers |
-| `core/worker` | 304 | 0 | 3 | **MED** | NexusWorker + WorkerPool |
-| `interfaces/tui_widgets` | 231 | 0 | 0 | **LOW** | SpinnerLabel, modals, SIGWINCH |
-| `memory/compaction` | 233 | 0 | 0 | **LOW** | Compaction pipeline |
-| `tools/research` | 204 | 0 | 0 | **LOW** | Research tools |
-| `tools/test_runner` | 216 | 0 | 0 | **LOW** | Test runner |
-| `widgets/chat_input` | 215 | 0 | 0 | **LOW** | ChatInput widget |
-| `server/sdk` | 210 | 0 | 2 | **LOW** | NexusSDK |
+| `server/server` | 354 | 0 | 3 | **MED** | Server is tightly coupled |
+| `server/sdk` | 210 | 0 | 2 | **LOW** | NexusSDK (SERVER_VERSION, MIN_CLIENT_VERSION) |
+| `server/version` | 10 | 0 | 0 | **LOW** | Version via importlib.metadata |
+| `interfaces/tui` | 787 | 0 | 0 | **LOW** | TUI with widget-based arch + version preflight |
+| `interfaces/cli` | 332 | 0 | 0 | **LOW** | CLI with --check-server flag |
 | `memory/memory_files` | 264 | 0 | 0 | **LOW** | FileMemory |
 | `core/graph` | 250 | 0 | 0 | **LOW** | LangGraph state machine |
+| `tools/fs` | 343 | 0 | 0 | **LOW** | Filesystem tools |
 | `infrastructure/prompt_loader` | 240 | 0 | 0 | **LOW** | Prompt loading |
 | `infrastructure/db/session_repo` | 199 | 0 | 0 | **LOW** | SessionRepository |
 | `tools/registry/policy` | 285 | 0 | 0 | **LOW** | Policy enforcement |
@@ -275,6 +273,20 @@ nexusagent/
 - Added missing `yolo` field to `AgentConfig`
 - Commit: `a290c93`
 
+### Phase 4D: TUI bug fixes ✅
+- Refactored to widget-based architecture (tui.py: 953L → 787L)
+- Fixed Enter key handling in ChatInput
+- Added httpx-based async version preflight check before WebSocket connect
+- Commit: TBD
+
+### Version System ✅
+- Added `server/version.py` — single source of truth via `importlib.metadata`
+- Added `/version` endpoint to FastAPI server
+- Added `SERVER_VERSION` and `MIN_CLIENT_VERSION` to SDK
+- Added `--check-server` and `--skip-version-check` flags to CLI
+- Added 43 new tests: `test_version.py` (8), `test_server_version.py` (5)
+- Test baseline: 528 pass / 15 fail
+
 ---
 
 ## Refactoring Pattern (Established)
@@ -285,6 +297,6 @@ For each extraction:
 3. Split into focused modules by concern (max 500L per module)
 4. Old file becomes compat shim: `from nexusagent.X import *`
 5. No behavior changes — all existing imports preserved
-6. Test gate: 453+ pass / 20 fail baseline unchanged
+6. Test gate: 528+ pass / 15 fail baseline unchanged
 7. Commit: `refactor: extract X into Y/ subpackage`
 8. Update CODEBASE_MAP.md
