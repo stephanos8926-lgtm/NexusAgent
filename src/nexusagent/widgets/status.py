@@ -105,7 +105,7 @@ class StatusBar(Horizontal):
     StatusBar .status-branch {
         width: auto;
         padding: 0 1;
-        color: $text-muted;
+        color: $primary;
     }
 
     StatusBar .status-tokens {
@@ -181,12 +181,17 @@ class StatusBar(Horizontal):
             # Responsive: hide CWD/branch on narrow terminals
             term_width = self.content_size.width
             if self._cwd and term_width > 60:
-                cwd.update(f"📁 {self._cwd}")
+                # Abbreviate long paths: show only last 2 components
+                from pathlib import Path
+                parts = Path(self._cwd).parts
+                short = str(Path(*parts[-2:])) if len(parts) > 2 else self._cwd
+                cwd.update(short)
             else:
                 cwd.update("")
 
             if self._branch and term_width > 80:
-                branch.update(f"⎇ {self._branch}")
+                # Plain text branch — no ⎇ glyph (breaks non-NF terminals)
+                branch.update(f"[{self._branch}]")
             else:
                 branch.update("")
 

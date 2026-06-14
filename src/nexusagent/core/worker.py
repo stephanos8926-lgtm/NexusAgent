@@ -239,11 +239,17 @@ class WorkerPool:
         async with self._semaphore:
             handle._mark_running()
             try:
+                # Propagate resolved model+provider into task metadata so
+                # run_agent_task can forward them to Agent() without touching
+                # global env vars (which would bleed across concurrent workers).
+                meta = dict(handle.contract.metadata)
+                meta.setdefault("agent_model", handle.model)
+                meta.setdefault("agent_provider", handle.provider)
                 task = TaskSchema(
                     id=handle.contract.task_id,
                     description=handle.contract.description,
                     priority=handle.contract.priority,
-                    metadata=handle.contract.metadata,
+                    metadata=meta,
                 )
                 result = await self._execute_bounded(task, handle)
                 if handle.is_cancelled():

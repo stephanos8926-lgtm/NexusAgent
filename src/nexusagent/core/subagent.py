@@ -70,8 +70,36 @@ class SubAgentHandle:
 
     @property
     def model(self) -> str:
-        """Return the model for this sub-agent (from contract or default)."""
-        return self.contract.model or os.getenv("AGENT_MODEL", "gemini-3.1-flash-lite")
+        """Return the model for this sub-agent.
+
+        Resolution order:
+        1. contract.model  (explicit per-task override)
+        2. AGENT_MODEL env var  (deployment-level override)
+        3. settings.agent.default_model  (config file / default)
+
+        Never falls back to a hardcoded model name — always inherits from
+        the active configuration so subagents match the main agent provider.
+        """
+        from nexusagent.infrastructure.config import settings
+        return (
+            self.contract.model
+            or os.getenv("AGENT_MODEL")
+            or settings.agent.default_model
+        )
+
+    @property
+    def provider(self) -> str:
+        """Return the LLM provider for this sub-agent.
+
+        Resolution order:
+        1. contract.provider  (explicit per-task override)
+        2. settings.agent.primary_provider  (config file / default)
+
+        Ensures subagents use the same provider as the main agent unless
+        explicitly overridden.
+        """
+        from nexusagent.infrastructure.config import settings
+        return self.contract.provider or settings.agent.primary_provider
 
     # -- public query methods ------------------------------------------------
 

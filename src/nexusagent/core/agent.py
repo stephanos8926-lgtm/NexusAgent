@@ -67,27 +67,65 @@ class Agent:
     so parent and sub-agents can run concurrently with different policies.
     """
 
+    @staticmethod
+    def _resolve_model(
+        model_override: str | None,
+        provider_override: str | None,
+    ) -> str:
+        """Resolve the final model string for deepagents.
+
+        Resolution order for model:
+          1. model_override (from TaskContract / caller)
+          2. AGENT_MODEL env var
+          3. settings.agent.default_model
+
+        Resolution order for provider:
+          1. provider_override (from TaskContract / caller)
+          2. settings.agent.primary_provider
+
+        Applies the google_genai: prefix for Gemini/Gemma models to prevent
+        deepagents from routing them to VertexAI.
+        """
+        provider = provider_override or settings.agent.primary_provider
+        model_name = model_override or os.getenv("AGENT_MODEL") or settings.agent.default_model
+
+        # For Gemini provider: use the provider-specific model if no explicit override
+        if not model_override:
+            if provider == "gemini":
+                model_name = settings.agent.gemini_model
+            elif provider == "openrouter":
+                model_name = (
+                    settings.agent.openrouter_override_model
+                    or settings.agent.openrouter_default_model
+                )
+
+        # Prefix bare gemini/gemma names to avoid VertexAI routing
+        if model_name.startswith(("gemini", "gemma")) and ":" not in model_name:
+            model_name = f"google_genai:{model_name}"
+
+        return model_name
+
     def __init__(
         self,
         role: str = "full",
         policy: str = "permissive",
+        model_override: str | None = None,
+        provider_override: str | None = None,
         *args: Any,
         **kwargs: Any,
     ) -> None:
-        """
-        Initialize the agent.
+        """Initialize the agent.
 
         Args:
             role: Tool access role. One of: minimal, reader, writer, coder,
                   tester, reviewer, debugger, researcher, full.
             policy: Access policy. One of: permissive, restricted, strict.
+            model_override: Explicit model name (from TaskContract or CLI).
+                If None, inherits from provider config.
+            provider_override: Explicit provider (from TaskContract or CLI).
+                If None, uses settings.agent.primary_provider.
         """
-        model_name = os.getenv("AGENT_MODEL") or settings.agent.default_model
-
-        # Auto-prefix google models with google_genai provider to avoid
-        # deepagents routing them to VertexAI (which needs langchain-google-vertexai + GCP project)
-        if model_name.startswith(("gemini", "gemma")) and ":" not in model_name:
-            model_name = f"google_genai:{model_name}"
+        model_name = self._resolve_model(model_override, provider_override)
 
         # Set policy context for this agent (thread-local)
         set_policy_context(role, policy)
@@ -115,17 +153,23 @@ class Agent:
 
 
 def run_agent_task(state: dict) -> dict:
-    """
-    Process a task through the agent.
+    """Process a task through the agent.
 
-    Gets role and policy from state dict.
+    Reads role, policy, and optional model/provider overrides from state.
+    model/provider come from WorkerPool metadata when spawned as a subagent,
+    ensuring subagents inherit the main agent's provider rather than
+    defaulting to a hardcoded value.
     """
     task_desc = state.get("task", "unknown")
     role = state.get("role", "full")
     policy = state.get("policy", "permissive")
+    model_override = state.get("agent_model")
+    provider_override = state.get("agent_provider")
 
     try:
-        agent = Agent(role=role, policy=policy)
+        agent = Agent(role=role, policy=policy,
+                      model_override=model_override,
+                      provider_override=provider_override)
         result = agent(state)
         return {"result": result}
     except Exception as e:

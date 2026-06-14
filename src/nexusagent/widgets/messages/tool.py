@@ -179,19 +179,22 @@ class ToolCallMessage(Static):
         if syntax_hint:
             output_parts.append((f"  [{syntax_hint}]", "text-muted"))
 
-        # Handle collapsed state
+        # Handle collapsed state — show hint so user knows it's clickable
         if self._collapsed:
-            output_parts.append((f"  ▸ {line_count} lines (collapsed)", "text-muted"))
+            output_parts.append((
+                f"  ▸ {line_count} line{'s' if line_count != 1 else ''}"
+                f" · click to expand",
+                "text-muted",
+            ))
             return Content.assemble(*output_parts)
 
-        # Truncate long output
-        output = self._truncate_output(self._output)
+        # Expanded: truncate only very large outputs (10k chars)
+        output = self._output if len(self._output) <= 10000 else (
+            self._output[:10000] + f"\n[truncated — {len(self._output)-10000:,} more chars]"
+        )
 
-        if has_code:
-            output_parts.append(("\n", ""))
-            output_parts.append((output, "text-muted"))
-        else:
-            output_parts.append(("\n", ""))
-            output_parts.append((output, "text-muted"))
+        output_parts.append(("\n", ""))
+        output_parts.append((output, "text-muted"))
+        output_parts.append(("\n  ▾ click to collapse", "text-dim"))
 
         return Content.assemble(*output_parts)
