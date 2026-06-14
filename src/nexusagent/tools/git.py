@@ -5,16 +5,20 @@ Provides git status, diff, log, branch, commit, and stash operations.
 All operations are read-only by default; write operations require explicit flags.
 """
 
+import shlex
 import subprocess
 
 
 def _run_git(args: str, workdir: str | None = None, timeout: int = 30) -> str:
-    """Run a git command and return output."""
-    cmd = f"git {args}"
+    """Run a git command and return output.
+
+    Uses list-based args with shell=False to prevent shell injection.
+    """
     try:
+        cmd = ["git"] + shlex.split(args)
         result = subprocess.run(
             cmd,
-            shell=True,
+            shell=False,
             capture_output=True,
             text=True,
             timeout=timeout,

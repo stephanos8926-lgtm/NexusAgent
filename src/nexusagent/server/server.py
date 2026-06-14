@@ -279,8 +279,11 @@ async def session_websocket(
     """
     # Verify API key before accepting the connection
     from nexusagent.infrastructure.api_auth import verify_api_key
+    if not api_key:
+        await websocket.close(code=4001, reason="Missing API key")
+        return
     try:
-        verify_api_key(api_key)
+        await verify_api_key(api_key)
     except HTTPException:
         await websocket.close(code=4001, reason="Invalid or missing API key")
         return

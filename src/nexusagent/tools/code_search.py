@@ -5,6 +5,7 @@ Provides local code search using ripgrep (rg) with structured output.
 Falls back to grep if ripgrep is not available.
 """
 
+import re
 import shutil
 import subprocess
 
@@ -114,17 +115,19 @@ def find_symbol(
         Structured results showing where the symbol is defined and used
     """
     # Build regex for common definition patterns
+    # Always escape the symbol to prevent regex injection
+    safe_symbol = re.escape(symbol)
     patterns = [
-        rf"def\s+{symbol}\b",  # Python
-        rf"class\s+{symbol}\b",  # Python/JS/Java
-        rf"function\s+{symbol}\b",  # JS
-        rf"(const|let|var)\s+{symbol}\b",  # JS
-        rf"func\s+{symbol}\b",  # Go
-        rf"fn\s+{symbol}\b",  # Rust
-        rf"struct\s+{symbol}\b",  # Rust/Go
-        rf"impl\s+{symbol}\b",  # Rust
-        rf"interface\s+{symbol}\b",  # TS/Java
-        rf"type\s+{symbol}\b",  # TS
+        rf"def\s+{safe_symbol}\b",  # Python
+        rf"class\s+{safe_symbol}\b",  # Python/JS/Java
+        rf"function\s+{safe_symbol}\b",  # JS
+        rf"(const|let|var)\s+{safe_symbol}\b",  # JS
+        rf"func\s+{safe_symbol}\b",  # Go
+        rf"fn\s+{safe_symbol}\b",  # Rust
+        rf"struct\s+{safe_symbol}\b",  # Rust/Go
+        rf"impl\s+{safe_symbol}\b",  # Rust
+        rf"interface\s+{safe_symbol}\b",  # TS/Java
+        rf"type\s+{safe_symbol}\b",  # TS
     ]
 
     query = "|".join(patterns)

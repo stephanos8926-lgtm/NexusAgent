@@ -1,6 +1,7 @@
 # src/nexusagent/auth.py
 import base64
 import json
+import logging
 import os
 import secrets
 from pathlib import Path
@@ -8,6 +9,8 @@ from pathlib import Path
 from cryptography.fernet import Fernet
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
+
+logger = logging.getLogger(__name__)
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
 from nexusagent.infrastructure.config import settings
@@ -107,7 +110,8 @@ class AuthManager:
             if not encrypted_key:
                 return None
             return fernet.decrypt(encrypted_key.encode()).decode()
-        except Exception:
+        except Exception as e:
+            logger.warning(f"Failed to decrypt key for '{service}': {type(e).__name__}")
             return None
 
     def _load_keystore(self) -> dict:

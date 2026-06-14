@@ -171,8 +171,8 @@ def run_agent_task(state: dict) -> dict:
                       model_override=model_override,
                       provider_override=provider_override)
         result = agent(state)
-        return {"result": result}
+        return {"result": result, "success": True}
     except Exception as e:
         logger = logging.getLogger(__name__)
         logger.error(f"Agent execution failed for task '{task_desc}': {e}", exc_info=True)
-        return {"result": None, "error": str(e)}
+        return {"result": None, "error": str(e), "success": False}

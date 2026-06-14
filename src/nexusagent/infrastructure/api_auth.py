@@ -1,5 +1,6 @@
 """API key authentication middleware for NexusAgent."""
 
+import hmac
 import logging
 
 from fastapi import HTTPException, Security, status
@@ -11,7 +12,10 @@ api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 
 async def verify_api_key(api_key: str = Security(api_key_header)) -> str:
-    """Verify API key from header against the auth keystore."""
+    """Verify API key from header against the auth keystore.
+
+    Uses constant-time comparison to prevent timing attacks.
+    """
     if not api_key:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -24,7 +28,7 @@ async def verify_api_key(api_key: str = Security(api_key_header)) -> str:
 
         stored_key = auth_manager.get_key("api")
         if stored_key is not None:
-            if api_key != stored_key:
+            if not hmac.compare_digest(api_key, stored_key):
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="Invalid API key",

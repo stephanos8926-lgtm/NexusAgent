@@ -1,55 +1,51 @@
-"""Policy context (thread-local) and enforcement for tool access control.
+"""Policy context (context-local) and enforcement for tool access control.
 
-Each agent session gets its own policy context stored in thread-local storage.
+Each agent session gets its own policy context stored in context-local storage.
 This allows concurrent agents (parent + sub-agents) to each enforce their own
-policy independently.
+policy independently, even across async/coroutine boundaries.
 """
 
 from __future__ import annotations
 
-import threading
+import contextvars
 from collections.abc import Callable
 
 from .types import ToolInfo
 
-# Thread-local policy context
-_policy_context = threading.local()
+# Context-local policy context (async-safe, unlike threading.local)
+_policy_context: contextvars.ContextVar[dict] = contextvars.ContextVar(
+    "policy_context", default={"role": "full", "policy": "permissive", "unlocked": set()}
+)
 
 
-def _get_ctx():
-    """Get or create the current thread's policy context."""
-    if not hasattr(_policy_context, "role"):
-        _policy_context.role = "full"
-    if not hasattr(_policy_context, "policy"):
-        _policy_context.policy = "permissive"
-    if not hasattr(_policy_context, "unlocked"):
-        _policy_context.unlocked = set()
-    return _policy_context
+def _get_ctx() -> dict:
+    """Get or create the current context's policy context."""
+    ctx = _policy_context.get()
+    if not isinstance(ctx, dict):
+        ctx = {"role": "full", "policy": "permissive", "unlocked": set()}
+        _policy_context.set(ctx)
+    return ctx
 
 
 def set_policy_context(role: str, policy: str):
     """Set the policy context for the current agent session."""
-    ctx = _get_ctx()
-    ctx.role = role
-    ctx.policy = policy
-    ctx.unlocked = set()
+    ctx = {"role": role, "policy": policy, "unlocked": set()}
+    _policy_context.set(ctx)
 
 
 def get_policy_context() -> dict:
     """Get the current policy context."""
     ctx = _get_ctx()
     return {
-        "role": ctx.role,
-        "policy": ctx.policy,
-        "unlocked": set(ctx.unlocked),
+        "role": ctx.get("role", "full"),
+        "policy": ctx.get("policy", "permissive"),
+        "unlocked": set(ctx.get("unlocked", set())),
     }
 
 
 def clear_policy_context():
     """Clear the current policy context."""
-    _policy_context.role = "full"
-    _policy_context.policy = "permissive"
-    _policy_context.unlocked = set()
+    _policy_context.set({"role": "full", "policy": "permissive", "unlocked": set()})
 
 
 # ─── Role Manifests ─────────────────────────────────────────────────────

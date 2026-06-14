@@ -245,6 +245,13 @@ def create_research_graph(db_path: str | None = None) -> Any:
         conn = sqlite3.connect(":memory:", check_same_thread=False)
 
     memory = SqliteSaver(conn)
-    memory.setup()
+    try:
+        memory.setup()
+    except Exception:
+        conn.close()
+        raise
 
-    return workflow.compile(checkpointer=memory)
+    # Attach close method so callers can clean up the connection
+    graph = workflow.compile(checkpointer=memory)
+    graph._sqlite_conn = conn  # type: ignore[attr-defined]
+    return graph

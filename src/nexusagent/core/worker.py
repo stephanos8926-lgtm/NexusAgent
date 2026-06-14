@@ -292,7 +292,8 @@ class WorkerPool:
                 )
                 result = await _run_agent_task(turn_task)
                 last_result = result
-                if result.get("status") == "complete":
+                # If the agent reports success or explicit completion, stop early
+                if result.get("success") is True or result.get("status") == "complete":
                     return last_result
             except Exception as e:
                 if contract.on_failure == "abort":

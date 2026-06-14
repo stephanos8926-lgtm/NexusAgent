@@ -87,7 +87,7 @@ class ReviewResult:
 
         # Summary
         critical = sum(1 for i in self.issues if i.severity == SEVERITY_CRITICAL)
-        high = sum(1 for i in self.issues if i.severity == SEVERITY_MEDIUM)
+        high = sum(1 for i in self.issues if i.severity == SEVERITY_HIGH)
         medium = sum(1 for i in self.issues if i.severity == SEVERITY_MEDIUM)
         low = sum(1 for i in self.issues if i.severity in (SEVERITY_LOW, SEVERITY_INFO))
 

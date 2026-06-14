@@ -194,7 +194,7 @@ class Session:
 
         self.status: str = "active"
         self._cancel_flag: bool = False
-        self._event_queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
+        self._event_queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue(maxsize=1000)
         self._pending_approvals: dict[str, asyncio.Event] = {}
         self._approval_results: dict[str, bool] = {}
         self._seen_tool_results: set[str] = set()  # deduplicate tool_result events
