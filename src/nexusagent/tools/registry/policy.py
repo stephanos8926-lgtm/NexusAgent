@@ -13,8 +13,10 @@ from collections.abc import Callable
 from .types import ToolInfo
 
 # Context-local policy context (async-safe, unlike threading.local)
-_policy_context: contextvars.ContextVar[dict] = contextvars.ContextVar(
-    "policy_context", default={"role": "full", "policy": "permissive", "unlocked": set()}
+# NOTE: No mutable default — ContextVar doesn't support default_factory.
+# The default is None; _get_ctx() creates a fresh dict per context.
+_policy_context: contextvars.ContextVar[dict | None] = contextvars.ContextVar(
+    "policy_context", default=None
 )
 
 
@@ -45,7 +47,7 @@ def get_policy_context() -> dict:
 
 def clear_policy_context():
     """Clear the current policy context."""
-    _policy_context.set({"role": "full", "policy": "permissive", "unlocked": set()})
+    _policy_context.set(None)
 
 
 # ─── Role Manifests ─────────────────────────────────────────────────────

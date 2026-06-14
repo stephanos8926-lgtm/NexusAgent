@@ -17,7 +17,7 @@ import json
 import logging
 import os
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 from textual.binding import Binding
 from textual.events import Key as KeyEvent
@@ -90,7 +90,7 @@ class ChatInput(TextArea):
     - Command history persistence to ~/.nexusagent/history.json
     """
 
-    BINDINGS: list[Binding] = [
+    BINDINGS: ClassVar[list[Binding]] = [
         Binding("enter", "submit", "Submit", show=False),
         Binding("shift+enter", "newline", "Newline", show=False),
         Binding("escape", "cancel", "Cancel", show=False),
