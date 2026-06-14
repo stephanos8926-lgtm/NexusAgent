@@ -368,7 +368,7 @@ class TestHooksConfig:
 
         schema = ConfigSchema()
         assert schema.hooks.hooks_enabled is True
-        assert schema.hooks.hooks_dir == ".nexusagent/hooks"
+        assert schema.hooks.hooks_dir == "~/.nexusagent/hooks"
 
     def test_hooks_config_custom(self):
         from nexusagent.infrastructure.config import ConfigSchema

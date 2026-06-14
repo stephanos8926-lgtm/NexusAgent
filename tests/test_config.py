@@ -15,8 +15,8 @@ def test_load_config_success(tmp_path, monkeypatch):
 
     from unittest.mock import patch
 
-    with patch("nexusagent.config.get_project_root", return_value=tmp_path):
-        config = load_config("nexusagent.yaml")
+    with patch("nexusagent.infrastructure.config.get_nexus_home", return_value=tmp_path):
+        config = load_config(str(config_file))
         assert config.server.nats_url == "nats://test"
         assert config.server.db_path.endswith("test.db")
 
