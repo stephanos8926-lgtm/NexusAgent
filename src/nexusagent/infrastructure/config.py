@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 class ServerConfig(BaseModel):
     nats_url: str = Field(default="nats://localhost:4222")
-    db_path: str = Field(default="~/.nexusagent/data/nexus.db")
+    db_path: str = Field(default="data/nexus.db")
     api_port: int = Field(default=8000, ge=1, le=65535)
     worker_threads: int = Field(default=4, ge=1)
     nats_reconnect_wait: int = Field(default=2, ge=0)
@@ -31,9 +31,9 @@ class ClientConfig(BaseModel):
 
 
 class AuthConfig(BaseModel):
-    master_secret_path: str = Field(default="~/.nexusagent/auth/.master.secret")
-    keystore_path: str = Field(default="~/.nexusagent/auth/keystore.json")
-    salt_path: str = Field(default="~/.nexusagent/auth/.master.salt")
+    master_secret_path: str = Field(default="auth/.master.secret")
+    keystore_path: str = Field(default="auth/keystore.json")
+    salt_path: str = Field(default="auth/.master.salt")
     kdf_iterations: int = Field(default=100000, ge=1000)
 
 
@@ -60,7 +60,7 @@ class AgentConfig(BaseModel):
 class PromptConfig(BaseModel):
     """Configuration for the NEXUS.md prompt system."""
     # Path to the base prompt file (defaults to ~/.nexusagent/NEXUS.md)
-    base_prompt_file: str = Field(default="~/.nexusagent/NEXUS.md")
+    base_prompt_file: str = Field(default="NEXUS.md")
     # Whether to look for a project-specific NEXUS.md in CWD
     load_cwd_prompt: bool = Field(default=True)
     # Maximum @file chain depth (prevents infinite recursion)
@@ -163,16 +163,20 @@ def load_config(config_file: str = "~/.nexusagent/config/nexusagent.yaml") -> Co
     try:
         config = ConfigSchema(**raw_data)
 
-        # Resolve relative server/auth paths against nexusagent home
+        # Resolve server/auth paths: expand ~, then resolve relative against nexus home
         nexus_home = get_nexus_home()
-        if not Path(config.server.db_path).is_absolute():
-            config.server.db_path = str(nexus_home / config.server.db_path)
-        if not Path(config.auth.master_secret_path).is_absolute():
-            config.auth.master_secret_path = str(nexus_home / config.auth.master_secret_path)
-        if not Path(config.auth.keystore_path).is_absolute():
-            config.auth.keystore_path = str(nexus_home / config.auth.keystore_path)
-        if not Path(config.auth.salt_path).is_absolute():
-            config.auth.salt_path = str(nexus_home / config.auth.salt_path)
+        for attr in ("db_path",):
+            val = getattr(config.server, attr)
+            val = str(Path(val).expanduser())
+            if not Path(val).is_absolute():
+                val = str(nexus_home / val)
+            setattr(config.server, attr, val)
+        for attr in ("master_secret_path", "keystore_path", "salt_path"):
+            val = getattr(config.auth, attr)
+            val = str(Path(val).expanduser())
+            if not Path(val).is_absolute():
+                val = str(nexus_home / val)
+            setattr(config.auth, attr, val)
 
         # Ensure data subdirectories exist
         for path_str in (config.server.db_path, config.auth.master_secret_path,

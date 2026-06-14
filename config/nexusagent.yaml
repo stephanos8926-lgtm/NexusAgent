@@ -1,6 +1,6 @@
 server:
   nats_url: "nats://localhost:4222"
-  db_path: "~/.nexusagent/data/nexus.db"
+  db_path: "data/nexus.db"
   api_port: 8000
 
 client:
@@ -16,7 +16,7 @@ agent:
   compaction_enabled: true
 
 prompt:
-  base_prompt_file: "~/.nexusagent/NEXUS.md"
+  base_prompt_file: "NEXUS.md"
   load_cwd_prompt: true
   max_chain_depth: 8
   max_inject_file_size: 262144
