@@ -21,6 +21,7 @@ import json
 import logging
 import pathlib
 import signal as _signal
+import urllib.request
 import uuid
 from typing import Any, ClassVar
 
@@ -30,6 +31,8 @@ from textual.binding import Binding
 from textual.containers import Container, VerticalScroll
 
 from nexusagent.infrastructure.config import settings
+from nexusagent.interfaces.cli import is_compatible, parse_version
+from nexusagent.version import VERSION as CLIENT_VERSION
 from nexusagent.interfaces.tui_formatters import (
     format_arg_value,
     render_markdown,
@@ -232,6 +235,42 @@ class NexusApp(App):
             except Exception as exc:
                 logger.debug(f"Failed to restore SIGWINCH handler: {exc}")
 
+    # ── Pre-connect version check ────────────────────────────────────
+
+    async def _check_server_version(self) -> bool:
+        """Fetch server version via HTTP before WebSocket connect.
+
+        Returns True if server is reachable (version mismatch is non-blocking).
+        Returns False if server is unreachable.
+        """
+        url = f"http://127.0.0.1:{settings.server.api_port}/version"
+        try:
+            loop = asyncio.get_running_loop()
+            raw = await loop.run_in_executor(
+                None,
+                lambda: urllib.request.urlopen(url, timeout=5).read(),
+            )
+            data = json.loads(raw)
+            server_ver = data.get("version", "unknown")
+            if not is_compatible(server_ver, CLIENT_VERSION):
+                msg = AppMessage(
+                    f"⚠ Version mismatch: server={server_ver} "
+                    f"client={CLIENT_VERSION}. Consider upgrading."
+                )
+                self.messages_container.mount(msg)
+                logger.warning(
+                    "Version mismatch: server=%s client=%s",
+                    server_ver, CLIENT_VERSION,
+                )
+        except Exception as exc:
+            msg = AppMessage(
+                f"⚠ Server unreachable: {exc}. Retrying…"
+            )
+            self.messages_container.mount(msg)
+            logger.warning("Version check failed: %s", exc)
+            return False
+        return True
+
     # ── WebSocket loop ──────────────────────────────────────────────
 
     async def _ws_loop(self) -> None:
@@ -240,6 +279,9 @@ class NexusApp(App):
         extra_headers: dict[str, str] = {}
         if api_key:
             extra_headers["Authorization"] = f"Bearer {api_key}"
+
+        # Pre-connect version check (non-blocking on mismatch)
+        await self._check_server_version()
 
         max_retries = 6
         base_delay = 1.0  # seconds
@@ -487,7 +529,7 @@ class NexusApp(App):
             return True
         if command == "/version":
             msg = AppMessage(
-                f"NexusAgent v0.1.0 | Model: {settings.agent.default_model} | "
+                f"NexusAgent {CLIENT_VERSION} | Model: {settings.agent.default_model} | "
                 f"Session: {self.session_id} | Theme: {self._theme_name}"
             )
             self.messages_container.mount(msg)
