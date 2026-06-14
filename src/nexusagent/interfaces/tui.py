@@ -19,24 +19,37 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import os
 import pathlib
 import signal as _signal
 import uuid
-from datetime import datetime
 from typing import Any, ClassVar
 
 import websockets
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Container, Horizontal, VerticalScroll
-from textual.events import Resize
-from textual.screen import ModalScreen
-from textual.widgets import Button, Input, Static
+from textual.containers import Container, VerticalScroll
 
 from nexusagent.infrastructure.config import settings
+from nexusagent.interfaces.tui_formatters import (
+    format_arg_value,
+    render_markdown,
+    truncate,
+)
 
+# ── Re-exports for backward compatibility (tests import from tui.py) ──
+from nexusagent.interfaces.tui_widgets import (  # noqa: F401
+    NO_COLOR,
+    ApprovalModal,
+    Breakpoint,
+    SpinnerLabel,
+    _sigwinch_handler,
+    classify_breakpoint,
+    debounce_resize,
+    is_no_color,
+)
+from nexusagent.widgets.chat_input import ChatInput
 from nexusagent.widgets.messages import (
+    AppMessage,
     AssistantMessage,
     ErrorMessage,
     ToolCallMessage,
@@ -44,33 +57,7 @@ from nexusagent.widgets.messages import (
     WelcomeBanner,
 )
 from nexusagent.widgets.status import StatusBar
-from nexusagent.widgets.theme import get_css_variable_defaults, register_themes
-from nexusagent.widgets.chat_input import ChatInput
-
-# ── Re-exports for backward compatibility (tests import from tui.py) ──
-from nexusagent.interfaces.tui_widgets import (  # noqa: F401
-    NO_COLOR,
-    SpinnerLabel,
-    is_no_color,
-    debounce_resize,
-    classify_breakpoint,
-)
-from nexusagent.interfaces.tui_widgets import (
-    ApprovalModal,
-    Breakpoint,
-    _sigwinch_handler,
-    classify_breakpoint,
-    debounce_resize,
-)
-from nexusagent.interfaces.tui_formatters import (
-    format_arg_value,
-    format_tool_output_generic,
-    format_tool_result_for_display,
-    render_markdown,
-    truncate,
-    truncate_output,
-    _escape,
-)
+from nexusagent.widgets.theme import register_themes
 
 logger = logging.getLogger(__name__)
 
@@ -253,10 +240,10 @@ class NexusApp(App):
         if api_key:
             extra_headers["Authorization"] = f"Bearer {api_key}"
 
-        _MAX_RETRIES = 6
-        _BASE_DELAY = 1.0  # seconds
+        max_retries = 6
+        base_delay = 1.0  # seconds
 
-        for attempt in range(_MAX_RETRIES):
+        for attempt in range(max_retries):
             try:
                 async with websockets.connect(
                     ws_url,
@@ -288,13 +275,13 @@ class NexusApp(App):
                     return
 
             except ConnectionRefusedError:
-                delay = _BASE_DELAY * (2 ** attempt)
-                remaining = _MAX_RETRIES - attempt - 1
+                delay = base_delay * (2 ** attempt)
+                remaining = max_retries - attempt - 1
                 if remaining == 0:
                     self.status_bar.set_status("Connection refused")
                     self._mount_error(
                         f"Cannot connect to server at port {settings.server.api_port} "
-                        f"after {_MAX_RETRIES} attempts."
+                        f"after {max_retries} attempts."
                     )
                     return
                 self.status_bar.set_status(f"Reconnecting ({remaining} left)…")
@@ -306,8 +293,8 @@ class NexusApp(App):
                 return
 
             except websockets.exceptions.ConnectionClosedError as e:
-                delay = _BASE_DELAY * (2 ** attempt)
-                remaining = _MAX_RETRIES - attempt - 1
+                delay = base_delay * (2 ** attempt)
+                remaining = max_retries - attempt - 1
                 if remaining == 0:
                     self.status_bar.set_status("Connection lost")
                     self._mount_error(f"Connection lost: {e}")
@@ -343,8 +330,6 @@ class NexusApp(App):
             tool = event.get("tool", "?")
             args = event.get("args", {})
             self._last_tool_name = tool
-
-            args_str = self._format_args_str(args)
 
             if isinstance(args, dict):
                 args_display = ", ".join(
@@ -560,7 +545,7 @@ class NexusApp(App):
                 await self._ws.send(json.dumps({"type": "redo"}))
             return True
         if command == "/skills":
-            from nexusagent.skills import load_all_skills, get_skills_summary
+            from nexusagent.skills import get_skills_summary, load_all_skills
             skills = load_all_skills()
             if skills:
                 get_skills_summary(skills)
@@ -577,7 +562,7 @@ class NexusApp(App):
                 msg = AppMessage("Usage: /skill <name>")
                 self.messages_container.mount(msg)
                 return True
-            from nexusagent.skills import load_all_skills, get_skill_content
+            from nexusagent.skills import get_skill_content, load_all_skills
             skills = load_all_skills()
             skill_content = get_skill_content(skills, skill_name)
             if skill_content:
