@@ -7,8 +7,11 @@ Handles:
 
 from __future__ import annotations
 
-from nexusagent.widgets.messages import AppMessage, UserMessage
-from nexusagent.interfaces.tui.streaming import handle_slash_command, update_queue_status
+from nexusagent.interfaces.tui.streaming import (  # noqa: I001
+    handle_slash_command,
+    update_queue_status,
+)
+from nexusagent.widgets.messages import AppMessage, UserMessage  # noqa: I001
 
 
 async def on_chat_input_submitted(app, event) -> None:

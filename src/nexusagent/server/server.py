@@ -20,7 +20,7 @@ from nexusagent.infrastructure.api_auth import verify_api_key
 from nexusagent.infrastructure.bus import get_bus
 from nexusagent.infrastructure.config import settings
 from nexusagent.server.sdk import sdk
-from nexusagent.version import VERSION, MIN_CLIENT_VERSION
+from nexusagent.version import MIN_CLIENT_VERSION, VERSION
 
 # Track server start time for uptime reporting
 _SERVER_START_TIME = time.monotonic()
@@ -50,7 +50,9 @@ async def lifespan(app: FastAPI):
 
         # 3. Start the Worker as a background task within the same process
         # This co-locates the API and the Worker for simplicity in deployment.
-        worker_task = asyncio.create_task(worker.start())
+        from nexusagent.core.worker import NexusWorker
+        worker = NexusWorker()
+        worker_task = asyncio.create_task(worker.start())  # noqa: RUF006
         logger.info("Worker background task started.")
 
         yield

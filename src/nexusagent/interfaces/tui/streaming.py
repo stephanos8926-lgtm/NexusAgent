@@ -422,7 +422,7 @@ def process_next_in_queue(app) -> None:
     app.status_bar.set_status("Thinking...")
     app.status_bar.set_spinner(True)
     import asyncio
-    asyncio.create_task(app._input_queue.put(next_msg))
+    asyncio.create_task(app._input_queue.put(next_msg))  # noqa: RUF006
     update_queue_status(app)
 
 

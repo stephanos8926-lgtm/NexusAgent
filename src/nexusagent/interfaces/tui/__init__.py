@@ -9,10 +9,18 @@ This compat shim ensures all existing imports from tui.py continue to work:
 from __future__ import annotations
 
 # App class and entry point
-from nexusagent.interfaces.tui.app import NexusApp, main  # noqa: F401
+from nexusagent.interfaces.tui.app import NexusApp, main  # noqa: F401, I001
+
+# Formatters
+from nexusagent.interfaces.tui.formatters import (  # noqa: F401, I001
+    format_arg_value,
+    render_markdown,
+    truncate,
+)
 
 # Widgets re-exported for backward compat (tests import from tui.py)
-from nexusagent.interfaces.tui_widgets import (  # noqa: F401
+from nexusagent.interfaces.tui_widgets import (  # noqa: F401, I001
+    NO_COLOR,
     ApprovalModal,
     Breakpoint,
     ErrorModal,
@@ -21,12 +29,11 @@ from nexusagent.interfaces.tui_widgets import (  # noqa: F401
     classify_breakpoint,
     debounce_resize,
     is_no_color,
-    NO_COLOR,
 )
 
 # Message widgets (tests import from tui.py)
-from nexusagent.widgets.chat_input import ChatInput  # noqa: F401
-from nexusagent.widgets.messages import (  # noqa: F401
+from nexusagent.widgets.chat_input import ChatInput  # noqa: F401, I001
+from nexusagent.widgets.messages import (  # noqa: F401, I001
     AppMessage,
     AssistantMessage,
     ErrorMessage,
@@ -37,10 +44,3 @@ from nexusagent.widgets.messages import (  # noqa: F401
 
 # Status bar
 from nexusagent.widgets.status import StatusBar  # noqa: F401
-
-# Formatters
-from nexusagent.interfaces.tui_formatters import (  # noqa: F401
-    format_arg_value,
-    render_markdown,
-    truncate,
-)
