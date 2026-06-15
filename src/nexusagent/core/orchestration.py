@@ -189,5 +189,21 @@ class DeepResearchOrchestrator:
         return response.content
 
 
-# Singleton orchestrator
-deep_research_orchestrator = DeepResearchOrchestrator()
+# Module-level singleton (lazy, injectable)
+_deep_research_orchestrator_instance: DeepResearchOrchestrator | None = None
+
+
+def get_deep_research_orchestrator() -> DeepResearchOrchestrator:
+    global _deep_research_orchestrator_instance
+    if _deep_research_orchestrator_instance is None:
+        _deep_research_orchestrator_instance = DeepResearchOrchestrator()
+    return _deep_research_orchestrator_instance
+
+
+def set_deep_research_orchestrator(instance: DeepResearchOrchestrator) -> None:
+    global _deep_research_orchestrator_instance
+    _deep_research_orchestrator_instance = instance
+
+
+# Backward-compatible alias — deprecated, use get_deep_research_orchestrator()
+deep_research_orchestrator = get_deep_research_orchestrator()
