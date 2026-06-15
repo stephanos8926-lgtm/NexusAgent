@@ -102,8 +102,8 @@ def _check_web_auth(username: str, password: str) -> bool:
     if not api_key:
         # If no API key configured, check against auth manager
         try:
-            from nexusagent.infrastructure.auth import auth_manager
-            stored = auth_manager.get_key("api")
+            from nexusagent.infrastructure.auth import get_auth_manager
+            stored = get_auth_manager().get_key("api")
             if stored is None:
                 return False  # No key configured, deny
             api_key = stored

@@ -129,5 +129,21 @@ class AuthManager:
         os.chmod(self.keystore_path, 0o600)
 
 
-# Global instance for use across the app
-auth_manager = AuthManager()
+# Module-level singleton (lazy, injectable)
+_auth_manager_instance: AuthManager | None = None
+
+
+def get_auth_manager() -> AuthManager:
+    global _auth_manager_instance
+    if _auth_manager_instance is None:
+        _auth_manager_instance = AuthManager()
+    return _auth_manager_instance
+
+
+def set_auth_manager(instance: AuthManager) -> None:
+    global _auth_manager_instance
+    _auth_manager_instance = instance
+
+
+# Backward-compatible alias — deprecated, use get_auth_manager()
+auth_manager = get_auth_manager()

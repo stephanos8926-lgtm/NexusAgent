@@ -39,7 +39,7 @@ _test_auth.save_key("api", "test-key")
 
 # Patch the global auth_manager to use test keystore
 import nexusagent.infrastructure.auth as _auth_module
-_auth_module.auth_manager = _test_auth
+_auth_module.set_auth_manager(_test_auth)
 
 # Initialize test database for server/session tests that need it
 import asyncio as _asyncio
