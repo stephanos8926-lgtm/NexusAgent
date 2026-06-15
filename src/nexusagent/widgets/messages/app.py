@@ -27,8 +27,19 @@ class AppMessage(Static):
     """
 
     def __init__(self, message: str, **kwargs: Any) -> None:
+        """Initialize the app message widget.
+
+        Args:
+            message: The system/app message text to display.
+            **kwargs: Additional keyword arguments passed to Static.
+        """
         super().__init__(**kwargs)
         self._message = message
 
     def render(self) -> Content:
+        """Render the message with a muted ○ prefix.
+
+        Returns:
+            Content with dim italic styling.
+        """
         return Content.assemble(("○ ", "text-muted"), (self._message, "text-muted"))

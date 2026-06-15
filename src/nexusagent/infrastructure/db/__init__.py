@@ -39,6 +39,11 @@ _session_repo: SessionRepository | None = None
 
 
 def get_db_manager() -> DatabaseManager:
+    """Return the global DatabaseManager singleton, creating it if needed.
+
+    Returns:
+        The shared DatabaseManager instance.
+    """
     global _db_manager
     if _db_manager is None:
         _db_manager = DatabaseManager()
@@ -46,11 +51,21 @@ def get_db_manager() -> DatabaseManager:
 
 
 def set_db_manager(instance: DatabaseManager) -> None:
+    """Set the global DatabaseManager singleton (for testing/overrides).
+
+    Args:
+        instance: The DatabaseManager instance to use globally.
+    """
     global _db_manager
     _db_manager = instance
 
 
 def get_task_repo() -> TaskRepository:
+    """Return the global TaskRepository singleton, creating it if needed.
+
+    Returns:
+        The shared TaskRepository instance.
+    """
     global _task_repo
     if _task_repo is None:
         _task_repo = TaskRepository(get_db_manager())
@@ -58,11 +73,21 @@ def get_task_repo() -> TaskRepository:
 
 
 def set_task_repo(instance: TaskRepository) -> None:
+    """Set the global TaskRepository singleton (for testing/overrides).
+
+    Args:
+        instance: The TaskRepository instance to use globally.
+    """
     global _task_repo
     _task_repo = instance
 
 
 def get_session_repo() -> SessionRepository:
+    """Return the global SessionRepository singleton, creating it if needed.
+
+    Returns:
+        The shared SessionRepository instance.
+    """
     global _session_repo
     if _session_repo is None:
         _session_repo = SessionRepository(get_db_manager())
@@ -70,6 +95,11 @@ def get_session_repo() -> SessionRepository:
 
 
 def set_session_repo(instance: SessionRepository) -> None:
+    """Set the global SessionRepository singleton (for testing/overrides).
+
+    Args:
+        instance: The SessionRepository instance to use globally.
+    """
     global _session_repo
     _session_repo = instance
 

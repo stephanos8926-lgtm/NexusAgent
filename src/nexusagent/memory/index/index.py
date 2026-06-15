@@ -44,6 +44,12 @@ class HybridMemoryIndex:
     """SQLite-based hybrid search index (FTS5 + sqlite-vec)."""
 
     def __init__(self, workspace_dir: str):
+        """Initialize the hybrid search index.
+
+        Args:
+            workspace_dir: Path to the workspace root. The index database
+                is stored at ``<workspace>/.memory/index.sqlite``.
+        """
         self.workspace = Path(workspace_dir)
         self.db_path = self.workspace / ".memory" / "index.sqlite"
         self.db_path.parent.mkdir(parents=True, exist_ok=True)

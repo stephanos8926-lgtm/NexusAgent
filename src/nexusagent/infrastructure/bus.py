@@ -1,3 +1,10 @@
+"""NATS JetStream message bus for task distribution and result storage.
+
+Provides ``AgentBus`` (a NATS client wrapper with JetStream KV, automatic
+reconnection, health monitoring, and JSON encoding for complex types) and
+``NATSJSONEncoder`` (a custom JSON encoder that handles datetime, bytes,
+sets, and Path objects).
+"""
 import asyncio
 import base64
 import json
@@ -37,7 +44,25 @@ def _effective_max_reconnects(requested: int) -> int:
 
 
 class NATSJSONEncoder(json.JSONEncoder):
+    """Custom JSON encoder for NATS message payloads.
+
+    Handles ``datetime``, ``date``, ``bytes``, ``set``, ``Path``, and
+    ``Exception`` objects that the default encoder cannot serialize.
+    """
+
     def default(self, obj):
+        """Serialize objects that the default JSON encoder cannot handle.
+
+        Args:
+            obj: The object to serialize. Supports ``datetime``, ``date``,
+                ``bytes``, ``set``, ``Path``, and ``Exception`` types.
+
+        Returns:
+            A JSON-serializable representation of *obj*.
+
+        Raises:
+            TypeError: If *obj* is not one of the handled types.
+        """
         if isinstance(obj, (datetime, date)):
             return obj.isoformat()
         if isinstance(obj, bytes):
@@ -55,7 +80,19 @@ class NATSJSONEncoder(json.JSONEncoder):
 
 
 class AgentBus:
+    """NATS JetStream message bus for task distribution and result storage.
+
+    Wraps an async NATS client with automatic reconnection, health tracking,
+    JetStream key-value storage, and subject-based pub/sub subscriptions.
+    """
+
     def __init__(self, url: str | None = None) -> None:
+        """Initialize the bus with an optional NATS server URL.
+
+        Args:
+            url: NATS server URL (e.g. ``"nats://localhost:4222"``). If None,
+                uses ``settings.server.nats_url``.
+        """
         self.url = url or settings.server.nats_url
         self.nc: NATSClient | None = None
         self.js: Any = None
@@ -87,6 +124,7 @@ class AgentBus:
 
     @property
     def reconnect_count(self) -> int:
+        """Return the number of times the NATS client has reconnected."""
         return self._reconnect_count
 
     async def wait_for_connection(self, timeout: float = 30.0) -> bool:
@@ -103,6 +141,11 @@ class AgentBus:
             return False
 
     async def connect(self) -> None:
+        """Connect to NATS and initialize JetStream KV store.
+
+        Skips reconnection if already connected. Creates the ``nexus_results``
+        KV bucket on first use or attaches to an existing one.
+        """
         if self.nc:
             logger.debug("NATS already connected, skipping reconnect")
             return
@@ -330,6 +373,12 @@ class AgentBus:
         self._subscriptions.append(loop_task)  # type: ignore[arg-type]
 
     async def publish(self, subject: str, message: Any) -> None:
+        """Publish a JSON-serialized message to a NATS subject.
+
+        Args:
+            subject: The NATS subject to publish to.
+            message: The payload to serialize and send.
+        """
         if not self.nc:
             raise RuntimeError("NATSBus not connected. Call connect() first.")
         try:
@@ -412,6 +461,7 @@ class AgentBus:
             return None
 
     async def close(self) -> None:
+        """Unsubscribe from all subjects and close the NATS connection."""
         import contextlib
 
         for sub in self._subscriptions:

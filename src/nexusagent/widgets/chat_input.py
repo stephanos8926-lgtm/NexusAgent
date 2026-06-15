@@ -58,7 +58,15 @@ _MAX_HISTORY = 200
 
 
 def _load_history() -> list[str]:
-    """Load command history from disk."""
+    """Load command history from ``~/.nexusagent/history.json``.
+
+    Returns a list of previously submitted command strings, up to
+    ``_MAX_HISTORY`` entries. Returns an empty list if the file
+    is missing or corrupt.
+
+    Returns:
+        List of historical command strings.
+    """
     try:
         if _HISTORY_FILE.exists():
             with open(_HISTORY_FILE) as f:
@@ -71,7 +79,14 @@ def _load_history() -> list[str]:
 
 
 def _save_history(history: list[str]) -> None:
-    """Persist command history to disk."""
+    """Persist command history to ``~/.nexusagent/history.json``.
+
+    Writes up to ``_MAX_HISTORY`` most recent entries. Logs a
+    warning on failure instead of raising.
+
+    Args:
+        history: The full list of command history entries.
+    """
     try:
         _HISTORY_DIR.mkdir(parents=True, exist_ok=True)
         with open(_HISTORY_FILE, "w") as f:
@@ -118,6 +133,14 @@ class ChatInput(TextArea):
     """
 
     def __init__(self, **kwargs: Any) -> None:
+        """Initialize the chat input widget.
+
+        Loads command history from disk and initializes internal state
+        for slash command matching and hint display.
+
+        Args:
+            **kwargs: Additional keyword arguments passed to TextArea.
+        """
         super().__init__(**kwargs)
         self._history: list[str] = _load_history()
         self._history_idx = len(self._history)
@@ -126,6 +149,7 @@ class ChatInput(TextArea):
         self._hint: str | None = None
 
     def on_mount(self) -> None:
+        """Set up the widget on mount: configure border title and hint."""
         self.border_title = "Message"
         self._update_hint()
 
@@ -281,6 +305,15 @@ class ChatInput(TextArea):
         BUBBLE = True
 
         def __init__(self, text: str, images: list[str]) -> None:
+            """Initialize a Submitted message.
+
+            Bypasses the TextArea.Changed contract by calling
+            Message.__init__ directly.
+
+            Args:
+                text: The submitted message text.
+                images: List of image paths/URLs extracted from the text.
+            """
             # TextArea.Changed requires a TextArea instance; pass None and let
             # Textual set `control` via the normal message routing machinery.
             # We call Message.__init__ directly to avoid the Changed contract.

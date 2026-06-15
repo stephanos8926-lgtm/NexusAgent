@@ -1,3 +1,10 @@
+"""Research and web fetching tools for NexusAgent.
+
+Provides web search (Exa/Tavily), local documentation search (ctx7),
+and URL fetching with HTML-to-text conversion. All functions are
+standalone (no class required) and use httpx for HTTP requests.
+"""
+
 import logging
 import os
 import subprocess

@@ -1,3 +1,9 @@
+"""File patching tool for NexusAgent.
+
+Applies unified diff patches to files using the patch-ng library.
+Used by the agent to apply code changes from diff/patch format.
+"""
+
 from pathlib import Path
 
 import patch_ng

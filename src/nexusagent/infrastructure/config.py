@@ -1,4 +1,11 @@
-# src/nexusagent/config.py
+"""Pydantic configuration schema for NexusAgent.
+
+Provides ``ConfigSchema`` and its sub-models (``ServerConfig``, ``ClientConfig``,
+``AuthConfig``, ``AgentConfig``, ``PromptConfig``, ``LoggingConfig``,
+``HooksConfig``), plus ``load_config`` for three-tier configuration loading
+(file → env vars → Pydantic defaults) and ``get_project_root`` /
+``get_nexus_home`` path helpers.
+"""
 import logging
 import os
 from pathlib import Path
@@ -10,6 +17,8 @@ logger = logging.getLogger(__name__)
 
 
 class ServerConfig(BaseModel):
+    """Server-side configuration for NATS, database, and API settings."""
+
     nats_url: str = Field(default="nats://localhost:4222")
     db_path: str = Field(default="data/nexus.db")
     api_port: int = Field(default=8000, ge=1, le=65535)
@@ -20,6 +29,8 @@ class ServerConfig(BaseModel):
 
 
 class ClientConfig(BaseModel):
+    """Client-side configuration for the TUI (theme, timeouts, retries)."""
+
     tui_theme: str = Field(default="textual-dark")
     timeout: int = Field(default=30, ge=1)
     retry_limit: int = Field(default=3, ge=0)
@@ -31,6 +42,8 @@ class ClientConfig(BaseModel):
 
 
 class AuthConfig(BaseModel):
+    """Authentication configuration for master secret, keystore, and KDF parameters."""
+
     master_secret_path: str = Field(default="auth/.master.secret")
     keystore_path: str = Field(default="auth/keystore.json")
     salt_path: str = Field(default="auth/.master.salt")
@@ -38,6 +51,8 @@ class AuthConfig(BaseModel):
 
 
 class AgentConfig(BaseModel):
+    """Agent runtime configuration (model, provider, tools, compaction, images)."""
+
     default_model: str = Field(default="gemini-3.1-flash-lite")
     primary_provider: str = Field(default="gemini")
     gemini_model: str = Field(default="gemini-3.1-flash-lite")
@@ -76,6 +91,8 @@ class PromptConfig(BaseModel):
 
 
 class LoggingConfig(BaseModel):
+    """Logging configuration for level and format string."""
+
     level: str = Field(default="INFO")
     format: str = Field(
         default="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
@@ -90,6 +107,8 @@ class HooksConfig(BaseModel):
 
 
 class ConfigSchema(BaseModel):
+    """Top-level configuration schema aggregating all sub-configurations."""
+
     server: ServerConfig = Field(default_factory=ServerConfig)
     client: ClientConfig = Field(default_factory=ClientConfig)
     auth: AuthConfig = Field(default_factory=AuthConfig)
@@ -114,6 +133,7 @@ def get_nexus_home() -> Path:
 
 
 def get_project_root() -> Path:
+    """Return the repository root directory (four levels up from this file)."""
     # The config file is located at <root>/config/nexusagent.yaml
     # The file this function is in is <root>/src/nexusagent/infrastructure/config.py
     # To get to <root> from here: infrastructure -> nexusagent -> src -> (root)
@@ -121,6 +141,20 @@ def get_project_root() -> Path:
 
 
 def load_config(config_file: str = "~/.nexusagent/config/nexusagent.yaml") -> ConfigSchema:
+    """Load and validate configuration from file, env vars, and defaults.
+
+    Resolution order:
+        1. Pydantic model defaults
+        2. YAML config file values
+        3. ``NEXUS_*`` environment variables (double underscore = nested key)
+
+    Args:
+        config_file: Path to the YAML config file. ``~`` is expanded to the
+            user home directory.
+
+    Returns:
+        A validated ``ConfigSchema`` instance.
+    """
     # Resolve ~ in config file path
     config_path = Path(config_file).expanduser()
 

@@ -50,16 +50,31 @@ class ModelLabel(Static):
     """
 
     def __init__(self, **kwargs: Any) -> None:
+        """Initialize the model label with empty provider and model."""
         super().__init__("", **kwargs)
         self._provider = ""
         self._model = ""
 
     def set_model(self, provider: str, model: str) -> None:
+        """Set the provider and model name, then refresh the display.
+
+        Args:
+            provider: The LLM provider name (e.g. "anthropic").
+            model: The model name (e.g. "claude-sonnet-4").
+        """
         self._provider = provider
         self._model = model
         self.refresh()
 
     def render(self) -> Content:
+        """Render the model label with smart truncation.
+
+        Truncates from the left if the full "provider:model" string
+        exceeds the available width.
+
+        Returns:
+            Content with the model name, possibly truncated.
+        """
         if not self._model:
             return Content("")
         full = f"{self._provider}:{self._model}" if self._provider else self._model
@@ -125,6 +140,7 @@ class StatusBar(Horizontal):
     SPINNER_CHARS = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
 
     def __init__(self, **kwargs: Any) -> None:
+        """Initialize the status bar with default 'Ready' state."""
         super().__init__(**kwargs)
         self._status_message = "Ready"
         self._cwd = ""
@@ -138,6 +154,11 @@ class StatusBar(Horizontal):
         self._context_limit = 0
 
     def compose(self) -> ComposeResult:
+        """Compose the status bar child widgets.
+
+        Yields Static widgets for spinner, message, cwd, branch,
+        tokens, context bar, and ModelLabel, all with unique IDs.
+        """
         yield Static("", id="status-spinner")
         yield Static("Ready", id="status-message")
         yield Static("", id="status-cwd")
@@ -147,6 +168,7 @@ class StatusBar(Horizontal):
         yield ModelLabel(id="status-model")
 
     def on_mount(self) -> None:
+        """Set up the status bar on mount: update widgets and start spinner timer."""
         self._update_widgets()
         # Drive spinner animation at 100ms intervals
         self.set_interval(0.1, self._animate_spinner)
@@ -223,33 +245,69 @@ class StatusBar(Horizontal):
             pass
 
     def set_status(self, msg: str) -> None:
+        """Update the status message displayed in the bar.
+
+        Args:
+            msg: The new status message text.
+        """
         self._status_message = msg
         self._update_widgets()
 
     def set_cwd(self, cwd: str) -> None:
+        """Update the current working directory display.
+
+        Args:
+            cwd: The working directory path to show.
+        """
         self._cwd = cwd
         self._update_widgets()
 
     def set_branch(self, branch: str) -> None:
+        """Update the git branch display.
+
+        Args:
+            branch: The branch name to show.
+        """
         self._branch = branch
         self._update_widgets()
 
     def set_tokens(self, count: int) -> None:
+        """Update the token count display.
+
+        Args:
+            count: The number of tokens used.
+        """
         self._tokens = count
         self._update_widgets()
 
     def set_model(self, provider: str, model: str) -> None:
+        """Update the model name display.
+
+        Args:
+            provider: The LLM provider name.
+            model: The model name.
+        """
         self._model_provider = provider
         self._model_name = model
         self._update_widgets()
 
     def set_context(self, used: int, total: int) -> None:
-        """Update context window usage display."""
+        """Update context window usage display.
+
+        Args:
+            used: Number of context tokens used.
+            total: Total context window size.
+        """
         self._context_used = used
         self._context_limit = total
         self._update_widgets()
 
     def set_spinner(self, spinning: bool) -> None:
+        """Enable or disable the spinner animation.
+
+        Args:
+            spinning: True to start the spinner, False to stop it.
+        """
         self._spinning = spinning
         if spinning:
             self._spinner_idx = 0
@@ -359,6 +417,12 @@ class ContextWindowBar:
     DANGER_COLOR = "#F7768E"
 
     def __init__(self, used: int, total: int) -> None:
+        """Initialize the context window bar.
+
+        Args:
+            used: Number of context tokens used.
+            total: Total context window size.
+        """
         self.used = used
         self.total = total
 
@@ -397,6 +461,7 @@ class BrailleSpinner:
     CHARS = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
 
     def __init__(self) -> None:
+        """Initialize the braille spinner at frame 0."""
         self.frame = 0
 
     def tick(self) -> None:

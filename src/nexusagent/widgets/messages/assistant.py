@@ -36,6 +36,7 @@ class AssistantMessage(Static):
     """
 
     def __init__(self, **kwargs: Any) -> None:
+        """Initialize the assistant message widget with an empty buffer."""
         super().__init__("", **kwargs)
         self._buffer = ""
         self._finalized = False
@@ -64,4 +65,9 @@ class AssistantMessage(Static):
             self.update(Content(content))
 
     def render(self) -> Content:
+        """Render the buffered content as plain text.
+
+        Returns:
+            Content wrapping the current buffer string.
+        """
         return Content(self._buffer)

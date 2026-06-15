@@ -125,6 +125,7 @@ class NexusApp(App):
     """
 
     def compose(self) -> ComposeResult:
+        """Compose the TUI layout: chat area, input, and status bar."""
         register_themes(self)
         self.theme = self._theme_name
 
@@ -134,6 +135,13 @@ class NexusApp(App):
         yield StatusBar(id="status-bar")
 
     def __init__(self, session_id: str | None = None, yolo: bool = False, **kwargs: Any) -> None:
+        """Initialize the NexusAgent TUI application.
+
+        Args:
+            session_id: Optional session identifier. Auto-generated if not provided.
+            yolo: If True, enable auto-approve mode by default.
+            **kwargs: Additional keyword arguments passed to the App base class.
+        """
         super().__init__(**kwargs)
         self.session_id = session_id or str(uuid.uuid4())[:8]
         self._yolo_default = yolo
@@ -153,6 +161,7 @@ class NexusApp(App):
         self._context_limit = 0
 
     def on_mount(self) -> None:
+        """Set up the TUI on mount: initialize queues, widgets, and start WebSocket loop."""
         self._input_queue: asyncio.Queue[str | None] = asyncio.Queue()
         self._ws: websockets.WebSocketClientProtocol | None = None
         self._ws_task: asyncio.Task | None = None
@@ -193,7 +202,7 @@ class NexusApp(App):
             if branch:
                 self.status_bar.set_branch(branch)
         except Exception:
-            pass
+            pass  # Git branch detection is best-effort
 
     # ── Greeting ──────────────────────────────────────────────────────
 
@@ -700,6 +709,11 @@ class NexusApp(App):
     # ── Input handling ──────────────────────────────────────────────
 
     async def on_chat_input_submitted(self, event: ChatInput.Submitted) -> None:
+        """Handle chat input submission from the user.
+
+        Routes slash commands to the command handler or sends user messages
+        to the WebSocket server.
+        """
         message = event.text.strip()
         if not message:
             return
@@ -728,16 +742,19 @@ class NexusApp(App):
     # ── Actions ─────────────────────────────────────────────────────
 
     def action_clear(self) -> None:
+        """Clear all messages and show the welcome greeting."""
         self.messages_container.clear()
         self._show_greeting()
 
     def action_quit(self) -> None:
+        """Quit the TUI application, canceling background tasks."""
         asyncio.create_task(self._input_queue.put(None))  # noqa: RUF006
         if hasattr(self, '_ws_task'):
             self._ws_task.cancel()
         self.exit()
 
     def action_interrupt(self) -> None:
+        """Send an interrupt signal to the running agent."""
         if self._ws:
             self._interrupt_task = asyncio.create_task(
                 self._ws.send(json.dumps({"type": "interrupt"}))
@@ -769,6 +786,7 @@ class NexusApp(App):
         self._show_help()
 
     def action_toggle_auto_approve(self) -> None:
+        """Toggle auto-approve mode for tool calls on or off."""
         self._auto_approve = not self._auto_approve
         if self._auto_approve:
             msg = AppMessage("Auto-approve enabled")
@@ -779,6 +797,11 @@ class NexusApp(App):
 
 
 def main(yolo: bool = False) -> None:
+    """Entry point for launching the NexusAgent TUI.
+
+    Args:
+        yolo: If True, enable auto-approve mode by default.
+    """
     app = NexusApp(yolo=yolo)
     app.run()
 

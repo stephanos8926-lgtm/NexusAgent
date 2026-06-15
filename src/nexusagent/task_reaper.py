@@ -16,6 +16,13 @@ class TaskReaper:
     """Reaps tasks stuck in PROCESSING beyond max_age."""
 
     def __init__(self, max_age_seconds: float = 3600, check_interval: float = 60.0):
+        """Initialize the task reaper.
+
+        Args:
+            max_age_seconds: Maximum age (in seconds) a task can remain in
+                PROCESSING state before being reaped. Defaults to 3600 (1 hour).
+            check_interval: Seconds between each reaping scan. Defaults to 60.
+        """
         self.max_age = max_age_seconds
         self.check_interval = check_interval
         self._running = False

@@ -31,6 +31,13 @@ class SubAgentHandle:
     """
 
     def __init__(self, worker_id: str, contract: TaskContract, depth: int = 0) -> None:
+        """Initialize a sub-agent control handle.
+
+        Args:
+            worker_id: Unique identifier for the spawned worker.
+            contract: Task configuration (model, max_depth, summary_only, etc.).
+            depth: Current nesting depth (0 = top-level). Children get depth + 1.
+        """
         self.worker_id = worker_id
         self.contract = contract
         self.depth = depth  # Nesting depth (0 = top-level)
@@ -50,6 +57,7 @@ class SubAgentHandle:
 
     @property
     def status(self) -> SubAgentStatus:
+        """Return the current lifecycle status of the sub-agent."""
         return self._status
 
     @property
@@ -66,6 +74,7 @@ class SubAgentHandle:
 
     @property
     def error(self) -> str | None:
+        """Return the error message if the sub-agent failed, or None."""
         return self._error
 
     @property

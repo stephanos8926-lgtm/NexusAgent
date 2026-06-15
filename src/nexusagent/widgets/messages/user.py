@@ -30,10 +30,21 @@ class UserMessage(Static):
     """
 
     def __init__(self, content: str, **kwargs: Any) -> None:
+        """Initialize the user message widget.
+
+        Args:
+            content: The user's message text.
+            **kwargs: Additional keyword arguments passed to Static.
+        """
         super().__init__(**kwargs)
         self._content = content
 
     def render(self) -> Content:
+        """Render the user message with a dim timestamp prefix.
+
+        Returns:
+            Content with timestamp and message text.
+        """
         ts = datetime.now().strftime("%H:%M")
         return Content.assemble(
             (f"  {ts}  ", "text-dim"),

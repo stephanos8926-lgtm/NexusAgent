@@ -37,6 +37,13 @@ class CompactionPipeline:
         context_window_tokens: int = 200_000,
         compaction_threshold: float = 0.75,
     ) -> None:
+        """Initialize the compaction pipeline.
+
+        Args:
+            context_window_tokens: Maximum tokens the model context window holds.
+            compaction_threshold: Fraction of the context window at which
+                compaction is triggered (e.g. 0.75 = compact at 75% full).
+        """
         self.context_window_tokens = context_window_tokens
         self.compaction_threshold = compaction_threshold
 

@@ -17,11 +17,24 @@ class TaskRepository:
     """CRUD operations on tasks and results."""
 
     def __init__(self, db_manager: "DatabaseManager") -> None:
+        """Initialize the repository with a database manager instance.
+
+        Args:
+            db_manager: The ``DatabaseManager`` providing session factories.
+        """
         self.db_manager = db_manager
 
     async def create_task(
         self, task_id: str, description: str, priority: int, metadata: dict
     ) -> None:
+        """Create a new task record (idempotent — skips if ID already exists).
+
+        Args:
+            task_id: Unique task identifier.
+            description: Human-readable task description.
+            priority: Task priority (lower = higher priority).
+            metadata: Arbitrary JSON-serializable metadata dict.
+        """
         async with self.db_manager.get_session() as session:
             # Check if task already exists (idempotent)
             existing = await session.execute(
@@ -38,6 +51,12 @@ class TaskRepository:
             session.add(task)
 
     async def update_task_status(self, task_id: str, status: str) -> None:
+        """Update the status field of a task.
+
+        Args:
+            task_id: The task UUID to update.
+            status: The new status string (e.g. ``"pending"``, ``"processing"``, ``"completed"``).
+        """
         async with self.db_manager.get_session() as session:
             stmt = (
                 update(TaskModel).where(TaskModel.id == task_id).values(status=status)
@@ -45,6 +64,14 @@ class TaskRepository:
             await session.execute(stmt)
 
     async def get_task_status(self, task_id: str) -> str | None:
+        """Retrieve only the status field of a task.
+
+        Args:
+            task_id: The task UUID to look up.
+
+        Returns:
+            The status string, or None if the task doesn't exist.
+        """
         async with self.db_manager.get_session() as session:
             result = await session.execute(
                 select(TaskModel).where(TaskModel.id == task_id)
@@ -79,6 +106,15 @@ class TaskRepository:
         error: str | None,
         duration: float | None,
     ) -> None:
+        """Persist a task execution result.
+
+        Args:
+            task_id: The task UUID the result belongs to.
+            success: Whether the task completed successfully.
+            data: The result data (as a string) on success.
+            error: The error message on failure.
+            duration: Wall-clock execution time in seconds.
+        """
         async with self.db_manager.get_session() as session:
             result = ResultModel(
                 task_id=task_id,

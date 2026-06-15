@@ -48,6 +48,12 @@ class Issue:
     suggestion: str = ""
 
     def format(self) -> str:
+        """Format the issue as a human-readable string with severity icon.
+
+        Returns:
+            Formatted string with severity, category, message, line number,
+            and optional suggestion.
+        """
         icon = _SEVERITY_ICON.get(self.severity, "•")
         line_info = f" (line {self.line})" if self.line else ""
         suggestion = f"\n    → Suggestion: {self.suggestion}" if self.suggestion else ""
@@ -62,12 +68,30 @@ class ReviewResult:
     lines_reviewed: int = 0
 
     def add(self, severity, category, message, line=None, suggestion=""):
+        """Add a new issue to the review result.
+
+        Args:
+            severity: One of SEVERITY_CRITICAL, SEVERITY_HIGH, etc.
+            category: Issue category (e.g. "security", "bug", "style").
+            message: Human-readable description of the issue.
+            line: Optional 1-based line number.
+            suggestion: Optional suggestion text for fixing the issue.
+        """
         self.issues.append(Issue(severity, category, message, line, suggestion))
 
     def sort_issues(self):
+        """Sort issues by severity (critical first, info last)."""
         self.issues.sort(key=lambda i: _SEVERITY_ORDER.get(i.severity, 99))
 
     def format_report(self) -> str:
+        """Generate the full formatted review report.
+
+        Groups issues by category, appends a severity summary,
+        and returns the complete report string.
+
+        Returns:
+            Full markdown-style review report.
+        """
         self.sort_issues()
         lines = [f"# Code Review Report ({self.lines_reviewed} lines reviewed)\n"]
 

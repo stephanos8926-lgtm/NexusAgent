@@ -30,12 +30,23 @@ class WelcomeBanner(Static):
     """
 
     def __init__(self, session_id: str, **kwargs: Any) -> None:
+        """Initialize the welcome banner widget.
+
+        Args:
+            session_id: The session identifier to display.
+            **kwargs: Additional keyword arguments passed to Static.
+        """
         ts = datetime.now().strftime("%H:%M")
         self._session_id = session_id
         self._ts = ts
         super().__init__(**kwargs)
 
     def render(self) -> Content:
+        """Render the welcome banner with session info and help hint.
+
+        Returns:
+            Content with styled session information.
+        """
         return Content.assemble(
             ("NexusAgent", "bold primary"),
             (" — AI Coding Agent  ", ""),

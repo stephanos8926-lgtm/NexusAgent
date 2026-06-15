@@ -1,3 +1,8 @@
+"""NexusAgent Command Line Interface (CLI).
+
+Provides Click-based CLI commands for interacting with the NexusAgent service,
+including task submission, worker execution, session management, and hook control.
+"""
 # src/nexusagent/cli.py
 import asyncio
 import logging
@@ -76,6 +81,10 @@ async def preflight() -> bool:
 
 
 def get_version() -> str:
+    """Get the installed nexusagent package version.
+
+    Tries importlib.metadata first, then falls back to reading pyproject.toml.
+    """
     try:
         return pkg_version("nexusagent")
     except Exception:

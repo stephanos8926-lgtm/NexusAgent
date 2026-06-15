@@ -17,11 +17,25 @@ class SessionRepository:
     """CRUD operations on sessions and messages."""
 
     def __init__(self, db_manager: "DatabaseManager") -> None:
+        """Initialize the repository with a database manager instance.
+
+        Args:
+            db_manager: The ``DatabaseManager`` providing session factories.
+        """
         self.db_manager = db_manager
 
     async def create_session(
         self, working_dir: str = ".", memory_id: str | None = None
     ) -> str:
+        """Create a new session record and return its UUID.
+
+        Args:
+            working_dir: The project working directory for the session.
+            memory_id: Optional identifier for the hybrid memory store.
+
+        Returns:
+            The newly generated session UUID.
+        """
         session_id = str(uuid.uuid4())
         async with self.db_manager.get_session() as session:
             sess = SessionModel(
@@ -33,6 +47,14 @@ class SessionRepository:
         return session_id
 
     async def get_session(self, session_id: str) -> dict | None:
+        """Retrieve a session record by its UUID.
+
+        Args:
+            session_id: The session UUID to look up.
+
+        Returns:
+            A dict of session fields, or None if not found.
+        """
         async with self.db_manager.get_session() as session:
             result = await session.execute(
                 select(SessionModel).where(SessionModel.id == session_id)
@@ -50,6 +72,12 @@ class SessionRepository:
             }
 
     async def update_status(self, session_id: str, status: str) -> None:
+        """Update the status field of a session.
+
+        Args:
+            session_id: The session UUID to update.
+            status: The new status string (e.g. ``"active"``, ``"idle"``, ``"closed"``).
+        """
         async with self.db_manager.get_session() as session:
             stmt = (
                 update(SessionModel)
@@ -66,6 +94,18 @@ class SessionRepository:
         tool_name: str | None = None,
         tool_args: dict | None = None,
     ) -> str:
+        """Append a message to a session's conversation history.
+
+        Args:
+            session_id: The session UUID the message belongs to.
+            role: Message role (``"user"``, ``"assistant"``, ``"system"``).
+            content: The message text content.
+            tool_name: Optional tool name if this is a tool call message.
+            tool_args: Optional tool arguments dict.
+
+        Returns:
+            The newly generated message UUID.
+        """
         msg_id = str(uuid.uuid4())
         async with self.db_manager.get_session() as session:
             msg = MessageModel(
@@ -82,6 +122,15 @@ class SessionRepository:
     async def get_messages(
         self, session_id: str, limit: int = 100
     ) -> list[dict]:
+        """Retrieve messages for a session, ordered oldest-first.
+
+        Args:
+            session_id: The session UUID to fetch messages for.
+            limit: Maximum number of messages to return.
+
+        Returns:
+            A list of message dicts.
+        """
         async with self.db_manager.get_session() as session:
             query = (
                 select(MessageModel)

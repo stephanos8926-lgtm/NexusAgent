@@ -33,9 +33,7 @@ def _detect_test_framework(workdir: str) -> str | None:
             if "jest" in deps or "vitest" in deps:
                 return "jest" if "jest" in deps else "vitest"
         except Exception:
-            pass
-
-    # Check for maven/gradle (Java)
+            pass  # Dependency detection is best-effort
     if (p / "pom.xml").exists():
         return "maven"
     if (p / "build.gradle").exists() or (p / "build.gradle.kts").exists():

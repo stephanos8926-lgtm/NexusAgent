@@ -1,4 +1,9 @@
-# src/nexusagent/auth.py
+"""Authentication and API key management.
+
+Provides ``AuthManager`` for Fernet-encrypted API key storage with PBKDF2
+key derivation, plus module-level ``get_auth_manager`` / ``set_auth_manager``
+singleton accessors.
+"""
 import base64
 import json
 import logging
@@ -17,8 +22,14 @@ from nexusagent.infrastructure.config import settings
 
 
 class AuthManager:
+    """Manages Fernet-encrypted API key storage using PBKDF2 key derivation.
+
+    Reads configuration paths from ``settings.auth`` and provides
+    ``save_key`` / ``get_key`` for encrypted key persistence.
+    """
+
     def __init__(self):
-        # Use settings from ConfigSchema
+        """Initialize the auth manager with paths from the global settings."""
         self.master_secret_path = Path(settings.auth.master_secret_path)
         self.keystore_path = Path(settings.auth.keystore_path)
         self.salt_path = Path(settings.auth.salt_path)
@@ -134,6 +145,7 @@ _auth_manager_instance: AuthManager | None = None
 
 
 def get_auth_manager() -> AuthManager:
+    """Get or create the module-level AuthManager singleton."""
     global _auth_manager_instance
     if _auth_manager_instance is None:
         _auth_manager_instance = AuthManager()
@@ -141,6 +153,7 @@ def get_auth_manager() -> AuthManager:
 
 
 def set_auth_manager(instance: AuthManager) -> None:
+    """Override the module-level AuthManager singleton (for testing/dependency injection)."""
     global _auth_manager_instance
     _auth_manager_instance = instance
 

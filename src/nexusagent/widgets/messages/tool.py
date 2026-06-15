@@ -78,6 +78,15 @@ class ToolCallMessage(Static):
         status: str = "running",
         **kwargs: Any,
     ) -> None:
+        """Initialize the tool call message widget.
+
+        Args:
+            tool: Name of the tool that was called.
+            args: Stringified arguments passed to the tool.
+            output: Initial output text (may be empty for streaming).
+            status: One of STATUS_RUNNING, STATUS_SUCCESS, STATUS_FAILED.
+            **kwargs: Additional keyword arguments passed to Static.
+        """
         super().__init__(**kwargs)
         self._tool = tool
         self._args = args
@@ -159,6 +168,11 @@ class ToolCallMessage(Static):
             self.toggle_collapse()
 
     def render(self) -> Content:
+        """Render the tool call with status icon, args, and collapsible output.
+
+        Returns:
+            Content with header line and optional output body.
+        """
         icon = self._STATUS_ICONS.get(self._status, "⚙")
         style = self._STATUS_STYLES.get(self._status, "bold warning")
 

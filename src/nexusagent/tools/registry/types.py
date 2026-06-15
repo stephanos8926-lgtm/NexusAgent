@@ -20,6 +20,12 @@ class ToolInfo:
     requires: str = ""  # Optional: tools this tool depends on
 
     def to_prompt_format(self) -> str:
+        """Format the tool metadata as a full prompt-ready string.
+
+        Returns:
+            Multi-line string with name, category, description,
+            parameters, returns, and example.
+        """
         params_str = "\n".join(f"    - {k}: {v}" for k, v in self.parameters.items())
         return (
             f"Tool: {self.name}\n"
@@ -31,5 +37,10 @@ class ToolInfo:
         )
 
     def to_compact(self) -> str:
+        """Format the tool as a single-line compact summary.
+
+        Returns:
+            String like ``- name(param1, param2): description``.
+        """
         params = ", ".join(self.parameters.keys())
         return f"- {self.name}({params}): {self.description}"

@@ -1,4 +1,10 @@
-# src/nexusagent/agent.py
+"""LLM-powered coding agent with policy-aware tool access.
+
+Provides the ``Agent`` class that wraps a deepagents agent with configurable
+tool access roles, prompt injection defence, and multi-resolution model/provider
+selection. Also exposes ``run_agent_task`` as the shared execution entry point
+used by the worker pool and sub-agent system.
+"""
 import logging
 import os
 import re
@@ -205,13 +211,16 @@ class Agent:
 
     @property
     def role(self) -> str:
+        """Return the tool access role assigned to this agent instance."""
         return self._role
 
     @property
     def policy(self) -> str:
+        """Return the access policy assigned to this agent instance."""
         return self._policy
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
+        """Invoke the inner deepagents agent with the given arguments."""
         return self._inner.invoke(*args, **kwargs)
 
 

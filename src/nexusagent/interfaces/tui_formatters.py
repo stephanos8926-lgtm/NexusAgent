@@ -284,7 +284,13 @@ def _escape(text: str) -> str:
 
 class contextlib_suppress:
     """Minimal context manager to suppress specific exceptions."""
+
     def __init__(self, *exceptions):
+        """Initialize with the exception types to suppress.
+
+        Args:
+            *exceptions: Exception classes to catch and suppress.
+        """
         self.exceptions = exceptions
 
     def __enter__(self):

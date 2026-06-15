@@ -1,4 +1,10 @@
-# src/nexusagent/worker.py
+"""NATS-backed task execution worker and worker pool.
+
+Provides ``NexusWorker`` (a NATS subscriber that executes agent tasks with
+circuit-breaker protection, health monitoring, and degraded-mode operation)
+and ``WorkerPool`` (a concurrency-limited pool that spawns isolated sub-agent
+workers with turn counting and wall-time bounds).
+"""
 import asyncio
 import json
 import logging
@@ -80,12 +86,28 @@ async def _run_research_workflow(task: TaskSchema) -> str:
 
 
 class NexusWorker:
+    """NATS-backed worker that executes agent tasks from a JetStream queue.
+
+    Submits to ``tasks.submit`` and ``tasks.cancel`` subjects, routes tasks
+    between the deepagents Agent and the LangGraph research workflow, and
+    persists results to both SQLite and NATS JetStream KV.
+
+    Includes background health monitoring with automatic degraded-mode
+    transition when NATS becomes unreachable.
+    """
+
     # Health-check interval (seconds) — how often we probe NATS liveness
     HEALTH_CHECK_INTERVAL = 10.0
     # Seconds to wait for NATS reconnection before entering degraded mode
     DEGRADED_TIMEOUT = 30.0
 
     def __init__(self, bus: AgentBus | None = None) -> None:
+        """Initialize the worker with an optional NATS bus instance.
+
+        Args:
+            bus: An ``AgentBus`` instance. If None, uses the module-level
+                default bus from ``get_bus()``.
+        """
         self.bus = bus or get_bus()
         self._health_task: asyncio.Task | None = None
         self._healthy: bool = True
@@ -95,10 +117,12 @@ class NexusWorker:
 
     @property
     def is_healthy(self) -> bool:
+        """Return True if the worker is operating normally (NATS connected)."""
         return self._healthy
 
     @property
     def is_degraded(self) -> bool:
+        """Return True if the worker is in degraded mode (NATS unreachable)."""
         return self._degraded
 
     async def start(self) -> None:
@@ -265,7 +289,7 @@ class NexusWorker:
                     if task_obj and task_obj.status == "processing":
                         task_obj.updated_at = datetime.now(UTC)
             except Exception:
-                pass  # Heartbeat must never crash the worker
+                logger.debug("Heartbeat update failed for task %s", task_id)
 
     async def _handle_cancel(self, msg: Any) -> None:
         """Handle task cancellation signal from server."""
@@ -372,6 +396,7 @@ _worker_instance: NexusWorker | None = None
 
 
 def get_worker() -> NexusWorker:
+    """Get or create the module-level NexusWorker singleton."""
     global _worker_instance
     if _worker_instance is None:
         _worker_instance = NexusWorker()
@@ -379,6 +404,7 @@ def get_worker() -> NexusWorker:
 
 
 def set_worker(instance: NexusWorker) -> None:
+    """Override the module-level NexusWorker singleton (for testing/dependency injection)."""
     global _worker_instance
     _worker_instance = instance
 
@@ -391,6 +417,11 @@ class WorkerPool:
     """Manages a pool of isolated worker executions."""
 
     def __init__(self, max_workers: int = 4):
+        """Initialize the worker pool with a concurrency limit.
+
+        Args:
+            max_workers: Maximum number of concurrent worker executions.
+        """
         self.max_workers = max_workers
         self._active: dict[str, SubAgentHandle] = {}
         self._tasks: set[asyncio.Task] = set()
@@ -487,6 +518,7 @@ class WorkerPool:
         return f"Max turns reached. Last: {last_result}"
 
     def list_active(self) -> list[SubAgentHandle]:
+        """Return a snapshot of all currently active sub-agent handles."""
         return list(self._active.values())
 
 
@@ -495,6 +527,7 @@ _worker_pool_instance: WorkerPool | None = None
 
 
 def get_worker_pool() -> WorkerPool:
+    """Get or create the module-level WorkerPool singleton."""
     global _worker_pool_instance
     if _worker_pool_instance is None:
         _worker_pool_instance = WorkerPool()
@@ -502,6 +535,7 @@ def get_worker_pool() -> WorkerPool:
 
 
 def set_worker_pool(instance: WorkerPool) -> None:
+    """Override the module-level WorkerPool singleton (for testing/dependency injection)."""
     global _worker_pool_instance
     _worker_pool_instance = instance
 

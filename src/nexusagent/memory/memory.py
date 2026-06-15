@@ -55,7 +55,15 @@ def _hash_embed(text: str) -> list[float]:
 
 
 class MemoryItem(BaseModel):
-    """A single memory entry."""
+    """A single memory entry.
+
+    Attributes:
+        id: Unique identifier (UUID string).
+        content: The memory text content.
+        metadata: Arbitrary key-value metadata attached to the entry.
+        created_at: ISO-8601 timestamp of when the entry was created.
+        embedding: Optional embedding vector for similarity search.
+    """
 
     id: str
     content: str
@@ -85,6 +93,15 @@ class Memory:
         parent_memory_id: str | None = None,
         conn: Any = None,
     ) -> None:
+        """Initialize a scoped memory bank.
+
+        Args:
+            memory_id: Unique identifier for this memory bank.
+            scope: Access scope (shared, isolated, or scoped).
+            db_path: Path to the SQLite database file.
+            parent_memory_id: Optional parent bank ID for scoped access.
+            conn: Optional existing SQLite connection to reuse.
+        """
         self.memory_id = memory_id
         self.scope = scope
         self.db_path = db_path
@@ -334,6 +351,14 @@ class MemoryManager:
         return conn
 
     def get(self, memory_id: str) -> Memory | None:
+        """Retrieve a previously created Memory instance by ID.
+
+        Args:
+            memory_id: The unique identifier of the memory bank.
+
+        Returns:
+            The ``Memory`` instance if found, otherwise ``None``.
+        """
         return self._memories.get(memory_id)
 
     async def close(self) -> None:
@@ -357,6 +382,12 @@ class HybridMemoryManager:
     """
 
     def __init__(self, workspace_dir: str):
+        """Initialize the hybrid memory manager.
+
+        Args:
+            workspace_dir: Path to the workspace root. Memory files live
+                under this directory; the SQLite index is derived from them.
+        """
         from nexusagent.memory.memory_files import FileMemory
         from nexusagent.memory.memory_index import HybridMemoryIndex
 

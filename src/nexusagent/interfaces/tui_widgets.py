@@ -33,23 +33,38 @@ SPINNER_CHARS = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
 
 class SpinnerLabel(Horizontal):
     """Label with an animated spinner prefix."""
+
     spinner_chars = SPINNER_CHARS
     tick = reactive(0)
 
     def __init__(self, text: str = "Ready", **kwargs):
+        """Initialize the SpinnerLabel.
+
+        Args:
+            text: The label text to display.
+            **kwargs: Additional keyword arguments passed to the Horizontal container.
+        """
         super().__init__(**kwargs)
         self._text = text
         self._timer: Timer | None = None
         self._spinning = False
 
     def compose(self) -> ComposeResult:
+        """Compose the spinner icon and text widgets."""
         yield Static("", id="spinner-icon")
         yield Static("", id="spinner-text")
 
     def on_mount(self) -> None:
+        """Update the display on initial mount."""
         self.update_display()
 
     def set_text(self, text: str, spinning: bool = False):
+        """Set the label text and spinner state.
+
+        Args:
+            text: The label text to display.
+            spinning: If True, animate the spinner.
+        """
         self._text = text
         if spinning and not self._spinning:
             self._spinning = True
@@ -65,6 +80,7 @@ class SpinnerLabel(Horizontal):
         self.tick += 1
 
     def watch_tick(self):
+        """React to tick changes by updating the display."""
         self.update_display()
 
     def update_display(self):
@@ -75,7 +91,7 @@ class SpinnerLabel(Horizontal):
             self.query_one("#spinner-icon", Static).update(spinner)
             self.query_one("#spinner-text", Static).update(self._text)
         except Exception:
-            pass
+            pass  # Spinner update is best-effort, never crash the UI
 
     def on_unmount(self):
         if self._timer:

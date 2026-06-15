@@ -40,6 +40,15 @@ MEMORY_INDEX_MAX_BYTES = 25_000  # 25KB
 
 
 class MemoryEntryType(StrEnum):
+    """Types of memory entries stored in topic files.
+
+    Each type corresponds to a category of knowledge:
+        - WORLD: Objective facts about the environment.
+        - EXPERIENCE: Actions the agent has taken.
+        - OPINION: Preferences with confidence scores.
+        - OBSERVATION: Summaries or generated insights.
+    """
+
     WORLD = "world"  # Objective facts
     EXPERIENCE = "experience"  # What the agent did
     OPINION = "opinion"  # Preferences + confidence

@@ -41,10 +41,23 @@ def register_tool(
 
 
 def get_tool_info(name: str) -> ToolInfo | None:
+    """Look up a tool by name in the global registry.
+
+    Args:
+        name: The registered tool name.
+
+    Returns:
+        The ToolInfo if found, or None.
+    """
     return _REGISTRY.get(name)
 
 
 def list_all_tools() -> list[ToolInfo]:
+    """Return all registered tools.
+
+    Returns:
+        List of all ToolInfo entries in the registry.
+    """
     return list(_REGISTRY.values())
 
 

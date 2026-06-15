@@ -138,7 +138,7 @@ def _build_environment_context(working_dir: str) -> str:
                 names = ", ".join(sorted(by_cat[cat]))
                 lines.append(f"- **{cat}**: {names}")
     except Exception:
-        pass
+        logger.debug("Failed to list tools for greeting")
 
     return "\n".join(lines)
 
@@ -174,6 +174,17 @@ class Session:
         db_repo: Any,
         memory_dir: str | Path | None = None,
     ) -> None:
+        """Initialize a new interactive session.
+
+        Args:
+            session_id: Unique identifier for this session.
+            working_dir: Absolute path to the project working directory.
+            agent: The agent instance used to process user messages.
+            memory: Memory manager for recalling context across turns.
+            db_repo: Database repository for persisting session and message data.
+            memory_dir: Optional override for the hybrid memory directory path.
+                Defaults to ``~/.nexusagent/sessions/{session_id}/memory``.
+        """
         self.session_id = session_id
         self.working_dir = working_dir
         self.agent = agent
@@ -604,6 +615,7 @@ class SessionManager:
     """
 
     def __init__(self) -> None:
+        """Initialize an empty session manager with no cached sessions."""
         self._sessions: dict[str, Session] = {}
         self._creating: set[str] = set()
         self._lock = asyncio.Lock()
@@ -725,6 +737,7 @@ _session_manager_instance: SessionManager | None = None
 
 
 def get_session_manager() -> SessionManager:
+    """Get or create the module-level SessionManager singleton."""
     global _session_manager_instance
     if _session_manager_instance is None:
         _session_manager_instance = SessionManager()
@@ -732,6 +745,7 @@ def get_session_manager() -> SessionManager:
 
 
 def set_session_manager(instance: SessionManager) -> None:
+    """Override the module-level SessionManager singleton (for testing/dependency injection)."""
     global _session_manager_instance
     _session_manager_instance = instance
 

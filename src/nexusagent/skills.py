@@ -29,6 +29,14 @@ class Skill:
     """A single loaded skill."""
 
     def __init__(self, name: str, description: str, content: str, path: Path):
+        """Initialize a Skill instance.
+
+        Args:
+            name: The skill name (from frontmatter or directory name).
+            description: Short description from frontmatter.
+            content: The skill body (markdown, without frontmatter).
+            path: Path to the SKILL.md file.
+        """
         self.name = name
         self.description = description
         self.content = content

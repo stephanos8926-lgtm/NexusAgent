@@ -26,6 +26,15 @@ class DatabaseManager:
     """Async SQLAlchemy engine + session factory."""
 
     def __init__(self, db_url: str | None = None) -> None:
+        """Initialize the async engine and session factory.
+
+        Auto-prefixes plain paths with ``sqlite+aiosqlite://`` and ensures
+        the parent directory exists for file-based SQLite databases.
+
+        Args:
+            db_url: Database URL. If None, resolved from
+                ``settings.server.db_path``.
+        """
         url = db_url or settings.server.db_path
         if not url.startswith("sqlite+aiosqlite://"):
             if url.startswith("sqlite://"):
@@ -72,6 +81,7 @@ class DatabaseManager:
         )
 
     async def init_db(self) -> None:
+        """Create all ORM tables (idempotent — safe to call at startup)."""
         async with self.engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
         logger.info(f"Database initialized at {self.db_url}")
@@ -82,6 +92,10 @@ class DatabaseManager:
 
     @asynccontextmanager
     async def get_session(self) -> AsyncGenerator[AsyncSession]:
+        """Yield a transactional session, committing on success or rolling back on error.
+
+        The session is always closed when the context exits.
+        """
         async with self.async_session() as session:
             try:
                 yield session
@@ -93,6 +107,15 @@ class DatabaseManager:
                 await session.close()
 
     async def execute(self, query: str, params: dict | None = None) -> object:
+        """Execute a raw SQL query and return the result.
+
+        Args:
+            query: The SQL statement to execute.
+            params: Optional dict of named parameters.
+
+        Returns:
+            The SQLAlchemy ``Result`` object.
+        """
         async with self.get_session() as session:
             result = await session.execute(text(query), params or {})
             return result

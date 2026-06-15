@@ -56,6 +56,11 @@ class EmbeddingProvider:
     """Tiered embedding provider: Gemini → local → hash fallback."""
 
     def __init__(self):
+        """Initialize the embedding provider.
+
+        The local model is lazily loaded on first use to avoid
+        importing heavy dependencies unless needed.
+        """
         self._local_model = None
 
     async def embed(self, text: str) -> list[float]:

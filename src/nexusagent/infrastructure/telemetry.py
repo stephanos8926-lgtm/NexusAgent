@@ -24,6 +24,11 @@ class TelemetryManager:
     """Manages telemetry collection and structured logging."""
 
     def __init__(self, app: App) -> None:
+        """Initialize telemetry collection for the given app.
+
+        Args:
+            app: The Textual app instance to attach telemetry to.
+        """
         self.app = app
         self.session_start = time.time()
         self.tool_calls: list[dict] = []
@@ -132,11 +137,18 @@ class LogViewer(Static):
     """Widget to display recent log entries."""
 
     def __init__(self, telemetry: TelemetryManager, **kwargs: Any) -> None:
+        """Initialize the log viewer widget.
+
+        Args:
+            telemetry: The telemetry manager to read logs from.
+            **kwargs: Additional keyword arguments passed to ``Static``.
+        """
         super().__init__("", **kwargs)
         self.telemetry = telemetry
         self._lines = 100
 
     def on_mount(self) -> None:
+        """Refresh logs when the widget is mounted."""
         self.update_logs()
 
     def update_logs(self) -> None:

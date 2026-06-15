@@ -39,6 +39,12 @@ class CircuitBreakerError(Exception):
     """Raised when the circuit breaker is open and calls are rejected."""
 
     def __init__(self, name: str, state: str):
+        """Initialize the error with circuit breaker details.
+
+        Args:
+            name: Name of the circuit breaker that rejected the call.
+            state: Current state of the circuit breaker (e.g. ``"open"``).
+        """
         self.name = name
         self.state = state
         super().__init__(
@@ -64,6 +70,18 @@ class CircuitBreaker:
         recovery_timeout: float = 30.0,
         expected_exceptions: tuple[type[BaseException], ...] = (Exception,),
     ):
+        """Initialize the circuit breaker.
+
+        Args:
+            name: Human-readable name for this circuit breaker (used in logs
+                and error messages).
+            failure_threshold: Number of consecutive failures before the
+                circuit trips open.
+            recovery_timeout: Seconds to wait in OPEN state before
+                transitioning to HALF_OPEN for a test call.
+            expected_exceptions: Tuple of exception types that count as
+                failures. Other exceptions pass through uncounted.
+        """
         self.name = name
         self.failure_threshold = failure_threshold
         self.recovery_timeout = recovery_timeout
@@ -76,18 +94,31 @@ class CircuitBreaker:
 
     @property
     def state(self) -> str:
+        """Return the current circuit breaker state.
+
+        Returns:
+            One of ``CircuitState.CLOSED``, ``CircuitState.OPEN``, or
+            ``CircuitState.HALF_OPEN``.
+        """
         return self._state
 
     @property
     def failure_count(self) -> int:
+        """Return the current consecutive failure count.
+
+        Returns:
+            Number of consecutive failures since the last reset.
+        """
         return self._failure_count
 
     def _reset(self) -> None:
+        """Reset the circuit breaker to CLOSED with zero failures."""
         self._failure_count = 0
         self._state = CircuitState.CLOSED
         logger.info(f"Circuit breaker '{self.name}' reset to CLOSED")
 
     def _trip(self) -> None:
+        """Record a failure and trip the circuit open if threshold is reached."""
         self._failure_count += 1
         self._last_failure_time = time.time()
         if self._failure_count >= self.failure_threshold:
@@ -109,12 +140,31 @@ class CircuitBreaker:
         return False
 
     async def __aenter__(self) -> "CircuitBreaker":
+        """Enter the circuit breaker context.
+
+        Returns:
+            The circuit breaker instance.
+
+        Raises:
+            CircuitBreakerError: If the circuit is open and recovery timeout
+                has not yet elapsed.
+        """
         async with self._lock:
             if not await self._check_recovery():
                 raise CircuitBreakerError(self.name, self._state)
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb) -> bool:
+        """Exit the circuit breaker context, recording success or failure.
+
+        Args:
+            exc_type: Exception type if an exception was raised, else None.
+            exc_val: Exception value if an exception was raised, else None.
+            exc_tb: Exception traceback if an exception was raised, else None.
+
+        Returns:
+            False — exceptions are never suppressed.
+        """
         async with self._lock:
             if exc_type is None:
                 # Success

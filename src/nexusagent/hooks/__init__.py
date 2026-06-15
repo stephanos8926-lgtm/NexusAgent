@@ -41,15 +41,24 @@ class HookRegistration:
         callback: Callable[..., Any],
         name: str | None = None,
     ) -> None:
+        """Initialize a hook registration.
+
+        Args:
+            event: The event type this hook listens for.
+            callback: The callable to invoke when the event fires.
+            name: Optional human-readable name. Defaults to callback.__name__.
+        """
         self.event = event
         self.name: str = name if name is not None else getattr(callback, "__name__", repr(callback))
         self.callback = callback
         self.enabled: bool = True
 
     def enable(self) -> None:
+        """Enable this hook so it will fire on its event."""
         self.enabled = True
 
     def disable(self) -> None:
+        """Disable this hook so it will not fire on its event."""
         self.enabled = False
 
 
@@ -57,6 +66,7 @@ class HookManager:
     """Manages hook registration and execution."""
 
     def __init__(self) -> None:
+        """Initialize the hook manager with empty registries."""
         self._hooks: dict[HookEvent, list[HookRegistration]] = {}
         self._registry: dict[str, HookRegistration] = {}
 

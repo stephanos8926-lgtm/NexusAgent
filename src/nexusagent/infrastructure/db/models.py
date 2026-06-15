@@ -13,6 +13,8 @@ from .base import Base
 
 
 class TaskModel(Base):
+    """ORM model for the ``tasks`` table."""
+
     __tablename__ = "tasks"
     id = Column(String, primary_key=True)
     description = Column(String, nullable=False)
@@ -26,6 +28,8 @@ class TaskModel(Base):
 
 
 class ResultModel(Base):
+    """ORM model for the ``results`` table."""
+
     __tablename__ = "results"
     task_id = Column(String, primary_key=True)
     success = Column(Integer, default=0)
@@ -36,6 +40,8 @@ class ResultModel(Base):
 
 
 class SessionModel(Base):
+    """ORM model for the ``sessions`` table."""
+
     __tablename__ = "sessions"
     id = Column(String, primary_key=True)
     working_dir = Column(String, nullable=False, default=".")
@@ -48,6 +54,8 @@ class SessionModel(Base):
 
 
 class MessageModel(Base):
+    """ORM model for the ``messages`` table."""
+
     __tablename__ = "messages"
     id = Column(String, primary_key=True)
     session_id = Column(String, nullable=False)
