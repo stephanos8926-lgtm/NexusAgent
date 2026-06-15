@@ -84,6 +84,7 @@ class SpinnerLabel(Horizontal):
         self.update_display()
 
     def update_display(self):
+        """Update the spinner icon and text on the next animation tick."""
         try:
             spinner = ""
             if self._spinning:
@@ -94,6 +95,7 @@ class SpinnerLabel(Horizontal):
             pass  # Spinner update is best-effort, never crash the UI
 
     def on_unmount(self):
+        """Stop the spinner timer when the widget is unmounted from the DOM."""
         if self._timer:
             self._timer.stop()
 
@@ -200,13 +202,23 @@ def _sigwinch_handler(app: Any) -> None:
 
 
 class ApprovalModal(ModalScreen[bool]):
+    """Modal dialog for approving or rejecting a tool call before execution."""
+
     def __init__(self, tool_name: str, tool_args: dict, call_id: str = "") -> None:
+        """Initialize the approval modal.
+
+        Args:
+            tool_name: Name of the tool to be approved.
+            tool_args: Arguments the tool will be called with.
+            call_id: Unique identifier for this tool call request.
+        """
         super().__init__()
         self.tool_name = tool_name
         self.tool_args = tool_args
         self.call_id = call_id
 
     def compose(self) -> ComposeResult:
+        """Build the approval dialog UI with scrollable args and action buttons."""
         with Vertical(id="approval-dialog"):
             yield Static(f"⚡ Approval Required: {self.tool_name}", id="approval-title")
             with ScrollableContainer(id="approval-scroll"):
@@ -218,6 +230,7 @@ class ApprovalModal(ModalScreen[bool]):
                 yield Button("Cancel", id="cancel")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
+        """Handle Approve/Reject/Cancel button presses."""
         if event.button.id == "approve":
             self.dismiss(True)
         else:
@@ -233,10 +246,12 @@ class ErrorModal(ModalScreen[None]):
     """Modal dialog for displaying errors."""
 
     def __init__(self, error_message: str) -> None:
+        """Initialize the error modal with the message to display."""
         super().__init__()
         self.error_message = error_message
 
     def compose(self) -> ComposeResult:
+        """Build the error dialog UI with message and OK button."""
         with Vertical(id="approval-dialog"):
             yield Static("⚠ Error", id="approval-title")
             yield Static(self.error_message, id="approval-args")
@@ -244,4 +259,4 @@ class ErrorModal(ModalScreen[None]):
                 yield Button("OK", id="ok", variant="primary")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
-        self.dismiss(None)
+        """Dismiss the error dialog when OK is pressed."""

@@ -273,6 +273,12 @@ class MemoryManager:
     """Create and manage Memory instances backed by a single SQLite file."""
 
     def __init__(self, db_path: str = ":memory:") -> None:
+        """Initialize the memory manager.
+
+        Args:
+            db_path: Path to the SQLite database file. Defaults to
+                ``:memory:`` for an in-memory database.
+        """
         self.db_path = db_path
         self._memories: dict[str, Memory] = {}
 
@@ -362,6 +368,7 @@ class MemoryManager:
         return self._memories.get(memory_id)
 
     async def close(self) -> None:
+        """Close all managed memory connections and clear the registry."""
         for mem in self._memories.values():
             if mem._conn is not None:
                 mem._conn.close()

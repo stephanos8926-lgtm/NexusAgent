@@ -39,6 +39,12 @@ def _get_db_pool(tenant_id: str = "default") -> ThreadPoolExecutor:
 
     Each tenant (workspace) gets its own pool so that index operations
     on different workspaces don't contend on a single executor.
+
+    Args:
+        tenant_id: Unique tenant/workspace identifier. Defaults to ``"default"``.
+
+    Returns:
+        A ``ThreadPoolExecutor`` dedicated to this tenant.
     """
     with _DB_POOL_LOCK:
         pool = _DB_POOLS.get(tenant_id)

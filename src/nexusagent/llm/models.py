@@ -1,4 +1,11 @@
 # src/nexusagent/models.py
+"""Data models for tasks, results, agent events, and memory scopes.
+
+Defines the Pydantic schemas and enumerations used throughout the
+NexusAgent system for task lifecycle management, LLM agent event
+streaming, and memory isolation.
+"""
+
 from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
@@ -7,6 +14,8 @@ from pydantic import BaseModel, Field
 
 
 class TaskStatus(StrEnum):
+    """Lifecycle states for a NexusAgent task."""
+
     PENDING = "pending"
     PROCESSING = "processing"
     COMPLETED = "completed"
@@ -15,6 +24,8 @@ class TaskStatus(StrEnum):
 
 
 class TaskSchema(BaseModel):
+    """Schema for task submission and tracking."""
+
     id: str
     description: str
     priority: int = Field(default=1, ge=1, le=5)
@@ -25,12 +36,16 @@ class TaskSchema(BaseModel):
 
 
 class MemoryScope(StrEnum):
+    """Memory isolation scope for agent sessions."""
+
     SHARED = "shared"
     ISOLATED = "isolated"
     SCOPED = "scoped"
 
 
 class TaskContract(BaseModel):
+    """Configuration contract for spawning an agent task execution."""
+
     task_id: str
     title: str
     working_dir: str = Field(default=".")
@@ -58,6 +73,8 @@ class TaskContract(BaseModel):
 
 
 class ResultSchema(BaseModel):
+    """Schema for task execution results."""
+
     task_id: str
     success: bool
     data: Any | None = None
@@ -70,15 +87,21 @@ class ResultSchema(BaseModel):
 
 
 class AgentEvent(BaseModel):
+    """Base class for all agent streaming events."""
+
     type: str
 
 
 class ThinkingEvent(AgentEvent):
+    """Event emitted when the agent is reasoning between tool calls."""
+
     type: str = "thinking"
     content: str = ""
 
 
 class ToolCallEvent(AgentEvent):
+    """Event emitted when the agent invokes a tool."""
+
     type: str = "tool_call"
     tool: str
     args: dict[str, Any]
@@ -86,6 +109,8 @@ class ToolCallEvent(AgentEvent):
 
 
 class ToolResultEvent(AgentEvent):
+    """Event emitted after a tool call completes."""
+
     type: str = "tool_result"
     call_id: str
     output: str = ""
@@ -93,6 +118,8 @@ class ToolResultEvent(AgentEvent):
 
 
 class ApprovalRequestEvent(AgentEvent):
+    """Event emitted when the agent needs user approval before executing a tool."""
+
     type: str = "approval_request"
     tool: str
     args: dict[str, Any]
@@ -101,11 +128,15 @@ class ApprovalRequestEvent(AgentEvent):
 
 
 class ResponseEvent(AgentEvent):
+    """Event emitted with a text response from the agent."""
+
     type: str = "response"
     content: str = ""
 
 
 class ErrorEvent(AgentEvent):
+    """Event emitted when the agent encounters an error."""
+
     type: str = "error"
     message: str = ""
 

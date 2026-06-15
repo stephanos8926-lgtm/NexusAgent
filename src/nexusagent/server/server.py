@@ -1,4 +1,12 @@
 # src/nexusagent/server.py
+"""FastAPI WebSocket server for the NexusAgent platform.
+
+Provides REST endpoints for task submission, status tracking, and
+cancellation, plus a WebSocket interface for real-time interactive
+sessions. Includes rate limiting, API key authentication, and
+version handshake middleware.
+"""
+
 import asyncio
 import logging
 import time
@@ -114,6 +122,8 @@ async def rate_limit_middleware(request, call_next):
 
 
 class SubmitTaskRequest(BaseModel):
+    """Request body for submitting a new task to the orchestrator."""
+
     description: str = Field(..., max_length=10000, description="Task description (max 10K chars)")
     priority: int = Field(default=1, ge=1, le=10)
     metadata: dict = Field(default_factory=dict)
@@ -206,6 +216,7 @@ async def get_task_result(task_id: str):
 
 @app.get("/health")
 async def health_check():
+    """Return server health status including NATS and JetStream connectivity."""
     _bus = get_bus()
     nats_connected = _bus.nc is not None and not _bus.nc.is_closed
     js_available = False
@@ -225,6 +236,7 @@ async def health_check():
 
 @app.get("/version")
 async def version_endpoint():
+    """Return server version and minimum supported client version."""
     _bus = get_bus()
     return {
         "version": VERSION,

@@ -1,4 +1,11 @@
 # src/nexusagent/sdk.py
+"""NexusSDK — high-level client for submitting tasks and retrieving results.
+
+Provides a unified API over NATS JetStream for task submission, result
+retrieval, and health monitoring. Used by both the FastAPI server and
+external clients.
+"""
+
 import asyncio
 import logging
 import uuid
@@ -38,6 +45,12 @@ class NexusSDK:
     """
 
     def __init__(self, bus: AgentBus | None = None):
+        """Initialize the SDK with an optional NATS bus instance.
+
+        Args:
+            bus: An existing ``AgentBus`` to reuse. If None, uses the
+                global default bus via ``get_bus()``.
+        """
         self.bus = bus or get_bus()
 
     async def connect(self):

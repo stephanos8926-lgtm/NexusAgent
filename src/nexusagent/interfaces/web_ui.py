@@ -1,3 +1,11 @@
+# src/nexusagent/interfaces/web_ui.py
+"""Gradio-based web UI for the NexusAgent platform.
+
+Provides a browser-accessible control center for submitting tasks,
+monitoring status, and viewing results. Uses an industrial/utilitarian
+dark theme.
+"""
+
 import uuid
 
 import gradio as gr
@@ -33,8 +41,8 @@ async def handle_submit(text: str, sdk: NexusSDK | None = None) -> tuple[str, st
 
 
 def create_ui():
+    """Build and return the Gradio web UI for the NexusAgent Control Center."""
     with gr.Blocks(
-        title="NexusAgent Control Center",
         css=f"""
         .gradio-container {{ background-color: {BG_COLOR}; color: {TEXT_COLOR}; font-family: 'JetBrains Mono', monospace; }}
         .task-card {{ border: 1px solid {THEME_COLOR}; border-radius: 0px; padding: 10px; margin-bottom: 10px; }}

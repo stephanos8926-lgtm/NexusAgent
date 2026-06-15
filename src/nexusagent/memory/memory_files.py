@@ -59,6 +59,12 @@ class FileMemory:
     """File-based memory — canonical source of truth."""
 
     def __init__(self, workspace_dir: str):
+        """Initialize file-backed memory for the given workspace.
+
+        Args:
+            workspace_dir: Path to the workspace root. Subdirectories
+                ``memory/`` and ``bank/`` are created as needed.
+        """
         self.workspace = Path(workspace_dir)
         self.memory_dir = self.workspace / "memory"
         self.bank_dir = self.workspace / "bank"

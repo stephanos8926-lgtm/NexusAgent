@@ -1,4 +1,12 @@
 # src/nexusagent/llm.py
+"""Multi-provider LLM bridge with retry and circuit-breaker support.
+
+Routes generation requests between Gemini (google-genai) and OpenRouter
+(openai-compatible) providers based on the active configuration.  All
+public calls are wrapped with :func:`retry_with_backoff` so transient
+failures are handled gracefully.
+"""
+
 import logging
 import os
 
@@ -13,6 +21,8 @@ logger = logging.getLogger(__name__)
 
 
 class LLMResponse(BaseModel):
+    """Structured response from an LLM provider call."""
+
     content: str
     model_used: str
     provider: str
@@ -25,6 +35,7 @@ class LLMProvider:
     """
 
     def __init__(self):
+        """Initialize the LLM provider with configured API keys and model settings."""
         # Gemini Setup
         self.gemini_key = os.environ.get("GEMINI_API_KEY")
         if self.gemini_key:
@@ -62,6 +73,20 @@ class LLMProvider:
     async def generate(
         self, prompt: str, system_prompt: str | None = None, timeout: float = 120.0, **kwargs
     ) -> LLMResponse:
+        """Generate a response from the active LLM provider.
+
+        Args:
+            prompt: The user prompt to send.
+            system_prompt: Optional system-level instructions.
+            timeout: Maximum seconds to wait for a response.
+            **kwargs: Additional provider-specific parameters.
+
+        Returns:
+            A structured ``LLMResponse`` with the generated content.
+
+        Raises:
+            ValueError: If the active provider is not supported.
+        """
         provider, model_id = self.get_active_model()
         logger.info(f"Generating response using {provider} ({model_id})")
 
