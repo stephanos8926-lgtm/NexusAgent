@@ -193,7 +193,7 @@ class Agent:
         try:
             loop = asyncio.get_running_loop()
             # Schedule MCP loading; agent creation is sync so we fire-and-forget
-            loop.create_task(_ensure_mcp_tools_loaded())
+            loop.create_task(_ensure_mcp_tools_loaded())  # noqa: RUF006
         except RuntimeError:
             # No event loop — skip async MCP loading (tools already in registry)
             pass

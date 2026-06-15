@@ -403,7 +403,7 @@ class ContextWindowBar:
 
     Color thresholds:
     - < 70%: success (green)
-    - 70–90%: warning (amber)
+    - 70-90%: warning (amber)
     - > 90%: danger (red)
     """
 
@@ -424,7 +424,7 @@ class ContextWindowBar:
 
     @property
     def percentage(self) -> int:
-        """Context usage as integer percentage (0–100)."""
+        """Context usage as integer percentage (0-100)."""
         if self.total <= 0:
             return 0
         return min(100, int(self.used / self.total * 100))
