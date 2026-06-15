@@ -14,6 +14,9 @@ Subpackage structure:
 - review_code.py: main review_code() orchestrator
 """
 
+from __future__ import annotations
+
+# Models (safe to import — no circular deps)
 from nexusagent.tools.code_review.models import (
     SEVERITY_CRITICAL,
     SEVERITY_HIGH,
@@ -23,19 +26,16 @@ from nexusagent.tools.code_review.models import (
     Issue,
     ReviewResult,
 )
-from nexusagent.tools.code_review.checks.security import _check_security
-from nexusagent.tools.code_review.checks.bugs import _check_bugs
-from nexusagent.tools.code_review.checks.style import _check_style
-from nexusagent.tools.code_review.checks.performance import _check_performance
-from nexusagent.tools.code_review.checks.ast_check import _check_python_ast
+
+# Main function (imports checks internally to avoid circular deps)
 from nexusagent.tools.code_review.review_code import review_code
 
 __all__ = [
     "SEVERITY_CRITICAL",
     "SEVERITY_HIGH",
-    "SEVERITY_INFO",
-    "SEVERITY_LOW",
     "SEVERITY_MEDIUM",
+    "SEVERITY_LOW",
+    "SEVERITY_INFO",
     "Issue",
     "ReviewResult",
     "review_code",

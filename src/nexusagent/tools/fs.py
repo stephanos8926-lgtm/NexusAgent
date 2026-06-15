@@ -3,74 +3,30 @@
 Provides read, write, edit, and directory listing with safety constraints:
 - read_file: tracks files read in session, supports line ranges
 - write_file: full file replacement, requires read-first for existing files
-- edit_file: surgical line-range edit, requires read-first + validates old_text location
+- edit_file: surgical line-range edit (re-exported from tools.editor)
 - list_directory: recursive tree with depth limit and glob filtering
 """
 
+from __future__ import annotations
+
 from pathlib import Path
 
-# Track files read in the current session (module-level state)
-_read_files: set[str] = set()
-
-# Default directory excludes for list_directory
-_DEFAULT_DIR_EXCLUDES = frozenset(
-    {
-        ".git",
-        "__pycache__",
-        "node_modules",
-        ".venv",
-        "venv",
-        ".tox",
-        ".mypy_cache",
-        ".eggs",
-        "*.egg-info",
-    }
+# Shared utilities from fs_base (single source of truth)
+from nexusagent.tools.fs_base import (
+    _DEFAULT_DIR_EXCLUDES,
+    _check_read,
+    _get_workspace_root,
+    _mark_read,
+    _read_files,
+    _resolve,
+    _WORKSPACE_ROOT,
+    get_read_files,
+    reset_read_tracking,
+    set_workspace_root,
 )
 
-
-# Workspace root — all file operations are jailed to this directory
-_WORKSPACE_ROOT: Path | None = None
-
-
-def set_workspace_root(path: str) -> None:
-    """Set the workspace root directory for path jail."""
-    global _WORKSPACE_ROOT
-    _WORKSPACE_ROOT = Path(path).resolve()
-
-
-def _get_workspace_root() -> Path:
-    """Get the workspace root, defaulting to CWD if not set."""
-    if _WORKSPACE_ROOT is not None:
-        return _WORKSPACE_ROOT
-    return Path.cwd().resolve()
-
-
-def _resolve(path: str) -> Path:
-    """Resolve a path and return absolute Path, ensuring it's within workspace jail."""
-    raw = Path(path)
-    resolved = raw.resolve() if raw.is_absolute() else (_get_workspace_root() / raw).resolve()
-
-    # Path jail: ensure the resolved path is within the workspace root
-    workspace = _get_workspace_root()
-    try:
-        resolved.relative_to(workspace)
-    except ValueError as e:
-        raise PermissionError(
-            f"SAFETY: Path '{path}' resolves to '{resolved}' which is outside "
-            f"the workspace root '{workspace}'. File operations are jailed to "
-            f"the workspace directory."
-        ) from e
-    return resolved
-
-
-def _check_read(path: str) -> None:
-    """Raise if the file hasn't been read in this session."""
-    resolved = str(_resolve(path))
-    if resolved not in _read_files:
-        raise PermissionError(
-            f"SAFETY: File '{path}' has not been read in this session. "
-            f"Call read_file() first to understand the file's contents before modifying it."
-        )
+# Re-export edit_file from the editor subpackage for backward compatibility
+from nexusagent.tools.editor import edit_file  # noqa: F401
 
 
 def read_file(path: str, offset: int = 1, limit: int | None = None) -> str:
@@ -155,112 +111,6 @@ def write_file(path: str, content: str) -> str:
     _read_files.add(str(p))
 
     return f"Successfully wrote {len(content)} bytes to {path}"
-
-
-def edit_file(
-    path: str,
-    old_text: str,
-    new_text: str,
-    start_line: int | None = None,
-    end_line: int | None = None,
-) -> str:
-    """Perform a surgical edit on a file.
-
-    Replaces `old_text` with `new_text` in the specified line range.
-    If no line range is specified, searches the entire file.
-
-    Safety requirements:
-    1. File MUST have been read in this session
-    2. `old_text` MUST exist in the specified range (or entire file if no range)
-    3. If line range is specified, `old_text` MUST start within that range
-
-    This prevents hallucinated edits — the agent must have read the file
-    and must specify exactly what it's replacing.
-
-    Args:
-        path: File path
-        old_text: Exact text to find and replace (must match exactly)
-        new_text: Replacement text
-        start_line: Optional start line (1-indexed) to constrain search
-        end_line: Optional end line (1-indexed) to constrain search
-
-    Returns:
-        Success message with details of the edit
-    """
-    p = _resolve(path)
-
-    if not p.exists():
-        return f"Error: File '{path}' does not exist"
-
-    _check_read(path)
-
-    content = p.read_text(encoding="utf-8")
-    lines = content.splitlines()
-
-    # Determine search range
-    if start_line is not None or end_line is not None:
-        s = (start_line or 1) - 1  # 0-indexed
-        e = end_line or len(lines)  # exclusive
-        s = max(0, s)
-        e = min(len(lines), e)
-
-        # Build the search text from the specified range
-        range_text = "\n".join(lines[s:e])
-
-        if old_text not in range_text:
-            # Provide helpful context: show what's actually in the range
-            preview = range_text[:500]
-            return (
-                f"Error: old_text not found in lines {s + 1}-{e} of '{path}'. "
-                f"Content preview:\n{preview}"
-            )
-
-        # Verify old_text starts within the range (not just overlaps)
-        # Find the position of old_text in the full content
-        range_start_offset = sum(len(line) + 1 for line in lines[:s])  # +1 for newlines
-        pos = content.find(old_text, range_start_offset)
-
-        if pos == -1:
-            return f"Error: Could not locate old_text in '{path}'"
-
-        # Check that the found position is within the range
-        line_at_pos = content[:pos].count("\n")
-        if line_at_pos < s or line_at_pos >= e:
-            return (
-                f"Error: old_text found at line {line_at_pos + 1}, "
-                f"which is outside the specified range {s + 1}-{e}"
-            )
-
-        # Perform the replacement
-        new_content = content[:pos] + new_text + content[pos + len(old_text) :]
-    else:
-        # Search entire file
-        if old_text not in content:
-            preview = content[:500]
-            return f"Error: old_text not found in '{path}'. Content preview:\n{preview}"
-
-        # Count occurrences
-        count = content.count(old_text)
-        if count > 1:
-            return (
-                f"Error: old_text appears {count} times in '{path}'. "
-                f"Please specify start_line and end_line to disambiguate."
-            )
-
-        new_content = content.replace(old_text, new_text, 1)
-
-    # Write the result
-    p.write_text(new_content, encoding="utf-8")
-
-    # Count lines changed
-    old_lines = old_text.count("\n")
-    new_lines = new_text.count("\n")
-
-    return (
-        f"Successfully edited '{path}': "
-        f"replaced {old_lines + 1} lines with {new_lines + 1} lines "
-        f"(net change: {new_lines - old_lines:+d} lines)"
-    )
 
 
 def list_directory(
