@@ -201,8 +201,24 @@ class NexusWorker:
                 logger.error(f"Critical failure reporting task error: {inner_e}")
 
 
-# Global instance
-worker = NexusWorker()
+# Module-level singleton (lazy, injectable)
+_worker_instance: NexusWorker | None = None
+
+
+def get_worker() -> NexusWorker:
+    global _worker_instance
+    if _worker_instance is None:
+        _worker_instance = NexusWorker()
+    return _worker_instance
+
+
+def set_worker(instance: NexusWorker) -> None:
+    global _worker_instance
+    _worker_instance = instance
+
+
+# Backward-compatible alias — deprecated, use get_worker()
+worker = get_worker()
 
 
 class WorkerPool:
@@ -308,4 +324,21 @@ class WorkerPool:
         return list(self._active.values())
 
 
-worker_pool = WorkerPool()
+# Module-level singleton (lazy, injectable)
+_worker_pool_instance: WorkerPool | None = None
+
+
+def get_worker_pool() -> WorkerPool:
+    global _worker_pool_instance
+    if _worker_pool_instance is None:
+        _worker_pool_instance = WorkerPool()
+    return _worker_pool_instance
+
+
+def set_worker_pool(instance: WorkerPool) -> None:
+    global _worker_pool_instance
+    _worker_pool_instance = instance
+
+
+# Backward-compatible alias — deprecated, use get_worker_pool()
+worker_pool = get_worker_pool()

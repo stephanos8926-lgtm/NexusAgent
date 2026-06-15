@@ -16,7 +16,7 @@ _SERVER_START_TIME = time.monotonic()
 from nexusagent.infrastructure.bus import get_bus
 from nexusagent.infrastructure.config import settings
 from nexusagent.server.sdk import sdk
-from nexusagent.core.worker import worker
+from nexusagent.core.worker import get_worker
 
 # Setup logging
 logging.basicConfig(

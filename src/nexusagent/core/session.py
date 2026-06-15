@@ -605,6 +605,7 @@ class SessionManager:
 
     def __init__(self) -> None:
         self._sessions: dict[str, Session] = {}
+        self._creating: set[str] = set()
         self._lock = asyncio.Lock()
 
     def get(
@@ -635,26 +636,70 @@ class SessionManager:
             if existing is not None:
                 return existing
 
-            # Build the memory directory path for this session
-            memory_dir = os.path.expanduser(f"~/.nexusagent/sessions/{session_id}/memory")
-            os.makedirs(memory_dir, exist_ok=True)
+            # Check if another coroutine is already creating this session
+            if session_id in self._creating:
+                # Another coroutine is creating this session.
+                # We must release the lock and wait for it to finish.
+                # The creating coroutine will add the session to _sessions
+                # and remove session_id from _creating when done.
+                pass  # Fall through to wait loop below
 
-            session = Session(
-                session_id=session_id,
-                working_dir=working_dir,
-                agent=agent,
-                memory=memory,
-                db_repo=db_repo,
-                memory_dir=memory_dir,
-            )
-            self._sessions[session_id] = session
-            return session
+            else:
+                # Mark this session as being created
+                self._creating.add(session_id)
+
+                try:
+                    # Build the memory directory path for this session
+                    memory_dir = os.path.expanduser(f"~/.nexusagent/sessions/{session_id}/memory")
+                    os.makedirs(memory_dir, exist_ok=True)
+
+                    session = Session(
+                        session_id=session_id,
+                        working_dir=working_dir,
+                        agent=agent,
+                        memory=memory,
+                        db_repo=db_repo,
+                        memory_dir=memory_dir,
+                    )
+
+                    # Final double-check: did another coroutine already create it?
+                    existing = self._sessions.get(session_id)
+                    if existing is not None:
+                        # Race lost — close the session we just created to prevent leak
+                        await session.close()
+                        return existing
+
+                    self._sessions[session_id] = session
+                    return session
+                finally:
+                    self._creating.discard(session_id)
+
+        # Wait for the other coroutine to finish creating this session
+        while session_id in self._creating:
+            await asyncio.sleep(0)
+            existing = self._sessions.get(session_id)
+            if existing is not None:
+                return existing
+
+        # If we get here, the creating coroutine finished but didn't add to _sessions
+        # (e.g., it was closed). Retry the whole operation.
+        return await self.get_or_create(
+            session_id=session_id,
+            working_dir=working_dir,
+            agent=agent,
+            memory=memory,
+            db_repo=db_repo,
+        )
 
     async def mark_idle(self, session_id: str) -> None:
         """Transition a session to idle status."""
-        session = self._sessions.get(session_id)
-        if session is not None and session.status == "active":
-            session.status = "idle"
+        session: Session | None = None
+        async with self._lock:
+            session = self._sessions.get(session_id)
+            if session is not None and session.status == "active":
+                session.status = "idle"
+        # DB update outside lock to avoid holding lock during I/O
+        if session is not None:
             try:
                 if session.db_repo is not None:
                     await session.db_repo.update_status(session_id, "idle")
@@ -663,7 +708,9 @@ class SessionManager:
 
     async def close(self, session_id: str) -> None:
         """Close a session and remove it from the cache."""
-        session = self._sessions.pop(session_id, None)
+        session: Session | None = None
+        async with self._lock:
+            session = self._sessions.pop(session_id, None)
         if session is not None:
             await session.close()
 
@@ -673,5 +720,21 @@ class SessionManager:
         return len(self._sessions)
 
 
-# Module-level singleton
-session_manager = SessionManager()
+# Module-level singleton (lazy, injectable)
+_session_manager_instance: SessionManager | None = None
+
+
+def get_session_manager() -> SessionManager:
+    global _session_manager_instance
+    if _session_manager_instance is None:
+        _session_manager_instance = SessionManager()
+    return _session_manager_instance
+
+
+def set_session_manager(instance: SessionManager) -> None:
+    global _session_manager_instance
+    _session_manager_instance = instance
+
+
+# Backward-compatible alias — deprecated, use get_session_manager()
+session_manager = get_session_manager()

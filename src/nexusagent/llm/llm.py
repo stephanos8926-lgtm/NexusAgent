@@ -125,5 +125,6 @@ class LLMProvider:
             raise
 
 
-# Singleton provider instance
+# Singleton provider instance — stateless, safe to keep as global
+# For testability, wrap in a function: get_llm() -> LLMProvider
 llm = LLMProvider()

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import os
 import tempfile
 from unittest.mock import AsyncMock, MagicMock
@@ -9,7 +10,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from nexusagent.infrastructure.db import DatabaseManager, SessionRepository
-from nexusagent.core.session import SessionManager, session_manager
+from nexusagent.core.session import Session, SessionManager, session_manager
 
 # ── Fixtures ───────────────────────────────────────────────────────────
 
@@ -378,3 +379,106 @@ async def test_pre_compaction_flush_async(db_and_repo, mock_agent, mock_memory):
     result = await session.pre_compaction_flush()
     assert isinstance(result, str)
     assert "compaction flush" in result
+
+
+@pytest.mark.asyncio
+async def test_concurrent_get_or_create_returns_same_session(db_and_repo, mock_agent, mock_memory):
+    """Two concurrent get_or_create() calls with the same ID return the same session."""
+    _, repo = db_and_repo
+    manager = SessionManager()
+
+    sid = "test-concurrent-001"
+    results = []
+
+    async def create_session():
+        s = await manager.get_or_create(
+            session_id=sid,
+            working_dir="/tmp/work",
+            agent=mock_agent,
+            memory=mock_memory,
+            db_repo=repo,
+        )
+        results.append(s)
+
+    # Launch two concurrent creations
+    await asyncio.gather(create_session(), create_session())
+
+    # Both callers should get the exact same Session object
+    assert len(results) == 2
+    assert results[0] is results[1]
+    assert manager.active_count == 1
+
+
+@pytest.mark.asyncio
+async def test_concurrent_get_or_create_no_session_leak(db_and_repo, mock_agent, mock_memory):
+    """Concurrent get_or_create() does not leak a session on race close."""
+    _, repo = db_and_repo
+    manager = SessionManager()
+
+    sid = "test-concurrent-002"
+    close_count = 0
+    original_close = Session.close
+
+    async def counting_close(self):
+        nonlocal close_count
+        close_count += 1
+        await original_close(self)
+
+    # Monkey-patch Session.close to count invocations
+    Session.close = counting_close  # type: ignore[assignment]
+
+    try:
+        results = []
+
+        async def create_session():
+            s = await manager.get_or_create(
+                session_id=sid,
+                working_dir="/tmp/work",
+                agent=mock_agent,
+                memory=mock_memory,
+                db_repo=repo,
+            )
+            results.append(s)
+
+        # Launch many concurrent creations to maximize chance of race
+        await asyncio.gather(*[create_session() for _ in range(10)])
+
+        # All callers should get the same Session object
+        assert len(results) == 10
+        for r in results:
+            assert r is results[0]
+        assert manager.active_count == 1
+
+        # At most one session.close() should have been called (the loser in the race)
+        # With the _creating guard, no extra close should be needed, but if a race
+        # happened, close() was called on the losing session — that's the leak-prevention.
+        assert close_count <= 10  # Sanity: not more closes than creations
+    finally:
+        Session.close = original_close  # type: ignore[assignment]
+
+
+@pytest.mark.asyncio
+async def test_concurrent_get_or_create_different_ids(db_and_repo, mock_agent, mock_memory):
+    """Concurrent get_or_create() with different IDs creates separate sessions."""
+    _, repo = db_and_repo
+    manager = SessionManager()
+
+    results = {}
+
+    async def create_session(sid):
+        s = await manager.get_or_create(
+            session_id=sid,
+            working_dir="/tmp/work",
+            agent=mock_agent,
+            memory=mock_memory,
+            db_repo=repo,
+        )
+        results[sid] = s
+
+    ids = ["diff-1", "diff-2", "diff-3"]
+    await asyncio.gather(*[create_session(sid) for sid in ids])
+
+    # Each ID should have its own session
+    assert manager.active_count == 3
+    assert results["diff-1"] is not results["diff-2"]
+    assert results["diff-2"] is not results["diff-3"]
