@@ -1,8 +1,10 @@
 import asyncio
+import base64
 import json
 import logging
 from collections.abc import Callable
 from datetime import date, datetime
+from pathlib import Path
 from typing import Any
 
 import nats
@@ -14,11 +16,25 @@ from nexusagent.infrastructure.config import settings
 
 logger = logging.getLogger(__name__)
 
+# NATS max message size is 1MB by default
+NATS_MAX_MESSAGE_SIZE = 1024 * 1024
+
 
 class NATSJSONEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, (datetime, date)):
             return obj.isoformat()
+        if isinstance(obj, bytes):
+            try:
+                return obj.decode("utf-8", errors="replace")
+            except Exception:
+                return base64.b64encode(obj).decode("ascii")
+        if isinstance(obj, set):
+            return sorted(obj)
+        if isinstance(obj, Path):
+            return str(obj)
+        if isinstance(obj, Exception):
+            return f"{type(obj).__name__}: {obj}"
         return super().default(obj)
 
 
@@ -86,6 +102,11 @@ class AgentBus:
             raise RuntimeError("NATSBus not connected. Call connect() first.")
         try:
             payload = json.dumps(message, cls=NATSJSONEncoder).encode()
+            if len(payload) > NATS_MAX_MESSAGE_SIZE:
+                logger.warning(
+                    f"Publish to '{subject}': payload exceeds NATS max size "
+                    f"({len(payload)} > {NATS_MAX_MESSAGE_SIZE} bytes)."
+                )
             await self.nc.publish(subject, payload)
         except Exception as e:
             logger.error(f"Failed to publish to {subject}: {e}")
@@ -98,6 +119,25 @@ class AgentBus:
 
         async def _do_put() -> None:
             payload = json.dumps(result, cls=NATSJSONEncoder).encode()
+            if len(payload) > NATS_MAX_MESSAGE_SIZE:
+                logger.warning(
+                    f"Result for task {task_id} exceeds NATS max message size "
+                    f"({len(payload)} > {NATS_MAX_MESSAGE_SIZE} bytes). "
+                    f"Truncating data field."
+                )
+                # Try to truncate the 'data' field if present
+                if isinstance(result, dict) and "data" in result:
+                    truncated = {
+                        **result,
+                        "data": str(result["data"])[:NATS_MAX_MESSAGE_SIZE // 2]
+                        + "\n... [TRUNCATED: exceeded NATS 1MB limit]",
+                    }
+                    payload = json.dumps(truncated, cls=NATSJSONEncoder).encode()
+                if len(payload) > NATS_MAX_MESSAGE_SIZE:
+                    raise ValueError(
+                        f"Result for task {task_id} is too large for NATS "
+                        f"({len(payload)} bytes > {NATS_MAX_MESSAGE_SIZE} limit)"
+                    )
             await self.kv.put(task_id, payload)
 
         last_err: Exception | None = None
