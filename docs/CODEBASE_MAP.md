@@ -68,28 +68,51 @@ nexusagent/
 ├── skills.py (127L)             # Skill system — load/inject skills from .hermes/skills/
 ├── task_reaper.py (59L)         # Stale task cleanup
 │
-├── core/                        # Agent core (session, agent, orchestration, graph)
-│   ├── __init__.py (6L)         # Re-exports Session, SessionManager, SubAgentStatus, WorkerPool
-│   ├── agent.py (134L)          # Agent wrapper (role-based, policy)
-│   ├── worker.py (304L)         # NexusWorker + WorkerPool
-│   ├── session.py (677L)        # Session + SessionManager ← MONOLITH
-│   ├── orchestration.py (193L)  # DeepResearchOrchestrator
-│   ├── graph.py (250L)          # LangGraph research graph
-│   └── subagent.py (161L)       # SubAgentHandle tracking
+│   ├── core/                        # Agent core
+│   │   ├── __init__.py (6L)         # Re-exports from subpackages
+│   │   ├── agent.py (134L)          # Agent wrapper (role-based, policy)
+│   │   ├── orchestration.py (193L)  # DeepResearchOrchestrator
+│   │   ├── graph.py (250L)          # LangGraph research graph
+│   │   ├── subagent.py (161L)       # SubAgentHandle tracking
+│   │   ├── session/                 # Session subpackage ✅ EXTRACTED
+│   │   │   ├── __init__.py (10L)    # Re-exports Session, SessionManager
+│   │   │   ├── session.py (391L)    # Session class (streaming, events, compaction)
+│   │   │   ├── manager.py (154L)    # SessionManager (lifecycle, cache)
+│   │   │   └── helpers.py (173L)    # _extract_agent_response, env context, git info
+│   │   ├── session.py (6L)          # Compat shim → session/
+│   │   ├── worker/                  # Worker subpackage ✅ EXTRACTED
+│   │   │   ├── __init__.py (33L)    # Re-exports NexusWorker, WorkerPool, circuit breakers
+│   │   │   ├── worker.py (330L)     # NexusWorker (NATS, health loop, handle_task)
+│   │   │   ├── pool.py (177L)       # WorkerPool (concurrency, sub-agent spawning)
+│   │   │   └── handler.py (83L)     # _run_agent_task, _run_research_workflow, circuit breakers
+│   │   └── worker.py (6L)           # Compat shim → worker/
 │
-├── tools/                       # Tool implementations
-│   ├── registry.py (39L)        # Compat shim → registry/ subpackage
-│   ├── register_all.py (728L)   # Registration calls ← MONOLITH
-│   ├── fs.py (343L)             # Filesystem tools
-│   ├── git.py (169L)            # Git tools
-│   ├── shell.py (167L)          # Shell execution tools
-│   ├── code_review.py (367L)    # Code review tools
-│   ├── code_search.py (158L)    # Code search (ast-grep)
-│   ├── research.py (204L)       # Web research
-│   ├── test_runner.py (216L)    # Test execution
-│   ├── patch.py (17L)           # File patching
-│   ├── write_todos.py (118L)    # Todo write tool
-│   └── registry/                # Registry subpackage ✅ EXTRACTED Phase 5
+│   ├── tools/                       # Tool implementations
+│   │   ├── registry.py (39L)        # Compat shim → registry/ subpackage
+│   │   ├── register_all.py (494L)   # Static tool registration + MCP loader ✅ EXTRACTED
+│   │   ├── tool_specs.py (465L)     # TOOL_SPECS data (30 static tool definitions)
+│   │   ├── fs.py (188L)             # Filesystem tools (read/write/list) ✅ EXTRACTED
+│   │   ├── fs_base.py (82L)         # Shared fs utilities (_resolve, _check_read, etc.)
+│   │   ├── editor.py (113L)         # edit_file() — surgical line-range editing
+│   │   ├── git.py (169L)            # Git tools
+│   │   ├── shell.py (167L)          # Shell execution tools
+│   │   ├── code_review/             # Code review subpackage ✅ EXTRACTED
+│   │   │   ├── __init__.py (42L)    # Re-exports review_code, Issue, ReviewResult
+│   │   │   ├── models.py (130L)     # Issue, ReviewResult, severity constants
+│   │   │   ├── review_code.py (46L) # review_code() orchestrator
+│   │   │   └── checks/              # Individual check modules
+│   │   │       ├── security.py (73L)
+│   │   │       ├── bugs.py (66L)
+│   │   │       ├── style.py (51L)
+│   │   │       ├── performance.py (31L)
+│   │   │       └── ast_check.py (39L)
+│   │   ├── code_review.py (6L)      # Compat shim → code_review/
+│   │   ├── code_search.py (158L)    # Code search (ast-grep)
+│   │   ├── research.py (204L)       # Web research
+│   │   ├── test_runner.py (216L)    # Test execution
+│   │   ├── patch.py (17L)           # File patching
+│   │   ├── write_todos.py (118L)    # Todo write tool
+│   │   └── registry/                # Registry subpackage ✅ EXTRACTED Phase 5
 │       ├── __init__.py (62L)    # Re-exports from types, core, policy, search
 │       ├── types.py (35L)       # ToolInfo dataclass
 │       ├── core.py (113L)       # register_tool, get_tool_info, list_all_tools, auto_correct
@@ -128,7 +151,14 @@ nexusagent/
 │
 ├── interfaces/                  # External interfaces
 │   ├── __init__.py (4L)         # Interfaces package init
-│   ├── tui.py (787L)            # Textual TUI — NexusApp (widget-based arch, version preflight)
+│   ├── tui/                      # TUI subpackage ✅ EXTRACTED
+│   │   ├── __init__.py (46L)     # Re-exports NexusApp, main, widgets
+│   │   ├── app.py (315L)         # NexusApp class (lifecycle, compose, actions)
+│   │   ├── websocket.py (194L)   # ws_loop, version check, approval relay
+│   │   ├── streaming.py (437L)   # handle_event, slash commands, theme/help
+│   │   ├── input.py (47L)        # Chat input handling
+│   │   └── formatters.py (12L)   # Re-exports from tui_formatters
+│   ├── tui.py (40L)              # Compat shim → tui/
 │   ├── tui_widgets.py (231L)   # SpinnerLabel, modals, SIGWINCH ✅ EXTRACTED Phase 7
 │   ├── tui_formatters.py (296L)# render_markdown, all formatters ✅ EXTRACTED Phase 7
 │   ├── cli.py (332L)            # Click CLI (--check-server, --skip-version-check)
@@ -143,7 +173,8 @@ nexusagent/
 ├── infrastructure/              # Infrastructure
 │   ├── __init__.py (1L)         # Infrastructure package init
 │   ├── config.py (185L)         # Settings (3-tier loading)
-│   ├── prompt_loader.py (240L)  # NEXUS.md + @file injection
+│   ├── prompt_loader.py (139L)  # NEXUS.md loading (delegates to template_includes)
+│   ├── template_includes.py (125L)  # @file chain resolution, circular detection
 │   ├── bus.py (172L)            # NATS event bus
 │   ├── auth.py (129L)           # Fernet keystore
 │   ├── telemetry.py (160L)      # Telemetry
