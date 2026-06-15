@@ -29,8 +29,7 @@ class LLMResponse(BaseModel):
 
 
 class LLMProvider:
-    """
-    Bridge for multiple LLM providers.
+    """Bridge for multiple LLM providers.
     Handles routing between Gemini and OpenRouter using official SDKs.
     """
 

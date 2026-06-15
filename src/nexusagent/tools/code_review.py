@@ -1,5 +1,4 @@
-"""
-Code review tool for NexusAgent.
+"""Code review tool for NexusAgent.
 
 Provides static analysis and heuristic-based code review without requiring
 an LLM call. Uses pattern matching to detect common bugs, security issues,
@@ -357,8 +356,7 @@ def _check_python_ast(code: str, result: ReviewResult):
 # ─── Main Review Function ───────────────────────────────────────────────
 
 def review_code(code: str, language: str = "python") -> str:
-    """
-    Analyze code for bugs, style issues, security vulnerabilities, and performance problems.
+    """Analyze code for bugs, style issues, security vulnerabilities, and performance problems.
 
     Uses static analysis (pattern matching + AST for Python) to provide a structured
     review with severity levels. No LLM call required — works offline.

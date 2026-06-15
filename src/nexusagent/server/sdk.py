@@ -22,8 +22,7 @@ SERVER_VERSION = VERSION
 
 
 class NexusSDK:
-    """
-    High-level SDK for interacting with the NexusAgent system.
+    """High-level SDK for interacting with the NexusAgent system.
     This can be used by both the FastAPI server and external clients.
 
     Usage:
@@ -95,8 +94,7 @@ class NexusSDK:
         return None
 
     async def get_result(self, task_id: str) -> ResultSchema | None:
-        """
-        Retrieve the result of a specific task from the JetStream KV store.
+        """Retrieve the result of a specific task from the JetStream KV store.
         This replaces the ephemeral subscription model to prevent resource leaks.
         """
         await self.connect()

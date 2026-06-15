@@ -1,5 +1,4 @@
-"""
-Git operations tool for NexusAgent.
+"""Git operations tool for NexusAgent.
 
 Provides git status, diff, log, branch, commit, and stash operations.
 All operations are read-only by default; write operations require explicit flags.
@@ -34,8 +33,7 @@ def _run_git(args: str, workdir: str | None = None, timeout: int = 30) -> str:
 
 
 def git_status(workdir: str | None = None) -> str:
-    """
-    Show working tree status.
+    """Show working tree status.
 
     Returns: Short-format status showing modified, added, deleted, untracked files.
     """
@@ -47,8 +45,7 @@ def git_diff(
     cached: bool = False,
     workdir: str | None = None,
 ) -> str:
-    """
-    Show changes between working tree and index (or HEAD).
+    """Show changes between working tree and index (or HEAD).
 
     Args:
         file_path: Optional specific file to diff
@@ -71,8 +68,7 @@ def git_log(
     oneline: bool = True,
     workdir: str | None = None,
 ) -> str:
-    """
-    Show commit history.
+    """Show commit history.
 
     Args:
         count: Number of commits to show
@@ -91,8 +87,7 @@ def git_log(
 
 
 def git_branch(workdir: str | None = None) -> str:
-    """
-    List branches. Current branch is marked with *.
+    """List branches. Current branch is marked with *.
 
     Returns: Branch list output
     """
@@ -100,8 +95,7 @@ def git_branch(workdir: str | None = None) -> str:
 
 
 def git_show(commit: str = "HEAD", workdir: str | None = None) -> str:
-    """
-    Show a commit's details and diff.
+    """Show a commit's details and diff.
 
     Args:
         commit: Commit hash, branch name, or ref (default: HEAD)
@@ -118,8 +112,7 @@ def git_stash_list(workdir: str | None = None) -> str:
 
 
 def git_stash_push(message: str | None = None, workdir: str | None = None) -> str:
-    """
-    Stash current changes. Write operation.
+    """Stash current changes. Write operation.
 
     Args:
         message: Optional stash message
@@ -139,8 +132,7 @@ def git_stash_pop(workdir: str | None = None) -> str:
 
 
 def git_commit(message: str, files: list[str] | None = None, workdir: str | None = None) -> str:
-    """
-    Stage and commit changes. Write operation.
+    """Stage and commit changes. Write operation.
 
     Args:
         message: Commit message
@@ -159,8 +151,7 @@ def git_commit(message: str, files: list[str] | None = None, workdir: str | None
 
 
 def git_checkout_branch(branch: str, create: bool = False, workdir: str | None = None) -> str:
-    """
-    Checkout a branch. Write operation.
+    """Checkout a branch. Write operation.
 
     Args:
         branch: Branch name

@@ -34,8 +34,7 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """
-    FastAPI Lifespan: Handles startup and shutdown.
+    """FastAPI Lifespan: Handles startup and shutdown.
     """
     logger.info(f"NexusAgent Server v{VERSION} starting on port {settings.server.api_port}...")
     try:
@@ -130,8 +129,7 @@ class SubmitTaskRequest(BaseModel):
 
 @app.post("/tasks", response_model=dict, dependencies=[Depends(verify_api_key)])
 async def create_task(request: SubmitTaskRequest):
-    """
-    Submit a new task to the orchestrator.
+    """Submit a new task to the orchestrator.
     """
     try:
         import uuid
@@ -194,8 +192,7 @@ async def create_task(request: SubmitTaskRequest):
 
 @app.get("/tasks/{task_id}/status", dependencies=[Depends(verify_api_key)])
 async def get_task_status(task_id: str):
-    """
-    Check the status of a task.
+    """Check the status of a task.
     """
     status = await sdk.get_task_status(task_id)
     return {"task_id": task_id, "status": status}
@@ -203,8 +200,7 @@ async def get_task_status(task_id: str):
 
 @app.get("/tasks/{task_id}/result", dependencies=[Depends(verify_api_key)])
 async def get_task_result(task_id: str):
-    """
-    Retrieve the result of a task.
+    """Retrieve the result of a task.
     Returns 404 if result is not yet available.
     """
     result = await sdk.get_result(task_id)

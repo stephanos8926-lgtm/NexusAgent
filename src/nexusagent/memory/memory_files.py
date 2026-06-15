@@ -1,5 +1,4 @@
-"""
-File-based memory layer — canonical source of truth.
+"""File-based memory layer — canonical source of truth.
 
 Memory layout:
   MEMORY.md              ← index (pointers only, ≤200 lines / 25KB)

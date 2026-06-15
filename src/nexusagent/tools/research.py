@@ -131,8 +131,7 @@ def _search_tavily(query: str) -> str | None:
 
 
 def search_web(query: str) -> str:
-    """
-    Web search with Exa primary and Tavily fallback.
+    """Web search with Exa primary and Tavily fallback.
     Requires EXA_API_KEY and/or TAVILY_API_KEY in environment.
     """
     # Try Exa first
@@ -157,8 +156,7 @@ def search_web(query: str) -> str:
 
 
 def search_local_docs(query: str) -> str:
-    """
-    Search local documentation using ctx7 via subprocess.
+    """Search local documentation using ctx7 via subprocess.
     """
     try:
         result = subprocess.run(
@@ -173,8 +171,7 @@ def search_local_docs(query: str) -> str:
 
 
 def fetch_url(url: str) -> str:
-    """
-    Fetch a URL and return the content as markdown-formatted text.
+    """Fetch a URL and return the content as markdown-formatted text.
 
     Uses httpx for fetching and a built-in HTML-to-text converter.
     Truncates output to 5000 chars max.

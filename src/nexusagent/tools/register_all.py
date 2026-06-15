@@ -1,5 +1,4 @@
-"""
-Tool registration — registers all tools in the global registry.
+"""Tool registration — registers all tools in the global registry.
 
 This module imports all tools and calls register_tool() for each one.
 Import this module once at startup to populate the registry.

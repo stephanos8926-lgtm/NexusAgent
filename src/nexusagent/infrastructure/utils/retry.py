@@ -30,8 +30,7 @@ def retry_with_backoff(
     exceptions: tuple[type[BaseException], ...] = (Exception,),
     on_retry: Callable[[BaseException, int], None] | None = None,
 ):
-    """
-    Retry decorator with exponential backoff.
+    """Retry decorator with exponential backoff.
 
     Args:
         max_attempts: Maximum number of attempts (including initial try)
@@ -141,8 +140,7 @@ def retry_on_false(
     jitter: bool = True,
     on_retry: Callable[[Any, int], None] | None = None,
 ):
-    """
-    Retry decorator that retries when function returns False or None.
+    """Retry decorator that retries when function returns False or None.
 
     Args:
         max_attempts: Maximum number of attempts (including initial try)

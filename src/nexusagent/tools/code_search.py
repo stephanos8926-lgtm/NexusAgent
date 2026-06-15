@@ -1,5 +1,4 @@
-"""
-Code search tool for NexusAgent.
+"""Code search tool for NexusAgent.
 
 Provides local code search using ripgrep (rg) with structured output.
 Falls back to grep if ripgrep is not available.
@@ -23,8 +22,7 @@ def search_code(
     max_results: int = 50,
     case_sensitive: bool = False,
 ) -> str:
-    """
-    Search code using ripgrep (or grep as fallback).
+    """Search code using ripgrep (or grep as fallback).
 
     Args:
         query: Search pattern (regex supported)
@@ -97,8 +95,7 @@ def find_symbol(
     path: str = ".",
     file_pattern: str | None = None,
 ) -> str:
-    """
-    Find all occurrences of a symbol (function, class, variable definition).
+    """Find all occurrences of a symbol (function, class, variable definition).
 
     Searches for common definition patterns:
     - Python: `def symbol`, `class symbol`
@@ -140,8 +137,7 @@ def find_references(
     file_pattern: str | None = None,
     max_results: int = 100,
 ) -> str:
-    """
-    Find all references to a symbol (not just definitions).
+    """Find all references to a symbol (not just definitions).
 
     Args:
         symbol: Symbol name to find references for

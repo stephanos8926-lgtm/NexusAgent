@@ -1,5 +1,4 @@
-"""
-Todo management tools for NexusAgent.
+"""Todo management tools for NexusAgent.
 
 Provides write_todos and read_todos for tracking multi-step work.
 Todos are stored as JSON files for easy parsing and human readability.
@@ -12,8 +11,7 @@ from datetime import datetime, timezone
 
 
 def write_todos(todos: list[dict], path: str = "./todos.json") -> str:
-    """
-    Write a task list (todos) to a JSON file.
+    """Write a task list (todos) to a JSON file.
 
     Each todo is a dict with at minimum a "task" key. Common keys:
         - task: str — description of the task
@@ -85,8 +83,7 @@ def write_todos(todos: list[dict], path: str = "./todos.json") -> str:
 
 
 def read_todos(path: str = "./todos.json") -> list[dict]:
-    """
-    Read a task list (todos) from a JSON file.
+    """Read a task list (todos) from a JSON file.
 
     Args:
         path: File path for the todos JSON file (default: "./todos.json")

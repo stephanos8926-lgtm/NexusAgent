@@ -53,8 +53,7 @@ class CircuitBreakerError(Exception):
 
 
 class CircuitBreaker:
-    """
-    Stateful circuit breaker for protecting against cascading failures.
+    """Stateful circuit breaker for protecting against cascading failures.
 
     States:
       - CLOSED: Normal operation. Calls pass through. Failures are counted.

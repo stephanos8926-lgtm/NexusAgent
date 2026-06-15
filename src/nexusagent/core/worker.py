@@ -33,8 +33,7 @@ _agent_breaker = CircuitBreaker("agent", failure_threshold=5, recovery_timeout=3
 
 
 async def _run_agent_task(task: TaskSchema) -> str:
-    """
-    Shared agent execution entry point.
+    """Shared agent execution entry point.
 
     Routes research tasks to the LangGraph workflow and coding tasks to the
     deepagents Agent, protected by the module-level agent circuit breaker.
@@ -126,8 +125,7 @@ class NexusWorker:
         return self._degraded
 
     async def start(self) -> None:
-        """
-        Start the NATS worker loop.
+        """Start the NATS worker loop.
         """
         await self.bus.connect()
         self._running = True
@@ -268,8 +266,7 @@ class NexusWorker:
 
     @retry_with_backoff(max_attempts=2, base_delay=0.5, max_delay=5.0)
     async def _execute_agent_logic(self, task: TaskSchema) -> Any:
-        """
-        Wraps the agent call with circuit breaker protection.
+        """Wraps the agent call with circuit breaker protection.
         Routes research tasks to the LangGraph workflow,
         coding tasks to the deepagents Agent.
         """
@@ -302,8 +299,7 @@ class NexusWorker:
             logger.warning(f"Worker cancel handler error: {e}")
 
     async def handle_task(self, msg: Any) -> None:
-        """
-        NATS callback to process an incoming task.
+        """NATS callback to process an incoming task.
         """
         task_id = "unknown"
         try:

@@ -1,6 +1,5 @@
 # src/nexusagent/graph.py
-"""
-LangGraph Research Workflow — durable state machine for deep research.
+"""LangGraph Research Workflow — durable state machine for deep research.
 
 Architecture:
     ┌──────────────────────────────────────────────────────────────────┐
@@ -206,8 +205,7 @@ def route_after_execute(state: dict) -> str:
 
 
 def create_research_graph(db_path: str | None = None) -> Any:
-    """
-    Build and compile the research state machine.
+    """Build and compile the research state machine.
 
     Args:
         db_path: Path for checkpoint SQLite DB. If None, uses in-memory.

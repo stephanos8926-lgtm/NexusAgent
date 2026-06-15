@@ -1,5 +1,4 @@
-"""
-File system tools for NexusAgent.
+"""File system tools for NexusAgent.
 
 Provides read, write, edit, and directory listing with safety constraints:
 - read_file: tracks files read in session, supports line ranges
@@ -75,8 +74,7 @@ def _check_read(path: str) -> None:
 
 
 def read_file(path: str, offset: int = 1, limit: int | None = None) -> str:
-    """
-    Read a file's contents with optional line-range selection.
+    """Read a file's contents with optional line-range selection.
 
     Args:
         path: File path (absolute or relative)
@@ -133,8 +131,7 @@ def read_multiple_files(paths: list[str]) -> dict[str, str]:
 
 
 def write_file(path: str, content: str) -> str:
-    """
-    Write content to a file (full replacement).
+    """Write content to a file (full replacement).
 
     Safety: If the file already exists, it MUST have been read in this session first.
     New files can be created without prior read.
@@ -167,8 +164,7 @@ def edit_file(
     start_line: int | None = None,
     end_line: int | None = None,
 ) -> str:
-    """
-    Perform a surgical edit on a file.
+    """Perform a surgical edit on a file.
 
     Replaces `old_text` with `new_text` in the specified line range.
     If no line range is specified, searches the entire file.
@@ -274,8 +270,7 @@ def list_directory(
     pattern: str | None = None,
     exclude: list[str] | None = None,
 ) -> dict:
-    """
-    List directory contents as a nested tree.
+    """List directory contents as a nested tree.
 
     Args:
         path: Directory path

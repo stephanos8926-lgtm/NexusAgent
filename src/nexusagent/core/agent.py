@@ -104,8 +104,7 @@ _ROLE_TOOLS["full"] = _build_role_tools("full")
 
 
 class Agent:
-    """
-    NexusAgent — LLM-powered agent with policy-aware tool access.
+    """NexusAgent — LLM-powered agent with policy-aware tool access.
 
     Supports three policy levels:
 

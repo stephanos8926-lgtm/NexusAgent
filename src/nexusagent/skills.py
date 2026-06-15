@@ -1,5 +1,4 @@
-"""
-Skills system for NexusAgent.
+"""Skills system for NexusAgent.
 
 Loads skills from ~/.nexusagent/skills/ directory. Each skill is a directory
 containing a SKILL.md file with YAML frontmatter and markdown content.

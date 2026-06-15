@@ -1,5 +1,4 @@
-"""
-Test runner tool for NexusAgent.
+"""Test runner tool for NexusAgent.
 
 Auto-detects test framework from repository structure and runs tests
 with structured output parsing.
@@ -58,8 +57,7 @@ def run_tests(
     timeout: int = 300,
     verbose: bool = True,
 ) -> str:
-    """
-    Run tests with auto-detection and structured output.
+    """Run tests with auto-detection and structured output.
 
     Args:
         workdir: Project root directory
@@ -209,8 +207,7 @@ def run_single_test(
     framework: str | None = None,
     timeout: int = 60,
 ) -> str:
-    """
-    Run a single test file or test case.
+    """Run a single test file or test case.
 
     Args:
         test_path: Path to test file (e.g., "tests/test_auth.py")

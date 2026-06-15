@@ -35,8 +35,7 @@ class AuthManager:
         self.salt_path = Path(settings.auth.salt_path)
 
     def _get_salt(self) -> bytes:
-        """
-        Retrieves or creates a random salt for KDF.
+        """Retrieves or creates a random salt for KDF.
         """
         if not self.salt_path.exists():
             salt = secrets.token_bytes(16)
@@ -49,8 +48,7 @@ class AuthManager:
             return f.read()
 
     def _get_master_key(self) -> bytes:
-        """
-        Retrieves the master secret and derives a 32-byte key for Fernet using a unique salt.
+        """Retrieves the master secret and derives a 32-byte key for Fernet using a unique salt.
         """
         if not self.master_secret_path.exists():
             raise FileNotFoundError(
@@ -78,8 +76,7 @@ class AuthManager:
         return self._fernet
 
     def initialize_wizard(self, force: bool = False):
-        """
-        Creates the master secret if it doesn't exist.
+        """Creates the master secret if it doesn't exist.
         Sets restricted file permissions (600).
         """
         if self.master_secret_path.exists() and not force:
@@ -100,8 +97,7 @@ class AuthManager:
         return f"Master secret initialized successfully. Path: {self.master_secret_path}"
 
     def save_key(self, service: str, key: str):
-        """
-        Encrypts and saves a service API key to the keystore.
+        """Encrypts and saves a service API key to the keystore.
         """
         fernet = self._get_fernet()
         encrypted_key = fernet.encrypt(key.encode()).decode()
@@ -111,8 +107,7 @@ class AuthManager:
         self._save_keystore(keystore)
 
     def get_key(self, service: str) -> str | None:
-        """
-        Retrieves and decrypts a service API key.
+        """Retrieves and decrypts a service API key.
         """
         try:
             fernet = self._get_fernet()

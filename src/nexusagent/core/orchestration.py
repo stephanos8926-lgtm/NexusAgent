@@ -1,6 +1,5 @@
 # src/nexusagent/orchestration.py
-"""
-Deep Research Orchestrator — multi-phase research workflow.
+"""Deep Research Orchestrator — multi-phase research workflow.
 
 Implements: Intent → Planning → Refinement → Execution → Synthesis
 """
@@ -64,8 +63,7 @@ DeepResearchPlan = ResearchPlan
 
 
 class DeepResearchOrchestrator:
-    """
-    Implements the agentic Deep Research workflow:
+    """Implements the agentic Deep Research workflow:
     Intent -> Planning -> Refinement -> Approval -> Execution -> Synthesis.
     """
 

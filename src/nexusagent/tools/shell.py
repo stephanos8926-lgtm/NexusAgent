@@ -1,5 +1,4 @@
-"""
-Shell execution tools for NexusAgent.
+"""Shell execution tools for NexusAgent.
 
 Provides run_shell with timeout, working directory, environment control,
 and streaming support for long-running commands.
