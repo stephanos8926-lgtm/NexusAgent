@@ -112,6 +112,9 @@ class NexusWorker:
         # Subscribe to the task submission subject
         await self.bus.subscribe("tasks.submit", self.handle_task)
 
+        # Subscribe to task cancellation subject
+        await self.bus.subscribe("tasks.cancel", self._handle_cancel)
+
         # Allow subscription to propagate before processing
         await asyncio.sleep(0.1)
 
@@ -264,14 +267,27 @@ class NexusWorker:
             except Exception:
                 pass  # Heartbeat must never crash the worker
 
+    async def _handle_cancel(self, msg: Any) -> None:
+        """Handle task cancellation signal from server."""
+        try:
+            data = json.loads(msg.data.decode())
+            cancel_id = data.get("task_id", "")
+            if cancel_id:
+                self._in_flight.pop(cancel_id, None)
+                logger.info(f"Worker acknowledged cancel for task {cancel_id}")
+        except Exception as e:
+            logger.warning(f"Worker cancel handler error: {e}")
+
     async def handle_task(self, msg: Any) -> None:
         """
         NATS callback to process an incoming task.
         """
+        task_id = "unknown"
         try:
             # msg.data is bytes
             data = json.loads(msg.data.decode())
             task = TaskSchema(**data)
+            task_id = task.id
 
             logger.info(f"Worker received task {task.id}: {task.description}")
 
@@ -322,29 +338,31 @@ class NexusWorker:
 
             logger.info(f"Worker successfully completed task {task.id} in {duration:.2f}s")
 
+        except json.JSONDecodeError as e:
+            # Corrupted NATS message — can't parse task data
+            logger.error(f"Worker received corrupted message: {e}", exc_info=True)
+            # NACK the message so it's not redelivered infinitely
+            if hasattr(msg, "nak"):
+                await msg.nak()
         except Exception as e:
-            logger.error(f"Worker error processing task: {e}", exc_info=True)
+            logger.error(f"Worker error processing task {task_id}: {e}", exc_info=True)
             try:
-                # Using safe extraction of task_id from msg.data
-                raw_data = json.loads(msg.data.decode())
-                task_id = raw_data.get("id", "unknown")
+                if task_id != "unknown":
+                    # Mark as failed in DB
+                    await task_repo.update_task_status(task_id, TaskStatus.FAILED)
 
-                # Mark as failed in DB
-                await task_repo.update_task_status(task_id, TaskStatus.FAILED)
-
-                failure_result = ResultSchema(task_id=task_id, success=False, error=str(e))
-                await task_repo.save_result(
-                    task_id=task_id,
-                    success=False,
-                    data=None,
-                    error=str(e),
-                    duration=None,
-                )
-                # Store failure in JetStream KV (best-effort)
-                await self._publish_result_degraded(
-                    task_id, failure_result.model_dump()
-                )
-
+                    failure_result = ResultSchema(task_id=task_id, success=False, error=str(e))
+                    await task_repo.save_result(
+                        task_id=task_id,
+                        success=False,
+                        data=None,
+                        error=str(e),
+                        duration=None,
+                    )
+                    # Store failure in JetStream KV (best-effort)
+                    await self._publish_result_degraded(
+                        task_id, failure_result.model_dump()
+                    )
             except Exception as inner_e:
                 logger.error(f"Critical failure reporting task error: {inner_e}")
 

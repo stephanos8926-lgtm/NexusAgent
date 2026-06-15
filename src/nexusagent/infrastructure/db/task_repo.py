@@ -96,6 +96,9 @@ class TaskRepository:
         offset: int = 0,
     ) -> list[dict]:
         """List tasks with optional status filter and pagination."""
+        # Clamp limit to prevent resource exhaustion (max 200 per page)
+        limit = max(1, min(limit, 200))
+        offset = max(0, offset)
         async with self.db_manager.get_session() as session:
             query = select(TaskModel).order_by(TaskModel.created_at.desc())
             if status:

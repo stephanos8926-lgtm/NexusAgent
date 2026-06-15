@@ -111,6 +111,9 @@ class SessionRepository:
         offset: int = 0,
     ) -> list[dict]:
         """List sessions with optional status filter and pagination."""
+        # Clamp limit to prevent resource exhaustion (max 200 per page)
+        limit = max(1, min(limit, 200))
+        offset = max(0, offset)
         async with self.db_manager.get_session() as session:
             query = select(SessionModel).order_by(SessionModel.updated_at.desc())
             if status:

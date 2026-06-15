@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from nexusagent.infrastructure.api_auth import verify_api_key
 from nexusagent.version import VERSION, MIN_CLIENT_VERSION
@@ -114,9 +114,9 @@ async def rate_limit_middleware(request, call_next):
 
 
 class SubmitTaskRequest(BaseModel):
-    description: str
-    priority: int = 1
-    metadata: dict = {}
+    description: str = Field(..., max_length=10000, description="Task description (max 10K chars)")
+    priority: int = Field(default=1, ge=1, le=10)
+    metadata: dict = Field(default_factory=dict)
 
 
 @app.post("/tasks", response_model=dict, dependencies=[Depends(verify_api_key)])
@@ -207,10 +207,19 @@ async def get_task_result(task_id: str):
 @app.get("/health")
 async def health_check():
     _bus = get_bus()
+    nats_connected = _bus.nc is not None and not _bus.nc.is_closed
+    js_available = False
+    if nats_connected:
+        try:
+            _bus.nc.jetstream()
+            js_available = True
+        except Exception:
+            pass
     return {
         "status": "ok",
         "version": VERSION,
-        "nats": "connected" if _bus.nc else "disconnected",
+        "nats": "connected" if nats_connected else "disconnected",
+        "jetstream": js_available,
     }
 
 
@@ -235,8 +244,12 @@ async def list_tasks(status: str | None = None, limit: int = 50, offset: int = 0
     from nexusagent.infrastructure.db import get_task_repo
     task_repo = get_task_repo()
 
+    # Clamp limit to prevent resource exhaustion
+    limit = max(1, min(limit, 200))
+    offset = max(0, offset)
+
     tasks = await task_repo.list_tasks(status=status, limit=limit, offset=offset)
-    return {"tasks": tasks, "count": len(tasks)}
+    return {"tasks": tasks, "count": len(tasks), "limit": limit, "offset": offset}
 
 
 # ─── Task Cancellation ─────────────────────────────────────────────────
@@ -251,6 +264,14 @@ async def cancel_task(task_id: str):
     cancelled = await task_repo.cancel_task(task_id)
     if not cancelled:
         raise HTTPException(status_code=400, detail="Task not found or already completed/failed")
+
+    # Signal worker to stop processing (best-effort via NATS)
+    try:
+        bus = get_bus()
+        await bus.publish("tasks.cancel", {"task_id": task_id})
+    except Exception:
+        pass  # Worker may not be running; DB cancel is sufficient
+
     return {"task_id": task_id, "status": "cancelled"}
 
 
