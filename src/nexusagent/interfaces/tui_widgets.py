@@ -10,11 +10,7 @@ import logging
 import os
 import shutil
 import time
-from typing import Any, ClassVar
-
-import signal as _signal
-
-logger = logging.getLogger(__name__)
+from typing import Any
 
 from textual.app import ComposeResult
 from textual.containers import Horizontal, ScrollableContainer, Vertical
@@ -22,6 +18,8 @@ from textual.reactive import reactive
 from textual.screen import ModalScreen
 from textual.timer import Timer
 from textual.widgets import Button, Static
+
+logger = logging.getLogger(__name__)
 
 # ═══════════════════════════════════════════════════════════════════════════
 # SpinnerLabel — animated spinner + text

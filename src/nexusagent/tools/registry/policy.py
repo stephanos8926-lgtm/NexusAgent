@@ -10,7 +10,6 @@ from __future__ import annotations
 import contextvars
 from collections.abc import Callable
 
-from .types import ToolInfo
 
 # Context-local policy context (async-safe, unlike threading.local)
 # NOTE: No mutable default — ContextVar doesn't support default_factory.

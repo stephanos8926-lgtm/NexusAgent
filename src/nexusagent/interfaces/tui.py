@@ -31,7 +31,7 @@ from textual.binding import Binding
 from textual.containers import Container, VerticalScroll
 
 from nexusagent.infrastructure.config import settings
-from nexusagent.interfaces.cli import is_compatible, parse_version
+from nexusagent.interfaces.cli import is_compatible
 from nexusagent.version import VERSION as CLIENT_VERSION
 from nexusagent.interfaces.tui_formatters import (
     format_arg_value,
@@ -40,16 +40,16 @@ from nexusagent.interfaces.tui_formatters import (
 )
 
 # ── Re-exports for backward compatibility (tests import from tui.py) ──
-from nexusagent.interfaces.tui_widgets import (  # noqa: F401
-    NO_COLOR,
-    ApprovalModal,
-    Breakpoint,
-    ErrorModal,
-    SpinnerLabel,
-    _sigwinch_handler,
-    classify_breakpoint,
-    debounce_resize,
-    is_no_color,
+from nexusagent.interfaces.tui_widgets import (
+    NO_COLOR,  # noqa: F401
+    ApprovalModal,  # noqa: F401
+    Breakpoint,  # noqa: F401
+    ErrorModal,  # noqa: F401
+    SpinnerLabel,  # noqa: F401
+    _sigwinch_handler,  # noqa: F401
+    classify_breakpoint,  # noqa: F401
+    debounce_resize,  # noqa: F401
+    is_no_color,  # noqa: F401
 )
 from nexusagent.widgets.chat_input import ChatInput
 from nexusagent.widgets.messages import (
@@ -690,7 +690,7 @@ class NexusApp(App):
         self.messages_container.mount(user_msg)
         self.status_bar.set_status("Thinking...")
         self.status_bar.set_spinner(True)
-        asyncio.create_task(self._input_queue.put(next_msg))  # noqa: RUF006
+        asyncio.create_task(self._input_queue.put(next_msg))
         self._update_queue_status()
 
     def _update_queue_status(self) -> None:
@@ -748,7 +748,7 @@ class NexusApp(App):
 
     def action_quit(self) -> None:
         """Quit the TUI application, canceling background tasks."""
-        asyncio.create_task(self._input_queue.put(None))  # noqa: RUF006
+        asyncio.create_task(self._input_queue.put(None))
         if hasattr(self, '_ws_task'):
             self._ws_task.cancel()
         self.exit()

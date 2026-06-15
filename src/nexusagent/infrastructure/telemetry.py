@@ -5,16 +5,13 @@ Provides structured logging to file, session metrics, and an in-app log viewer.
 
 from __future__ import annotations
 
-import json
 import logging
 import logging.handlers
-import os
 import time
 from pathlib import Path
 from typing import Any
 
 from textual.app import App
-from textual.containers import VerticalScroll
 from textual.widgets import Static
 
 logger = logging.getLogger("nexusagent.telemetry")

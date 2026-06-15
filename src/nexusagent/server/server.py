@@ -17,14 +17,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from nexusagent.infrastructure.api_auth import verify_api_key
+from nexusagent.infrastructure.bus import get_bus
+from nexusagent.infrastructure.config import settings
+from nexusagent.server.sdk import sdk
 from nexusagent.version import VERSION, MIN_CLIENT_VERSION
 
 # Track server start time for uptime reporting
 _SERVER_START_TIME = time.monotonic()
-from nexusagent.infrastructure.bus import get_bus
-from nexusagent.infrastructure.config import settings
-from nexusagent.server.sdk import sdk
-from nexusagent.core.worker import get_worker
 
 # Setup logging
 logging.basicConfig(

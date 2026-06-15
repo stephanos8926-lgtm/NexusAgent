@@ -58,7 +58,6 @@ async def register_mcp_tools() -> list[str]:
         List of newly registered tool names.
     """
     import logging
-    import uuid as _uuid
 
     from nexusagent.infrastructure.config import settings
 
@@ -71,7 +70,7 @@ async def register_mcp_tools() -> list[str]:
         return registered
 
     try:
-        import httpx
+        import httpx  # noqa: F401
     except ImportError:
         logger.warning("httpx not installed — MCP tool loading skipped")
         return registered
@@ -131,7 +130,6 @@ async def _discover_mcp_tools(
 
     Supports both Streamable HTTP and SSE transports.
     """
-    import json
 
     # Normalize URL
     base_url = server_url.rstrip("/")
@@ -174,7 +172,6 @@ def _wrap_mcp_tool(
     tool_def: dict,
 ) -> callable:
     """Return an async callable that proxies calls to an MCP tool."""
-    import json
     import httpx
 
     base_url = server_url.rstrip("/")

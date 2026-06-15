@@ -60,7 +60,7 @@ def register_themes(app: "App") -> None:
     """
     from textual.theme import Theme
 
-    from nexusagent.widgets.theme.colors import ALL_THEMES, THEME_REGISTRY
+    from nexusagent.widgets.theme.colors import ALL_THEMES
 
     for name in ALL_THEMES:
         colors = get_theme_colors(name)

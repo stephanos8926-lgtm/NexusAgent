@@ -14,11 +14,11 @@ from pathlib import Path
 from cryptography.fernet import Fernet
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
-
-logger = logging.getLogger(__name__)
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
 from nexusagent.infrastructure.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 class AuthManager:

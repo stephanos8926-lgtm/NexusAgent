@@ -16,19 +16,15 @@ from __future__ import annotations
 
 import logging
 import os
-from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from textual.containers import Horizontal
 from textual.content import Content
 from textual.css.query import NoMatches
-from textual.geometry import Size
-from textual.reactive import reactive
 from textual.widgets import Static
 
 if TYPE_CHECKING:
-    from textual import events
-    from textual.app import ComposeResult, RenderResult
+    from textual.app import ComposeResult
 
 logger = logging.getLogger(__name__)
 

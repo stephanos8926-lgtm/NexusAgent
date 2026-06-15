@@ -5,9 +5,6 @@ Each message type is a separate Textual widget with its own CSS styling.
 
 from __future__ import annotations
 
-from textual.content import Content
-from textual.widgets import Static
-
 from .user import UserMessage
 from .assistant import AssistantMessage
 from .tool import ToolCallMessage

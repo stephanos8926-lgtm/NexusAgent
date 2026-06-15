@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import difflib
-from typing import Any
 
 from .types import ToolInfo
 

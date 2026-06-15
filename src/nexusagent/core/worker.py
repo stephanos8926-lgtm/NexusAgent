@@ -18,12 +18,12 @@ from sqlalchemy import select
 from nexusagent.core.agent import run_agent_task
 from nexusagent.infrastructure.bus import AgentBus, get_bus, _NATS_HARD_RECONNECT_CAP
 from nexusagent.infrastructure.db import TaskModel, get_task_repo
-
-task_repo = get_task_repo()  # singleton instance for module-level use
 from nexusagent.llm.models import ResultSchema, TaskContract, TaskSchema, TaskStatus
 from nexusagent.core.subagent import SubAgentHandle
 from nexusagent.infrastructure.utils.circuit import CircuitBreaker
 from nexusagent.infrastructure.utils.retry import retry_with_backoff
+
+task_repo = get_task_repo()  # singleton instance for module-level use
 
 logger = logging.getLogger(__name__)
 
@@ -167,7 +167,6 @@ class NexusWorker:
           1. Log recovery
           2. Resume normal mode
         """
-        import contextlib
 
         consecutive_failures = 0
         max_failures_before_degraded = 3  # 3 * 10s = 30s detection

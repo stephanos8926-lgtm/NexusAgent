@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING
 
 from sqlalchemy import select, update
 
-from .base import Base  # noqa: F401 — re-exported for consumer convenience
 from .models import ResultModel, TaskModel
 
 if TYPE_CHECKING:
@@ -157,7 +156,7 @@ class TaskRepository:
 
     async def cancel_task(self, task_id: str) -> bool:
         """Cancel a task. Returns True if cancelled, False if not found or terminal."""
-        from nexusagent.llm.models import TaskStatus  # noqa: E402 — avoid circular import
+        from nexusagent.llm.models import TaskStatus
 
         async with self.db_manager.get_session() as session:
             result = await session.execute(
@@ -173,7 +172,7 @@ class TaskRepository:
 
     async def retry_task(self, task_id: str) -> str | None:
         """Retry a failed task. Returns task ID or None if not eligible."""
-        from nexusagent.llm.models import TaskStatus  # noqa: E402 — avoid circular import
+        from nexusagent.llm.models import TaskStatus
 
         async with self.db_manager.get_session() as session:
             result = await session.execute(

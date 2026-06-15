@@ -168,7 +168,6 @@ def run(task, working_dir, max_turns, wall_time, memory_mode, acceptance, model,
         nexus run "Fix the auth bug in server.py" -d /project -t 20 -a "Tests pass"
         nexus run "Research X" --model gemini-3.1-flash-lite --max-depth 5 --summary-only
     """
-    from nexusagent.infrastructure.config import settings
     from nexusagent.llm.models import MemoryScope, TaskContract
     from nexusagent.core.worker import worker_pool
 

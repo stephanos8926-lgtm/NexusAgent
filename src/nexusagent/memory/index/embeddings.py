@@ -13,9 +13,7 @@ import os
 import struct
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Any
 
-import sqlite_vec
 
 from nexusagent.infrastructure.config import settings
 

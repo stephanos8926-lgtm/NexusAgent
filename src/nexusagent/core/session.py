@@ -312,11 +312,11 @@ class Session:
         return HumanMessage(content=content_blocks)
 
     async def send(self, user_message: str, images: list[str] | None = None) -> None:
-        """Process a user message: store in DB, recall memory, invoke agent, emit events.
+        """Process a user message: store in DB, recall memory, stream agent response.
 
-        Uses deepagents' astream() for real-time streaming of tool calls,
-        tool results, and tokens — so the TUI can show progress instead of
-        going silent for the entire duration.
+        Uses LangGraph's astream() with stream_mode="messages" for real-time
+        streaming of tool calls, tool results, and tokens — so the TUI can
+        show progress instead of going silent for the entire duration.
 
         Args:
             user_message: The user's text message.
@@ -402,17 +402,27 @@ class Session:
                     # assistant and any other roles → AIMessage
                     messages.append(AIMessage(content=md["content"]))
 
-        # Invoke the agent
+        # Invoke the agent via astream for real-time token streaming
         self._cancel_flag = False
+        accumulated: list[str] = []
         try:
-            result = self.agent({"messages": messages})
-            if asyncio.iscoroutine(result):
-                result = await result
+            async for chunk in self.agent.astream(
+                {"messages": messages},
+                stream_mode="messages",
+            ):
+                if self._cancel_flag:
+                    break
+                # chunk is (AIMessageChunk, metadata) tuple when stream_mode="messages"
+                if isinstance(chunk, tuple):
+                    token, metadata = chunk
+                    await self._handle_message_token(token, metadata, accumulated)
+                else:
+                    await self._handle_message_token(chunk, {}, accumulated)
 
             if self._cancel_flag:
                 self._enqueue(ErrorEvent(message="Session interrupted").model_dump())
             else:
-                final_content = _extract_agent_response(result)
+                final_content = "".join(accumulated)
                 self._enqueue(ResponseEvent(content=final_content).model_dump())
 
                 # Update conversation history for continuity

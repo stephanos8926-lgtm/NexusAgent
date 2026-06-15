@@ -7,7 +7,7 @@ This module is a compatibility shim. The actual implementations live in:
 All public symbols are re-exported here for backward compatibility.
 """
 
-from nexusagent.widgets.theme.colors import (  # noqa: F401
+from nexusagent.widgets.theme.colors import (
     ALL_THEMES,
     DARK_COLORS,
     ROSE_PINE_COLORS,
@@ -16,7 +16,7 @@ from nexusagent.widgets.theme.colors import (  # noqa: F401
     THEME_REGISTRY,
     ThemeColors,
 )
-from nexusagent.widgets.theme.registry import (  # noqa: F401
+from nexusagent.widgets.theme.registry import (
     get_css_variable_defaults,
     get_theme_colors,
     get_theme_css,

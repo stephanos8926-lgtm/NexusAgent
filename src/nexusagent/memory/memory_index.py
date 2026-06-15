@@ -5,8 +5,8 @@ continues to work. New code should import from ``nexusagent.memory.index``
 (the subpackage) directly.
 """
 
-from nexusagent.memory.index import *  # noqa: F401,F403
-from nexusagent.memory.index import (  # noqa: E401
+from nexusagent.memory.index import *
+from nexusagent.memory.index import (
     EMBED_DIM,
     CHUNK_SIZE,
     CHUNK_OVERLAP,

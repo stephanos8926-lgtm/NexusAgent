@@ -20,10 +20,20 @@ def mock_session():
         mock_hmm.return_value = mock_hybrid
         mock_hybrid.initialize = MagicMock()
 
+        agent = MagicMock()
+
+        async def _astream(input_data, stream_mode=None, **kwargs):
+            # Store the input for assertions
+            agent._astream_input = input_data
+            from langchain_core.messages import AIMessageChunk
+            yield AIMessageChunk(content="test response")
+
+        agent.astream = _astream
+
         session = Session(
             session_id="test-1",
             working_dir="/tmp",
-            agent=MagicMock(),
+            agent=agent,
             memory=MagicMock(),
             db_repo=MagicMock(),
         )
@@ -43,11 +53,8 @@ async def test_memory_context_in_system_prompt(mock_session):
     await mock_session.send("Fix the auth bug")
 
     # Agent should have been called with {"messages": [...]}
-    call_args = mock_session.agent.call_args
-    assert call_args is not None, "Agent was never called"
-
-    # Check that messages contain memory context as a SystemMessage
-    state = call_args[0][0] if call_args[0] else call_args[1]
+    assert hasattr(mock_session.agent, '_astream_input'), "Agent astream was never called"
+    state = mock_session.agent._astream_input
     assert "messages" in state, f"Expected 'messages' key in state, got: {list(state.keys())}"
     msgs = state["messages"]
     # Find a SystemMessage with memory context
@@ -65,11 +72,9 @@ async def test_no_memory_context_when_empty(mock_session):
     mock_session.hybrid_memory.get_memory_context = MagicMock(return_value="")
     await mock_session.send("Hello")
 
-    # Should still work — agent gets called
-    call_args = mock_session.agent.call_args
-    assert call_args is not None, "Agent was never called"
-
-    state = call_args[0][0] if call_args[0] else call_args[1]
+    # Should still work — agent gets called via astream
+    assert hasattr(mock_session.agent, '_astream_input'), "Agent astream was never called"
+    state = mock_session.agent._astream_input
     msgs = state["messages"]
     # Only base SystemMessage + HumanMessage (no memory SystemMessage)
     system_msgs = [m for m in msgs if isinstance(m, SystemMessage)]

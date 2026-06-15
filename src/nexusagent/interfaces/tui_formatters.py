@@ -8,7 +8,6 @@ import json
 import logging
 import re
 import textwrap
-from datetime import datetime
 from typing import Any
 
 logger = logging.getLogger(__name__)
