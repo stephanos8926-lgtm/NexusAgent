@@ -97,6 +97,119 @@ class AgentBus:
                     await asyncio.sleep(delay)
         raise last_err  # type: ignore[misc]
 
+    async def subscribe_durable(
+        self,
+        subject: str,
+        callback: Callable,
+        *,
+        stream: str = "nexus_tasks",
+        durable: str = "nexus_worker",
+        batch_size: int = 10,
+        batch_timeout: float = 5.0,
+    ) -> None:
+        """Subscribe via JetStream pull consumer with durable delivery.
+
+        Creates the JetStream stream and durable consumer on first use, then
+        fetches messages in batches, invoking *callback* for each one and
+        acknowledging (ack) on success or negatively acknowledging (nack) on
+        failure.
+
+        Args:
+            subject: NATS subject pattern to consume (e.g. "nexus.task.>").
+            callback: Async callable that receives a NATS message per item.
+            stream: JetStream stream name (default ``"nexus_tasks"``).
+            durable: Durable consumer name (default ``"nexus_worker"``).
+            batch_size: Max messages per pull batch.
+            batch_timeout: Seconds to wait for a full batch before processing
+                           whatever has arrived.
+        """
+        if not self.nc or not self.js:
+            raise RuntimeError("NATSBus not connected. Call connect() first.")
+
+        # ── 1. Ensure stream exists ──────────────────────────────────────
+        try:
+            await self.js.add_stream(
+                name=stream,
+                subjects=[subject],
+            )
+            logger.info(f"JetStream stream '{stream}' created (subjects={subject})")
+        except nats.errors.Error:
+            logger.debug(f"JetStream stream '{stream}' already exists, attaching")
+
+        # ── 2. Ensure durable consumer exists ────────────────────────────
+        try:
+            await self.js.add_consumer(
+                stream_name=stream,
+                durable_name=durable,
+                ack_policy="explicit",
+                deliver_policy="all",
+                max_deliver=-1,
+                ack_wait=30,
+            )
+            logger.info(
+                f"JetStream durable consumer '{durable}' created on '{stream}'"
+            )
+        except nats.errors.Error:
+            logger.debug(
+                f"JetStream durable consumer '{durable}' already exists on '{stream}'"
+            )
+
+        # ── 3. Pull-subscribe and batch-fetch loop ───────────────────────
+        psub = await self.js.pull_subscribe(subject, durable=durable, stream=stream)
+        self._subscriptions.append(psub)  # type: ignore[arg-type]
+        logger.info(
+            f"JetStream pull consumer active: stream='{stream}', "
+            f"durable='{durable}', subject='{subject}'"
+        )
+
+        async def _consume_loop() -> None:
+            while True:
+                try:
+                    msgs = await psub.fetch(
+                        batch=batch_size,
+                        timeout=batch_timeout,
+                    )
+                    batch_total = len(msgs)
+                    batch_ack = 0
+                    batch_nack = 0
+
+                    for msg in msgs:
+                        try:
+                            await callback(msg)
+                            await msg.ack()
+                            batch_ack += 1
+                        except Exception as exc:
+                            logger.error(
+                                f"Durable consumer error on '{subject}': {exc}",
+                                exc_info=True,
+                            )
+                            await msg.nack()
+                            batch_nack += 1
+
+                    if batch_total:
+                        logger.info(
+                            f"Durable batch complete: received={batch_total}, "
+                            f"ack={batch_ack}, nack={batch_nack}"
+                        )
+                except nats.errors.TimeoutError:
+                    # No messages available — loop and retry
+                    pass
+                except asyncio.CancelledError:
+                    logger.info(
+                        f"JetStream durable consumer '{durable}' cancelled"
+                    )
+                    break
+                except Exception as exc:
+                    logger.error(
+                        f"JetStream durable fetch error: {exc}", exc_info=True
+                    )
+                    await asyncio.sleep(1.0)
+
+        # Fire-and-forget: return immediately; loop runs as background task
+        loop_task = asyncio.create_task(_consume_loop())
+        # Keep a strong reference so the GC doesn't reap it
+        self._subscriptions.append(loop_task)  # type: ignore[arg-type]
+
     async def publish(self, subject: str, message: Any) -> None:
         if not self.nc:
             raise RuntimeError("NATSBus not connected. Call connect() first.")
