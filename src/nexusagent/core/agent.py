@@ -18,6 +18,24 @@ from nexusagent.tools.registry import (
     set_policy_context,
 )
 
+# ─── MCP + Memory Index Tool Wiring ────────────────────────────────────
+
+async def _ensure_mcp_tools_loaded():
+    """Lazily load MCP tools on first agent use.
+
+    Ensures MCP tools (dynamically discovered from configured servers)
+    are available in _REGISTRY before the role tool lists are built.
+    Safe to call multiple times — register_mcp_tools is idempotent.
+    """
+    # Delayed import to avoid pulling httpx unless needed
+    from nexusagent.tools.register_all import register_mcp_tools
+
+    try:
+        await register_mcp_tools()
+    except Exception as exc:
+        logging.getLogger(__name__).warning("MCP tool loading failed: %s", exc)
+
+
 # ─── Build Tool Lists per Role ──────────────────────────────────────────
 
 
@@ -129,6 +147,16 @@ class Agent:
 
         # Set policy context for this agent (thread-local)
         set_policy_context(role, policy)
+
+        # Ensure MCP + memory index tools are loaded before building tool list
+        import asyncio
+        try:
+            loop = asyncio.get_running_loop()
+            # Schedule MCP loading; agent creation is sync so we fire-and-forget
+            loop.create_task(_ensure_mcp_tools_loaded())
+        except RuntimeError:
+            # No event loop — skip async MCP loading (tools already in registry)
+            pass
 
         # Get tools for this role
         tools = _ROLE_TOOLS.get(role, _ROLE_TOOLS["full"])

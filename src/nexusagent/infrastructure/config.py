@@ -97,6 +97,11 @@ class ConfigSchema(BaseModel):
     prompt: PromptConfig = Field(default_factory=PromptConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
     hooks: HooksConfig = Field(default_factory=HooksConfig)
+    # MCP server configuration
+    mcp_servers: list[dict[str, str]] = Field(
+        default_factory=list,
+        description="List of MCP servers: [{'name': ..., 'url': ..., 'transport': ...}]",
+    )
     # Back-compat: top-level log_level maps to logging.level
     log_level: str = Field(default="INFO")
 

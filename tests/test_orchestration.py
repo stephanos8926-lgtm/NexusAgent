@@ -96,7 +96,7 @@ class TestParsePlanResponse:
         orch = _make_orchestrator()
 
         with patch(
-            "nexusagent.orchestration.llm.generate",
+            "nexusagent.core.orchestration.llm.generate",
             new_callable=AsyncMock,
             return_value=MockResponse(VALID_PLAN_JSON),
         ):
@@ -115,7 +115,7 @@ class TestParsePlanResponse:
         orch = _make_orchestrator()
 
         with patch(
-            "nexusagent.orchestration.llm.generate",
+            "nexusagent.core.orchestration.llm.generate",
             new_callable=AsyncMock,
             return_value=MockResponse("not valid JSON at all"),
         ):
@@ -182,7 +182,7 @@ class TestRefinePlan:
         )
 
         with patch(
-            "nexusagent.orchestration.llm.generate",
+            "nexusagent.core.orchestration.llm.generate",
             new_callable=AsyncMock,
             return_value=MockResponse(refined_json),
         ):
@@ -207,7 +207,7 @@ class TestRefinePlan:
         )
 
         with patch(
-            "nexusagent.orchestration.llm.generate",
+            "nexusagent.core.orchestration.llm.generate",
             new_callable=AsyncMock,
             return_value=MockResponse("broken response {{{ not json"),
         ):
@@ -253,7 +253,7 @@ class TestRunDeepResearch:
 
         # Patch llm.generate and search_web (used by _search)
         with patch(
-            "nexusagent.orchestration.llm.generate",
+            "nexusagent.core.orchestration.llm.generate",
             new_callable=AsyncMock,
             side_effect=mock_generate,
         ), patch(
@@ -294,7 +294,7 @@ class TestRunDeepResearch:
             return MockResponse("{}")
 
         with patch(
-            "nexusagent.orchestration.llm.generate",
+            "nexusagent.core.orchestration.llm.generate",
             new_callable=AsyncMock,
             side_effect=mock_generate,
         ), patch(
@@ -388,7 +388,7 @@ class TestSynthesizeReport:
         report_text = "# Professional Report\n\nFindings go here."
 
         with patch(
-            "nexusagent.orchestration.llm.generate",
+            "nexusagent.core.orchestration.llm.generate",
             new_callable=AsyncMock,
             return_value=MockResponse(report_text),
         ):
@@ -422,7 +422,7 @@ class TestSynthesizeReport:
         report_text = "Fallback template report."
 
         with patch(
-            "nexusagent.orchestration.llm.generate",
+            "nexusagent.core.orchestration.llm.generate",
             new_callable=AsyncMock,
             return_value=MockResponse(report_text),
         ):
@@ -464,7 +464,7 @@ class TestSynthesizeReport:
             return MockResponse("# Report\n\nDone.")
 
         with patch(
-            "nexusagent.orchestration.llm.generate",
+            "nexusagent.core.orchestration.llm.generate",
             new_callable=AsyncMock,
             side_effect=capture_prompt,
         ):
@@ -506,7 +506,7 @@ class TestSynthesizeReport:
             return MockResponse("# Report\n\nDone.")
 
         with patch(
-            "nexusagent.orchestration.llm.generate",
+            "nexusagent.core.orchestration.llm.generate",
             new_callable=AsyncMock,
             side_effect=capture_prompt,
         ):
@@ -532,7 +532,7 @@ class TestSynthesizeReport:
         )
 
         with patch(
-            "nexusagent.orchestration.llm.generate",
+            "nexusagent.core.orchestration.llm.generate",
             new_callable=AsyncMock,
             return_value=MockResponse("# Empty Report\n\nNo data available."),
         ):

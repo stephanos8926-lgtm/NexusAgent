@@ -230,7 +230,8 @@ def session_cmd(action, session_id, new_id, working_dir, status, limit):
         nexus session rename abc123 --new-id xyz789
         nexus session delete abc123
     """
-    from nexusagent.infrastructure.db import session_repo
+    from nexusagent.infrastructure.db import get_session_repo
+    session_repo = get_session_repo()
 
     async def _run():
         if action == "list":

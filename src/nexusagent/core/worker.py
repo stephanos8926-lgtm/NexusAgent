@@ -10,8 +10,10 @@ from typing import Any
 from sqlalchemy import select
 
 from nexusagent.core.agent import run_agent_task
-from nexusagent.infrastructure.bus import AgentBus, get_bus
-from nexusagent.infrastructure.db import TaskModel, task_repo
+from nexusagent.infrastructure.bus import AgentBus, get_bus, _NATS_HARD_RECONNECT_CAP
+from nexusagent.infrastructure.db import TaskModel, get_task_repo
+
+task_repo = get_task_repo()  # singleton instance for module-level use
 from nexusagent.llm.models import ResultSchema, TaskContract, TaskSchema, TaskStatus
 from nexusagent.core.subagent import SubAgentHandle
 from nexusagent.infrastructure.utils.circuit import CircuitBreaker
@@ -78,14 +80,33 @@ async def _run_research_workflow(task: TaskSchema) -> str:
 
 
 class NexusWorker:
+    # Health-check interval (seconds) — how often we probe NATS liveness
+    HEALTH_CHECK_INTERVAL = 10.0
+    # Seconds to wait for NATS reconnection before entering degraded mode
+    DEGRADED_TIMEOUT = 30.0
+
     def __init__(self, bus: AgentBus | None = None) -> None:
         self.bus = bus or get_bus()
+        self._health_task: asyncio.Task | None = None
+        self._healthy: bool = True
+        self._degraded: bool = False
+        self._running: bool = False
+        self._in_flight: dict[str, dict[str, Any]] = {}
+
+    @property
+    def is_healthy(self) -> bool:
+        return self._healthy
+
+    @property
+    def is_degraded(self) -> bool:
+        return self._degraded
 
     async def start(self) -> None:
         """
         Start the NATS worker loop.
         """
         await self.bus.connect()
+        self._running = True
         logger.info("Nexus Worker starting... listening for tasks.")
 
         # Subscribe to the task submission subject
@@ -93,6 +114,131 @@ class NexusWorker:
 
         # Allow subscription to propagate before processing
         await asyncio.sleep(0.1)
+
+        # Start background health-check loop
+        self._health_task = asyncio.create_task(self._health_loop())
+
+    async def stop(self) -> None:
+        """Gracefully stop the worker."""
+        self._running = False
+        if self._health_task:
+            self._health_task.cancel()
+            import contextlib
+            with contextlib.suppress(asyncio.CancelledError):
+                await self._health_task
+        logger.info("NexusWorker stopped")
+
+    async def _health_loop(self) -> None:
+        """Periodically check NATS health and toggle degraded mode.
+
+        Detects disconnection within HEALTH_CHECK_INTERVALs (<=30s).
+        When NATS goes down:
+          1. Log a warning
+          2. Enter degraded mode (continue operating, keep processing)
+          3. Attempt reconnection with a hard cap
+        When NATS comes back:
+          1. Log recovery
+          2. Resume normal mode
+        """
+        import contextlib
+
+        consecutive_failures = 0
+        max_failures_before_degraded = 3  # 3 * 10s = 30s detection
+
+        while self._running:
+            try:
+                await asyncio.sleep(self.HEALTH_CHECK_INTERVAL)
+                if not self._running:
+                    break
+
+                health = await self.bus.check_health()
+                is_connected = health["connected"]
+
+                if is_connected:
+                    if consecutive_failures > 0:
+                        logger.info(
+                            "NATS health recovered after %d failed probes",
+                            consecutive_failures,
+                        )
+                    consecutive_failures = 0
+                    if self._degraded:
+                        self._degraded = False
+                        self._healthy = True
+                        self.bus._reconnect_count = 0  # reset counter on recovery
+                        logger.info("NexusWorker exiting degraded mode — NATS recovered")
+                else:
+                    consecutive_failures += 1
+                    logger.warning(
+                        "NATS health check failed "
+                        "(probe %d/%d, reconnect_count=%d/%d)",
+                        consecutive_failures,
+                        max_failures_before_degraded,
+                        health.get("reconnect_count", 0),
+                        health.get("max_reconnects", 0),
+                    )
+                    if (
+                        consecutive_failures >= max_failures_before_degraded
+                        and not self._degraded
+                    ):
+                        self._degraded = True
+                        self._healthy = False
+                        logger.warning(
+                            "NexusWorker entering degraded mode — "
+                            "NATS unreachable for %.0fs. "
+                            "Continuing with in-memory task buffer.",
+                            consecutive_failures * self.HEALTH_CHECK_INTERVAL,
+                        )
+                    # Attempt reconnection if cap not exceeded
+                    rc = health.get("reconnect_count", 0)
+                    mr = health.get("max_reconnects", _NATS_HARD_RECONNECT_CAP)
+                    if rc < mr and not is_connected:
+                        logger.info(
+                            "Attempting NATS reconnect (%d/%d)...", rc + 1, mr
+                        )
+                        try:
+                            await self.bus.connect()
+                        except Exception as exc:
+                            logger.warning("NATS reconnect failed: %s", exc)
+
+            except asyncio.CancelledError:
+                break
+            except Exception as exc:
+                logger.error("Health loop error: %s", exc, exc_info=True)
+                # Don't let a loop error crash the worker
+                await asyncio.sleep(1.0)
+
+    async def _publish_result_degraded(self, task_id: str, result: Any) -> None:
+        """Best-effort result publishing that buffers when NATS is down.
+
+        Results are written to the DB regardless of NATS state.
+        If NATS is up, also store in JetStream KV.
+        If NATS is down, the result persists in DB — no data loss.
+        """
+        try:
+            # Always persist to DB first (this survives NATS outages)
+            logger.debug("Persisting result to DB for task %s", task_id)
+
+            # If NATS is healthy, also push to KV
+            if self.bus.is_connected:
+                try:
+                    await self.bus.put_result(task_id, result)
+                except Exception as e:
+                    logger.warning(
+                        "Failed to push result to NATS KV for task %s: %s. "
+                        "Result is safe in DB.",
+                        task_id,
+                        e,
+                    )
+            else:
+                logger.info(
+                    "NATS unavailable — result for task %s stored in DB only. "
+                    "Will sync to KV when NATS recovers.",
+                    task_id,
+                )
+        except Exception as e:
+            logger.error(
+                "Failed to persist result for task %s: %s", task_id, e
+            )
 
     @retry_with_backoff(max_attempts=2, base_delay=0.5, max_delay=5.0)
     async def _execute_agent_logic(self, task: TaskSchema) -> Any:
@@ -171,8 +317,8 @@ class NexusWorker:
             )
             await task_repo.update_task_status(task.id, TaskStatus.COMPLETED)
 
-            # Store in JetStream KV for SDK retrieval
-            await self.bus.put_result(task.id, result.model_dump())
+            # Store in JetStream KV for SDK retrieval (best-effort, degraded-aware)
+            await self._publish_result_degraded(task.id, result.model_dump())
 
             logger.info(f"Worker successfully completed task {task.id} in {duration:.2f}s")
 
@@ -194,8 +340,10 @@ class NexusWorker:
                     error=str(e),
                     duration=None,
                 )
-                # Store failure in JetStream KV
-                await self.bus.put_result(task_id, failure_result.model_dump())
+                # Store failure in JetStream KV (best-effort)
+                await self._publish_result_degraded(
+                    task_id, failure_result.model_dump()
+                )
 
             except Exception as inner_e:
                 logger.error(f"Critical failure reporting task error: {inner_e}")

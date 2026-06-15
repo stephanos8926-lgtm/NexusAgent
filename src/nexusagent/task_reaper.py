@@ -5,7 +5,9 @@ from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
 
-from nexusagent.infrastructure.db import TaskModel, db_manager
+from nexusagent.infrastructure.db import TaskModel, get_db_manager
+
+db_manager = get_db_manager()
 
 logger = logging.getLogger(__name__)
 

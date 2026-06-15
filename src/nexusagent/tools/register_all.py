@@ -35,6 +35,197 @@ from nexusagent.tools.test_runner import run_single_test, run_tests
 from nexusagent.tools.write_todos import read_todos, write_todos
 
 # ═══════════════════════════════════════════════════════════════════════
+# MCP Plugin Loader
+# ═══════════════════════════════════════════════════════════════════════
+
+_MCP_REGISTRY: dict[str, list[dict]] = {}
+_MCP_REGISTERED_NAMES: set[str] = set()
+
+
+async def register_mcp_tools() -> list[str]:
+    """Dynamically load MCP tools from configured servers.
+
+    Reads MCP server configuration from settings.mcp_servers (list of
+    dicts with 'name', 'url', 'transport' keys) and calls each
+    server's tools/list endpoint to discover available tools.
+
+    Discovered tools are:
+      1. Wrapped as async callables
+      2. Registered in the global tool registry via register_tool()
+      3. Added to tool_search results (category='mcp')
+
+    Returns:
+        List of newly registered tool names.
+    """
+    import logging
+    import uuid as _uuid
+
+    from nexusagent.infrastructure.config import settings
+
+    logger = logging.getLogger(__name__)
+    registered: list[str] = []
+
+    # Read MCP server configuration
+    servers = getattr(settings, "mcp_servers", None)
+    if not servers:
+        return registered
+
+    try:
+        import httpx
+    except ImportError:
+        logger.warning("httpx not installed — MCP tool loading skipped")
+        return registered
+
+    for server_cfg in servers:
+        server_name = server_cfg.get("name", "unknown")
+        server_url = server_cfg.get("url", "")
+        transport = server_cfg.get("transport", "http")
+
+        if not server_url:
+            logger.warning("MCP server '%s' has no URL — skipping", server_name)
+            continue
+
+        try:
+            tool_list = await _discover_mcp_tools(
+                server_name, server_url, transport
+            )
+        except Exception as exc:
+            logger.warning(
+                "Failed to discover tools from MCP server '%s': %s",
+                server_name, exc,
+            )
+            continue
+
+        for tool_def in tool_list:
+            tool_name = tool_def.get("name", "")
+            if not tool_name or tool_name in _MCP_REGISTERED_NAMES:
+                continue
+
+            _MCP_REGISTERED_NAMES.add(tool_name)
+            _MCP_REGISTRY.setdefault(server_name, []).append(tool_def)
+            wrapped = _wrap_mcp_tool(server_name, server_url, transport, tool_def)
+            tool_description = tool_def.get("description", f"MCP tool from {server_name}")
+            tool_params = _extract_param_descriptions(tool_def.get("inputSchema", {}))
+
+            register_tool(
+                name=tool_name,
+                description=f"[MCP:{server_name}] {tool_description}",
+                parameters=tool_params,
+                example=f"{tool_name}()",
+                category="mcp",
+                returns="Result from MCP server.",
+            )(wrapped)
+
+            registered.append(tool_name)
+            logger.info("Registered MCP tool: %s (from %s)", tool_name, server_name)
+
+    return registered
+
+
+async def _discover_mcp_tools(
+    server_name: str,
+    server_url: str,
+    transport: str,
+) -> list[dict]:
+    """Call an MCP server's tools/list endpoint and return tool definitions.
+
+    Supports both Streamable HTTP and SSE transports.
+    """
+    import json
+
+    # Normalize URL
+    base_url = server_url.rstrip("/")
+
+    if transport in ("http", "streamable"):
+        # MCP Streamable HTTP: POST to /tools/list
+        try:
+            import httpx
+
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.get(f"{base_url}/tools")
+                response.raise_for_status()
+                data = response.json()
+                return data.get("tools", [])
+        except Exception:
+            # Fallback: try JSON-RPC tools/list
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                payload = {
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "method": "tools/list",
+                    "params": {},
+                }
+                response = await client.post(
+                    f"{base_url}/mcp",
+                    json=payload,
+                    headers={"Content-Type": "application/json"},
+                )
+                response.raise_for_status()
+                data = response.json()
+                return data.get("result", {}).get("tools", [])
+    else:
+        raise ValueError(f"Unsupported MCP transport: {transport}")
+
+
+def _wrap_mcp_tool(
+    server_name: str,
+    server_url: str,
+    transport: str,
+    tool_def: dict,
+) -> callable:
+    """Return an async callable that proxies calls to an MCP tool."""
+    import json
+    import httpx
+
+    base_url = server_url.rstrip("/")
+    tool_name = tool_def["name"]
+
+    async def call_mcp_tool(**kwargs):
+        """Dynamically generated MCP tool proxy."""
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                payload = {
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "method": "tools/call",
+                    "params": {"name": tool_name, "arguments": kwargs},
+                }
+                response = await client.post(
+                    f"{base_url}/mcp",
+                    json=payload,
+                    headers={"Content-Type": "application/json"},
+                )
+                response.raise_for_status()
+                data = response.json()
+                result = data.get("result", {})
+                content = result.get("content", [])
+                texts = [
+                    c.get("text", "")
+                    for c in content
+                    if c.get("type") == "text"
+                ]
+                return "\n".join(texts) if texts else str(result)
+        except Exception as exc:
+            return f"[MCP:{server_name}] Error calling '{tool_name}': {exc}"
+
+    call_mcp_tool.__name__ = tool_name
+    call_mcp_tool.__doc__ = tool_def.get("description", f"MCP tool: {tool_name}")
+    return call_mcp_tool
+
+
+def _extract_param_descriptions(schema: dict) -> dict[str, str]:
+    """Extract parameter descriptions from a JSON Schema."""
+    props = schema.get("properties", {})
+    required = set(schema.get("required", []))
+    params: dict[str, str] = {}
+    for pname, pdef in props.items():
+        desc = pdef.get("description", pdef.get("type", "parameter"))
+        if pname in required:
+            desc = f"[required] {desc}"
+        params[pname] = desc
+    return params
+
+# ═══════════════════════════════════════════════════════════════════════
 # Discovery Tools
 # ═══════════════════════════════════════════════════════════════════════
 
@@ -726,3 +917,85 @@ def memory_write(
         entities=entities,
     )
     return f"Memory written to: {filepath}"
+
+
+@register_tool(
+    name="memory_index_search",
+    description=(
+        "Search the hybrid memory index (FTS5 + vector similarity) directly. "
+        "More powerful than memory_search — uses sqlite-vec for high-quality "
+        "vector search."
+    ),
+    parameters={
+        "query": "Search query string",
+        "max_results": "Maximum results to return (default: 6)",
+        "workspace": "Override workspace path (optional)",
+    },
+    example='memory_index_search(\"authentication flow\", max_results=5)',
+    category="memory",
+    returns="Formatted search results with file citations and scores.",
+)
+async def memory_index_search(
+    query: str,
+    max_results: int = 6,
+    workspace: str | None = None,
+) -> str:
+    """Search the hybrid memory index directly using HybridMemoryIndex.search()."""
+    import os
+
+    ws = workspace or _get_memory_workspace()
+    ws = os.path.expanduser(ws)
+    os.makedirs(ws, exist_ok=True)
+
+    try:
+        from nexusagent.memory.index.index import HybridMemoryIndex
+
+        idx = HybridMemoryIndex(ws)
+        results = await idx.search(query, max_results=max_results)
+    except Exception as exc:
+        return f"Index search failed: {exc}"
+
+    if not results:
+        return f"No index results for: {query}"
+
+    lines = [f"Index search results for: {query}\n"]
+    for r in results:
+        source = r.get("file", "unknown")
+        content = r.get("content", "").strip()
+        score = r.get("score", 0)
+        lines.append(f"Source: {source} (score: {score:.4f})")
+        lines.append(f"{content}\n")
+    return "\n".join(lines)
+
+
+@register_tool(
+    name="memory_index_rebuild",
+    description=(
+        "Rebuild the hybrid memory index from workspace files. "
+        "Drops all indexed chunks and re-scans bank/ and memory/ directories. "
+        "Use after bulk file changes."
+    ),
+    parameters={
+        "workspace": "Override workspace path (optional)",
+    },
+    example="memory_index_rebuild()",
+    category="memory",
+    returns="Confirmation message with file count.",
+)
+def memory_index_rebuild(workspace: str | None = None) -> str:
+    """Rebuild the hybrid memory index using HybridMemoryIndex.rebuild()."""
+    import os
+
+    ws = workspace or _get_memory_workspace()
+    ws = os.path.expanduser(ws)
+    os.makedirs(ws, exist_ok=True)
+
+    try:
+        from nexusagent.memory.index.index import HybridMemoryIndex
+
+        idx = HybridMemoryIndex(ws)
+        idx.rebuild()
+    except Exception as exc:
+        return f"Index rebuild failed: {exc}"
+
+    return f"Memory index rebuilt for workspace: {ws}"

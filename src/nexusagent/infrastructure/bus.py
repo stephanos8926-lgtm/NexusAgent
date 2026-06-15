@@ -2,6 +2,7 @@ import asyncio
 import base64
 import json
 import logging
+import time
 from collections.abc import Callable
 from datetime import date, datetime
 from pathlib import Path
@@ -18,6 +19,21 @@ logger = logging.getLogger(__name__)
 
 # NATS max message size is 1MB by default
 NATS_MAX_MESSAGE_SIZE = 1024 * 1024
+
+# Hard cap on reconnection attempts to prevent infinite hangs.
+# If settings.request -1 (infinite), we cap this at a safe maximum.
+_NATS_HARD_RECONNECT_CAP = 30  # ~2 minutes at 4s backoff
+
+
+def _effective_max_reconnects(requested: int) -> int:
+    """Return a safe maximum reconnect count.
+
+    -1 means "infinite" in NATS client — we cap that to avoid workers
+    hanging forever when NATS is permanently down.
+    """
+    if requested < 0:
+        return _NATS_HARD_RECONNECT_CAP
+    return min(requested, _NATS_HARD_RECONNECT_CAP)
 
 
 class NATSJSONEncoder(json.JSONEncoder):
@@ -45,17 +61,69 @@ class AgentBus:
         self.js: Any = None
         self.kv: Any = None
         self._subscriptions: list[Subscription] = []
+        # Health tracking
+        self._connected_event = asyncio.Event()
+        self._disconnected_event = asyncio.Event()
+        self._last_connect_time: float | None = None
+        self._last_disconnect_time: float | None = None
+        self._reconnect_count: int = 0
+        self._max_reconnects: int = _effective_max_reconnects(
+            settings.server.nats_max_reconnects
+        )
+
+    @property
+    def is_connected(self) -> bool:
+        """Return True if NATS client exists and is connected."""
+        return self.nc is not None and not self.nc.is_closed
+
+    @property
+    def is_degraded(self) -> bool:
+        """Return True if the bus was once connected but is now disconnected."""
+        return (
+            self._last_connect_time is not None
+            and self._last_disconnect_time is not None
+            and self._last_disconnect_time > self._last_connect_time
+        )
+
+    @property
+    def reconnect_count(self) -> int:
+        return self._reconnect_count
+
+    async def wait_for_connection(self, timeout: float = 30.0) -> bool:
+        """Wait up to *timeout* seconds for NATS connection.
+
+        Returns True if connected, False on timeout.
+        """
+        if self.is_connected:
+            return True
+        try:
+            await asyncio.wait_for(self._connected_event.wait(), timeout=timeout)
+            return True
+        except TimeoutError:
+            return False
 
     async def connect(self) -> None:
         if self.nc:
             logger.debug("NATS already connected, skipping reconnect")
             return
         try:
+            max_reconnects = self._max_reconnects
+            logger.info(
+                f"Connecting to NATS at {self.url} "
+                f"(max_reconnects={max_reconnects})"
+            )
             self.nc = await nats.connect(
                 self.url,
                 reconnect_time_wait=settings.server.nats_reconnect_wait,
-                max_reconnect_attempts=settings.server.nats_max_reconnects,
+                max_reconnect_attempts=max_reconnects,
+                disconnected_cb=self._on_disconnected,
+                reconnected_cb=self._on_reconnected,
+                closed_cb=self._on_closed,
+                error_cb=self._on_error,
             )
+            self._last_connect_time = time.time()
+            self._connected_event.set()
+            self._disconnected_event.clear()
             logger.info(f"Connected to NATS at {self.url}")
             self.js = self.nc.jetstream()
             # Try to create the KV bucket, but don't fail if it already exists
@@ -68,7 +136,58 @@ class AgentBus:
                 logger.info("JetStream KV bucket 'nexus_results' attached.")
         except NATSError as e:
             logger.error(f"Could not connect to NATS: {e}")
+            self._last_disconnect_time = time.time()
+            self._disconnected_event.set()
             raise
+
+    # ── NATS client callbacks ──────────────────────────────────────────
+
+    async def _on_disconnected(self) -> None:
+        self._last_disconnect_time = time.time()
+        self._disconnected_event.set()
+        self._connected_event.clear()
+        logger.warning("NATS disconnected")
+
+    async def _on_reconnected(self) -> None:
+        self._reconnect_count += 1
+        self._last_connect_time = time.time()
+        self._connected_event.set()
+        self._disconnected_event.clear()
+        logger.info(
+            f"NATS reconnected (attempt #{self._reconnect_count})"
+        )
+
+    async def _on_closed(self) -> None:
+        self._last_disconnect_time = time.time()
+        self._disconnected_event.set()
+        self._connected_event.clear()
+        logger.info("NATS connection closed permanently")
+
+    async def _on_error(self, err: Exception) -> None:
+        logger.error(f"NATS client error: {err}")
+
+    # ── Health probe ────────────────────────────────────────────────────
+
+    async def check_health(self) -> dict[str, Any]:
+        """Return a health snapshot dict for monitoring."""
+        healthy = self.is_connected
+        # Try a quick ping to verify actual connectivity
+        if healthy and self.nc is not None:
+            try:
+                # NATS client doesn't have a native ping, but is_closed checks socket state
+                if self.nc.is_closed:
+                    healthy = False
+            except Exception:
+                healthy = False
+        return {
+            "healthy": healthy,
+            "connected": self.is_connected,
+            "degraded": self.is_degraded,
+            "reconnect_count": self._reconnect_count,
+            "max_reconnects": self._max_reconnects,
+            "last_connect_time": self._last_connect_time,
+            "last_disconnect_time": self._last_disconnect_time,
+        }
 
     async def subscribe(self, subject: str, callback: Callable) -> None:
         """Subscribe to a NATS subject with automatic retry."""

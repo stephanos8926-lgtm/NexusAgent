@@ -29,7 +29,27 @@ KEYWORD_WEIGHT = 0.3
 CANDIDATE_MULTIPLIER = 4  # over-fetch factor
 
 # Thread pool for blocking DB operations
-_DB_POOL = ThreadPoolExecutor(max_workers=4, thread_name_prefix="memidx")
+# Per-tenant pool cache — keyed by tenant_id (db_path_str)
+_DB_POOLS: dict[str, ThreadPoolExecutor] = {}
+_DB_POOL_LOCK = __import__("threading").Lock()
+
+
+def _get_db_pool(tenant_id: str = "default") -> ThreadPoolExecutor:
+    """Get or create a per-tenant thread pool for blocking DB operations.
+
+    Each tenant (workspace) gets its own pool so that index operations
+    on different workspaces don't contend on a single executor.
+    """
+    with _DB_POOL_LOCK:
+        pool = _DB_POOLS.get(tenant_id)
+        if pool is None:
+            pool = ThreadPoolExecutor(max_workers=4, thread_name_prefix=f"memidx-{tenant_id}")
+            _DB_POOLS[tenant_id] = pool
+    return pool
+
+
+# Backward-compatible module-level pool (uses tenant "default")
+_DB_POOL = _get_db_pool("default")
 
 
 class EmbeddingProvider:

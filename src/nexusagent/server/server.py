@@ -33,8 +33,8 @@ async def lifespan(app: FastAPI):
     logger.info(f"NexusAgent Server v{VERSION} starting on port {settings.server.api_port}...")
     try:
         # 1. Initialize DB
-        from nexusagent.infrastructure.db import db_manager
-
+        from nexusagent.infrastructure.db import get_db_manager
+        db_manager = get_db_manager()
         await db_manager.init_db()
         logger.info("Database initialized.")
 
@@ -127,8 +127,10 @@ async def create_task(request: SubmitTaskRequest):
     try:
         import uuid
 
-        from nexusagent.infrastructure.db import task_repo
+        from nexusagent.infrastructure.db import get_task_repo
         from nexusagent.llm.models import TaskStatus
+
+        task_repo = get_task_repo()
 
         task_id = str(uuid.uuid4())
 
@@ -230,7 +232,8 @@ async def version_endpoint():
 @app.get("/tasks", dependencies=[Depends(verify_api_key)])
 async def list_tasks(status: str | None = None, limit: int = 50, offset: int = 0):
     """List tasks with optional status filter and pagination."""
-    from nexusagent.infrastructure.db import task_repo
+    from nexusagent.infrastructure.db import get_task_repo
+    task_repo = get_task_repo()
 
     tasks = await task_repo.list_tasks(status=status, limit=limit, offset=offset)
     return {"tasks": tasks, "count": len(tasks)}
@@ -242,7 +245,8 @@ async def list_tasks(status: str | None = None, limit: int = 50, offset: int = 0
 @app.post("/tasks/{task_id}/cancel", dependencies=[Depends(verify_api_key)])
 async def cancel_task(task_id: str):
     """Cancel a pending or processing task."""
-    from nexusagent.infrastructure.db import task_repo
+    from nexusagent.infrastructure.db import get_task_repo
+    task_repo = get_task_repo()
 
     cancelled = await task_repo.cancel_task(task_id)
     if not cancelled:
@@ -256,7 +260,8 @@ async def cancel_task(task_id: str):
 @app.post("/tasks/{task_id}/retry", dependencies=[Depends(verify_api_key)])
 async def retry_task(task_id: str):
     """Retry a failed task."""
-    from nexusagent.infrastructure.db import task_repo
+    from nexusagent.infrastructure.db import get_task_repo
+    task_repo = get_task_repo()
 
     # Fetch original task to preserve description
     original = await task_repo.get_task(task_id)
@@ -356,7 +361,8 @@ async def session_websocket(
     await websocket.accept()
 
     from nexusagent.core.agent import Agent
-    from nexusagent.infrastructure.db import session_repo
+    from nexusagent.infrastructure.db import get_session_repo
+    session_repo = get_session_repo()
     from nexusagent.core.session import session_manager
 
     # Create a real agent for this interactive session
