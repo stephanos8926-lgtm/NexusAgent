@@ -58,13 +58,13 @@ class ToolCallMessage(Static):
     STATUS_SUCCESS = "success"
     STATUS_FAILED = "failed"
 
-    _STATUS_ICONS = {
+    _STATUS_ICONS: ClassVar[dict[str, str]] = {
         STATUS_RUNNING: "⚙",
         STATUS_SUCCESS: "✔",
         STATUS_FAILED: "✘",
     }
 
-    _STATUS_STYLES = {
+    _STATUS_STYLES: ClassVar[dict[str, str]] = {
         STATUS_RUNNING: "bold warning",
         STATUS_SUCCESS: "bold success",
         STATUS_FAILED: "bold error",
@@ -183,7 +183,7 @@ class ToolCallMessage(Static):
             return Content.assemble((header, style))
 
         # Build output display
-        has_code = self._detect_code(self._output)
+        self._detect_code(self._output)
         syntax_hint = self._detect_syntax_hint()
         line_count = self._count_lines(self._output)
 

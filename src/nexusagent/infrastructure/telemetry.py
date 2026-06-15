@@ -40,7 +40,7 @@ class TelemetryManager:
         log_dir.mkdir(parents=True, exist_ok=True)
         log_file = log_dir / "tui.log"
 
-        # Rotating file handler: 5MB × 3 files
+        # Rotating file handler: 5MB x 3 files
         handler = logging.handlers.RotatingFileHandler(
             log_file,
             maxBytes=5_000_000,

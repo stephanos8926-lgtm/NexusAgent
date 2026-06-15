@@ -39,24 +39,24 @@ from .policy import (
 from .search import tool_search
 
 __all__ = [
-    # Types
-    "ToolInfo",
-    # Registration
-    "register_tool",
-    "get_tool_info",
-    "list_all_tools",
-    "_REGISTRY",
-    # Policy context
-    "set_policy_context",
-    "get_policy_context",
-    "clear_policy_context",
     # Roles
     "ROLE_MANIFESTS",
+    "_REGISTRY",
+    # Types
+    "ToolInfo",
+    "auto_correct",
+    "check_tool_access",
+    "clear_policy_context",
     "get_manifest",
+    "get_policy_context",
+    "get_tool_info",
+    "list_all_tools",
+    # Registration
+    "register_tool",
     # Policy enforcement
     "require_policy",
-    "check_tool_access",
+    # Policy context
+    "set_policy_context",
     # Search & correction
     "tool_search",
-    "auto_correct",
 ]

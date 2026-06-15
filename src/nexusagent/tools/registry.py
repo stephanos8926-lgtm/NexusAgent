@@ -22,17 +22,17 @@ from nexusagent.tools.registry import (
 )
 
 __all__ = [
+    "ROLE_MANIFESTS",
     "ToolInfo",
-    "register_tool",
+    "auto_correct",
+    "check_tool_access",
+    "clear_policy_context",
+    "get_manifest",
+    "get_policy_context",
     "get_tool_info",
     "list_all_tools",
-    "set_policy_context",
-    "get_policy_context",
-    "clear_policy_context",
-    "ROLE_MANIFESTS",
-    "get_manifest",
+    "register_tool",
     "require_policy",
-    "check_tool_access",
+    "set_policy_context",
     "tool_search",
-    "auto_correct",
 ]

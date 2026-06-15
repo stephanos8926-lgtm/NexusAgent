@@ -15,18 +15,18 @@ from .embeddings import (
 from .index import HybridMemoryIndex
 
 __all__ = [
+    "CANDIDATE_MULTIPLIER",
+    "CHUNK_OVERLAP",
+    "CHUNK_SIZE",
     # Constants
     "EMBED_DIM",
-    "CHUNK_SIZE",
-    "CHUNK_OVERLAP",
-    "VECTOR_WEIGHT",
     "KEYWORD_WEIGHT",
-    "CANDIDATE_MULTIPLIER",
+    "VECTOR_WEIGHT",
+    "_DB_POOL",
     # Classes
     "EmbeddingProvider",
     "HybridMemoryIndex",
+    "_blob_to_vec",
     # Helpers
     "_vec_to_blob",
-    "_blob_to_vec",
-    "_DB_POOL",
 ]

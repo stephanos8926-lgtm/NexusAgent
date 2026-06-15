@@ -31,7 +31,7 @@ _SEVERITY_ICON = {
     SEVERITY_HIGH: "🟠",
     SEVERITY_MEDIUM: "🟡",
     SEVERITY_LOW: "🔵",
-    SEVERITY_INFO: "ℹ️",
+    SEVERITY_INFO: "ℹ️",  # noqa: RUF001
 }
 
 
@@ -114,7 +114,7 @@ class ReviewResult:
         medium = sum(1 for i in self.issues if i.severity == SEVERITY_MEDIUM)
         low = sum(1 for i in self.issues if i.severity in (SEVERITY_LOW, SEVERITY_INFO))
 
-        lines.append(f"\n## Summary")
+        lines.append("\n## Summary")
         lines.append(f"  Total issues: {len(self.issues)}")
         if critical:
             lines.append(f"  🔴 Critical: {critical}")

@@ -5,7 +5,7 @@ continues to work. New code should import from ``nexusagent.memory.index``
 (the subpackage) directly.
 """
 
-from nexusagent.memory.index import *
+from nexusagent.memory.index import *  # noqa: F403
 from nexusagent.memory.index import (
     EMBED_DIM,
     CHUNK_SIZE,
@@ -20,15 +20,15 @@ from nexusagent.memory.index import (
 )
 
 __all__ = [
-    "EMBED_DIM",
-    "CHUNK_SIZE",
-    "CHUNK_OVERLAP",
-    "VECTOR_WEIGHT",
-    "KEYWORD_WEIGHT",
     "CANDIDATE_MULTIPLIER",
+    "CHUNK_OVERLAP",
+    "CHUNK_SIZE",
+    "EMBED_DIM",
+    "KEYWORD_WEIGHT",
+    "VECTOR_WEIGHT",
+    "_DB_POOL",
     "EmbeddingProvider",
     "HybridMemoryIndex",
-    "_vec_to_blob",
     "_blob_to_vec",
-    "_DB_POOL",
+    "_vec_to_blob",
 ]

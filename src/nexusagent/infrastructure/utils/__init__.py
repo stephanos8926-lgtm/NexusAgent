@@ -8,9 +8,9 @@ from nexusagent.infrastructure.utils.circuit import (
 from nexusagent.infrastructure.utils.retry import retry_on_false, retry_with_backoff
 
 __all__ = [
-    "retry_with_backoff",
-    "retry_on_false",
-    "CircuitState",
-    "CircuitBreakerError",
     "CircuitBreaker",
+    "CircuitBreakerError",
+    "CircuitState",
+    "retry_on_false",
+    "retry_with_backoff",
 ]

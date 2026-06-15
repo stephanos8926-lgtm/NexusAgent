@@ -23,16 +23,16 @@ from nexusagent.widgets.theme.colors import (
 from nexusagent.widgets.theme.registry import get_css_variable_defaults, get_theme_colors, get_theme_css
 
 __all__ = [
-    "ThemeColors",
+    "ALL_THEMES",
     "DARK_COLORS",
-    "TOKYO_NIGHT_COLORS",
     "ROSE_PINE_COLORS",
     "SOLARIZED_DARK_COLORS",
     "THEME_REGISTRY",
-    "ALL_THEMES",
+    "TOKYO_NIGHT_COLORS",
+    "ThemeColors",
+    "get_css_variable_defaults",
     "get_theme_colors",
     "get_theme_css",
-    "get_css_variable_defaults",
     "register_themes",
 ]
 

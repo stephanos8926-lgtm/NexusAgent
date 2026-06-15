@@ -9,27 +9,27 @@ from .task_repo import TaskRepository
 __all__ = [
     # Base
     "Base",
-    # Models
-    "TaskModel",
-    "ResultModel",
-    "SessionModel",
-    "MessageModel",
     # Manager
     "DatabaseManager",
+    "MessageModel",
+    "ResultModel",
+    "SessionModel",
+    "SessionRepository",
+    # Models
+    "TaskModel",
     # Repositories
     "TaskRepository",
-    "SessionRepository",
-    # Singleton getters/setters
-    "get_db_manager",
-    "set_db_manager",
-    "get_task_repo",
-    "set_task_repo",
-    "get_session_repo",
-    "set_session_repo",
     # Backward-compat lazy accessors (via __getattr__)
     "db_manager",
-    "task_repo",
+    # Singleton getters/setters
+    "get_db_manager",
+    "get_session_repo",
+    "get_task_repo",
     "session_repo",
+    "set_db_manager",
+    "set_session_repo",
+    "set_task_repo",
+    "task_repo",
 ]
 
 # Singleton instances — lazy init via get/set functions

@@ -5,7 +5,7 @@ to work. New code should import from ``nexusagent.infrastructure.db`` (the
 subpackage) directly.
 """
 
-from nexusagent.infrastructure.db import *
+from nexusagent.infrastructure.db import *  # noqa: F403
 from nexusagent.infrastructure.db import (
     Base,
     DatabaseManager,

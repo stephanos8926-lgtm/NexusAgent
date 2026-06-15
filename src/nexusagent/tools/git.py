@@ -14,7 +14,7 @@ def _run_git(args: str, workdir: str | None = None, timeout: int = 30) -> str:
     Uses list-based args with shell=False to prevent shell injection.
     """
     try:
-        cmd = ["git"] + shlex.split(args)
+        cmd = ["git", *shlex.split(args)]
         result = subprocess.run(
             cmd,
             shell=False,

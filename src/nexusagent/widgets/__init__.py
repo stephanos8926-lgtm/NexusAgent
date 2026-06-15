@@ -14,19 +14,19 @@ Usage:
 """
 
 __all__ = [
-    # Messages
-    "UserMessage",
-    "AssistantMessage",
-    "ToolCallMessage",
     "AppMessage",
-    "ErrorMessage",
-    "WelcomeBanner",
-    # Status
-    "StatusBar",
-    "ModelLabel",
+    "AssistantMessage",
     # Input
     "ChatInput",
+    "ErrorMessage",
+    "ModelLabel",
+    # Status
+    "StatusBar",
     # Theme
     "ThemeColors",
+    "ToolCallMessage",
+    # Messages
+    "UserMessage",
+    "WelcomeBanner",
     "get_css_variable_defaults",
 ]
