@@ -214,7 +214,15 @@ class SessionRepository:
     async def fork_session(
         self, source_id: str, new_working_dir: str | None = None
     ) -> str | None:
-        """Fork a session: copy messages to a new session ID. Returns new session ID or None."""
+        """Fork a session: copy messages to a new session ID.
+
+        All operations (create new session record, copy messages) happen
+        within a single database transaction via ``get_session()``, so
+        the fork is atomic — it either fully succeeds or fully rolls back.
+
+        Returns:
+            The new session UUID, or ``None`` if the source session was not found.
+        """
         async with self.db_manager.get_session() as session:
             src = await session.execute(
                 select(SessionModel).where(SessionModel.id == source_id)
