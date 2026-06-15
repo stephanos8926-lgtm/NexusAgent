@@ -34,7 +34,12 @@ NexusAgent is a production-grade AI coding agent platform. It combines an LLM-po
 ```
 NexusAgent/
 ├── src/nexusagent/          # Main source (src layout)
-│   ├── core/                # Agent, session, worker, subagent, graph
+│   ├── core/                # Agent core
+│   │   ├── session/         # Session + SessionManager (extracted)
+│   │   ├── worker/          # NexusWorker + WorkerPool (extracted)
+│   │   ├── agent.py         # Agent wrapper
+│   │   ├── graph.py         # LangGraph research graph
+│   │   └── subagent.py      # SubAgentHandle tracking
 │   ├── tools/               # 25+ tools + registry subpackage
 │   │   └── registry/        # types, core, policy, search (extracted Phase 5)
 │   ├── memory/              # Hybrid memory system
@@ -77,25 +82,30 @@ NexusAgent/
 
 ---
 
-## Refactoring History (2026-07-18)
+## Refactoring History
 
-Phases 1-7 completed the initial structural refactoring:
+### Phases 1-7 (2026-07-18) — Initial structural refactoring
+See CODEBASE_MAP.md for details. Established pattern: extract to subpackage → old file becomes compat shim → test → commit.
 
-| Phase | What | Commit | Pattern |
-|-------|------|--------|---------|
-| 1 | `infrastructure/utils.py` → `utils/` | `f260eee` | retry.py + circuit.py |
-| 2 | `widgets/theme.py` → `theme/` | `bfe2723` | colors.py + registry.py |
-| 3 | `infrastructure/db.py` → `db/` | `83aef0f` | 5 files (base, models, manager, repos) |
-| 4 | `widgets/messages.py` → `messages/` | `10e76dc` | 6 message widget classes |
-| 5 | `tools/registry.py` → `registry/` | `a076952` | types, core, policy, search |
-| 6 | `memory/memory_index.py` → `index/` | `db21f4c` | embeddings.py + index.py |
-| 7 | `memory/memory.py` DRY fix | `7bdb142` | Import shared constants from memory.index |
-| — | `interfaces/tui.py` split | `74fe4f9` | tui.py + tui_widgets.py + tui_formatters.py |
-| — | `yolo` field added to AgentConfig | `a290c93` | Fix missing config field |
-| 4D | TUI bug fixes | — | Widget-based arch, Enter key fix, httpx version preflight |
-| — | Version system | — | version.py, /version endpoint, SDK versions, CLI flags |
+### Phases 8-10 (2026-07-19) — Streaming + TUI + Tools
+| Phase | What | Result |
+|-------|------|--------|
+| 8 | Session streaming | `invoke()` → `astream()`, real token-by-token streaming, 4 new tests |
+| 9 | TUI split (810L) | `tui/` subpackage: app, websocket, streaming, input, formatters |
+| 10 | Tool registration (997L) | `tool_specs.py` (30 static tool tuples) + `register_all.py` (494L) |
 
-**Established pattern:** Extract to subpackage → old file becomes compat shim → test → commit → update CODEBASE_MAP.md
+### Phases 11-13 (2026-07-19) — Quick wins
+| Phase | What | Result |
+|-------|------|--------|
+| 11 | Code review (390L) | `code_review/` subpackage: models, checks/security, bugs, style, performance, ast |
+| 12 | Editor extraction | `editor.py` (edit_file), `fs_base.py` (shared utilities), fs.py reduced to 188L |
+| 13 | Template includes | `template_includes.py` (@-chain logic), prompt_loader.py reduced to 139L |
+
+### Phases 14-15 (2026-07-19) — Core modules
+| Phase | What | Result |
+|-------|------|--------|
+| 14 | Worker split (539L) | `worker/` subpackage: worker (NexusWorker), pool (WorkerPool), handler (agent execution) |
+| 15 | Session split (764L) | `session/` subpackage: session (Session), manager (SessionManager), helpers (context building) |
 
 ---
 
@@ -103,7 +113,7 @@ Phases 1-7 completed the initial structural refactoring:
 
 ### Import System
 - **Src layout**: Package is in `src/nexusagent/`. Always use `PYTHONPATH=src` or run from repo root.
-- **Compat shims**: Old files (utils.py, theme.py, db.py, messages.py, registry.py, memory_index.py) still exist as re-export shims. New code should import from subpackages directly.
+- **Compat shims**: Old files still exist as re-export shims: utils.py, theme.py, db.py, messages.py, registry.py, memory_index.py, tui.py, tui_widgets.py, tui_formatters.py, code_review.py, fs.py, prompt_loader.py, worker.py, session.py. New code should import from subpackages directly.
 - **Circular imports**: `tools/registry/core.py` imports `policy.py` with delayed import to avoid circular dependency. Don't restructure without understanding the import order.
 
 ### Config
