@@ -121,7 +121,11 @@ nexusagent/
 │
 ├── memory/                      # Hybrid memory system
 │   ├── __init__.py (4L)         # Re-exports HybridMemoryManager
-│   ├── memory.py (436L)         # Memory, MemoryManager, HybridMemoryManager
+│   ├── memory.py (14L)          # Compat shim → submodules
+│   ├── memory_item.py (50L)     # MemoryItem model + _hash_embed
+│   ├── memory_bank.py (210L)    # Memory class (scoped SQLite bank)
+│   ├── memory_manager.py (130L) # MemoryManager (lifecycle)
+│   ├── hybrid_memory.py (120L)  # HybridMemoryManager (file + index)
 │   ├── memory_index.py (34L)    # Compat shim → index/ subpackage
 │   ├── memory_files.py (264L)   # File-based canonical memory
 │   ├── compaction.py (233L)     # Context compaction pipeline
@@ -166,7 +170,10 @@ nexusagent/
 │
 │   ├── server/              # Server layer
 │   ├── __init__.py (1L)         # Server package init
-│   ├── server.py (354L)         # FastAPI + WebSocket (/version endpoint)
+│   ├── __main__.py (12L)        # Entry point for `python3 -m nexusagent.server`
+│   ├── server.py (100L)         # App factory (create_app) + lifespan + run()
+│   ├── routes.py (230L)         # REST endpoints (register_routes pattern)
+│   ├── websocket.py (160L)      # session_websocket handler
 │   ├── sdk.py (210L)            # NexusSDK (SERVER_VERSION, MIN_CLIENT_VERSION)
 │   └── version.py (42L)         # Single source of truth via importlib.metadata
 │
@@ -299,6 +306,16 @@ nexusagent/
 - Extracted: `tui_widgets.py` (231L), `tui_formatters.py` (296L)
 - Old file: Reduced from 1433L → 953L
 - Commit: `74fe4f9`
+
+### Phase 16: `server/server.py` → `server/` subpackage ✅
+- Extracted: `routes.py` (230L), `websocket.py` (160L), `__main__.py` (12L)
+- `server.py`: Reduced from 508L → 100L (app factory + lifespan)
+- Commit: `b9ef9e6`
+
+### Phase 17: `memory/memory.py` → `memory/` submodules ✅
+- Extracted: `memory_item.py` (50L), `memory_bank.py` (210L), `memory_manager.py` (130L), `hybrid_memory.py` (120L)
+- `memory.py`: Reduced from 474L → 14L (compat shim)
+- Commit: `086afba`
 
 ### Config Fix: `yolo` field added ✅
 - Added missing `yolo` field to `AgentConfig`

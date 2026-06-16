@@ -43,9 +43,14 @@ NexusAgent/
 │   ├── tools/               # 25+ tools + registry subpackage
 │   │   └── registry/        # types, core, policy, search (extracted Phase 5)
 │   ├── memory/              # Hybrid memory system
-│   │   ├── memory.py       # Memory, MemoryManager, HybridMemoryManager
+│   │   ├── __init__.py
+│   │   ├── memory.py        # Compat shim → submodules
+│   │   ├── memory_item.py   # MemoryItem model + _hash_embed
+│   │   ├── memory_bank.py   # Memory class (scoped SQLite bank)
+│   │   ├── memory_manager.py # MemoryManager (lifecycle)
+│   │   ├── hybrid_memory.py # HybridMemoryManager (file + index)
 │   │   ├── memory_files.py  # FileMemory (canonical)
-│   │   ├── memory_index.py  # Compat shim → memory/index/
+│   │   ├── memory_index.py  # Compat shim → index/ subpackage
 │   │   ├── index/           # embeddings.py, index.py (extracted Phase 6)
 │   │   └── compaction.py    # CompactionPipeline
 │   ├── widgets/             # TUI widgets
@@ -67,7 +72,11 @@ NexusAgent/
 │   │   ├── auth.py          # Fernet keystore
 │   │   └── prompt_loader.py # NEXUS.md loader
 │   ├── server/              # FastAPI + WebSocket + SDK + Version
-│   │   ├── server.py        # FastAPI + WebSocket (/version endpoint)
+│   │   ├── __init__.py
+│   │   ├── __main__.py       # Entry point for `python3 -m nexusagent.server`
+│   │   ├── server.py        # App factory (create_app) + lifespan + run()
+│   │   ├── routes.py        # REST endpoints (register_routes pattern)
+│   │   ├── websocket.py     # session_websocket handler
 │   │   ├── sdk.py           # NexusSDK (SERVER_VERSION, MIN_CLIENT_VERSION)
 │   │   └── version.py       # Single source of truth via importlib.metadata
 │   ├── llm/                 # Multi-provider LLM bridge
@@ -107,13 +116,19 @@ See CODEBASE_MAP.md for details. Established pattern: extract to subpackage → 
 | 14 | Worker split (539L) | `worker/` subpackage: worker (NexusWorker), pool (WorkerPool), handler (agent execution) |
 | 15 | Session split (764L) | `session/` subpackage: session (Session), manager (SessionManager), helpers (context building) |
 
+### Phases 16-17 (2026-07-19) — Server + Memory
+| Phase | What | Result |
+|-------|------|--------|
+| 16 | Server split (508L) | `server/` subpackage: server.py (app factory), routes.py (REST), websocket.py (WS handler), __main__.py |
+| 17 | Memory split (474L) | `memory/` subpackage: memory_item.py, memory_bank.py, memory_manager.py, hybrid_memory.py; memory.py = compat shim |
+
 ---
 
 ## Known Quirks & Gotchas
 
 ### Import System
 - **Src layout**: Package is in `src/nexusagent/`. Always use `PYTHONPATH=src` or run from repo root.
-- **Compat shims**: Old files still exist as re-export shims: utils.py, theme.py, db.py, messages.py, registry.py, memory_index.py, tui.py, tui_widgets.py, tui_formatters.py, code_review.py, fs.py, prompt_loader.py, worker.py, session.py. New code should import from subpackages directly.
+- **Compat shims**: Old files still exist as re-export shims: utils.py, theme.py, db.py, messages.py, registry.py, memory_index.py, tui.py, tui_widgets.py, tui_formatters.py, code_review.py, fs.py, prompt_loader.py, worker.py, session.py, server.py, memory.py. New code should import from subpackages directly.
 - **Circular imports**: `tools/registry/core.py` imports `policy.py` with delayed import to avoid circular dependency. Don't restructure without understanding the import order.
 
 ### Config
