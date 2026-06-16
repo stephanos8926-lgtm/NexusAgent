@@ -14,15 +14,13 @@ from pathlib import Path
 # Shared utilities from fs_base (single source of truth)
 from nexusagent.tools.fs_base import (
     _DEFAULT_DIR_EXCLUDES,
+    _WORKSPACE_ROOT,  # noqa: F401 — re-exported for backward compatibility
     _check_read,
-    _get_workspace_root,
-    _mark_read,
     _read_files,
     _resolve,
-    _WORKSPACE_ROOT,
     get_read_files,
     reset_read_tracking,
-    set_workspace_root,
+    set_workspace_root,  # noqa: F401 — re-exported for backward compatibility
 )
 
 # Re-export edit_file from the editor subpackage for backward compatibility
