@@ -322,6 +322,35 @@ def ask_user(question: str, options: list[str] | None = None) -> str:
 _DEFAULT_MEMORY_WORKSPACE = "~/.nexusagent/memory/"
 
 
+def _discover_workspaces() -> list[str]:
+    """Discover all workspace memory directories.
+
+    Scans ~/Workspaces/*/.nexusagent/ for directories that exist.
+    Falls back to the default global workspace.
+
+    Returns:
+        List of absolute paths to workspace memory directories.
+    """
+    import os
+    from pathlib import Path
+
+    workspaces: list[str] = []
+    workspaces_home = Path.home() / "Workspaces"
+    if workspaces_home.is_dir():
+        for project_dir in sorted(workspaces_home.iterdir()):
+            nexus_dir = project_dir / ".nexusagent"
+            if nexus_dir.is_dir():
+                mem_dir = nexus_dir / "memory"
+                if mem_dir.is_dir():
+                    workspaces.append(str(mem_dir))
+
+    # Always include the default global workspace as fallback
+    default = os.path.expanduser(_DEFAULT_MEMORY_WORKSPACE)
+    if default not in workspaces:
+        workspaces.append(default)
+    return workspaces
+
+
 def _get_memory_workspace() -> str:
     """Get the memory workspace path.
 
@@ -347,28 +376,62 @@ def _get_memory_workspace() -> str:
     parameters={
         "query": "Search query string",
         "max_results": "Maximum results to return (default: 6)",
+        "workspace": "Override workspace path (optional, defaults to config or global)",
     },
     example='memory_search("authentication", max_results=5)',
     category="memory",
     returns="Formatted search results with citations.",
 )
-async def memory_search(query: str, max_results: int = 6) -> str:
-    """Search memory using hybrid keyword + vector search."""
+async def memory_search(query: str, max_results: int = 6, workspace: str | None = None) -> str:
+    """Search memory using hybrid keyword + vector search.
+
+    Args:
+        query: Search query string.
+        max_results: Maximum results to return per workspace (default: 6).
+        workspace: Override workspace path, or "all" to search all workspaces.
+    """
+    import os
     from nexusagent.memory.memory import HybridMemoryManager
 
-    workspace = _get_memory_workspace()
-    mgr = HybridMemoryManager(workspace)
-    mgr.initialize()
-    results = await mgr.recall(query, max_results=max_results)
-    if not results:
+    if workspace == "all":
+        workspaces = _discover_workspaces()
+    else:
+        ws = workspace or _get_memory_workspace()
+        workspaces = [os.path.expanduser(ws)]
+
+    all_results: list[dict] = []
+    for ws in workspaces:
+        try:
+            mgr = HybridMemoryManager(ws)
+            mgr.initialize()
+            results = await mgr.recall(query, max_results=max_results)
+            for r in results:
+                r["_workspace"] = ws
+            all_results.extend(results)
+        except Exception:
+            continue
+
+    if not all_results:
         return f"No memories found for: {query}"
 
-    lines = [f"Memory search results for: {query}\n"]
-    for r in results:
+    # Deduplicate by content hash, keep highest score
+    seen: dict[str, dict] = {}
+    for r in all_results:
+        key = r.get("content", "")[:100]
+        if key not in seen or r.get("score", 0) > seen[key].get("score", 0):
+            seen[key] = r
+
+    # Sort by score, take top max_results
+    merged = sorted(seen.values(), key=lambda x: x.get("score", 0), reverse=True)[:max_results]
+
+    lines = [f"Memory search results for: {query} ({len(merged)} results)\n"]
+    for r in merged:
         source = r.get("file", "unknown")
+        ws = r.get("_workspace", "")
         content = r.get("content", "").strip()
         score = r.get("score", 0)
-        lines.append(f"Source: {source} (score: {score:.2f})")
+        ws_label = f" [{ws}]" if workspace == "all" else ""
+        lines.append(f"Source: {source}{ws_label} (score: {score:.2f})")
         lines.append(f"{content}\n")
     return "\n".join(lines)
 
@@ -417,25 +480,29 @@ def memory_get(path: str, offset: int = 1, limit: int = 50) -> str:
         "description": "Short description/title for the entry",
         "confidence": "Confidence score 0.0-1.0 (optional, for opinion entries)",
         "entities": "List of entity names this relates to (optional)",
+        "workspace": "Override workspace path (optional, defaults to config or global)",
     },
     example='memory_write("The auth module uses JWT tokens", type="world", description="Auth uses JWT", entities=["auth", "jwt"])',
     category="memory",
     returns="Confirmation message with file path of the written entry.",
 )
-def memory_write(
+async def memory_write(
     content: str,
     type: str = "world",
     description: str = "",
     confidence: float | None = None,
     entities: list[str] | None = None,
+    workspace: str | None = None,
 ) -> str:
     """Write a memory entry. Stores in bank/ directory with YAML frontmatter and indexes it."""
+    import os
     from nexusagent.memory.memory import HybridMemoryManager
 
-    workspace = _get_memory_workspace()
-    mgr = HybridMemoryManager(workspace)
+    ws = workspace or _get_memory_workspace()
+    ws = os.path.expanduser(ws)
+    mgr = HybridMemoryManager(ws)
     mgr.initialize()
-    filepath = mgr.remember(
+    filepath = await mgr.remember(
         content=content,
         type=type,
         description=description or content[:50],
