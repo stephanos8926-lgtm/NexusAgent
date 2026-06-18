@@ -282,4 +282,25 @@ Two comprehensive reviews were conducted. Full reports in:
 
 ---
 
+## Roadmap
+
+### Authz System (Next Major Feature)
+
+Design and implement a full authorization and key management system:
+
+- **Admin keys**: Full access to all API/SDK routes, can generate/manage other keys, view usage metrics
+- **Operator keys**: Scoped to specific workspace directories, cannot access admin functions or generate keys
+- **User profiles**: Username, name, notes, workspace location per key
+- **Unix integration** (optional mode): Attach operator keys to Unix user/password combos, scoped filesystem permissions via groups, cgroup resource management, chroot jails
+- **Key storage**: Move from Fernet file-based keystore to encrypted database (SQLCipher or similar) with encryption at rest
+- **Single-user mode**: Admin key has full machine access, operates from any workspace
+- **Multi-user mode**: Admin generates operator keys, each scoped to `/home/sysop/Workspaces/${OPERATOR_NAME}`
+- **API endpoints**: `POST /auth/keys` (create), `GET /auth/keys` (list), `DELETE /auth/keys/{id}` (revoke), `GET /auth/keys/{id}/usage` (metrics)
+
+### Test System
+- Parallel execution via pytest-xdist (`-n auto --dist worksteal`)
+- Test markers: `e2e`, `needs_db`, `slow`, `unit`
+- Coverage via pytest-cov
+- Randomized test order via pytest-randomly
+
 *This file is the living knowledge base for the NexusAgent project. Update it after every significant discovery, refactoring, or architectural decision. When in doubt, point to the reference documents rather than duplicating information.*
