@@ -23,6 +23,8 @@ NexusAgent is a production-grade AI coding agent platform. It combines an LLM-po
 | **Refactoring Plan** | `docs/REFACTORING_PLAN.md` | 14-item prioritized refactoring roadmap |
 | **State** | `docs/STATE.md` | Module-by-module inventory (⚠️ partially outdated) |
 | **Compliance** | `docs/DOC_COMPLIANCE.md` | Documentation audit and gap analysis |
+| **Code Review** | `docs/CODE_REVIEW_COMPREHENSIVE.md` | Comprehensive multi-audit (45+ issues, prioritized) |
+| **Assessment** | `docs/assessment/2026-07-18-independent-codebase-assessment.md` | Independent architecture assessment |
 | **Version** | `src/nexusagent/version.py` | Single source of truth (importlib.metadata) |
 || **ADRs** | `docs/adrs/` | Architecture decision records (0001-0005) |
 | **Config** | `config/nexusagent.yaml` | Runtime configuration |
@@ -170,6 +172,31 @@ See CODEBASE_MAP.md for details. Established pattern: extract to subpackage → 
 - **Dev server**: `uvicorn nexusagent.server.server:app --reload --port 8000` (auto-reload on code changes)
 - **Docker dev**: `docker-compose -f docker-compose.dev.yml up` for containerized development
 - **No CI/CD**: No GitHub Actions or similar. Tests run manually.
+
+---
+
+## Audit Findings (2026-07-18)
+
+Two comprehensive reviews were conducted. Full reports in:
+- `docs/CODE_REVIEW_COMPREHENSIVE.md` — 45+ issues across 8 audit dimensions
+- `docs/assessment/2026-07-18-independent-codebase-assessment.md` — Architecture assessment
+
+### 🔴 Critical Issues (Fix Immediately)
+1. **`refine_node` silently approves plan on failure** — `core/graph.py:125-127` — Returns `plan_approved: True` on exception
+2. **API key in URL query param** — `server/websocket.py:35` — Credential exposure in logs/browser history
+3. **Sync SQLite in async** — `memory/index/index.py` — Blocks event loop on every memory operation
+4. **`SessionManager.get_or_create` busy-wait spin loop** — No timeout, potential deadlock
+5. **`sanitize_tool_output` always marks untrusted** — Even when no injection detected, degrades LLM effectiveness
+6. **No TLS/SSL** — All traffic including API keys in plaintext
+
+### Most Notable Findings
+- **NATS bus is intentionally only in server layer** — WebSocket uses direct connections (correct architecture, not a bug)
+- **Policy-aware tool discovery** is the most impressive feature (production-grade)
+- **Hybrid memory system** is well-designed (files as source of truth, derived SQLite index)
+- **Deep research pipeline is non-functional** — `_search()` returns dummy data
+- **TUI streaming is cosmetic** — LLM bridge has no `astream()`, so streaming is fake
+
+### Score: 6.5/10 — Strong architecture, incomplete implementation
 
 ---
 
