@@ -33,6 +33,11 @@ class TaskSchema(BaseModel):
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     metadata: dict[str, Any] = Field(default_factory=dict)
+    # Working directory for workspace-scoped memory and path jail
+    working_dir: str | None = Field(
+        default=None,
+        description="Working directory for this task. Enables workspace-scoped memory and path jail.",
+    )
 
 
 class MemoryScope(StrEnum):
@@ -68,8 +73,13 @@ class TaskContract(BaseModel):
     # provider must match a key recognised by llm.py (e.g. "gemini", "openrouter").
     model: str | None = None
     provider: str | None = None
-    max_depth: int = Field(default=3, ge=1, le=10)  # Max sub-agent nesting depth
-    summary_only: bool = False  # If True, return only a summary (not full output)
+    max_depth: int = Field(default=3, ge=1, le=10)
+    summary_only: bool = False
+    # Custom system prompt override for subagents/workers
+    system_prompt: str | None = Field(
+        default=None,
+        description="Custom system prompt for this agent. If None, uses default NEXUS.md loading.",
+    )
 
 
 class ResultSchema(BaseModel):

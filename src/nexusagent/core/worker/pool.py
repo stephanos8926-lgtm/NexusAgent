@@ -60,6 +60,11 @@ class WorkerPool:
                 meta = dict(handle.contract.metadata)
                 meta.setdefault("agent_model", handle.model)
                 meta.setdefault("agent_provider", handle.provider)
+                # Pass working_dir and system_prompt from contract to task metadata
+                if handle.contract.working_dir and handle.contract.working_dir != ".":
+                    meta["working_dir"] = handle.contract.working_dir
+                if handle.contract.system_prompt:
+                    meta["system_prompt"] = handle.contract.system_prompt
                 task = TaskSchema(
                     id=handle.contract.task_id,
                     description=handle.contract.description,

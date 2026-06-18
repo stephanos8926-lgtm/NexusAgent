@@ -251,23 +251,92 @@ def run_agent_task(state: dict) -> dict:
     """Process a task through the agent.
 
     Reads role, policy, and optional model/provider overrides from state.
-    model/provider come from WorkerPool metadata when spawned as a subagent,
-    ensuring subagents inherit the main agent's provider rather than
-    defaulting to a hardcoded value.
+    Sets up workspace context (path jail, memory, NEXUS.md, environment)
+    when working_dir is provided in state.
     """
     task_desc = state.get("task", "unknown")
     role = state.get("role", "full")
     policy = state.get("policy", "permissive")
     model_override = state.get("agent_model")
     provider_override = state.get("agent_provider")
+    working_dir = state.get("working_dir", ".")
+
+    # Set up workspace context for worker-based agents
+    _setup_workspace_context(working_dir)
 
     try:
         agent = Agent(role=role, policy=policy,
                       model_override=model_override,
                       provider_override=provider_override)
+
+        # Inject workspace context into state for the agent
+        if working_dir and working_dir != ".":
+            # Load NEXUS.md from working_dir
+            from nexusagent.infrastructure.prompt_loader import load_nexus_prompt
+            from pathlib import Path
+            try:
+                nexus_prompt = load_nexus_prompt(
+                    package_root=Path(__file__).parent.parent,
+                    cwd=Path(working_dir),
+                    max_depth=8,
+                )
+                state["_nexus_prompt"] = nexus_prompt
+            except Exception:
+                pass
+
+            # Build environment context
+            try:
+                from nexusagent.core.session.helpers import _build_environment_context
+                env_ctx = _build_environment_context(working_dir)
+                state["_environment_context"] = env_ctx
+            except Exception:
+                pass
+
+        # Inject custom system_prompt if provided
+        custom_prompt = state.get("system_prompt")
+        if custom_prompt:
+            state["_system_prompt"] = custom_prompt
+
         result = agent(state)
         return {"result": result, "success": True}
     except Exception as e:
         logger = logging.getLogger(__name__)
         logger.error(f"Agent execution failed for task '{task_desc}': {e}", exc_info=True)
         return {"result": None, "error": str(e), "success": False}
+
+
+def _setup_workspace_context(working_dir: str) -> None:
+    """Set up workspace context for a worker agent.
+
+    Configures:
+    - Path jail (fs_base.set_workspace_root)
+    - Workspace-scoped memory directory
+    - NEXUS.md loading from working_dir
+    - Environment context injection
+    """
+    import os
+    from pathlib import Path
+
+    if not working_dir or working_dir == ".":
+        return
+
+    working_dir = str(Path(working_dir).resolve())
+
+    # 1. Set path jail
+    from nexusagent.tools.fs_base import set_workspace_root
+    set_workspace_root(working_dir)
+
+    # 2. Set workspace-scoped memory directory
+    from nexusagent.infrastructure.config import settings
+    ws_memory = Path(working_dir) / ".nexusagent" / "memory"
+    ws_memory.mkdir(parents=True, exist_ok=True)
+    # Note: memory tools use _get_memory_workspace() which checks config.
+    # For per-worker memory, we set a thread-local override.
+    _ws_memory_dir.set(str(ws_memory))
+
+
+# Thread-local override for per-worker memory directory
+import contextvars
+_ws_memory_dir: contextvars.ContextVar[str | None] = contextvars.ContextVar(
+    "ws_memory_dir", default=None
+)

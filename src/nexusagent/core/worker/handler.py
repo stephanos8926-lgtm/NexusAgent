@@ -37,12 +37,14 @@ async def _run_agent_task(task: TaskSchema) -> str:
     Routes research tasks to the LangGraph workflow and coding tasks to the
     deepagents Agent, protected by the module-level agent circuit breaker.
 
-    Both NexusWorker and WorkerPool delegate to this function so that routing
-    logic, circuit-breaker protection, and the research/code split live in one
-    place.
+    Sets up workspace context (path jail, memory, NEXUS.md, environment)
+    for all worker-based agents.
     """
     task_desc = task.description.lower()
     metadata = task.metadata if hasattr(task, "metadata") else {}
+
+    # Extract working_dir from task metadata or task.working_dir field
+    working_dir = metadata.get("working_dir") or getattr(task, "working_dir", None) or "."
 
     # Route: research tasks → LangGraph workflow, everything else → Agent
     is_research = metadata.get("mode") == "research" or any(
@@ -52,17 +54,27 @@ async def _run_agent_task(task: TaskSchema) -> str:
 
     async with _agent_breaker:
         if is_research:
-            return await _run_research_workflow(task)
+            return await _run_research_workflow(task, working_dir)
         else:
             loop = asyncio.get_running_loop()
-            state = {"task": task.description, "id": task.id, **metadata}
+            state = {
+                "task": task.description,
+                "id": task.id,
+                "working_dir": working_dir,
+                **metadata,
+            }
             result = await loop.run_in_executor(None, run_agent_task, state)
             return result.get("result", "No result returned from agent.")
 
 
-async def _run_research_workflow(task: TaskSchema) -> str:
+async def _run_research_workflow(task: TaskSchema, working_dir: str = ".") -> str:
     """Execute a research task through the LangGraph state machine."""
     from nexusagent.core.graph import create_research_graph
+
+    # Set up workspace path jail for research agents too
+    from nexusagent.tools.fs_base import set_workspace_root
+    if working_dir and working_dir != ".":
+        set_workspace_root(working_dir)
 
     graph = create_research_graph()
     config = {"configurable": {"thread_id": task.id}}

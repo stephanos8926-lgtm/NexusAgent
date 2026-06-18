@@ -78,7 +78,8 @@ class NexusSDK:
         # Don't mutate the caller's dict
         task_data = dict(task_data)
         task_id = task_data.pop("id", str(uuid.uuid4()))
-        task = TaskSchema(id=task_id, **task_data)
+        working_dir = task_data.pop("working_dir", None)
+        task = TaskSchema(id=task_id, working_dir=working_dir, **task_data)
 
         logger.info(f"Submitting task {task_id}: {task.description}")
         await self.bus.publish("tasks.submit", task.model_dump())

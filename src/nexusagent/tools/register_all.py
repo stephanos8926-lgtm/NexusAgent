@@ -264,6 +264,7 @@ async def spawn_subagent(
     max_turns: int = 15,
     acceptance_criteria: list[str] | None = None,
     memory_mode: str = "isolated",
+    system_prompt: str | None = None,
 ) -> str:
     """Spawn a sub-agent worker to execute an isolated task and return its ID."""
     from nexusagent.llm.models import MemoryScope, TaskContract
@@ -281,6 +282,7 @@ async def spawn_subagent(
             if memory_mode in ("isolated", "scoped")
             else MemoryScope.ISOLATED
         ),
+        system_prompt=system_prompt,
     )
 
     handle = await worker_pool.spawn(contract)
@@ -355,12 +357,21 @@ def _get_memory_workspace() -> str:
     """Get the memory workspace path.
 
     Resolution order:
-    1. Config setting ``agent.memory_workspace`` (if set)
-    2. Default: ``~/.nexusagent/memory/``
+    1. Thread-local worker override (set by _setup_workspace_context)
+    2. Config setting ``agent.memory_workspace`` (if set)
+    3. Default: ``~/.nexusagent/memory/``
     """
     import os
     from nexusagent.infrastructure.config import settings
 
+    # 1. Check thread-local worker override
+    from nexusagent.core.agent import _ws_memory_dir
+    ws = _ws_memory_dir.get()
+    if ws:
+        os.makedirs(ws, exist_ok=True)
+        return ws
+
+    # 2. Check config
     ws = settings.agent.memory_workspace
     if ws:
         path = os.path.expanduser(ws)
