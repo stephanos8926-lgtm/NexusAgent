@@ -14,6 +14,32 @@ logger = logging.getLogger(__name__)
 DEFAULT_MAX_CHAIN_DEPTH = 8
 MAX_FILE_SIZE = 256 * 1024  # 256KB max per injected file
 
+# Allowed base directories for @file includes.
+# Only files within these directories (or their subdirectories) are permitted.
+_ALLOWED_INCLUDE_PATHS: list[Path] = []
+
+
+def set_allowed_include_paths(paths: list[Path]) -> None:
+    """Set the allowlist of base directories for @file includes.
+
+    Args:
+        paths: List of resolved, absolute Path objects. Only files within
+               these directories (or their subdirectories) will be allowed.
+    """
+    _ALLOWED_INCLUDE_PATHS.clear()
+    _ALLOWED_INCLUDE_PATHS.extend(paths)
+
+
+def _is_path_allowed(resolved: Path) -> bool:
+    """Check whether *resolved* (absolute) path is within the allowlist."""
+    for base in _ALLOWED_INCLUDE_PATHS:
+        try:
+            resolved.relative_to(base)
+            return True
+        except ValueError:
+            continue
+    return False
+
 
 class PromptLoadError(Exception):
     """Raised when a prompt file cannot be loaded."""
@@ -71,6 +97,16 @@ def load_prompt_content(
 
             file_path = resolve_path(file_str, current_dir)
             abs_path = str(file_path.resolve())
+
+            # SECURITY: Path allowlist check — only allow files within permitted dirs
+            if _ALLOWED_INCLUDE_PATHS and not _is_path_allowed(file_path.resolve()):
+                logger.warning(
+                    "Prompt chain path blocked by allowlist: %s", file_path
+                )
+                output_parts.append(
+                    f"[prompt: {file_str} — BLOCKED by path allowlist]"
+                )
+                continue
 
             # Circular detection
             if abs_path in visited:

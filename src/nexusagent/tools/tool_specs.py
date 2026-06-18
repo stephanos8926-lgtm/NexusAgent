@@ -463,3 +463,7 @@ def register_all() -> None:
             category=category,
             returns=returns,
         )(func)
+
+
+# Set of all built-in tool names — used to prevent MCP tools from shadowing them
+BUILTIN_TOOL_NAMES: set[str] = {spec[0] for spec in TOOL_SPECS}

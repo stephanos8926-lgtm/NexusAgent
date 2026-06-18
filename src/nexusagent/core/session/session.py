@@ -386,5 +386,20 @@ class Session:
     # ── Internal helpers ───────────────────────────────────────────────
 
     def _enqueue(self, event: dict[str, Any]) -> None:
-        """Put an event dict onto the internal queue (non-blocking)."""
-        self._event_queue.put_nowait(event)
+        """Put an event dict onto the internal queue (non-blocking).
+
+        If the queue is full (consumer is slow), drop the oldest event
+        to prevent memory growth and potential deadlock.
+        """
+        try:
+            self._event_queue.put_nowait(event)
+        except asyncio.QueueFull:
+            # Drop oldest event to make room (prevents deadlock on slow consumers)
+            try:
+                self._event_queue.get_nowait()
+            except asyncio.QueueEmpty:
+                pass
+            try:
+                self._event_queue.put_nowait(event)
+            except asyncio.QueueFull:
+                logger.warning("Event queue full — dropping event for session %s", self.session_id)

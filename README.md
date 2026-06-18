@@ -1,5 +1,7 @@
 # NexusAgent
 
+[![CI](https://github.com/stephanos8926-lgtm/NexusAgent/actions/workflows/ci.yml/badge.svg)](https://github.com/stephanos8926-lgtm/NexusAgent/actions/workflows/ci.yml)
+
 **AI Coding Agent — terminal-native, privacy-first, built for real work.**
 
 ## What It Is

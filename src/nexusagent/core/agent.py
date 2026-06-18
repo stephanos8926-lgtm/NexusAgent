@@ -77,9 +77,28 @@ async def _ensure_mcp_tools_loaded():
         await register_mcp_tools()
     except Exception as exc:
         logging.getLogger(__name__).warning("MCP tool loading failed: %s", exc)
+    else:
+        # Increment version so role tool lists get rebuilt on next agent creation
+        global _role_tools_version
+        _role_tools_version += 1
 
 
 # ─── Build Tool Lists per Role ──────────────────────────────────────────
+
+# Version counter — incremented when MCP tools are loaded
+_role_tools_version: int = 0
+_built_version: int = -1  # version at which _ROLE_TOOLS was last built
+
+
+def _refresh_role_tools_if_needed() -> None:
+    """Rebuild _ROLE_TOOLS if MCP tools have been loaded since last build."""
+    global _built_version
+    if _built_version != _role_tools_version:
+        _ROLE_TOOLS.clear()
+        for _role in ROLE_MANIFESTS:
+            _ROLE_TOOLS[_role] = _build_role_tools(_role)
+        _ROLE_TOOLS["full"] = _build_role_tools("full")
+        _built_version = _role_tools_version
 
 
 def _build_role_tools(role: str) -> list:
@@ -189,9 +208,9 @@ class Agent:
 
         # Set policy context for this agent (thread-local)
         set_policy_context(role, policy)
-
         # Ensure MCP + memory index tools are loaded before building tool list
         import asyncio
+
         try:
             loop = asyncio.get_running_loop()
             # Schedule MCP loading; agent creation is sync so we fire-and-forget
@@ -199,6 +218,9 @@ class Agent:
         except RuntimeError:
             # No event loop — skip async MCP loading (tools already in registry)
             pass
+
+        # Refresh role tool lists if MCP tools were loaded since module import
+        _refresh_role_tools_if_needed()
 
         # Get tools for this role
         tools = _ROLE_TOOLS.get(role, _ROLE_TOOLS["full"])

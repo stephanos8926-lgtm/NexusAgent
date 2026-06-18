@@ -140,7 +140,7 @@ class NexusApp(App):
             **kwargs: Additional keyword arguments passed to the App base class.
         """
         super().__init__(**kwargs)
-        self.session_id = session_id or str(uuid.uuid4())[:8]
+        self.session_id = session_id or str(uuid.uuid4())
         self._yolo_default = yolo
         self._busy = False
         self._pending_inputs: list[str] = []
@@ -156,6 +156,22 @@ class NexusApp(App):
         self._last_tool_name = ""
         self._context_used = 0
         self._context_limit = 0
+
+    # ── Message widget sliding window ────────────────────────────────────
+
+    _MAX_MESSAGE_WIDGETS = 50
+
+    def _mount_message(self, widget) -> None:
+        """Mount a message widget with a sliding window limit.
+
+        Keeps only the last _MAX_MESSAGE_WIDGETS mounted. When the limit
+        is exceeded, the oldest widget is removed to bound memory usage.
+        """
+        self.messages_container.mount(widget)
+        children = list(self.messages_container.children)
+        while len(children) > self._MAX_MESSAGE_WIDGETS:
+            oldest = children.pop(0)
+            oldest.remove()
 
     def on_mount(self) -> None:
         """Set up the TUI on mount: initialize queues, widgets, and start WebSocket loop."""
@@ -206,7 +222,7 @@ class NexusApp(App):
     def _show_greeting(self) -> None:
         """Show welcome banner at top of message stream (scrolls away as chat grows)."""
         welcome = WelcomeBanner(session_id=self.session_id)
-        self.messages_container.mount(welcome)
+        self._mount_message(welcome)
 
     # ── SIGWINCH (responsive resize) ────────────────────────────────────
 
@@ -263,7 +279,7 @@ class NexusApp(App):
             )
             self.status_bar.set_status("Interrupting...")
             msg = AppMessage("Interrupt sent — waiting for agent to stop...")
-            self.messages_container.mount(msg)
+            self._mount_message(msg)
 
     def action_expand_all(self) -> None:
         """Expand all collapsed tool call outputs."""
@@ -290,10 +306,10 @@ class NexusApp(App):
         self._auto_approve = not self._auto_approve
         if self._auto_approve:
             msg = AppMessage("Auto-approve enabled")
-            self.messages_container.mount(msg)
+            self._mount_message(msg)
         else:
             msg = AppMessage("Auto-approve disabled")
-            self.messages_container.mount(msg)
+            self._mount_message(msg)
 
     # ── Input handling (delegates to input.py) ──────────────────────────
 

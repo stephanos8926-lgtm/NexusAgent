@@ -237,6 +237,12 @@ class AgentBus:
         if not self.nc:
             raise RuntimeError("NATSBus not connected. Call connect() first.")
 
+        # Deduplicate: don't re-subscribe to the same subject with the same callback
+        for existing_sub in self._subscriptions:
+            if getattr(existing_sub, 'subject', None) == subject:
+                logger.debug("Already subscribed to '%s' — skipping", subject)
+                return
+
         async def _do_subscribe() -> Subscription:
             sub = await self.nc.subscribe(subject, cb=callback)
             self._subscriptions.append(sub)

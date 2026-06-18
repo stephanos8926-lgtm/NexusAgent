@@ -11,6 +11,7 @@ Import this module once at startup to populate the registry:
 from __future__ import annotations
 
 import logging
+import re
 
 from nexusagent.tools.registry import register_tool
 
@@ -90,10 +91,23 @@ async def register_mcp_tools() -> list[str]:
             if not tool_name or tool_name in _MCP_REGISTERED_NAMES:
                 continue
 
+            # SECURITY: Deny MCP tools that shadow built-in tool names
+            from nexusagent.tools.tool_specs import BUILTIN_TOOL_NAMES
+            if tool_name in BUILTIN_TOOL_NAMES:
+                logger.warning(
+                    "MCP server '%s' attempted to register tool '%s' "
+                    "which shadows a built-in tool — BLOCKED",
+                    server_name, tool_name,
+                )
+                continue
+
+            # SECURITY: Sanitize tool description (strip HTML/script tags)
+            raw_description = tool_def.get("description", f"MCP tool from {server_name}")
+            tool_description = _sanitize_description(raw_description)
+
             _MCP_REGISTERED_NAMES.add(tool_name)
             _MCP_REGISTRY.setdefault(server_name, []).append(tool_def)
             wrapped = _wrap_mcp_tool(server_name, server_url, transport, tool_def)
-            tool_description = tool_def.get("description", f"MCP tool from {server_name}")
             tool_params = _extract_param_descriptions(tool_def.get("inputSchema", {}))
 
             register_tool(
@@ -207,6 +221,15 @@ def _extract_param_descriptions(schema: dict) -> dict[str, str]:
             desc = f"[required] {desc}"
         params[pname] = desc
     return params
+
+
+# Regex to strip HTML/script tags from tool descriptions
+_HTML_TAG_RE = re.compile(r"<[^>]+>")
+
+
+def _sanitize_description(desc: str) -> str:
+    """Strip HTML/script tags from tool descriptions to prevent injection."""
+    return _HTML_TAG_RE.sub("", desc).strip()
 
 
 # ═══════════════════════════════════════════════════════════════════════

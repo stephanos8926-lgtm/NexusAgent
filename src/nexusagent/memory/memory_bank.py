@@ -175,7 +175,8 @@ class Memory:
                 (child_id,),
             ).fetchall()
 
-            existing = {
+            # Build set of existing content in target for O(1) lookup
+            existing_content = {
                 r[0]
                 for r in conn.execute(
                     "SELECT content FROM memories WHERE memory_id = ?", (target_id,)
@@ -183,12 +184,12 @@ class Memory:
             }
             moved = 0
             for row_id, content, _meta_json, _created_at, _emb_blob in rows:
-                if content not in existing:
+                if content not in existing_content:
                     conn.execute(
                         "UPDATE memories SET memory_id = ? WHERE id = ?",
                         (target_id, row_id),
                     )
-                    existing.add(content)
+                    existing_content.add(content)
                     moved += 1
             conn.commit()
             return moved

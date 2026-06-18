@@ -106,8 +106,8 @@ def register_routes(app: FastAPI) -> None:
         except HTTPException:
             raise
         except Exception as e:
-            logger.error("Error submitting task: %s", e)
-            raise HTTPException(status_code=500, detail=str(e)) from e
+            logger.error("Error submitting task: %s", type(e).__name__)
+            raise HTTPException(status_code=500, detail="Internal server error") from e
 
     # ─── Task Status ────────────────────────────────────────────────────
 

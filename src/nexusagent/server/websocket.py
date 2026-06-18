@@ -156,5 +156,5 @@ async def session_websocket(
         logger.info("Session %s disconnected", session_id)
         await session_manager.mark_idle(session_id)
     except Exception as e:
-        logger.error("WebSocket error in session %s: %s", session_id, e, exc_info=True)
+        logger.error("WebSocket error in session %s: %s", session_id, type(e).__name__)
         await websocket.close(code=1011)

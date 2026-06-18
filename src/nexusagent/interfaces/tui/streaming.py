@@ -13,6 +13,25 @@ import logging
 
 from nexusagent.infrastructure.config import settings
 from nexusagent.version import VERSION as CLIENT_VERSION
+
+# Maximum message widgets mounted in the TUI (sliding window)
+_STREAMING_MAX_WIDGETS = 50
+
+
+def _mount_with_limit(app, widget) -> None:
+    """Mount a message widget with a sliding window limit.
+
+    Delegates to app._mount_message if available (app.py >= Phase C),
+    otherwise falls back to direct mount with manual cleanup.
+    """
+    if hasattr(app, "_mount_message"):
+        app._mount_message(widget)
+    else:
+        _mount_with_limit(app, widget)
+        children = list(app.messages_container.children)
+        while len(children) > _STREAMING_MAX_WIDGETS:
+            oldest = children.pop(0)
+            oldest.remove()
 from nexusagent.widgets.messages import (
     AppMessage,
     ErrorMessage,
@@ -40,7 +59,7 @@ async def handle_event(app, event: dict) -> None:
         content = event.get("content", "")
         if content and content != "Processing...":
             thinking = AppMessage(message=content)
-            app.messages_container.mount(thinking)
+            _mount_with_limit(app, thinking)
             app.status_bar.set_status("Thinking...")
 
     elif etype == "tool_call":
@@ -53,7 +72,7 @@ async def handle_event(app, event: dict) -> None:
         tool = event.get("tool", "?")
         error = event.get("error", "Unknown error")
         err_msg = ErrorMessage(message=f"{tool}: {error}")
-        app.messages_container.mount(err_msg)
+        _mount_with_limit(app, err_msg)
         app.status_bar.set_status(f"Error in {tool}")
 
     elif etype == "approval_request":
@@ -74,7 +93,7 @@ async def handle_event(app, event: dict) -> None:
         if app._current_assistant is None:
             from nexusagent.widgets.messages import AssistantMessage
             app._current_assistant = AssistantMessage()
-            app.messages_container.mount(app._current_assistant)
+            _mount_with_limit(app, app._current_assistant)
         await app._current_assistant.append_token(content)
         app.status_bar.set_status("Streaming...")
 
@@ -91,7 +110,7 @@ async def handle_event(app, event: dict) -> None:
             from nexusagent.widgets.messages import AssistantMessage
             msg = AssistantMessage()
             msg.finalize(render_markdown(content))
-            app.messages_container.mount(msg)
+            _mount_with_limit(app, msg)
 
         app._busy = False
         app._request_count += 1
@@ -150,7 +169,7 @@ def _handle_tool_call_event(app, event: dict) -> None:
         status="running",
     )
     app._current_tool = msg
-    app.messages_container.mount(msg)
+    _mount_with_limit(app, msg)
 
     if app._auto_approve and tool != "tool_search":
         from nexusagent.interfaces.tui.websocket import send_approval
@@ -182,7 +201,7 @@ def _handle_tool_result_event(app, event: dict) -> None:
             output=output,
             status="success" if success else "failed",
         )
-        app.messages_container.mount(msg)
+        _mount_with_limit(app, msg)
 
     app.status_bar.set_status("Processing response...")
 
@@ -195,7 +214,7 @@ def _mount_error(app, message: str) -> None:
         message: The error message to display.
     """
     err = ErrorMessage(message=message)
-    app.messages_container.mount(err)
+    _mount_with_limit(app, err)
 
 
 async def handle_slash_command(app, cmd: str) -> bool:
@@ -238,14 +257,14 @@ async def handle_slash_command(app, cmd: str) -> bool:
             f"Queued: {len(app._pending_inputs)} | Auto-approve: {auto} | "
             f"Tokens: {app._total_tokens_used:,} | Requests: {app._request_count}"
         )
-        app.messages_container.mount(msg)
+        _mount_with_limit(app, msg)
         return True
     if command == "/version":
         msg = AppMessage(
             f"NexusAgent {CLIENT_VERSION} | Model: {settings.agent.default_model} | "
             f"Session: {app.session_id} | Theme: {app._theme_name}"
         )
-        app.messages_container.mount(msg)
+        _mount_with_limit(app, msg)
         return True
     if command == "/tokens":
         avg = app._total_tokens_used // app._request_count if app._request_count > 0 else 0
@@ -256,7 +275,7 @@ async def handle_slash_command(app, cmd: str) -> bool:
             f"  Avg/request: {avg:,}\n"
             f"  Model: {settings.agent.default_model}"
         )
-        app.messages_container.mount(msg)
+        _mount_with_limit(app, msg)
         return True
     if command == "/model":
         msg = AppMessage(
@@ -264,7 +283,7 @@ async def handle_slash_command(app, cmd: str) -> bool:
             f"Provider: {settings.agent.primary_provider}\n"
             f"Session: {app.session_id}"
         )
-        app.messages_container.mount(msg)
+        _mount_with_limit(app, msg)
         return True
     if command == "/theme":
         cycle_theme(app)
@@ -279,11 +298,11 @@ async def handle_slash_command(app, cmd: str) -> bool:
         return True
     if command == "/copy":
         msg = AppMessage("Copy not available — use terminal selection")
-        app.messages_container.mount(msg)
+        _mount_with_limit(app, msg)
         return True
     if command == "/sessions":
         msg = AppMessage(f"Session: {app.session_id}")
-        app.messages_container.mount(msg)
+        _mount_with_limit(app, msg)
         return True
     if command == "/threads":
         if app._ws and app._ws.open:
@@ -310,13 +329,13 @@ async def handle_slash_command(app, cmd: str) -> bool:
                 desc = skill.description or "No description"
                 lines.append(f"  {name}: {desc}")
             msg = AppMessage("\n".join(lines))
-            app.messages_container.mount(msg)
+            _mount_with_limit(app, msg)
         return True
     if command.startswith("/skill"):
         skill_name = rest[0] if rest else ""
         if not skill_name:
             msg = AppMessage("Usage: /skill <name>")
-            app.messages_container.mount(msg)
+            _mount_with_limit(app, msg)
             return True
         from nexusagent.skills import get_skill_content, load_all_skills
         skills = load_all_skills()
@@ -328,11 +347,11 @@ async def handle_slash_command(app, cmd: str) -> bool:
             if len(skill_content.split("\n")) > 20:
                 lines.append(f"  ... ({len(skill_content.split(chr(10)))} lines total)")
             msg = AppMessage("\n".join(lines))
-            app.messages_container.mount(msg)
+            _mount_with_limit(app, msg)
         return True
 
     msg = AppMessage(f"Unknown command: {command}. Type /help for available commands.")
-    app.messages_container.mount(msg)
+    _mount_with_limit(app, msg)
     return True
 
 
@@ -349,7 +368,7 @@ def cycle_theme(app) -> None:
         app._theme_name = "nexus-dark"
     app.theme = app._theme_name
     msg = AppMessage(f"Theme: {app._theme_name}")
-    app.messages_container.mount(msg)
+    _mount_with_limit(app, msg)
 
 
 def show_help(app) -> None:
@@ -384,7 +403,7 @@ def show_help(app) -> None:
         "  A       Collapse",
     ]
     msg = AppMessage("\n".join(lines))
-    app.messages_container.mount(msg)
+    _mount_with_limit(app, msg)
 
 
 def format_args_str(app, args: dict) -> str:
@@ -418,7 +437,7 @@ def process_next_in_queue(app) -> None:
     next_msg = app._pending_inputs.pop(0)
     app._busy = True
     user_msg = UserMessage(content=next_msg)
-    app.messages_container.mount(user_msg)
+    _mount_with_limit(app, user_msg)
     app.status_bar.set_status("Thinking...")
     app.status_bar.set_spinner(True)
     import asyncio

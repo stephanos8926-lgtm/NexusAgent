@@ -22,6 +22,7 @@ from nexusagent.infrastructure.template_includes import (
     PromptLoadError,
     CircularChainError,
     DEFAULT_MAX_CHAIN_DEPTH,
+    set_allowed_include_paths,
 )
 
 logger = logging.getLogger(__name__)
@@ -46,6 +47,11 @@ def load_nexus_prompt(
         cwd = Path.cwd()
     elif isinstance(cwd, str):
         cwd = Path(cwd)
+
+    # Initialize path allowlist: workspace CWD + ~/.nexusagent prompt directory
+    nexus_home = Path.home() / ".nexusagent"
+    nexus_home.mkdir(parents=True, exist_ok=True)
+    set_allowed_include_paths([cwd.resolve(), nexus_home.resolve()])
 
     parts: list[str] = []
 

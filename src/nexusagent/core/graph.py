@@ -250,6 +250,10 @@ def create_research_graph(db_path: str | None = None) -> Any:
         raise
 
     # Attach close method so callers can clean up the connection
-    graph = workflow.compile(checkpointer=memory)
+    try:
+        graph = workflow.compile(checkpointer=memory)
+    except Exception:
+        conn.close()
+        raise
     graph._sqlite_conn = conn  # type: ignore[attr-defined]
     return graph

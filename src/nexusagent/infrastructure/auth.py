@@ -49,14 +49,23 @@ class AuthManager:
 
     def _get_master_key(self) -> bytes:
         """Retrieves the master secret and derives a 32-byte key for Fernet using a unique salt.
-        """
-        if not self.master_secret_path.exists():
-            raise FileNotFoundError(
-                f"Master secret not found at {self.master_secret_path}. Please run initialization wizard."
-            )
 
-        with open(self.master_secret_path, "rb") as f:
-            secret = f.read().strip()
+        Supports reading the master secret from the NEXUS_AUTH_MASTER_SECRET environment
+        variable as an alternative to the on-disk file. This is useful for containerized
+        deployments and secrets managers.
+        """
+        # Prefer env var over on-disk file (supports secrets managers / containers)
+        env_secret = os.environ.get("NEXUS_AUTH_MASTER_SECRET")
+        if env_secret:
+            secret = env_secret.strip().encode()
+        else:
+            if not self.master_secret_path.exists():
+                raise FileNotFoundError(
+                    f"Master secret not found at {self.master_secret_path}. "
+                    "Run initialization wizard or set NEXUS_AUTH_MASTER_SECRET env var."
+                )
+            with open(self.master_secret_path, "rb") as f:
+                secret = f.read().strip()
 
         salt = self._get_salt()
 
