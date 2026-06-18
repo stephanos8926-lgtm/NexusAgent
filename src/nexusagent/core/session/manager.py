@@ -35,8 +35,19 @@ class SessionManager:
         working_dir: str = ".",
         agent=None,
         db_repo=None,
+        memory_dir: str | None = None,
     ) -> Session:
-        """Get existing session or create new one (thread-safe)."""
+        """Get existing session or create new one (thread-safe).
+
+        Args:
+            session_id: Unique identifier for this session.
+            working_dir: Absolute path to the project working directory.
+            agent: The agent instance used to process user messages.
+            db_repo: Database repository for persisting session data.
+            memory_dir: Optional override for the hybrid memory directory path.
+                When None, defaults to ``~/.nexusagent/sessions/{session_id}/memory``.
+                When set, uses this path directly (for workspace-scoped memory).
+        """
         # Fast path: no lock needed for read
         existing = self._sessions.get(session_id)
         if existing is not None:
@@ -59,6 +70,7 @@ class SessionManager:
                         working_dir=working_dir,
                         agent=agent,
                         db_repo=db_repo,
+                        memory_dir=memory_dir,
                     )
                     # Final double-check
                     existing = self._sessions.get(session_id)

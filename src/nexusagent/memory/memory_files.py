@@ -84,6 +84,15 @@ class FileMemory:
                 "## Entries\n"
             )
 
+        # Create .gitignore in .nexusagent/ if .git/ exists in workspace root
+        nexus_dir = self.workspace / ".nexusagent"
+        git_dir = self.workspace / ".git"
+        if git_dir.is_dir():
+            nexus_dir.mkdir(parents=True, exist_ok=True)
+            gitignore = nexus_dir / ".gitignore"
+            if not gitignore.exists():
+                gitignore.write_text("*\n!.gitignore\n")
+
     def write_entry(
         self,
         content: str,

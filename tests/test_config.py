@@ -25,3 +25,35 @@ def test_llm_timeout_default():
     sig = inspect.signature(LLMProvider.generate)
     assert 'timeout' in sig.parameters
     assert sig.parameters['timeout'].default == 120.0
+
+
+def test_agent_memory_workspace_default():
+    from nexusagent.infrastructure.config import AgentConfig
+    cfg = AgentConfig()
+    assert cfg.memory_workspace is None
+
+
+def test_agent_memory_workspace_from_yaml(tmp_path):
+    from nexusagent.infrastructure.config import load_config
+    from unittest.mock import patch
+
+    config_file = tmp_path / "nexusagent.yaml"
+    config_file.write_text("agent:\n  memory_workspace: /tmp/my_workspace")
+
+    with patch("nexusagent.infrastructure.config.get_nexus_home", return_value=tmp_path):
+        config = load_config(str(config_file))
+        assert config.agent.memory_workspace == "/tmp/my_workspace"
+
+
+def test_agent_memory_workspace_from_env(tmp_path, monkeypatch):
+    from nexusagent.infrastructure.config import load_config
+    from unittest.mock import patch
+
+    config_file = tmp_path / "nexusagent.yaml"
+    config_file.write_text("agent:\n  default_model: gemini-3.1-flash-lite")
+
+    monkeypatch.setenv("NEXUS_AGENT__MEMORY_WORKSPACE", "/env/workspace")
+
+    with patch("nexusagent.infrastructure.config.get_nexus_home", return_value=tmp_path):
+        config = load_config(str(config_file))
+        assert config.agent.memory_workspace == "/env/workspace"

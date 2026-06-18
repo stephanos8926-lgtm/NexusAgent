@@ -113,3 +113,41 @@ def test_get_daily_logs(tmp_workspace):
     assert len(logs) >= 1
     assert logs[0]["retain"] != ""
     assert "Implemented" in logs[0]["retain"]
+
+
+def test_gitignore_created_when_git_exists(tmp_workspace):
+    """A .gitignore should be created in .nexusagent/ when .git/ is present."""
+    # Create .git directory to simulate a git repo
+    (Path(tmp_workspace) / ".git").mkdir()
+
+    fm = FileMemory(tmp_workspace)
+    fm.initialize()
+
+    gitignore = Path(tmp_workspace) / ".nexusagent" / ".gitignore"
+    assert gitignore.exists()
+    assert gitignore.read_text() == "*\n!.gitignore\n"
+
+
+def test_gitignore_not_created_without_git(tmp_workspace):
+    """No .gitignore should be created when .git/ does not exist."""
+    fm = FileMemory(tmp_workspace)
+    fm.initialize()
+
+    nexus_dir = Path(tmp_workspace) / ".nexusagent"
+    assert not nexus_dir.exists()
+
+
+def test_gitignore_not_overwritten(tmp_workspace):
+    """An existing .gitignore should not be overwritten."""
+    # Create .git directory and a pre-existing .gitignore with custom content
+    (Path(tmp_workspace) / ".git").mkdir()
+    nexus_dir = Path(tmp_workspace) / ".nexusagent"
+    nexus_dir.mkdir(parents=True, exist_ok=True)
+    gitignore = nexus_dir / ".gitignore"
+    gitignore.write_text("custom-content\n")
+
+    fm = FileMemory(tmp_workspace)
+    fm.initialize()
+
+    # Content should be preserved
+    assert gitignore.read_text() == "custom-content\n"

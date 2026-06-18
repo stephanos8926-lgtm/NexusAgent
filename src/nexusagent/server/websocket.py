@@ -65,11 +65,27 @@ async def session_websocket(
     # Create a real agent for this interactive session
     agent = Agent(role="full", policy="permissive")
 
+    # Resolve workspace-scoped memory directory
+    # Priority: config.memory_workspace > request workspace > session default
+    from nexusagent.infrastructure.config import settings as _settings
+    from pathlib import Path as _Path
+    import os as _os
+
+    _memory_dir: str | None = None
+    if _settings.agent.memory_workspace:
+        # Config-level override: use the configured workspace memory directory
+        _memory_dir = _os.path.expanduser(_settings.agent.memory_workspace)
+    elif working_dir and working_dir != ".":
+        # Per-session workspace: use <working_dir>/.nexusagent/memory
+        _ws_memory = _Path(working_dir) / ".nexusagent" / "memory"
+        _memory_dir = str(_ws_memory)
+
     session = await session_manager.get_or_create(
         session_id,
-        working_dir=".",
+        working_dir=working_dir,
         agent=agent,
         db_repo=session_repo,
+        memory_dir=_memory_dir,
     )
 
     # Set workspace root for file operation path jail
