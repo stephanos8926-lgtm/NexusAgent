@@ -34,7 +34,6 @@ class SessionManager:
         session_id: str,
         working_dir: str = ".",
         agent=None,
-        memory=None,
         db_repo=None,
     ) -> Session:
         """Get existing session or create new one (thread-safe)."""
@@ -59,7 +58,6 @@ class SessionManager:
                         session_id=session_id,
                         working_dir=working_dir,
                         agent=agent,
-                        memory=memory,
                         db_repo=db_repo,
                     )
                     # Final double-check
@@ -92,7 +90,6 @@ class SessionManager:
             session_id=session_id,
             working_dir=working_dir,
             agent=agent,
-            memory=memory,
             db_repo=db_repo,
         )
 

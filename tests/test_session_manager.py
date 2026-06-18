@@ -66,7 +66,6 @@ async def test_get_or_create_concurrent(db_and_repo, mock_agent, mock_memory):
             session_id=sid,
             working_dir="/tmp/work",
             agent=mock_agent,
-            memory=mock_memory,
             db_repo=repo,
         )
         results.append(s)

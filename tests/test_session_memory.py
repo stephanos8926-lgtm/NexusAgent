@@ -34,14 +34,11 @@ def mock_session():
             session_id="test-1",
             working_dir="/tmp",
             agent=agent,
-            memory=MagicMock(),
             db_repo=MagicMock(),
         )
         session.db_repo.add_message = AsyncMock()
         session.db_repo.update_status = AsyncMock()
-        session.memory.recall = AsyncMock(return_value=[])
-        session.memory.remember = AsyncMock()
-        session.hybrid_memory.get_memory_context = AsyncMock(return_value="## Test memory context")
+        session.hybrid_memory.get_memory_context = AsyncMock(return_value="")
         return session
 
 
@@ -50,6 +47,7 @@ async def test_memory_context_in_system_prompt(mock_session):
     """Verify memory context is injected as a SystemMessage in the messages list."""
     from langchain_core.messages import SystemMessage
 
+    mock_session.hybrid_memory.get_memory_context = AsyncMock(return_value="## Test memory context")
     await mock_session.send("Fix the auth bug")
 
     # Agent should have been called with {"messages": [...]}

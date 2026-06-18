@@ -64,7 +64,6 @@ async def test_session_creation(db_and_repo, mock_agent, mock_memory):
         session_id=sid,
         working_dir="/tmp/work",
         agent=mock_agent,
-        memory=mock_memory,
         db_repo=repo,
     )
 
@@ -93,7 +92,6 @@ async def test_session_send_and_events(db_and_repo, mock_agent, mock_memory):
         session_id=sid,
         working_dir="/tmp/work",
         agent=mock_agent,
-        memory=mock_memory,
         db_repo=repo,
     )
 
@@ -129,7 +127,6 @@ async def test_session_close(db_and_repo, mock_agent, mock_memory):
         session_id=sid,
         working_dir="/tmp/work",
         agent=mock_agent,
-        memory=mock_memory,
         db_repo=repo,
     )
 
@@ -153,7 +150,6 @@ async def test_session_manager_mark_idle(db_and_repo, mock_agent, mock_memory):
         session_id=sid,
         working_dir="/tmp/work",
         agent=mock_agent,
-        memory=mock_memory,
         db_repo=repo,
     )
 
@@ -173,14 +169,12 @@ async def test_session_manager_get_existing(db_and_repo, mock_agent, mock_memory
         session_id=sid,
         working_dir="/tmp/work",
         agent=mock_agent,
-        memory=mock_memory,
         db_repo=repo,
     )
     s2 = await manager.get_or_create(
         session_id=sid,
         working_dir="/tmp/work",
         agent=mock_agent,
-        memory=mock_memory,
         db_repo=repo,
     )
 
@@ -207,7 +201,6 @@ async def test_session_send_error_handling(db_and_repo, mock_memory):
         session_id=sid,
         working_dir="/tmp/work",
         agent=bad_agent,
-        memory=mock_memory,
         db_repo=repo,
     )
 
@@ -263,7 +256,6 @@ async def test_session_memory_injection(db_and_repo, mock_memory):
         session_id=sid,
         working_dir="/tmp/work",
         agent=mock_agent,
-        memory=mock_memory,
         db_repo=repo,
     )
     # Override hybrid_memory with fake
@@ -316,7 +308,6 @@ async def test_session_memory_injection_empty(db_and_repo, mock_memory):
         session_id=sid,
         working_dir="/tmp/work",
         agent=mock_agent,
-        memory=mock_memory,
         db_repo=repo,
     )
     session.hybrid_memory = FakeHybridMemory()
@@ -362,7 +353,6 @@ async def test_session_compaction_triggers_on_long_context(db_and_repo, mock_mem
         session_id=sid,
         working_dir="/tmp/work",
         agent=mock_agent,
-        memory=mock_memory,
         db_repo=repo,
     )
     session.hybrid_memory = FakeHybridMemory()
@@ -387,7 +377,6 @@ async def test_pre_compaction_flush_async(db_and_repo, mock_agent, mock_memory):
         session_id=sid,
         working_dir="/tmp/work",
         agent=mock_agent,
-        memory=mock_memory,
         db_repo=repo,
     )
 
@@ -411,7 +400,6 @@ async def test_concurrent_get_or_create_returns_same_session(db_and_repo, mock_a
             session_id=sid,
             working_dir="/tmp/work",
             agent=mock_agent,
-            memory=mock_memory,
             db_repo=repo,
         )
         results.append(s)
@@ -451,7 +439,6 @@ async def test_concurrent_get_or_create_no_session_leak(db_and_repo, mock_agent,
                 session_id=sid,
                 working_dir="/tmp/work",
                 agent=mock_agent,
-                memory=mock_memory,
                 db_repo=repo,
             )
             results.append(s)
@@ -486,7 +473,6 @@ async def test_concurrent_get_or_create_different_ids(db_and_repo, mock_agent, m
             session_id=sid,
             working_dir="/tmp/work",
             agent=mock_agent,
-            memory=mock_memory,
             db_repo=repo,
         )
         results[sid] = s

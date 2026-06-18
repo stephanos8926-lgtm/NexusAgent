@@ -69,7 +69,6 @@ async def session_websocket(
         session_id,
         working_dir=".",
         agent=agent,
-        memory=None,
         db_repo=session_repo,
     )
 

@@ -39,7 +39,6 @@ class Session:
         session_id: str,
         working_dir: str,
         agent: Any,
-        memory: Any,
         db_repo: Any,
         memory_dir: str | Path | None = None,
     ) -> None:
@@ -49,7 +48,6 @@ class Session:
             session_id: Unique identifier for this session.
             working_dir: Absolute path to the project working directory.
             agent: The agent instance used to process user messages.
-            memory: Memory manager for recalling context across turns.
             db_repo: Database repository for persisting session and message data.
             memory_dir: Optional override for the hybrid memory directory path.
                 Defaults to ``~/.nexusagent/sessions/{session_id}/memory``.
@@ -57,7 +55,6 @@ class Session:
         self.session_id = session_id
         self.working_dir = working_dir
         self.agent = agent
-        self.memory = memory
         self.db_repo = db_repo
 
         if memory_dir is None:
@@ -252,15 +249,6 @@ class Session:
                     await self.db_repo.add_message(self.session_id, "assistant", final_content)
                 except Exception as exc:
                     logger.warning("Failed to store assistant message in DB: %s", exc)
-
-                try:
-                    if self.memory is not None:
-                        await self.memory.remember(
-                            user_message,
-                            metadata={"response": final_content},
-                        )
-                except Exception as exc:
-                    logger.warning("Failed to remember in memory: %s", exc)
 
         except Exception as exc:
             logger.error("Agent invocation failed: %s", exc, exc_info=True)

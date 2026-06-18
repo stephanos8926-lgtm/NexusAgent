@@ -60,7 +60,6 @@ async def test_session_streaming_emits_chunks(db_and_repo, mock_memory):
         session_id=sid,
         working_dir="/tmp/work",
         agent=agent,
-        memory=mock_memory,
         db_repo=repo,
     )
 
@@ -110,7 +109,6 @@ async def test_session_streaming_tool_call_events(db_and_repo, mock_memory):
         session_id=sid,
         working_dir="/tmp/work",
         agent=agent,
-        memory=mock_memory,
         db_repo=repo,
     )
 
@@ -145,7 +143,6 @@ async def test_session_streaming_empty_response(db_and_repo, mock_memory):
         session_id=sid,
         working_dir="/tmp/work",
         agent=agent,
-        memory=mock_memory,
         db_repo=repo,
     )
 
@@ -179,7 +176,6 @@ async def test_session_streaming_error_during_stream(db_and_repo, mock_memory):
         session_id=sid,
         working_dir="/tmp/work",
         agent=agent,
-        memory=mock_memory,
         db_repo=repo,
     )
 
