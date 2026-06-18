@@ -587,6 +587,71 @@ class HybridMemoryIndex:
         merged.sort(key=lambda x: x["score"], reverse=True)
         return merged[:max_results]
 
+    def delete_by_file(self, relative_path: str) -> int:
+        """Delete all index entries for a file.
+
+        Removes chunks, FTS entries, vec entries, and file_meta for the
+        given file path. Returns the number of chunk rows deleted.
+
+        Args:
+            relative_path: Relative path of the file (e.g., 'bank/auth.md').
+
+        Returns:
+            Number of chunk rows deleted.
+        """
+        conn = sqlite3.connect(str(self.db_path))
+        try:
+            conn.enable_load_extension(True)
+            sqlite_vec.load(conn)
+            conn.enable_load_extension(False)
+
+            old_ids = [
+                r[0]
+                for r in conn.execute(
+                    "SELECT id FROM chunks WHERE file_path = ?", (relative_path,)
+                ).fetchall()
+            ]
+
+            cursor = conn.execute(
+                "DELETE FROM chunks WHERE file_path = ?", (relative_path,)
+            )
+            deleted = cursor.rowcount
+
+            conn.execute(
+                "DELETE FROM chunks_fts WHERE file_path = ?", (relative_path,)
+            )
+
+            for oid in old_ids:
+                conn.execute("DELETE FROM chunks_vec WHERE id = ?", (oid,))
+
+            conn.execute(
+                "DELETE FROM file_meta WHERE file_path = ?", (relative_path,)
+            )
+
+            conn.commit()
+            logger.info("Deleted %d index entries for %s", deleted, relative_path)
+            return deleted
+        finally:
+            conn.close()
+
+    def reindex_file(self, relative_path: str) -> bool:
+        """Re-index a single file: delete old entries then index fresh.
+
+        Args:
+            relative_path: Relative path of the file (e.g., 'bank/auth.md').
+
+        Returns:
+            True if the file was re-indexed, False if file not found.
+        """
+        filepath = self.workspace / relative_path
+        if not filepath.exists():
+            logger.warning("File not found for reindex: %s", filepath)
+            return False
+        self.delete_by_file(relative_path)
+        self.index_file(relative_path)
+        logger.info("Re-indexed file: %s", relative_path)
+        return True
+
     def rebuild(self):
         """Rebuild the entire index from files."""
         conn = sqlite3.connect(str(self.db_path))

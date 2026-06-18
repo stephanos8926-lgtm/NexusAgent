@@ -515,3 +515,359 @@ def memory_index_rebuild(workspace: str | None = None) -> str:
         return f"Index rebuild failed: {exc}"
 
     return f"Memory index rebuilt for workspace: {ws}"
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Memory Self-Management Tools (Phase 1)
+# ═══════════════════════════════════════════════════════════════════════
+
+
+@register_tool(
+    name="memory_delete",
+    description=(
+        "Delete a memory entry by its relative path. "
+        "Removes the file and all its index entries. "
+        "Use for removing stale, incorrect, or duplicate memories."
+    ),
+    parameters={
+        "path": "Relative path within the memory workspace (e.g., 'bank/auth-20260712.md')",
+        "workspace": "Override workspace path (optional, defaults to configured memory workspace)",
+    },
+    example='memory_delete("bank/auth-20260712.md")',
+    category="memory",
+    returns="Confirmation message with deletion details.",
+)
+def memory_delete(path: str, workspace: str | None = None) -> str:
+    """Delete a memory entry and its index entries."""
+    import os
+
+    ws = workspace or _get_memory_workspace()
+    ws = os.path.expanduser(ws)
+    full_path = os.path.realpath(os.path.join(ws, path))
+    real_workspace = os.path.realpath(ws)
+
+    if not full_path.startswith(real_workspace):
+        return "ACCESS DENIED: Path traversal detected"
+
+    if not os.path.exists(full_path):
+        return f"File not found: {path}"
+
+    # Delete from index first
+    try:
+        from nexusagent.memory.index.index import HybridMemoryIndex
+
+        idx = HybridMemoryIndex(ws)
+        deleted_count = idx.delete_by_file(path)
+    except Exception as exc:
+        return f"Index cleanup failed: {exc}"
+
+    # Delete the file
+    try:
+        os.remove(full_path)
+    except OSError as exc:
+        return f"File deletion failed: {exc}"
+
+    return f"Deleted memory: {path} ({deleted_count} index entries removed)"
+
+
+@register_tool(
+    name="memory_update",
+    description=(
+        "Update an existing memory entry. Replaces the content and re-indexes it. "
+        "Preserves YAML frontmatter unless new frontmatter is provided. "
+        "Use for correcting or refreshing existing memories."
+    ),
+    parameters={
+        "path": "Relative path within the memory workspace (e.g., 'bank/auth-20260712.md')",
+        "content": "New content for the memory entry",
+        "type": "Entry type: world, experience, opinion, observation (optional, preserved from frontmatter if not set)",
+        "description": "Short description/title (optional, preserved from frontmatter if not set)",
+    },
+    example='memory_update("bank/auth-20260712.md", content="Updated: the auth module now uses JWT + refresh tokens", type="world")',
+    category="memory",
+    returns="Confirmation message with update details.",
+)
+def memory_update(
+    path: str,
+    content: str,
+    type: str = "",
+    description: str = "",
+    workspace: str | None = None,
+) -> str:
+    """Update an existing memory entry and re-index it."""
+    import os
+
+    ws = workspace or _get_memory_workspace()
+    ws = os.path.expanduser(ws)
+    full_path = os.path.realpath(os.path.join(ws, path))
+    real_workspace = os.path.realpath(ws)
+
+    if not full_path.startswith(real_workspace):
+        return "ACCESS DENIED: Path traversal detected"
+
+    if not os.path.exists(full_path):
+        return f"File not found: {path}"
+
+    # Read existing file to preserve frontmatter if needed
+    existing_content = open(full_path).read()
+    existing_fm = {}
+
+    # Parse existing frontmatter
+    if existing_content.startswith("---"):
+        parts = existing_content.split("---", 2)
+        if len(parts) >= 3:
+            fm_text = parts[1].strip()
+            # Simple YAML key: value parsing
+            for line in fm_text.split("\n"):
+                if ":" in line:
+                    key, _, val = line.partition(":")
+                    existing_fm[key.strip()] = val.strip().strip("\"'")
+
+    # Determine frontmatter values
+    final_type = type or existing_fm.get("type", "world")
+    final_desc = description or existing_fm.get("description", "")
+    existing_entities = existing_fm.get("entities", "")
+    existing_created = existing_fm.get("created", "")
+    existing_confidence = existing_fm.get("confidence", "")
+
+    # Build new content with preserved frontmatter
+    fm_lines = ["---"]
+    fm_lines.append(f'name: "{final_desc or path}"')
+    fm_lines.append(f"description: {final_desc}")
+    fm_lines.append(f"type: {final_type}")
+    if existing_created:
+        fm_lines.append(f"created: {existing_created}")
+    else:
+        from datetime import UTC, datetime
+        fm_lines.append(f"created: {datetime.now(UTC).isoformat()}")
+    if existing_confidence:
+        fm_lines.append(f"confidence: {existing_confidence}")
+    if existing_entities:
+        fm_lines.append(f"entities: {existing_entities}")
+    fm_lines.append("---")
+    fm_lines.append("")
+    fm_lines.append(content)
+
+    new_content = "\n".join(fm_lines)
+
+    # Write updated file
+    try:
+        with open(full_path, "w") as f:
+            f.write(new_content + "\n")
+    except OSError as exc:
+        return f"File write failed: {exc}"
+
+    # Re-index the file
+    try:
+        from nexusagent.memory.index.index import HybridMemoryIndex
+
+        idx = HybridMemoryIndex(ws)
+        idx.reindex_file(path)
+    except Exception as exc:
+        return f"File updated but re-index failed: {exc}"
+
+    return f"Updated memory: {path}"
+
+
+@register_tool(
+    name="memory_list",
+    description=(
+        "List memory entries with optional filtering. "
+        "Shows file paths, types, descriptions, and creation dates. "
+        "Use for discovering what memories exist before updating or pruning."
+    ),
+    parameters={
+        "type": "Filter by entry type: world, experience, opinion, observation (optional)",
+        "limit": "Maximum number of entries to return (default: 50)",
+        "workspace": "Override workspace path (optional)",
+    },
+    example='memory_list(type="world", limit=20)',
+    category="memory",
+    returns="Formatted list of memory entries.",
+)
+def memory_list(
+    type: str = "",
+    limit: int = 50,
+    workspace: str | None = None,
+) -> str:
+    """List memory entries with optional filtering."""
+    import os
+    from datetime import datetime
+
+    ws = workspace or _get_memory_workspace()
+    ws = os.path.expanduser(ws)
+    os.makedirs(ws, exist_ok=True)
+
+    bank_dir = os.path.join(ws, "bank")
+    if not os.path.exists(bank_dir):
+        return "No memories found (bank directory does not exist)"
+
+    entries = []
+    for md_file in sorted(os.listdir(bank_dir)):
+        if not md_file.endswith(".md"):
+            continue
+        filepath = os.path.join(bank_dir, md_file)
+        try:
+            content = open(filepath).read()
+        except OSError:
+            continue
+
+        # Parse frontmatter
+        entry_type = "unknown"
+        desc = ""
+        created = ""
+        if content.startswith("---"):
+            parts = content.split("---", 2)
+            if len(parts) >= 3:
+                for line in parts[1].strip().split("\n"):
+                    if line.startswith("type:"):
+                        entry_type = line.split(":", 1)[1].strip()
+                    elif line.startswith("description:"):
+                        desc = line.split(":", 1)[1].strip()
+                    elif line.startswith("created:"):
+                        created = line.split(":", 1)[1].strip()
+                    elif line.startswith("name:"):
+                        name = line.split(":", 1)[1].strip().strip("\"'")
+                        if not desc:
+                            desc = name
+
+        # Apply type filter
+        if type and entry_type != type:
+            continue
+
+        entries.append({
+            "file": f"bank/{md_file}",
+            "type": entry_type,
+            "description": desc,
+            "created": created,
+        })
+
+    if not entries:
+        return "No memories found matching the criteria"
+
+    # Apply limit
+    entries = entries[:limit]
+
+    lines = [f"Memory entries ({len(entries)} shown):\n"]
+    for e in entries:
+        lines.append(f"  {e['file']}  [{e['type']}]")
+        if e["description"]:
+            lines.append(f"    {e['description']}")
+        if e["created"]:
+            lines.append(f"    Created: {e['created']}")
+        lines.append("")
+
+    return "\n".join(lines)
+
+
+@register_tool(
+    name="memory_prune",
+    description=(
+        "Prune memory entries matching criteria. "
+        "Supports dry-run mode to preview what would be deleted. "
+        "Use for removing old, low-confidence, or specific-type memories."
+    ),
+    parameters={
+        "older_than_days": "Delete entries older than N days (optional)",
+        "type": "Only delete entries of this type (optional)",
+        "dry_run": "If True, preview what would be deleted without actually deleting (default: True)",
+        "workspace": "Override workspace path (optional)",
+    },
+    example='memory_prune(older_than_days=30, type="observation", dry_run=True)',
+    category="memory",
+    returns="Report of deleted (or would-be-deleted) entries.",
+)
+def memory_prune(
+    older_than_days: int = 0,
+    type: str = "",
+    dry_run: bool = True,
+    workspace: str | None = None,
+) -> str:
+    """Prune memory entries matching criteria."""
+    import os
+    from datetime import UTC, datetime, timedelta
+
+    ws = workspace or _get_memory_workspace()
+    ws = os.path.expanduser(ws)
+
+    # First, list matching entries
+    bank_dir = os.path.join(ws, "bank")
+    if not os.path.exists(bank_dir):
+        return "No memories found (bank directory does not exist)"
+
+    to_delete = []
+    cutoff = None
+    if older_than_days > 0:
+        cutoff = datetime.now(UTC) - timedelta(days=older_than_days)
+
+    for md_file in sorted(os.listdir(bank_dir)):
+        if not md_file.endswith(".md"):
+            continue
+        filepath = os.path.join(bank_dir, md_file)
+        rel_path = f"bank/{md_file}"
+
+        try:
+            content = open(filepath).read()
+        except OSError:
+            continue
+
+        # Parse frontmatter
+        entry_type = "world"
+        created_str = ""
+        if content.startswith("---"):
+            parts = content.split("---", 2)
+            if len(parts) >= 3:
+                for line in parts[1].strip().split("\n"):
+                    if line.startswith("type:"):
+                        entry_type = line.split(":", 1)[1].strip()
+                    elif line.startswith("created:"):
+                        created_str = line.split(":", 1)[1].strip()
+
+        # Apply type filter
+        if type and entry_type != type:
+            continue
+
+        # Apply age filter
+        if cutoff and created_str:
+            try:
+                created_dt = datetime.fromisoformat(created_str.replace("Z", "+00:00"))
+                if created_dt > cutoff:
+                    continue
+            except ValueError:
+                pass  # If date parsing fails, include it
+
+        # If no age filter, only delete if explicitly matches type
+        if not cutoff and not type:
+            continue
+
+        to_delete.append({
+            "file": rel_path,
+            "type": entry_type,
+            "created": created_str,
+            "full_path": filepath,
+        })
+
+    if not to_delete:
+        return "No memories match the prune criteria"
+
+    # Dry run or actual deletion
+    action = "Would delete" if dry_run else "Deleted"
+    lines = [f"Memory prune ({action} {len(to_delete)} entries):\n"]
+    for entry in to_delete:
+        lines.append(f"  {entry['file']}  [{entry['type']}]  {entry['created']}")
+
+    if not dry_run:
+        # Actually delete
+        from nexusagent.memory.index.index import HybridMemoryIndex
+        idx = HybridMemoryIndex(ws)
+        for entry in to_delete:
+            try:
+                idx.delete_by_file(entry["file"])
+                os.remove(entry["full_path"])
+            except Exception as exc:
+                lines.append(f"\n  ERROR deleting {entry['file']}: {exc}")
+        lines.append(f"\nPruned {len(to_delete)} memories")
+    else:
+        lines.append(f"\nDry run — no memories deleted. Set dry_run=False to execute.")
+
+    return "\n".join(lines)
