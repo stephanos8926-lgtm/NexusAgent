@@ -104,6 +104,10 @@ async def ws_loop(app) -> None:
     """
     api_key = settings.client.api_key
     ws_url = f"ws://127.0.0.1:{settings.server.api_port}/sessions/{app.session_id}/ws"
+    # Pass working_dir as query param for workspace-scoped memory
+    if app.working_dir and app.working_dir != ".":
+        from urllib.parse import quote as _quote
+        ws_url += f"?working_dir={_quote(app.working_dir, safe='')}"
     extra_headers: dict[str, str] = {}
     if api_key:
         extra_headers["Authorization"] = f"Bearer {api_key}"

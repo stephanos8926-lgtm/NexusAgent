@@ -323,10 +323,20 @@ _DEFAULT_MEMORY_WORKSPACE = "~/.nexusagent/memory/"
 
 
 def _get_memory_workspace() -> str:
-    """Get (and create if needed) the default memory workspace path."""
-    import os
+    """Get the memory workspace path.
 
-    path = os.path.expanduser(_DEFAULT_MEMORY_WORKSPACE)
+    Resolution order:
+    1. Config setting ``agent.memory_workspace`` (if set)
+    2. Default: ``~/.nexusagent/memory/``
+    """
+    import os
+    from nexusagent.infrastructure.config import settings
+
+    ws = settings.agent.memory_workspace
+    if ws:
+        path = os.path.expanduser(ws)
+    else:
+        path = os.path.expanduser(_DEFAULT_MEMORY_WORKSPACE)
     os.makedirs(path, exist_ok=True)
     return path
 
