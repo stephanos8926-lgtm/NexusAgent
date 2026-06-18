@@ -139,9 +139,14 @@ def test_setup_workspace_context_sets_memory_dir():
 def test_setup_workspace_context_noop_for_dot():
     """_setup_workspace_context is no-op when working_dir is '.'."""
     from nexusagent.core.agent import _setup_workspace_context
+    from nexusagent.tools.fs_base import _get_workspace_root, set_workspace_root
 
+    # Reset to clean state
+    set_workspace_root(".")
     _setup_workspace_context(".")
     assert _ws_memory_dir.get() is None
+    # Verify workspace root wasn't changed
+    assert _get_workspace_root() == Path.cwd().resolve()
 
 
 # ── _get_memory_workspace thread-local override tests ─────────────────────

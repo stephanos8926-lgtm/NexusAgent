@@ -492,6 +492,7 @@ def memory_get(path: str, offset: int = 1, limit: int = 50) -> str:
         "confidence": "Confidence score 0.0-1.0 (optional, for opinion entries)",
         "entities": "List of entity names this relates to (optional)",
         "workspace": "Override workspace path (optional, defaults to config or global)",
+        "dedup_threshold": "Similarity threshold for deduplication (0.0-1.0, default: 0.95). Set to 0 to disable.",
     },
     example='memory_write("The auth module uses JWT tokens", type="world", description="Auth uses JWT", entities=["auth", "jwt"])',
     category="memory",
@@ -504,8 +505,14 @@ async def memory_write(
     confidence: float | None = None,
     entities: list[str] | None = None,
     workspace: str | None = None,
+    dedup_threshold: float = 0.95,
 ) -> str:
-    """Write a memory entry. Stores in bank/ directory with YAML frontmatter and indexes it."""
+    """Write a memory entry. Stores in bank/ directory with YAML frontmatter and indexes it.
+
+    Before writing, checks for duplicate memories using hybrid search.
+    If a similar memory already exists (score >= dedup_threshold), returns
+    the existing file path instead of writing a duplicate.
+    """
     import os
     from nexusagent.memory.memory import HybridMemoryManager
 
@@ -513,6 +520,22 @@ async def memory_write(
     ws = os.path.expanduser(ws)
     mgr = HybridMemoryManager(ws)
     mgr.initialize()
+
+    # Write-time deduplication: check if similar memory already exists
+    if dedup_threshold > 0:
+        try:
+            existing = await mgr.recall(content, max_results=3)
+            if existing:
+                top_score = existing[0].get("score", 0)
+                if top_score >= dedup_threshold:
+                    top_file = existing[0].get("file", "unknown")
+                    return (
+                        f"Duplicate memory (score: {top_score:.2f}). "
+                        f"Existing entry: {top_file}"
+                    )
+        except Exception:
+            pass  # If dedup check fails, proceed with write
+
     filepath = await mgr.remember(
         content=content,
         type=type,
@@ -957,5 +980,103 @@ def memory_prune(
         lines.append(f"\nPruned {len(to_delete)} memories")
     else:
         lines.append(f"\nDry run — no memories deleted. Set dry_run=False to execute.")
+
+    return "\n".join(lines)
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Memory Consolidation Tools (Phase 4)
+# ═══════════════════════════════════════════════════════════════════════
+
+
+@register_tool(
+    name="memory_consolidate",
+    description=(
+        "Consolidate memory entries by removing duplicates and stale entries. "
+        "Scans all memories, identifies duplicates by content hash, "
+        "and prunes entries older than 30 days. "
+        "Supports dry-run mode to preview changes."
+    ),
+    parameters={
+        "workspace": "Override workspace path (optional)",
+        "dry_run": "If True, preview what would be deleted (default: True)",
+    },
+    example='memory_consolidate(dry_run=True)',
+    category="memory",
+    returns="Consolidation report with actions taken.",
+)
+def memory_consolidate(workspace: str | None = None, dry_run: bool = True) -> str:
+    """Consolidate memory entries by removing duplicates and stale entries."""
+    import os
+
+    ws = workspace or _get_memory_workspace()
+    ws = os.path.expanduser(ws)
+
+    try:
+        from nexusagent.memory.consolidation import ConsolidationEngine
+
+        engine = ConsolidationEngine(ws, dry_run=dry_run)
+        report = engine.scan()
+        actions = engine.consolidate(report)
+    except Exception as exc:
+        return f"Consolidation failed: {exc}"
+
+    lines = ["Memory Consolidation Report\n"]
+    lines.append(f"Total memories: {report['total_files']}")
+    lines.append(f"Total entities: {report['total_entities']}")
+    lines.append(f"Duplicates found: {len(report['duplicates'])}")
+    lines.append(f"Stale entries: {len(report['stale'])}")
+
+    if actions.get("dry_run"):
+        lines.append("\nDry run — no changes made. Set dry_run=False to execute.")
+    else:
+        lines.append(f"\nDuplicates removed: {actions['duplicates_removed']}")
+        lines.append(f"Stale pruned: {actions['stale_pruned']}")
+        lines.append(f"Index rebuilt: {actions['index_rebuilt']}")
+
+    return "\n".join(lines)
+
+
+@register_tool(
+    name="memory_health",
+    description=(
+        "Report memory health metrics including total entries, "
+        "duplicates, stale entries, and overall health score."
+    ),
+    parameters={
+        "workspace": "Override workspace path (optional)",
+    },
+    example="memory_health()",
+    category="memory",
+    returns="Health report with metrics and score.",
+)
+def memory_health(workspace: str | None = None) -> str:
+    """Report memory health metrics."""
+    import os
+
+    ws = workspace or _get_memory_workspace()
+    ws = os.path.expanduser(ws)
+
+    try:
+        from nexusagent.memory.consolidation import ConsolidationEngine
+
+        engine = ConsolidationEngine(ws, dry_run=True)
+        health = engine.health_report()
+    except Exception as exc:
+        return f"Health check failed: {exc}"
+
+    lines = ["Memory Health Report\n"]
+    lines.append(f"Total memories: {health['total_memories']}")
+    lines.append(f"Total entities: {health['total_entities']}")
+    lines.append(f"Duplicates: {health['duplicate_count']}")
+    lines.append(f"Stale entries: {health['stale_count']}")
+    lines.append(f"Health score: {health['health_score']:.2f}")
+
+    if health["health_score"] >= 0.9:
+        lines.append("\nStatus: HEALTHY")
+    elif health["health_score"] >= 0.7:
+        lines.append("\nStatus: NEEDS_ATTENTION")
+    else:
+        lines.append("\nStatus: DEGRADED — consolidation recommended")
 
     return "\n".join(lines)

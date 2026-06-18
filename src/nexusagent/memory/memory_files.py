@@ -25,7 +25,7 @@ Design principles:
 
 import logging
 import re
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from enum import StrEnum
 from pathlib import Path
 from typing import Any
@@ -100,10 +100,21 @@ class FileMemory:
         description: str,
         confidence: float | None = None,
         entities: list[str] | None = None,
+        ttl_hours: int | None = None,
+        valid_from: str | None = None,
+        valid_until: str | None = None,
     ) -> str:
         """Write a memory entry to a topic file and update the index.
 
-        Returns the path of the topic file.
+        Args:
+            content: The memory content.
+            entry_type: Type of memory entry.
+            description: Short description/title.
+            confidence: Confidence score (for opinion entries).
+            entities: Related entity names.
+            ttl_hours: Optional TTL in hours. Entry expires after this time.
+            valid_from: Optional ISO date when this knowledge becomes valid.
+            valid_until: Optional ISO date when this knowledge expires.
         """
         # Generate a filename from the description
         slug = re.sub(r"[^a-z0-9]+", "-", description.lower())[:40].strip("-")
@@ -111,17 +122,27 @@ class FileMemory:
         filename = f"{slug}-{timestamp}.md"
         filepath = self.bank_dir / filename
 
-        # Build YAML frontmatter
+        # Build YAML frontmatter with bi-temporal and quality fields
+        now = datetime.now(UTC)
         frontmatter: dict[str, Any] = {
             "name": description[:50],
             "description": description[:100],
             "type": entry_type.value,
-            "created": datetime.now(UTC).isoformat(),
+            "created": now.isoformat(),
+            "quality_score": self._compute_quality_score(content, confidence),
+            "retrieval_count": 0,
         }
         if confidence is not None:
             frontmatter["confidence"] = round(confidence, 2)
         if entities:
             frontmatter["entities"] = entities
+        if ttl_hours is not None:
+            frontmatter["ttl_hours"] = ttl_hours
+            frontmatter["expires_at"] = (now + timedelta(hours=ttl_hours)).isoformat()
+        if valid_from:
+            frontmatter["valid_from"] = valid_from
+        if valid_until:
+            frontmatter["valid_until"] = valid_until
 
         # Write topic file
         file_content = f"---\n{yaml.dump(frontmatter, default_flow_style=False)}---\n\n{content}\n"
@@ -142,6 +163,27 @@ class FileMemory:
                 self._update_entity(entity, content, entry_type)
 
         return str(filepath)
+
+    @staticmethod
+    def _compute_quality_score(content: str, confidence: float | None = None) -> float:
+        """Compute initial quality score for a memory entry.
+
+        Based on content length (longer = more detailed) and confidence.
+        Score range: 0.0 - 1.0
+        """
+        # Base score from content length (logarithmic, caps at 1.0 for ~1000 chars)
+        import math
+        length_score = min(math.log(max(len(content), 1)) / math.log(1000), 1.0)
+
+        # Confidence bonus
+        if confidence is not None:
+            confidence_score = confidence
+        else:
+            confidence_score = 0.5  # Default for non-opinion entries
+
+        # Weighted average: 60% length, 40% confidence
+        score = 0.6 * length_score + 0.4 * confidence_score
+        return round(score, 2)
 
     def _add_index_entry(self, description: str, filename: str, entry_type: MemoryEntryType):
         """Add a one-line pointer to MEMORY.md."""
