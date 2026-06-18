@@ -251,7 +251,7 @@ async def test_session_memory_injection(db_and_repo, mock_memory):
 
     # Hybrid memory that returns context
     class FakeHybridMemory:
-        def get_memory_context(self, query, max_results=5):
+        async def get_memory_context(self, query, max_results=5):
             return "## Relevant Memories\n\nSource: bank/test.md (score: 0.95)\nTest memory content\n"
         async def flush(self, summary=""):
             pass

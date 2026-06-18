@@ -98,8 +98,8 @@ async def refine_node(state: dict) -> dict:
         }
     except Exception as e:
         logger.error(f"Refine node failed: {e}", exc_info=True)
-        # If refine fails, proceed with original plan
-        return {"plan_approved": True, "error": None}
+        # If refine fails, do NOT approve the plan — return error for graph to handle
+        return {"plan_approved": False, "error": str(e)}
 
 
 async def execute_node(state: dict) -> dict:

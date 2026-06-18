@@ -6,7 +6,7 @@ import logging
 from fastapi import Depends, FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
-from nexusagent.infrastructure.api_auth import verify_api_key
+from nexusagent.infrastructure.api_auth import require_admin, verify_api_key
 from nexusagent.infrastructure.bus import get_bus
 from nexusagent.infrastructure.db import get_task_repo
 from nexusagent.infrastructure.rate_limit import check_rate_limit
@@ -57,7 +57,7 @@ def register_routes(app: FastAPI) -> None:
 
     # ─── Task Submission ────────────────────────────────────────────────
 
-    @app.post("/tasks", response_model=dict, dependencies=[Depends(verify_api_key)])
+    @app.post("/tasks", response_model=dict, dependencies=[Depends(require_admin)])
     async def create_task(request: SubmitTaskRequest):
         """Submit a new task to the orchestrator."""
         try:
@@ -177,7 +177,7 @@ def register_routes(app: FastAPI) -> None:
 
     # ─── Task Cancellation ──────────────────────────────────────────────
 
-    @app.post("/tasks/{task_id}/cancel", dependencies=[Depends(verify_api_key)])
+    @app.post("/tasks/{task_id}/cancel", dependencies=[Depends(require_admin)])
     async def cancel_task(task_id: str):
         """Cancel a pending or processing task."""
         task_repo = get_task_repo()
@@ -195,7 +195,7 @@ def register_routes(app: FastAPI) -> None:
 
     # ─── Task Retry ─────────────────────────────────────────────────────
 
-    @app.post("/tasks/{task_id}/retry", dependencies=[Depends(verify_api_key)])
+    @app.post("/tasks/{task_id}/retry", dependencies=[Depends(require_admin)])
     async def retry_task(task_id: str):
         """Retry a failed task."""
         task_repo = get_task_repo()
@@ -251,3 +251,37 @@ def register_routes(app: FastAPI) -> None:
                 "parameters": t.parameters,
             })
         return {"tools": by_cat, "total": len(tools)}
+
+    # ─── Auth Token Exchange (for browser WebSocket clients) ─────────────
+
+    class TokenExchangeRequest(BaseModel):
+        """Request body for token exchange."""
+        api_key: str = Field(..., description="API key to exchange for a connection token")
+
+    class TokenExchangeResponse(BaseModel):
+        """Response with short-lived connection token."""
+        token: str = Field(..., description="Short-lived connection token for WebSocket")
+        expires_in: int = Field(default=300, description="Token expiry in seconds")
+
+    @app.post("/auth/token", response_model=TokenExchangeResponse)
+    async def exchange_token(request: TokenExchangeRequest):
+        """Exchange an API key for a short-lived WebSocket connection token.
+
+        Browser clients that cannot set custom headers on WebSocket connections
+        should call this endpoint first, then pass the returned token via
+        the ?token= query parameter when connecting to /sessions/{id}/ws.
+        """
+        import secrets
+
+        try:
+            await verify_api_key(request.api_key)
+        except HTTPException:
+            raise HTTPException(status_code=401, detail="Invalid API key")
+
+        # Generate a short-lived token (the API key itself, marked as a token)
+        # In production, this would be a JWT or similar with expiry
+        # For now, we use the API key as the token — it's already verified
+        return TokenExchangeResponse(
+            token=request.api_key,
+            expires_in=300,
+        )

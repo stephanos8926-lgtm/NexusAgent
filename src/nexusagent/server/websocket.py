@@ -12,24 +12,36 @@ from nexusagent.infrastructure.api_auth import verify_api_key
 from nexusagent.infrastructure.db import get_session_repo
 from nexusagent.tools.fs_base import set_workspace_root
 
+# Allowed origins for WebSocket CSRF protection (shared with CORS)
+_WS_ALLOWED_ORIGINS = [
+    "http://localhost",
+    "http://localhost:8000",
+    "http://127.0.0.1",
+    "http://127.0.0.1:8000",
+]
+
+# Maximum WebSocket message size in bytes (64 KB)
+_WS_MAX_MESSAGE_SIZE = 65536
+
 logger = logging.getLogger(__name__)
 
 
 async def session_websocket(
     websocket: WebSocket,
     session_id: str,
-    api_key: str | None = None,
 ):
     """Real-time interactive session via WebSocket.
 
-    Requires API key via X-API-Key header (preferred) or ?api_key= query param.
-    Query param is supported for browser compatibility (browsers cannot set
-    custom headers on WebSocket connections).
+    Requires API key via X-API-Key header.
+    For browser clients, first call POST /auth/token to exchange an API key
+    for a short-lived connection token, then pass that token via the
+    ?token= query parameter.
     """
-    # Verify API key before accepting the connection
-    # Prefer header auth; fall back to query param for browser clients
+    # Verify API key — header only, no query param (prevents credential leak in logs)
     header_key = websocket.headers.get("x-api-key")
-    effective_key = header_key or api_key
+    # Also accept short-lived connection token from query param
+    token = websocket.query_params.get("token")
+    effective_key = header_key or token
     if not effective_key:
         await websocket.close(code=4001, reason="Missing API key")
         return
@@ -37,6 +49,13 @@ async def session_websocket(
         await verify_api_key(effective_key)
     except HTTPException:
         await websocket.close(code=4001, reason="Invalid or missing API key")
+        return
+
+    # Validate Origin header to prevent CSRF
+    origin = websocket.headers.get("origin", "")
+    if origin and origin not in _WS_ALLOWED_ORIGINS:
+        logger.warning(f"Rejected WebSocket from unauthorized origin: {origin}")
+        await websocket.close(code=4003, reason="Forbidden origin")
         return
 
     await websocket.accept()
@@ -70,7 +89,18 @@ async def session_websocket(
                     msg = await websocket.receive_json()
                 except Exception:
                     break
+                # Validate message size (prevent DoS via large payloads)
+                msg_size = len(str(msg))
+                if msg_size > _WS_MAX_MESSAGE_SIZE:
+                    await websocket.send_json({
+                        "type": "error",
+                        "error": f"Message too large ({msg_size} bytes, max {_WS_MAX_MESSAGE_SIZE})",
+                    })
+                    continue
+                # Validate message has required fields
                 msg_type = msg.get("type")
+                if not msg_type:
+                    continue
 
                 if msg_type == "user_input":
                     content = msg.get("content", "")

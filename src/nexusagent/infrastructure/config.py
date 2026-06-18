@@ -26,6 +26,10 @@ class ServerConfig(BaseModel):
     nats_reconnect_wait: int = Field(default=2, ge=0)
     nats_max_reconnects: int = Field(default=60, ge=0)
     reload: bool = Field(default=False, description="Enable uvicorn --reload for development")
+    # TLS settings (set via env: NEXUS_SERVER__TLS_CERTFILE, NEXUS_SERVER__TLS_KEYFILE)
+    tls_certfile: str | None = Field(default=None, description="Path to TLS certificate file (PEM)")
+    tls_keyfile: str | None = Field(default=None, description="Path to TLS private key file (PEM)")
+    tls_enabled: bool = Field(default=False, description="Enable TLS for the API server")
 
 
 class ClientConfig(BaseModel):

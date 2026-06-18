@@ -116,17 +116,19 @@ class TestRefineNode:
         assert result["error"] is None
         mock_refine.assert_awaited_once()
 
+    @pytest.mark.slow
     @pytest.mark.asyncio
     @patch.object(DeepResearchOrchestrator, "_refine_plan", new_callable=AsyncMock)
     async def test_refine_node_error_resilience(self, mock_refine):
-        """When refine fails, plan_approved should still be True (proceed with original)."""
+        """When refine fails, plan_approved should be False with error info."""
         mock_refine.side_effect = RuntimeError("Refinement failed")
 
         state = {"plan": SAMPLE_PLAN_DICT}
         result = await refine_node(state)
 
-        assert result["plan_approved"] is True
-        assert result["error"] is None
+        assert result["plan_approved"] is False
+        assert result["error"] is not None
+        assert "Refinement failed" in result["error"]
 
     @pytest.mark.asyncio
     async def test_refine_node_no_plan(self):

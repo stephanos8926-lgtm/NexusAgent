@@ -41,7 +41,7 @@ def mock_session():
         session.db_repo.update_status = AsyncMock()
         session.memory.recall = AsyncMock(return_value=[])
         session.memory.remember = AsyncMock()
-        session.hybrid_memory.get_memory_context = MagicMock(return_value="## Test memory context")
+        session.hybrid_memory.get_memory_context = AsyncMock(return_value="## Test memory context")
         return session
 
 
@@ -69,7 +69,7 @@ async def test_no_memory_context_when_empty(mock_session):
     """When no memories are found, messages should only have base system prompt + user message."""
     from langchain_core.messages import HumanMessage, SystemMessage
 
-    mock_session.hybrid_memory.get_memory_context = MagicMock(return_value="")
+    mock_session.hybrid_memory.get_memory_context = AsyncMock(return_value="")
     await mock_session.send("Hello")
 
     # Should still work — agent gets called via astream

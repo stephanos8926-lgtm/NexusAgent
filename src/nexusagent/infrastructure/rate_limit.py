@@ -7,8 +7,11 @@ Each client (identified by API key or IP) has its own bucket.
 from __future__ import annotations
 
 import asyncio
+import logging
 import time
 from dataclasses import dataclass, field
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -23,8 +26,10 @@ class _Bucket:
 _RATE_LIMIT_ENABLED = True
 _RATE_LIMIT_TOKENS = 60      # max tokens per bucket
 _RATE_LIMIT_REFILL = 60      # refill period in seconds
-_RATE_LIMIT_PER_CLIENT = {}   # client_id -> _Bucket
-_RATE_LIMIT_CLEANUP = 300     # cleanup interval for stale buckets
+_RATE_LIMIT_PER_CLIENT: dict[str, _Bucket] = {}   # client_id -> _Bucket
+_RATE_LIMIT_CLEANUP = 300     # cleanup interval for stale buckets (seconds)
+_RATE_LIMIT_MAX_IDLE = 600    # remove buckets idle longer than this (seconds)
+_last_cleanup: float = 0.0   # timestamp of last cleanup run
 
 
 def _get_bucket(client_id: str) -> _Bucket:
@@ -38,6 +43,28 @@ def _get_bucket(client_id: str) -> _Bucket:
     return _RATE_LIMIT_PER_CLIENT[client_id]
 
 
+def _cleanup_stale_buckets() -> None:
+    """Remove buckets that have been idle longer than _RATE_LIMIT_MAX_IDLE.
+
+    Prevents unbounded memory growth in long-running processes.
+    Called automatically by check_rate_limit at _RATE_LIMIT_CLEANUP intervals.
+    """
+    now = time.monotonic()
+    global _last_cleanup
+    if now - _last_cleanup < _RATE_LIMIT_CLEANUP:
+        return
+    _last_cleanup = now
+    stale = [
+        cid
+        for cid, bucket in _RATE_LIMIT_PER_CLIENT.items()
+        if now - bucket.last_refill > _RATE_LIMIT_MAX_IDLE
+    ]
+    for cid in stale:
+        del _RATE_LIMIT_PER_CLIENT[cid]
+    if stale:
+        logger.debug("Rate limiter: cleaned up %d stale buckets", len(stale))
+
+
 async def check_rate_limit(client_id: str) -> tuple[bool, dict]:
     """Check if a request is within rate limits.
 
@@ -49,6 +76,9 @@ async def check_rate_limit(client_id: str) -> tuple[bool, dict]:
     """
     if not _RATE_LIMIT_ENABLED:
         return True, {}
+
+    # Periodic cleanup of stale buckets (non-blocking, cheap check)
+    _cleanup_stale_buckets()
 
     bucket = _get_bucket(client_id)
     now = time.monotonic()

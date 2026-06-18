@@ -17,7 +17,6 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from nexusagent.core.session.helpers import (
     _build_environment_context,
     _build_session_history_context,
-    _extract_agent_response,
 )
 from nexusagent.hooks import HookEvent, get_hook_manager
 from nexusagent.infrastructure.config import settings
@@ -189,7 +188,7 @@ class Session:
         messages = [SystemMessage(content=system_prompt)]
 
         try:
-            hybrid_context = self.hybrid_memory.get_memory_context(user_message, max_results=5)
+            hybrid_context = await self.hybrid_memory.get_memory_context(user_message, max_results=5)
             if hybrid_context:
                 messages.append(SystemMessage(content=hybrid_context))
         except Exception as exc:

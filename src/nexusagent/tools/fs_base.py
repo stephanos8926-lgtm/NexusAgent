@@ -4,8 +4,17 @@ from __future__ import annotations
 
 from pathlib import Path
 
-# Track files read in the current session (module-level state)
-_read_files: set[str] = set()
+# Track files read in the current session (context-local for session isolation)
+import contextvars
+
+_read_files_var: contextvars.ContextVar[set[str]] = contextvars.ContextVar(
+    "read_files", default=set()
+)
+
+
+def _get_read_files() -> set[str]:
+    """Get the read-files set for the current context."""
+    return _read_files_var.get()
 
 # Default directory excludes for list_directory
 _DEFAULT_DIR_EXCLUDES = frozenset(
@@ -60,7 +69,7 @@ def _resolve(path: str) -> Path:
 def _check_read(path: str) -> None:
     """Raise if the file hasn't been read in this session."""
     resolved = str(_resolve(path))
-    if resolved not in _read_files:
+    if resolved not in _get_read_files():
         raise PermissionError(
             f"SAFETY: File '{path}' has not been read in this session. "
             f"Call read_file() first to understand the file's contents before modifying it."
@@ -69,14 +78,14 @@ def _check_read(path: str) -> None:
 
 def _mark_read(path: str) -> None:
     """Mark a file as read in session tracking."""
-    _read_files.add(str(path))
+    _get_read_files().add(str(path))
 
 
 def get_read_files() -> list[str]:
     """Return list of files that have been read in this session."""
-    return sorted(_read_files)
+    return sorted(_get_read_files())
 
 
 def reset_read_tracking() -> None:
     """Reset the read-file tracking. Use when starting a new task/session."""
-    _read_files.clear()
+    _get_read_files().clear()

@@ -59,7 +59,7 @@ async def test_memory_context_format(tmp_workspace):
         entities=["testing", "pytest"],
     )
 
-    context = mgr.get_memory_context("pytest testing", max_results=5)
+    context = await mgr.get_memory_context("pytest testing", max_results=5)
     assert context != ""
     assert "## Relevant Memories" in context
     assert "Source:" in context

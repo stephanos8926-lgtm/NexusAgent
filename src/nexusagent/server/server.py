@@ -57,7 +57,7 @@ async def lifespan(app: FastAPI):
         # 3. Start the Worker as a background task within the same process
         from nexusagent.core.worker import NexusWorker
         worker = NexusWorker()
-        worker_task = asyncio.create_task(worker.start())  # noqa: RUF006
+        worker_task = asyncio.create_task(worker.start())
         logger.info("Worker background task started.")
 
         yield
@@ -74,7 +74,6 @@ async def lifespan(app: FastAPI):
 
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
-    import time as _time
     app = FastAPI(
         title="NexusAgent API",
         description="Production-grade API for the NexusAgent Orchestrator",
@@ -94,8 +93,8 @@ def create_app() -> FastAPI:
 
     # Register WebSocket endpoint
     @app.websocket("/sessions/{session_id}/ws")
-    async def ws_endpoint(websocket, session_id: str, api_key: str | None = None):
-        await session_websocket(websocket, session_id, api_key)
+    async def ws_endpoint(websocket, session_id: str):
+        await session_websocket(websocket, session_id)
 
     return app
 
@@ -113,6 +112,8 @@ def run(reload: bool = False) -> None:
         host="0.0.0.0",
         port=settings.server.api_port,
         reload=settings.server.reload,
+        ssl_certfile=settings.server.tls_certfile if settings.server.tls_enabled else None,
+        ssl_keyfile=settings.server.tls_keyfile if settings.server.tls_enabled else None,
     )
 
 

@@ -16,7 +16,7 @@ from nexusagent.tools.fs_base import (
     _DEFAULT_DIR_EXCLUDES,
     _WORKSPACE_ROOT,  # noqa: F401 — re-exported for backward compatibility
     _check_read,
-    _read_files,
+    _get_read_files,
     _resolve,
     get_read_files,
     reset_read_tracking,
@@ -50,7 +50,7 @@ def read_file(path: str, offset: int = 1, limit: int | None = None) -> str:
         return f"Error: '{path}' is not a file"
 
     # Mark as read
-    _read_files.add(str(p))
+    _get_read_files().add(str(p))
 
     content = p.read_text(encoding="utf-8", errors="replace")
 
@@ -106,7 +106,7 @@ def write_file(path: str, content: str) -> str:
     p.write_text(content, encoding="utf-8")
 
     # Mark as read since we just wrote it
-    _read_files.add(str(p))
+    _get_read_files().add(str(p))
 
     return f"Successfully wrote {len(content)} bytes to {path}"
 
@@ -178,9 +178,9 @@ def write_multiple_files(files: dict[str, str]) -> str:
 
 def get_read_files() -> list[str]:
     """Return list of files that have been read in this session. Useful for debugging."""
-    return sorted(_read_files)
+    return sorted(_get_read_files())
 
 
 def reset_read_tracking() -> None:
     """Reset the read-file tracking. Use when starting a new task/session."""
-    _read_files.clear()
+    _get_read_files().clear()

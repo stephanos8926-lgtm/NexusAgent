@@ -66,12 +66,13 @@ class HybridMemoryManager:
         """
         return await self.index.search(query, max_results=max_results)
 
-    def get_memory_context(self, query: str, max_results: int = 5) -> str:
+    async def get_memory_context(self, query: str, max_results: int = 5) -> str:
         """Format recall results as a context string for prompt injection.
 
         Includes source citations in the format 'Source: bank/filename.md'.
+        Uses async search to avoid blocking the event loop.
         """
-        results = self.index.search_sync(query, max_results=max_results)
+        results = await self.index.search(query, max_results=max_results)
         if not results:
             return ""
 

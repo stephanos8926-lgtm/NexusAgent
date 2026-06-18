@@ -1,7 +1,8 @@
-"""API key authentication middleware for NexusAgent."""
+"""API key authentication and authorization middleware for NexusAgent."""
 
 import hmac
 import logging
+import os
 
 from fastapi import HTTPException, Security, status
 from fastapi.security import APIKeyHeader
@@ -10,11 +11,31 @@ logger = logging.getLogger(__name__)
 
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
+# Admin API key — the primary key from the keystore has full access
+# Additional operator keys can be set via NEXUS_AUTH_OPERATOR_KEYS (comma-separated)
+_OPERATOR_KEYS: set[str] = set(
+    k.strip()
+    for k in os.environ.get("NEXUS_AUTH_OPERATOR_KEYS", "").split(",")
+    if k.strip()
+)
+
+
+def _classify_key(api_key: str) -> str:
+    """Classify an API key as 'admin' or 'operator'.
+
+    The admin key is the one stored in the Fernet keystore.
+    Operator keys are configured via NEXUS_AUTH_OPERATOR_KEYS env var.
+    """
+    if api_key in _OPERATOR_KEYS:
+        return "operator"
+    return "admin"  # keystore key is always admin
+
 
 async def verify_api_key(api_key: str = Security(api_key_header)) -> str:
     """Verify API key from header against the auth keystore.
 
     Uses constant-time comparison to prevent timing attacks.
+    Returns the API key if valid.
     """
     if not api_key:
         raise HTTPException(
@@ -55,3 +76,21 @@ async def verify_api_key(api_key: str = Security(api_key_header)) -> str:
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Authentication system error",
         ) from e
+
+
+async def require_admin(api_key: str = Security(api_key_header)) -> str:
+    """Dependency: require admin role.
+
+    Use on endpoints that modify state (task submission, worker management, etc.).
+    Operator keys are rejected with 403.
+    """
+    # First verify the key is valid
+    verified_key = await verify_api_key(api_key)
+    # Then check role
+    role = _classify_key(verified_key)
+    if role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required",
+        )
+    return verified_key

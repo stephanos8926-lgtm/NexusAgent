@@ -73,8 +73,17 @@ class SessionManager:
                     self._creating.discard(session_id)
 
         # Wait for the other coroutine to finish creating this session
+        # Timeout after 30s to prevent deadlock if the creating coroutine is cancelled
+        deadline = asyncio.get_running_loop().time() + 30.0
         while session_id in self._creating:
-            await asyncio.sleep(0)
+            if asyncio.get_running_loop().time() >= deadline:
+                logger.warning(
+                    "Timeout waiting for session %s creation — "
+                    "proceeding with new session (possible orphaned creation)",
+                    session_id,
+                )
+                break
+            await asyncio.sleep(0.05)
             existing = self._sessions.get(session_id)
             if existing is not None:
                 return existing
