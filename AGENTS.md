@@ -1,6 +1,6 @@
 # AGENTS.md — NexusAgent Project Knowledge Base
 
-> Last updated: 2026-07-18
+> Last updated: 2026-07-22
 > Maintained by: OWL (Lucien)
 > Purpose: Critical project knowledge for any agent working on this codebase
 
@@ -10,7 +10,7 @@
 
 NexusAgent is a production-grade AI coding agent platform. It combines an LLM-powered agent (via `deepagents` / LangGraph) with a NATS-backed task orchestration system, a Textual TUI, a FastAPI WebSocket server, and a hybrid file+vector memory system.
 
-**Language:** Python 3.13+ | **Package:** `nexusagent` (src layout) | **Tests:** pytest (528 pass / 15 pre-existing fail)
+**Language:** Python 3.13+ | **Package:** `nexusagent` (src layout) | **Tests:** pytest (680 pass / 11 pre-existing fail)
 
 ---
 
@@ -26,7 +26,9 @@ NexusAgent is a production-grade AI coding agent platform. It combines an LLM-po
 | **Code Review** | `docs/CODE_REVIEW_COMPREHENSIVE.md` | Comprehensive multi-audit (45+ issues, prioritized) |
 | **Assessment** | `docs/assessment/2026-07-18-independent-codebase-assessment.md` | Independent architecture assessment |
 | **Version** | `src/nexusagent/version.py` | Single source of truth (importlib.metadata) |
-|| **ADRs** | `docs/adrs/` | Architecture decision records (0001-0005) |
+| **ADRs** | `docs/adrs/` | Architecture decision records (0001-0008) |
+| **Specs** | `docs/specs/` | Implementation specs (SPEC-001 to SPEC-006: memory system) |
+| **Plans** | `docs/plans/` | Implementation plans (memory overhaul, security, TUI, version) |
 | **Config** | `config/nexusagent.yaml` | Runtime configuration |
 
 ---
@@ -51,10 +53,15 @@ NexusAgent/
 │   │   ├── memory_bank.py   # Memory class (scoped SQLite bank)
 │   │   ├── memory_manager.py # MemoryManager (lifecycle)
 │   │   ├── hybrid_memory.py # HybridMemoryManager (file + index)
-│   │   ├── memory_files.py  # FileMemory (canonical)
+│   │   ├── memory_files.py  # FileMemory (canonical, git-backed)
 │   │   ├── memory_index.py  # Compat shim → index/ subpackage
 │   │   ├── index/           # embeddings.py, index.py (extracted Phase 6)
-│   │   └── compaction.py    # CompactionPipeline
+│   │   ├── compaction.py    # CompactionPipeline (graduated + DAG)
+│   │   ├── dag.py           # SummaryDAG (hierarchical compression)
+│   │   ├── dream.py         # DreamCycle (4-phase consolidation)
+│   │   ├── extraction.py    # MemoryExtractor (regex-based auto-extraction)
+│   │   ├── git_ops.py       # MemoryGitOps (auto-commit after writes)
+│   │   └── rate_limiter.py  # MemoryRateLimiter (token-bucket)
 │   ├── widgets/             # TUI widgets
 │   │   ├── messages/        # 6 message widget classes (extracted Phase 4)
 │   │   ├── theme/           # colors.py, registry.py (extracted Phase 2)
@@ -93,6 +100,55 @@ NexusAgent/
 
 ---
 
+## Memory System Architecture
+
+The memory system is a hybrid file+vector architecture with 4 layers:
+
+### Layer 1: FileMemory (Canonical Storage)
+- `memory_files.py` — File-based canonical source of truth
+- Markdown files in `bank/` directory with YAML frontmatter (type, description, confidence, entities, ttl_hours, valid_from, valid_until)
+- Git-backed: auto-commits after every write via `MemoryGitOps`
+- Bi-temporal fields: `valid_from`/`valid_until` for time-based queries
+- TTL enforcement: check-on-read (expired entries excluded from index) + `sweep_expired()` for physical removal
+
+### Layer 2: HybridMemoryIndex (Search)
+- `memory/index/index.py` — SQLite-based hybrid search (FTS5 + sqlite-vec)
+- `memory/index/embeddings.py` — Embedding provider (Gemini API → local sentence-transformers → SHA256 hash fallback)
+- Reciprocal Rank Fusion (RRF, k=60) for vector + keyword fusion
+- Chunk size: 256 tokens with 15% overlap
+
+### Layer 3: HybridMemoryManager (Orchestration)
+- `hybrid_memory.py` — Top-level interface combining FileMemory + HybridMemoryIndex
+- `remember()` — Write + index
+- `get_memory_context()` — Search + format for prompt injection
+- `flush()` — Pre-compaction save
+- `close()` — Resource cleanup
+
+### Layer 4: Background Processes
+- `extraction.py` — `MemoryExtractor`: Regex-based auto-extraction (decisions, preferences, errors, entities)
+- `compaction.py` — `CompactionPipeline`: 4 graduated strategies + DAG-based hierarchical compression
+- `dag.py` — `SummaryDAG`: Depth-0 (specifics) → Depth-1 (arc) → Depth-2 (narrative)
+- `dream.py` — `DreamCycle`: 4-phase consolidation (scan → patterns → consolidate → trim)
+- `rate_limiter.py` — `MemoryRateLimiter`: Token-bucket rate limiting (30 writes/min, 60 searches/min)
+
+### Session Integration
+- Session creates `HybridMemoryManager` on init, calls `close()` on session end
+- `send()` calls `get_memory_context()` to inject relevant memories as SystemMessage
+- `send()` schedules `_run_extraction()` as fire-and-forget after each turn
+- Dream cycle auto-triggers every N turns (configurable, default 20)
+- Pre-compaction flush calls `hybrid_memory.flush()` to preserve context
+
+### Data Flow
+```
+User Message → Memory Recall → Context Assembly → Agent Invocation → Memory Store
+     ↓              ↓                                                    ↓
+  get_memory_context()                                        _run_extraction()
+     ↓                                                              ↓
+  SystemMessage injection                              observation-type memory
+```
+
+---
+
 ## Refactoring History
 
 ### Phases 1-7 (2026-07-18) — Initial structural refactoring
@@ -124,6 +180,17 @@ See CODEBASE_MAP.md for details. Established pattern: extract to subpackage → 
 | 16 | Server split (508L) | `server/` subpackage: server.py (app factory), routes.py (REST), websocket.py (WS handler), __main__.py |
 | 17 | Memory split (474L) | `memory/` subpackage: memory_item.py, memory_bank.py, memory_manager.py, hybrid_memory.py; memory.py = compat shim |
 
+### Phases 18-24 (2026-07-22) — Memory System Overhaul (Recovered from prior session)
+| Phase | What | Result |
+|-------|------|--------|
+| 18 | Foundation fixes | `config.py` db_path fix, `memory_dir` DB column + migration, `find_sessions_by_working_dir` query, compaction/git/extraction config fields, `HybridMemoryManager.close()` |
+| 19 | Cross-session memory discovery | `SessionManager._discover_cross_session_memories()` — parallel search of previous sessions by `working_dir`, 5-min cache TTL |
+| 20 | Regex-based auto extraction | `MemoryExtractor.extract()` — regex patterns for code paths, errors, decisions, todos; schedules on every response |
+| 21 | Git-backed memory | `FileMemory.write_entry()` auto-commits via `MemoryGitOps`; `FileMemory.initialize()` calls `git init` |
+| 22 | Two-tier compaction | `CompactionPipeline` with 4 graduated strategies + `compress_with_dag()` using `SummaryDAG` |
+| 23 | Summary DAG compression | `memory/dag.py` — `SummaryDAG` class with node/edge management, DAG-based hierarchical compression |
+| 24 | Dream cycle consolidation | `memory/dream.py` — `DreamCycle` engine with 4 phases (orient, gather, consolidate, prune), file locking, provenance |
+
 ---
 
 ## Known Quirks & Gotchas
@@ -153,33 +220,84 @@ See CODEBASE_MAP.md for details. Established pattern: extract to subpackage → 
 - **NO_COLOR**: Respects https://no-color.org. Check `NO_COLOR` env var before adding color.
 - **SIGWINCH**: Resize handler installed in `on_mount()`. Uses debounce (0.2s) to avoid excessive re-renders.
 - **Streaming**: `_write_response_chunk()` accumulates tokens in `_streaming_response` string. `_finalize_response()` writes to log and clears widget.
+- **⚠️ Known broken**: Streaming is fake (accumulates then dumps as single event), search providers not wired, word wrapping broken, tool calls show raw JSON, welcome message may not render. See `docs/CODE_REVIEW_COMPREHENSIVE.md` for full TUI audit.
 
 ### Memory System
 - **Two systems coexist**: Old SQLite `Memory` class (in `memory.py`) and new file-based `HybridMemoryManager` (also in `memory.py`). Session uses the hybrid system.
 - **Embedding fallback chain**: Gemini API → local sentence-transformers → SHA256 hash (deterministic, low quality)
 - **sqlite-vec**: Virtual table for vector search. Requires `sqlite_vec.load(conn)` at startup.
+- **3-tier architecture**: Core (session-scoped, in-memory) + Recall (file-backed, `FileMemory`) + Archival (consolidated, `DreamCycle`)
+- **Cross-session discovery**: `SessionManager.get_or_create()` calls `_discover_cross_session_memories()` — searches all previous sessions with same `working_dir` via `SessionRepository.find_sessions_by_working_dir()`, merges memories with session_id prefix
+- **Auto-extraction**: `MemoryExtractor.extract()` runs regex patterns on every assistant response (code paths, file:line refs, errors, decisions, todos). Configurable via `memory_model` (empty = use current model)
+- **Git-backed memory**: `FileMemory.initialize()` calls `git init` if `memory_git_enabled=True`. `FileMemory.write_entry()` auto-commits via `MemoryGitOps` if `memory_git_auto_commit=True`
+- **Two-tier compaction**: `CompactionPipeline.compact()` applies graduated strategies (summarization, sliding window, emergency truncation). Optional Level 5: `compress_with_dag()` builds `SummaryDAG` for hierarchical context compression
+- **Dream cycle**: `DreamCycle.run()` executes 4 phases: orient (scan), gather (collect), consolidate (cluster + synthesize), prune (expire low-quality). Uses file locking (`fcntl.flock`) to prevent corruption during concurrent writes
+- **Provenance**: `MemoryItem` has `extraction_method` (regex|llm|manual), `source_message_id`, `extraction_confidence` (0.0-1.0)
 
 ### Testing
-- **Baseline**: 528 pass / 15 fail (all pre-existing). Zero regressions allowed.
+- **Baseline**: 663 pass / 11 fail (all pre-existing). Zero regressions allowed.
 - **Run command**: `PYTHONPATH=src python3 -m pytest tests/ -q --tb=short`
 - **Timeout**: Full suite takes ~100s. Use `timeout 120` for safety.
 - **Pre-existing failures**: `test_orchestration.py` (module path issues), `test_tui_responsive.py` (wrong mock paths), `test_e2e_production.py` (WebSocket dependency)
-- **New tests**: `test_version.py` (8), `test_server_version.py` (5) — version system coverage
+- **New tests**: `test_version.py` (8), `test_server_version.py` (5), `test_memory_extraction.py` (8) — version system + memory extraction coverage
+- **Memory system tests**: All new memory tests pass (extraction, git ops, cross-session, compaction, dream cycle)
+
+### Critical Lessons Learned (2026-07-22)
+
+1. **Never trust session summaries over `git log`** — The prior session (June 18-19) claimed 80% of the memory system was committed, but `git log` showed zero commits for those files. The subagent work was lost during context compaction. Always verify with `git log --oneline -- <file>` before claiming completion.
+
+2. **Subagents timeout at 600s for complex multi-file work** — The `delegate_task` tool consistently times out at 600s for implementation tasks touching >3 files. Use subagents only for:
+   - Research/analysis tasks (1-2 tool calls)
+   - Single-file edits
+   - Code review/verification
+   - Never for complex multi-file implementation — do those inline
+
+3. **Audit workers can miss implementations using unexpected patterns** — The forward/reverse/adversarial audits searched for specific patterns (tool names, class names) but the actual implementation used different patterns (inline methods, different naming). Always read the actual code, not just grep for expected patterns.
+
+4. **Kanban dependency links can become stale** — Tasks were marked `todo` because of dependencies on already-completed work. The prior session completed the work but the Kanban links weren't updated. Always verify dependency status before blocking.
+
+5. **The `patch` tool requires `path=` not `file=`** — Caused 7 consecutive failures. `read_file` and `write_file` also use `path=`. Always use `patch(path="...", old_string="...", new_string="...")`.
+
+6. **I001 import sorting — use ruff, not manual** — Manual import rearrangement often can't satisfy ruff's grouping. Use `ruff check --select I001 --fix`. If auto-fix can't resolve, add `# noqa: I001`.
+
+7. **Code audit pattern: Read → Impact → Search → Edit → Verify** — For any code change:
+   - `ast_read` before modifying
+   - `impact_analysis` before public API changes
+   - `ast_grep` for structural patterns
+   - `ast_edit` with `dry_run=true` first
+   - `find_references` after renaming/removing
+
+8. **Session compaction loses uncommitted work** — The prior session's subagents created files but the session compacted before commits. The files existed on disk but were never committed. Always commit after subagent work completes, or run subagents in worktrees with auto-collect.
+
+9. **Always check `git status` before starting** — Other agents may have stashed changes or modified files. Several times this session I started editing files that had uncommitted changes from prior work.
+
+10. **The memory system was already 80% done** — The biggest discovery: the prior session implemented cross-session discovery, regex extraction, git-backed memory, DAG compaction, and dream cycle — all working code, just never committed. This means the "10-15 day plan" was actually 1-2 days of wiring and testing.
 
 ### Build & Deploy
 - **No pyproject.toml build config**: Uses setuptools with `src/` layout.
 - **Dependencies**: See `pyproject.toml`. Key: `textual`, `fastapi`, `sqlalchemy[asyncio]`, `sqlite-vec`, `nats-py`, `deepagents`, `langgraph`.
+- **Console scripts**: `nexus-server` (FastAPI+WebSocket), `nexus-client` (CLI), `nexus` (TUI), `nexus-web` (Gradio UI)
 - **Dev server**: `uvicorn nexusagent.server.server:app --reload --port 8000` (auto-reload on code changes)
-- **Docker dev**: `docker-compose -f docker-compose.dev.yml up` for containerized development
+- **Docker production**: `docker-compose -f docker-compose.yml up -d` — builds image with all deps
+- **Dockerfile**: Multi-stage build (builder → runtime). Uses Python 3.13 slim. Copies `src/` and installs with `pip install -e .`
+- **Dockerfile.dev**: Same but installs deps first for layer caching, adds `CMD ["--reload"]` for hot reload
+- **docker-compose.yml**: Service: `nexus` (port 8000, host network, volume `nexus-data:/data`). Env from `.env`. Healthcheck on `/health` (checks NATS + JetStream)
+- **docker-compose.dev.yml**: Same + mounts `./src:/app/src:delegated` and `./config:/app/config:delegated` for hot reload
 - **No CI/CD**: No GitHub Actions or similar. Tests run manually.
+- **Server entrypoint**: `python3 -m nexusagent.server` or `nexus-server` (installed console script via `pyproject.toml`)
+- **Health check**: `GET /health` returns `{"status": "ok", "version": "...", "nats": "connected|disconnected", "jetstream": true|false}`. `GET /version` returns `{"version": "...", "min_client": "..."}`. TUI performs preflight check before WebSocket connect
+- **Config**: `config/nexusagent.yaml` → env vars `NEXUS_*` → defaults. Server loads config at startup, passes to TUI via version handshake
+- **Env template**: `.env.example` — copy to `.env`, fill in `GEMINI_API_KEY`, `OPENROUTER_API_KEY`, `EXA_API_KEY`, `NEXUS_PORT`
 
 ---
 
-## Audit Findings (2026-07-18)
+## Audit Findings (2026-07-18 / 2026-07-22)
 
 Two comprehensive reviews were conducted. Full reports in:
 - `docs/CODE_REVIEW_COMPREHENSIVE.md` — 45+ issues across 8 audit dimensions
 - `docs/assessment/2026-07-18-independent-codebase-assessment.md` — Architecture assessment
+- `docs/plans/2026-07-22-memory-system-audit-synthesis.md` — Memory system forward/reverse/adversarial audit synthesis
+- `docs/plans/2026-07-22-memory-system-v2.md` — Research-backed memory system plan v2
 
 ### 🔴 Critical Issues (Fix Immediately)
 1. **`refine_node` silently approves plan on failure** — `core/graph.py:125-127` — Returns `plan_approved: True` on exception
@@ -188,6 +306,14 @@ Two comprehensive reviews were conducted. Full reports in:
 4. **`SessionManager.get_or_create` busy-wait spin loop** — No timeout, potential deadlock
 5. **`sanitize_tool_output` always marks untrusted** — Even when no injection detected, degrades LLM effectiveness
 6. **No TLS/SSL** — All traffic including API keys in plaintext
+
+### 🟠 Memory System Audit Findings (2026-07-22)
+The memory system forward/reverse/adversarial audits revealed:
+- **~40% of planned work was already implemented but uncommitted** — Prior session (June 18-19) built cross-session discovery, regex extraction, git-backed memory, DAG compaction, dream cycle. Lost during context compaction.
+- **Critical blocker: Cross-session discovery needs DB migration** — `SessionRepository.find_sessions_by_working_dir()` and `memory_dir` column needed (now done in Phase 18)
+- **Dream cycle race condition** — `ConsolidationEngine.consolidate()` deleted files while active sessions wrote to same directory. Fixed with `fcntl.flock` in `DreamCycle`
+- **Three sprints, not five phases** — Consolidated to: Foundation (1 day), Maintenance (3 days), Polish (3 days)
+- **Deferred**: DAG compression (graduated compaction sufficient), LLM extraction (regex-first), cross-encoder reranking (RRF sufficient)
 
 ### Most Notable Findings
 - **NATS bus is intentionally only in server layer** — WebSocket uses direct connections (correct architecture, not a bug)
