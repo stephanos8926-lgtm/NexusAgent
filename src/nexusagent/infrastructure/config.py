@@ -20,7 +20,7 @@ class ServerConfig(BaseModel):
     """Server-side configuration for NATS, database, and API settings."""
 
     nats_url: str = Field(default="nats://localhost:4222")
-    db_path: str = Field(default="data/nexus.db")
+    db_path: str = Field(default="nexus.db")
     api_port: int = Field(default=8000, ge=1, le=65535)
     worker_threads: int = Field(default=4, ge=1)
     nats_reconnect_wait: int = Field(default=2, ge=0)
