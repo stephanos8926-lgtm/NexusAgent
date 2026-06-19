@@ -1,11 +1,5 @@
 # src/nexusagent/server.py
-"""FastAPI WebSocket server for the NexusAgent platform.
-
-Provides REST endpoints for task submission, status tracking, and
-cancellation, plus a WebSocket interface for real-time interactive
-sessions. Includes rate limiting, API key authentication, and
-version handshake middleware.
-"""
+"""FastAPI WebSocket server for the NexusAgent platform."""
 
 import asyncio
 import logging
@@ -13,7 +7,6 @@ import time
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 
 from nexusagent.infrastructure.bus import get_bus
 from nexusagent.infrastructure.config import settings
@@ -29,14 +22,6 @@ logging.basicConfig(
     level=settings.log_level, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 )
 logger = logging.getLogger(__name__)
-
-# SECURITY: restrict CORS to localhost only.
-_ALLOWED_ORIGINS = [
-    "http://localhost",
-    "http://localhost:8000",
-    "http://127.0.0.1",
-    "http://127.0.0.1:8000",
-]
 
 
 @asynccontextmanager
@@ -80,13 +65,7 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=_ALLOWED_ORIGINS,
-        allow_credentials=True,
-        allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
-        allow_headers=["Authorization", "Content-Type"],
-    )
+    # NO CORS MIDDLEWARE FOR TESTING
 
     # Register REST routes (includes rate limiting middleware)
     register_routes(app)

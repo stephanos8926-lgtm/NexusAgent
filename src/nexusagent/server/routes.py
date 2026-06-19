@@ -35,7 +35,7 @@ def register_routes(app: FastAPI) -> None:
     async def rate_limit_middleware(request, call_next):
         """Apply rate limiting to all API endpoints."""
         # Skip rate limiting for health/version endpoints
-        if request.url.path in ("/health", "/version"):
+        if request.url.path in ("/health", "/version") or request.url.path.startswith("/sessions/"):
             return await call_next(request)
 
         # Identify client by API key header or fallback to IP

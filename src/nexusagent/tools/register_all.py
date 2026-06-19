@@ -13,9 +13,17 @@ from __future__ import annotations
 import logging
 import re
 
+from nexusagent.memory.rate_limiter import MemoryRateLimiter
 from nexusagent.tools.registry import register_tool
 
 logger = logging.getLogger(__name__)
+
+# ── Memory Rate Limiter (singleton) ──────────────────────────────────
+# Prevents buggy loops from flooding the DB with low-value observations.
+_memory_rate_limiter = MemoryRateLimiter(
+    max_writes_per_minute=30,
+    max_searches_per_minute=60,
+)
 
 
 def register_all() -> None:
@@ -267,8 +275,8 @@ async def spawn_subagent(
     system_prompt: str | None = None,
 ) -> str:
     """Spawn a sub-agent worker to execute an isolated task and return its ID."""
-    from nexusagent.llm.models import MemoryScope, TaskContract
     from nexusagent.core.worker import worker_pool
+    from nexusagent.llm.models import MemoryScope, TaskContract
 
     contract = TaskContract(
         task_id=f"sub-{task[:20]}",
@@ -362,10 +370,10 @@ def _get_memory_workspace() -> str:
     3. Default: ``~/.nexusagent/memory/``
     """
     import os
-    from nexusagent.infrastructure.config import settings
 
     # 1. Check thread-local worker override
     from nexusagent.core.agent import _ws_memory_dir
+    from nexusagent.infrastructure.config import settings
     ws = _ws_memory_dir.get()
     if ws:
         os.makedirs(ws, exist_ok=True)
@@ -401,7 +409,12 @@ async def memory_search(query: str, max_results: int = 6, workspace: str | None 
         max_results: Maximum results to return per workspace (default: 6).
         workspace: Override workspace path, or "all" to search all workspaces.
     """
+    rate_limit_msg = _memory_rate_limiter.check_search()
+    if rate_limit_msg:
+        return rate_limit_msg
+
     import os
+
     from nexusagent.memory.memory import HybridMemoryManager
 
     if workspace == "all":
@@ -461,6 +474,10 @@ async def memory_search(query: str, max_results: int = 6, workspace: str | None 
 )
 def memory_get(path: str, offset: int = 1, limit: int = 50) -> str:
     """Read a memory file by its relative path."""
+    rate_limit_msg = _memory_rate_limiter.check_search()
+    if rate_limit_msg:
+        return rate_limit_msg
+
     import os
 
     workspace = _get_memory_workspace()
@@ -513,7 +530,12 @@ async def memory_write(
     If a similar memory already exists (score >= dedup_threshold), returns
     the existing file path instead of writing a duplicate.
     """
+    rate_limit_msg = _memory_rate_limiter.check_write()
+    if rate_limit_msg:
+        return rate_limit_msg
+
     import os
+
     from nexusagent.memory.memory import HybridMemoryManager
 
     ws = workspace or _get_memory_workspace()
@@ -568,6 +590,10 @@ async def memory_index_search(
     workspace: str | None = None,
 ) -> str:
     """Search the hybrid memory index directly using HybridMemoryIndex.search()."""
+    rate_limit_msg = _memory_rate_limiter.check_search()
+    if rate_limit_msg:
+        return rate_limit_msg
+
     import os
 
     ws = workspace or _get_memory_workspace()
@@ -611,6 +637,10 @@ async def memory_index_search(
 )
 def memory_index_rebuild(workspace: str | None = None) -> str:
     """Rebuild the hybrid memory index using HybridMemoryIndex.rebuild()."""
+    rate_limit_msg = _memory_rate_limiter.check_write()
+    if rate_limit_msg:
+        return rate_limit_msg
+
     import os
 
     ws = workspace or _get_memory_workspace()
@@ -650,6 +680,10 @@ def memory_index_rebuild(workspace: str | None = None) -> str:
 )
 def memory_delete(path: str, workspace: str | None = None) -> str:
     """Delete a memory entry and its index entries."""
+    rate_limit_msg = _memory_rate_limiter.check_write()
+    if rate_limit_msg:
+        return rate_limit_msg
+
     import os
 
     ws = workspace or _get_memory_workspace()
@@ -706,6 +740,10 @@ def memory_update(
     workspace: str | None = None,
 ) -> str:
     """Update an existing memory entry and re-index it."""
+    rate_limit_msg = _memory_rate_limiter.check_write()
+    if rate_limit_msg:
+        return rate_limit_msg
+
     import os
 
     ws = workspace or _get_memory_workspace()
@@ -802,8 +840,11 @@ def memory_list(
     workspace: str | None = None,
 ) -> str:
     """List memory entries with optional filtering."""
+    rate_limit_msg = _memory_rate_limiter.check_search()
+    if rate_limit_msg:
+        return rate_limit_msg
+
     import os
-    from datetime import datetime
 
     ws = workspace or _get_memory_workspace()
     ws = os.path.expanduser(ws)
@@ -895,6 +936,10 @@ def memory_prune(
     workspace: str | None = None,
 ) -> str:
     """Prune memory entries matching criteria."""
+    rate_limit_msg = _memory_rate_limiter.check_write()
+    if rate_limit_msg:
+        return rate_limit_msg
+
     import os
     from datetime import UTC, datetime, timedelta
 
@@ -979,7 +1024,7 @@ def memory_prune(
                 lines.append(f"\n  ERROR deleting {entry['file']}: {exc}")
         lines.append(f"\nPruned {len(to_delete)} memories")
     else:
-        lines.append(f"\nDry run — no memories deleted. Set dry_run=False to execute.")
+        lines.append("\nDry run — no memories deleted. Set dry_run=False to execute.")
 
     return "\n".join(lines)
 
@@ -1007,6 +1052,10 @@ def memory_prune(
 )
 def memory_consolidate(workspace: str | None = None, dry_run: bool = True) -> str:
     """Consolidate memory entries by removing duplicates and stale entries."""
+    rate_limit_msg = _memory_rate_limiter.check_write()
+    if rate_limit_msg:
+        return rate_limit_msg
+
     import os
 
     ws = workspace or _get_memory_workspace()
@@ -1052,6 +1101,10 @@ def memory_consolidate(workspace: str | None = None, dry_run: bool = True) -> st
 )
 def memory_health(workspace: str | None = None) -> str:
     """Report memory health metrics."""
+    rate_limit_msg = _memory_rate_limiter.check_search()
+    if rate_limit_msg:
+        return rate_limit_msg
+
     import os
 
     ws = workspace or _get_memory_workspace()
@@ -1078,5 +1131,58 @@ def memory_health(workspace: str | None = None) -> str:
         lines.append("\nStatus: NEEDS_ATTENTION")
     else:
         lines.append("\nStatus: DEGRADED — consolidation recommended")
+
+    return "\n".join(lines)
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Dream Cycle Tool (manual trigger)
+# ═══════════════════════════════════════════════════════════════════════
+
+
+@register_tool(
+    name="memory_dream",
+    description=(
+        "Manually trigger a dream cycle to consolidate memories. "
+        "Runs the 4-phase cycle: scan, patterns, consolidate, trim. "
+        "Removes duplicates, prunes stale entries, extracts patterns, "
+        "and rebuilds the memory index. "
+        "Supports dry-run mode to preview changes."
+    ),
+    parameters={
+        "workspace": "Override workspace path (optional, defaults to configured memory workspace)",
+        "dry_run": "If True, preview changes without modifying files (default: True)",
+    },
+    example="memory_dream(dry_run=True)",
+    category="memory",
+    returns="Dream cycle report with actions taken.",
+)
+async def memory_dream(workspace: str | None = None, dry_run: bool = True) -> str:
+    """Manually trigger a dream cycle consolidation."""
+    import os
+
+    ws = workspace or _get_memory_workspace()
+    ws = os.path.expanduser(ws)
+
+    try:
+        from nexusagent.memory.dream import DreamCycle
+
+        cycle = DreamCycle(ws)
+        report = await cycle.run(dry_run=dry_run)
+    except Exception as exc:
+        return f"Dream cycle failed: {exc}"
+
+    lines = ["Dream Cycle Report\n"]
+    lines.append(f"Dry run: {report['dry_run']}")
+    lines.append(f"Patterns extracted: {report['patterns_extracted']}")
+    lines.append(f"Duplicates removed: {report['duplicates_removed']}")
+    lines.append(f"Stale pruned: {report['stale_pruned']}")
+    lines.append(f"Health: {report['health_before']:.2f} -> {report['health_after']:.2f}")
+
+    if report["dry_run"]:
+        consolidate = report.get("phase3_consolidate", {})
+        lines.append(f"\nWould remove {consolidate.get('would_remove_duplicates', 0)} duplicates")
+        lines.append(f"Would prune {consolidate.get('would_prune_stale', 0)} stale entries")
+        lines.append("Dry run — no changes made. Set dry_run=False to execute.")
 
     return "\n".join(lines)

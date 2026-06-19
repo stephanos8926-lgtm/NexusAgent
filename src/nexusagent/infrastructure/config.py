@@ -79,6 +79,8 @@ class AgentConfig(BaseModel):
     compaction_tier2_threshold: float = Field(default=0.75, ge=0.0, le=1.0, description="Fraction of context window to trigger tier-2 compaction (summarization)")
     compaction_tier2_fresh_tail: int = Field(default=32, ge=1, description="Number of recent messages to preserve untouched during tier-2 compaction")
     compaction_tier2_model: str = Field(default="", description="Model for tier-2 LLM summarization; empty string uses the current agent model")
+    # Dream cycle
+    dream_cycle_interval: int = Field(default=20, ge=1, description="Number of turns between automatic dream cycle consolidations")
     # Image input settings
     max_image_size_mb: int = Field(default=10, ge=1, le=50)
     supported_image_types: list[str] = Field(

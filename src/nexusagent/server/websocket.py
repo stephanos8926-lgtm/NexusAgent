@@ -37,22 +37,30 @@ async def session_websocket(
     for a short-lived connection token, then pass that token via the
     ?token= query parameter.
     """
+    logger.info(f"session_websocket CALLED: session_id={session_id}")
+    print(f"DEBUG session_websocket CALLED: session_id={session_id}", flush=True)
     # Verify API key — header only, no query param (prevents credential leak in logs)
     header_key = websocket.headers.get("x-api-key")
     # Also accept short-lived connection token from query param
     token = websocket.query_params.get("token")
     effective_key = header_key or token
+    print(f"DEBUG WS auth: header_key={header_key}, token={token}, effective_key={effective_key}")
+    logger.info(f"WS auth: header_key={header_key}, token={token}, effective_key={effective_key}")
     if not effective_key:
         await websocket.close(code=4001, reason="Missing API key")
         return
     try:
         await verify_api_key(effective_key)
-    except HTTPException:
+    except HTTPException as e:
+        print(f"DEBUG WS auth failed: {e}")
+        logger.warning(f"WS auth failed for key={effective_key}: {e}")
         await websocket.close(code=4001, reason="Invalid or missing API key")
         return
 
     # Validate Origin header to prevent CSRF
     origin = websocket.headers.get("origin", "")
+    print(f"DEBUG WS origin: '{origin}', allowed={_WS_ALLOWED_ORIGINS}")
+    logger.info(f"WS origin: '{origin}', allowed={_WS_ALLOWED_ORIGINS}")
     if origin and origin not in _WS_ALLOWED_ORIGINS:
         logger.warning(f"Rejected WebSocket from unauthorized origin: {origin}")
         await websocket.close(code=4003, reason="Forbidden origin")

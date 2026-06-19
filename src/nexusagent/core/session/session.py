@@ -23,6 +23,7 @@ from nexusagent.infrastructure.config import settings
 from nexusagent.infrastructure.prompt_loader import inject_file_at_reference, load_nexus_prompt
 from nexusagent.llm.models import ErrorEvent, ResponseEvent, ThinkingEvent
 from nexusagent.memory.compaction import CompactionPipeline, pre_compaction_flush
+from nexusagent.memory.dream import DreamCycle
 from nexusagent.memory.extraction import MemoryExtractor
 from nexusagent.memory.memory import HybridMemoryManager
 
@@ -84,6 +85,7 @@ class Session:
         self._conversation_history: list[Any] = []
         self._extractor = MemoryExtractor()
         self._extraction_queue: asyncio.Queue = asyncio.Queue(maxsize=_MAX_EXTRACTION_QUEUE)
+        self._turn_count: int = 0
 
     # ── Prompt & Context ─────────────────────────────────────────────────
 
@@ -273,6 +275,10 @@ class Session:
                 # Fire-and-forget auto extraction (non-blocking)
                 self._schedule_extraction(user_msg, final_content)
 
+                # Increment turn count and auto-trigger dream cycle
+                self._turn_count += 1
+                self._maybe_trigger_dream_cycle()
+
         except Exception as exc:
             logger.error("Agent invocation failed: %s", exc, exc_info=True)
             if settings.hooks.hooks_enabled:
@@ -440,6 +446,45 @@ class Session:
         exc = task.exception()
         if exc is not None:
             logger.warning("Auto-extraction task failed: %s", exc)
+
+    def _maybe_trigger_dream_cycle(self) -> None:
+        """Auto-trigger dream cycle every N turns (fire-and-forget).
+
+        Uses ``settings.agent.dream_cycle_interval`` to determine frequency.
+        Runs as a background task — never blocks the session turn.
+        """
+        interval = settings.agent.dream_cycle_interval
+        if interval <= 0:
+            return
+        if self._turn_count % interval != 0:
+            return
+        task = asyncio.create_task(self._run_dream_cycle())
+        task.add_done_callback(self._on_dream_cycle_done)
+
+    async def _run_dream_cycle(self) -> None:
+        """Run the dream cycle on the session's hybrid memory directory."""
+        try:
+            cycle = DreamCycle(str(self.memory_dir))
+            report = await cycle.run(dry_run=False)
+            logger.info(
+                "Dream cycle completed for session %s: "
+                "duplicates=%d stale=%d patterns=%d health=%.2f->%.2f",
+                self.session_id,
+                report.get("duplicates_removed", 0),
+                report.get("stale_pruned", 0),
+                report.get("patterns_extracted", 0),
+                report.get("health_before", 1.0),
+                report.get("health_after", 1.0),
+            )
+        except Exception as exc:
+            logger.warning("Dream cycle failed for session %s: %s", self.session_id, exc)
+
+    @staticmethod
+    def _on_dream_cycle_done(task: asyncio.Task) -> None:
+        """Log errors from background dream cycle tasks."""
+        exc = task.exception()
+        if exc is not None:
+            logger.warning("Dream cycle task failed: %s", exc)
 
     def _enqueue(self, event: dict[str, Any]) -> None:
         """Put an event dict onto the internal queue (non-blocking).
