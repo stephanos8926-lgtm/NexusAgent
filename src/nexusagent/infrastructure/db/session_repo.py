@@ -159,6 +159,47 @@ class SessionRepository:
                 for m in messages
             ]
 
+    async def find_sessions_by_working_dir(
+        self,
+        working_dir: str,
+        exclude: str | None = None,
+        limit: int = 5,
+    ) -> list[dict]:
+        """Find previous sessions for the same workspace, ordered by created_at desc.
+
+        Args:
+            working_dir: The working directory to filter by.
+            exclude: Optional session UUID to exclude from results.
+            limit: Maximum number of sessions to return.
+
+        Returns:
+            A list of session dicts matching the working directory.
+        """
+        limit = max(1, min(limit, 200))
+        async with self.db_manager.get_session() as session:
+            query = (
+                select(SessionModel)
+                .where(SessionModel.working_dir == working_dir)
+                .order_by(SessionModel.created_at.desc())
+                .limit(limit)
+            )
+            if exclude:
+                query = query.where(SessionModel.id != exclude)
+            result = await session.execute(query)
+            sessions = result.scalars().all()
+            return [
+                {
+                    "id": s.id,
+                    "working_dir": s.working_dir,
+                    "memory_id": s.memory_id,
+                    "memory_dir": s.memory_dir,
+                    "status": s.status,
+                    "created_at": s.created_at.isoformat() if s.created_at else None,
+                    "updated_at": s.updated_at.isoformat() if s.updated_at else None,
+                }
+                for s in sessions
+            ]
+
     async def list_sessions(
         self,
         status: str | None = None,

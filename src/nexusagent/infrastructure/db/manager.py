@@ -116,6 +116,19 @@ class DatabaseManager:
                 "INSERT INTO _migrations (name) VALUES ('add_memory_dir')"
             ))
 
+        # Migration: add index on working_dir for find_sessions_by_working_dir
+        row = await conn.execute(text(
+            "SELECT name FROM _migrations WHERE name = 'add_working_dir_index'"
+        ))
+        if row.scalar_one_or_none() is None:
+            await conn.execute(text(
+                "CREATE INDEX IF NOT EXISTS ix_sessions_working_dir "
+                "ON sessions (working_dir)"
+            ))
+            await conn.execute(text(
+                "INSERT INTO _migrations (name) VALUES ('add_working_dir_index')"
+            ))
+
     async def close(self) -> None:
         """Dispose the engine (call on shutdown)."""
         await self.engine.dispose()
