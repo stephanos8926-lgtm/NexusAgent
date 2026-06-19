@@ -41,6 +41,28 @@ MEMORY_INDEX_MAX_LINES = 200
 MEMORY_INDEX_MAX_BYTES = 25_000  # 25KB
 
 
+# ── TTL helpers ──────────────────────────────────────────────────────────
+
+
+def _parse_expiry(frontmatter: dict) -> datetime | None:
+    """Parse expires_at from frontmatter, returning None if absent or unparseable."""
+    expires_at = frontmatter.get("expires_at")
+    if not expires_at:
+        return None
+    try:
+        return datetime.fromisoformat(expires_at)
+    except (ValueError, TypeError):
+        return None
+
+
+def _is_expired(frontmatter: dict) -> bool:
+    """Return True if the entry has an expires_at that is in the past."""
+    expiry = _parse_expiry(frontmatter)
+    if expiry is None:
+        return False
+    return datetime.now(UTC) > expiry
+
+
 class MemoryEntryType(StrEnum):
     """Types of memory entries stored in topic files.
 
@@ -287,7 +309,12 @@ class FileMemory:
             log_file.write_text(f"# {today}\n\n### Session Start\n{content}\n")
 
     def get_index_entries(self) -> list[dict]:
-        """Parse MEMORY.md and return list of index entries."""
+        """Parse MEMORY.md and return list of index entries.
+
+        Expired entries (those with ``expires_at`` in the past) are
+        silently excluded from the results but are NOT deleted — use
+        :meth:`sweep_expired` to physically remove them.
+        """
         if not self.index_file.exists():
             return []
 
@@ -300,15 +327,44 @@ class FileMemory:
                 # Parse: - [W] description → bank/filename.md
                 match = re.match(r"- \[(\w)\] (.+) → (.+)", line)
                 if match:
+                    entry_file = match.group(3).strip()
+                    # Check TTL: skip expired entries
+                    if self._entry_is_expired(entry_file):
+                        continue
                     entries.append(
                         {
                             "type": match.group(1),
                             "description": match.group(2).strip(),
-                            "file": match.group(3).strip(),
+                            "file": entry_file,
                         }
                     )
 
         return entries
+
+    def _entry_is_expired(self, relative_path: str) -> bool:
+        """Check whether a bank/ entry has expired based on its frontmatter."""
+        filepath = self.workspace / relative_path
+        if not filepath.exists():
+            return False
+        try:
+            content = filepath.read_text()
+            frontmatter = self._parse_frontmatter(content)
+            return _is_expired(frontmatter)
+        except Exception:
+            return False
+
+    @staticmethod
+    def _parse_frontmatter(content: str) -> dict:
+        """Parse YAML frontmatter from a memory file."""
+        if not content.startswith("---"):
+            return {}
+        parts = content.split("---", 2)
+        if len(parts) < 3:
+            return {}
+        try:
+            return yaml.safe_load(parts[1]) or {}
+        except yaml.YAMLError:
+            return {}
 
     def read_topic_file(self, filename: str) -> str | None:
         """Read a topic file from the bank/ directory."""
@@ -380,6 +436,76 @@ class FileMemory:
         except Exception as e:
             logger.warning("Failed to delete %s: %s", relative_path, e)
             return False
+
+    def sweep_expired(self) -> dict[str, Any]:
+        """Physically remove expired memory files and their index entries.
+
+        Scans all ``bank/*.md`` files, checks their ``expires_at`` frontmatter,
+        and deletes any that have expired. Corresponding index entries in
+        MEMORY.md are also removed.
+
+        Returns a report dict with:
+            - expired_found: number of expired entries found
+            - files_removed: number of files actually deleted
+            - index_entries_removed: number of index lines removed
+            - files: list of removed file paths (relative)
+        """
+        report: dict[str, Any] = {
+            "expired_found": 0,
+            "files_removed": 0,
+            "index_entries_removed": 0,
+            "files": [],
+        }
+
+        if not self.bank_dir.exists():
+            return report
+
+        expired_files: list[str] = []
+        for f in self.bank_dir.glob("*.md"):
+            try:
+                content = f.read_text()
+                frontmatter = self._parse_frontmatter(content)
+                if _is_expired(frontmatter):
+                    rel = str(f.relative_to(self.workspace))
+                    expired_files.append(rel)
+            except Exception:
+                continue
+
+        report["expired_found"] = len(expired_files)
+
+        # Delete expired files and remove their index entries
+        for rel_path in expired_files:
+            filepath = self.workspace / rel_path
+            try:
+                filepath.unlink()
+                report["files_removed"] += 1
+                report["files"].append(rel_path)
+                logger.info("Swept expired memory: %s", rel_path)
+            except Exception as e:
+                logger.warning("Failed to delete expired %s: %s", rel_path, e)
+                continue
+
+            # Remove from index
+            try:
+                self._remove_index_entry(rel_path)
+                report["index_entries_removed"] += 1
+            except Exception as e:
+                logger.warning(
+                    "Failed to remove index entry for %s: %s", rel_path, e
+                )
+
+        # Auto-commit if enabled
+        if (
+            report["files_removed"] > 0
+            and self._git is not None
+            and getattr(settings.agent, "memory_git_auto_commit", True)
+        ):
+            self._git.commit(
+                f"feat(memory): sweep {report['files_removed']} expired entries",
+                files=None,  # stage all changes
+            )
+
+        return report
 
     def _remove_index_entry(self, relative_path: str):
         """Remove pointer lines from MEMORY.md matching the given file path."""

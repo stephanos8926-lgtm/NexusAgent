@@ -342,17 +342,23 @@ class DreamCycle:
     def trim_index(self) -> dict[str, Any]:
         """Rebuild FTS5 index and trim MEMORY.md to ≤200 lines.
 
+        Also sweeps expired TTL entries from the bank/ directory.
+
         Returns a report dict with:
             - index_rebuilt: bool
             - memory_lines_before: int
             - memory_lines_after: int
             - memory_trimmed: bool
+            - expired_swept: dict (from :meth:`FileMemory.sweep_expired`)
         """
+        from nexusagent.memory.memory_files import FileMemory
+
         report: dict[str, Any] = {
             "index_rebuilt": False,
             "memory_lines_before": 0,
             "memory_lines_after": 0,
             "memory_trimmed": False,
+            "expired_swept": {},
         }
 
         # Rebuild FTS5 index
@@ -365,6 +371,18 @@ class DreamCycle:
             logger.info("Rebuilt FTS5 index")
         except Exception as e:
             logger.error("Index rebuild failed: %s", e)
+
+        # Sweep expired TTL entries
+        try:
+            fm = FileMemory(str(self.workspace))
+            sweep_report = fm.sweep_expired()
+            report["expired_swept"] = sweep_report
+            if sweep_report["files_removed"] > 0:
+                logger.info(
+                    "Trim swept %d expired entries", sweep_report["files_removed"]
+                )
+        except Exception as e:
+            logger.warning("Expired sweep failed during trim: %s", e)
 
         # Trim MEMORY.md
         if self.index_file.exists():
