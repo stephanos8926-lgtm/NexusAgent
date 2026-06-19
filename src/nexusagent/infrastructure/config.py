@@ -70,6 +70,14 @@ class AgentConfig(BaseModel):
     compaction_enabled: bool = Field(default=True)
     yolo: bool = Field(default=False)
     memory_workspace: str | None = Field(default=None, description="Path to the workspace-scoped memory directory, overrides default memory location when set")
+    # Memory extraction
+    memory_model: str = Field(default="", description="Model for memory extraction; empty string uses the current agent model")
+    # Git-backed memory
+    memory_git_enabled: bool = Field(default=True, description="Enable git-backed memory persistence")
+    memory_git_auto_commit: bool = Field(default=True, description="Auto-commit memory changes after each write")
+    # Two-tier compaction
+    compaction_tier2_threshold: float = Field(default=0.75, ge=0.0, le=1.0, description="Fraction of context window to trigger tier-2 compaction (summarization)")
+    compaction_tier2_fresh_tail: int = Field(default=32, ge=1, description="Number of recent messages to preserve untouched during tier-2 compaction")
     # Image input settings
     max_image_size_mb: int = Field(default=10, ge=1, le=50)
     supported_image_types: list[str] = Field(

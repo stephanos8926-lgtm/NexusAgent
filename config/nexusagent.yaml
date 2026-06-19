@@ -14,6 +14,14 @@ agent:
   max_tool_output_chars: 400
   max_conversation_history: 40
   compaction_enabled: true
+  # Memory extraction
+  memory_model: ""
+  # Git-backed memory
+  memory_git_enabled: true
+  memory_git_auto_commit: true
+  # Two-tier compaction
+  compaction_tier2_threshold: 0.75
+  compaction_tier2_fresh_tail: 32
 
 prompt:
   base_prompt_file: "NEXUS.md"
