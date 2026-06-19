@@ -150,8 +150,10 @@ class DreamCycle:
         }
 
         # Find duplicates by content hash
+        # Sort by mtime (oldest first) so the earliest-written file is kept as original
+        files_sorted = sorted(files, key=lambda f: f.stat().st_mtime)
         seen_hashes: dict[str, str] = {}
-        for f in files:
+        for f in files_sorted:
             try:
                 content = f.read_text()
                 content_hash = self._hash_content(content)

@@ -404,13 +404,15 @@ class TestSessionDreamCycleTrigger:
         """Dream cycle should trigger every N turns."""
         session = _create_mock_session()
 
+        # Mock _load_system_prompt to avoid filesystem access
+        session._load_system_prompt = MagicMock(return_value="Test system prompt")
+
         # Set interval to 3 for testing
         with patch("nexusagent.core.session.session.settings") as mock_settings:
             mock_settings.agent.dream_cycle_interval = 3
             mock_settings.agent.max_conversation_history = 40
             mock_settings.agent.compaction_enabled = False
             mock_settings.hooks.hooks_enabled = False
-            mock_settings.prompt.chat_file_injection = False
 
             # Mock DreamCycle to track calls
             with patch("nexusagent.core.session.session.DreamCycle") as mock_dream_cycle:
@@ -433,6 +435,8 @@ class TestSessionDreamCycleTrigger:
 
                 await session.send("msg3")
                 assert session._turn_count == 3
+                # Give the event loop a chance to run the background dream cycle task
+                await asyncio.sleep(0.1)
                 # Now it should have been called
                 mock_dream_cycle.assert_called_once_with(str(session.memory_dir))
 
