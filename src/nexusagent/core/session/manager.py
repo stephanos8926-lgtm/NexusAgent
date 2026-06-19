@@ -7,10 +7,116 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
+from typing import Any
 
 from nexusagent.core.session.session import Session
 
 logger = logging.getLogger(__name__)
+
+
+# ── Cross-session memory cache ──────────────────────────────────────────
+
+# Simple dict cache: {working_dir: (timestamp, [memory_strings])}
+# TTL = 5 minutes
+_MEMORY_DISCOVERY_CACHE: dict[str, tuple[float, list[str]]] = {}
+_MEMORY_DISCOVERY_TTL = 300.0  # 5 minutes
+
+
+def _get_cached_memories(working_dir: str) -> list[str] | None:
+    """Return cached memories for a working dir if not expired."""
+    entry = _MEMORY_DISCOVERY_CACHE.get(working_dir)
+    if entry is None:
+        return None
+    ts, memories = entry
+    if time.monotonic() - ts > _MEMORY_DISCOVERY_TTL:
+        del _MEMORY_DISCOVERY_CACHE[working_dir]
+        return None
+    return memories
+
+
+def _set_cached_memories(working_dir: str, memories: list[str]) -> None:
+    """Store discovered memories in the cache."""
+    _MEMORY_DISCOVERY_CACHE[working_dir] = (time.monotonic(), memories)
+
+
+async def _discover_cross_session_memories(
+    working_dir: str,
+    session_id: str,
+    db_repo: Any,
+) -> list[str]:
+    """Search previous sessions' memory indices for relevant memories.
+
+    Finds up to 5 previous sessions for the same workspace, searches each
+    session's HybridMemoryIndex, and returns the top-3 memories by score.
+
+    Returns an empty list if no previous sessions or no memories found.
+    """
+    try:
+        prev_sessions = await db_repo.find_sessions_by_working_dir(
+            working_dir, exclude=session_id, limit=5
+        )
+    except Exception as exc:
+        logger.warning("Failed to find previous sessions for %s: %s", working_dir, exc)
+        return []
+
+    if not prev_sessions:
+        return []
+
+    # Search each previous session's memory index in parallel
+    async def _search_session(sess_info: dict) -> list[dict]:
+        """Search a single previous session's memory index."""
+        mem_dir = sess_info.get("memory_dir")
+        if not mem_dir:
+            return []
+        try:
+            from nexusagent.memory.memory_index import HybridMemoryIndex
+
+            index = HybridMemoryIndex(mem_dir)
+            results = await asyncio.to_thread(
+                index.search_sync, "recent work and decisions", max_results=6
+            )
+            return results
+        except Exception as exc:
+            logger.debug(
+                "Failed to search memory for session %s: %s",
+                sess_info.get("id", "?"),
+                exc,
+            )
+            return []
+
+    # Run searches in parallel across all previous sessions
+    all_results_nested = await asyncio.gather(
+        *[_search_session(s) for s in prev_sessions]
+    )
+
+    # Flatten and deduplicate by content
+    seen_contents: set[str] = set()
+    all_results: list[dict] = []
+    for result_list in all_results_nested:
+        for r in result_list:
+            content = r.get("content", "").strip()
+            if content and content not in seen_contents:
+                seen_contents.add(content)
+                all_results.append(r)
+
+    if not all_results:
+        return []
+
+    # Rank by score (higher is better), take top 3
+    all_results.sort(key=lambda r: r.get("score", 0.0), reverse=True)
+    top_results = all_results[:3]
+
+    # Format as context strings
+    memories: list[str] = []
+    for r in top_results:
+        source = r.get("file", "unknown")
+        content = r.get("content", "").strip()
+        score = r.get("score", 0.0)
+        if content:
+            memories.append(f"Source: {source} (score: {score:.2f})\n{content}")
+
+    return memories
 
 
 class SessionManager:
@@ -65,12 +171,28 @@ class SessionManager:
             else:
                 self._creating.add(session_id)
                 try:
+                    # Discover cross-session memories from previous sessions
+                    injected_memories: list[str] | None = None
+                    try:
+                        cached = _get_cached_memories(working_dir)
+                        if cached is not None:
+                            injected_memories = cached
+                        elif db_repo is not None:
+                            injected_memories = await _discover_cross_session_memories(
+                                working_dir, session_id, db_repo
+                            )
+                            if injected_memories:
+                                _set_cached_memories(working_dir, injected_memories)
+                    except Exception as exc:
+                        logger.debug("Cross-session memory discovery failed: %s", exc)
+
                     session = Session(
                         session_id=session_id,
                         working_dir=working_dir,
                         agent=agent,
                         db_repo=db_repo,
                         memory_dir=memory_dir,
+                        injected_memories=injected_memories,
                     )
                     # Final double-check
                     existing = self._sessions.get(session_id)

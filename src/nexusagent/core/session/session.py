@@ -23,9 +23,12 @@ from nexusagent.infrastructure.config import settings
 from nexusagent.infrastructure.prompt_loader import inject_file_at_reference, load_nexus_prompt
 from nexusagent.llm.models import ErrorEvent, ResponseEvent, ThinkingEvent
 from nexusagent.memory.compaction import CompactionPipeline, pre_compaction_flush
+from nexusagent.memory.extraction import MemoryExtractor
 from nexusagent.memory.memory import HybridMemoryManager
 
 logger = logging.getLogger(__name__)
+
+_MAX_EXTRACTION_QUEUE = 3
 
 
 class Session:
@@ -41,6 +44,7 @@ class Session:
         agent: Any,
         db_repo: Any,
         memory_dir: str | Path | None = None,
+        injected_memories: list[str] | None = None,
     ) -> None:
         """Initialize a new interactive session.
 
@@ -51,6 +55,9 @@ class Session:
             db_repo: Database repository for persisting session and message data.
             memory_dir: Optional override for the hybrid memory directory path.
                 Defaults to ``~/.nexusagent/sessions/{session_id}/memory``.
+            injected_memories: Optional list of memory context strings from
+                previous sessions in the same workspace, to be injected as
+                SystemMessages during agent calls.
         """
         self.session_id = session_id
         self.working_dir = working_dir
@@ -65,6 +72,8 @@ class Session:
         self.hybrid_memory = HybridMemoryManager(str(self.memory_dir))
         self.hybrid_memory.initialize()
 
+        self.injected_memories: list[str] = injected_memories or []
+
         self.status: str = "active"
         self._cancel_flag: bool = False
         self._event_queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue(maxsize=1000)
@@ -73,6 +82,8 @@ class Session:
         self._seen_tool_results: set[str] = set()
         self._seen_tool_calls: set[str] = set()
         self._conversation_history: list[Any] = []
+        self._extractor = MemoryExtractor()
+        self._extraction_queue: asyncio.Queue = asyncio.Queue(maxsize=_MAX_EXTRACTION_QUEUE)
 
     # ── Prompt & Context ─────────────────────────────────────────────────
 
@@ -184,6 +195,15 @@ class Session:
             system_prompt = system_prompt + "\n\n" + context_block
         messages = [SystemMessage(content=system_prompt)]
 
+        # Inject cross-session memories from previous sessions in same workspace
+        if self.injected_memories:
+            cross_session_ctx = (
+                "[Previous Session Context]\n"
+                + "\n---\n".join(self.injected_memories)
+                + "\n[/Previous Session Context]"
+            )
+            messages.append(SystemMessage(content=cross_session_ctx))
+
         try:
             hybrid_context = await self.hybrid_memory.get_memory_context(user_message, max_results=5)
             if hybrid_context:
@@ -249,6 +269,9 @@ class Session:
                     await self.db_repo.add_message(self.session_id, "assistant", final_content)
                 except Exception as exc:
                     logger.warning("Failed to store assistant message in DB: %s", exc)
+
+                # Fire-and-forget auto extraction (non-blocking)
+                self._schedule_extraction(user_msg, final_content)
 
         except Exception as exc:
             logger.error("Agent invocation failed: %s", exc, exc_info=True)
@@ -373,6 +396,50 @@ class Session:
                 break
 
     # ── Internal helpers ───────────────────────────────────────────────
+
+    def _schedule_extraction(self, user_message: str, response: str) -> None:
+        """Schedule fire-and-forget memory extraction from a turn.
+
+        Uses a bounded queue (max 3 pending). If the queue is full,
+        drops the oldest extraction to prevent unbounded growth.
+        """
+        # Drop oldest if at capacity
+        if self._extraction_queue.full():
+            try:
+                self._extraction_queue.get_nowait()
+            except asyncio.QueueEmpty:
+                pass
+
+        combined = f"User: {user_message}\nAssistant: {response}"
+        task = asyncio.create_task(self._run_extraction(combined))
+        task.add_done_callback(self._on_extraction_done)
+        try:
+            self._extraction_queue.put_nowait(task)
+        except asyncio.QueueFull:
+            # Extremely unlikely (we just made room), but handle gracefully
+            task.cancel()
+
+    async def _run_extraction(self, text: str) -> None:
+        """Run regex extraction and store results as observation memories."""
+        results = self._extractor.extract(text)
+        for result in results:
+            try:
+                await self.hybrid_memory.remember(
+                    content=result.content,
+                    type=result.type,
+                    description=result.description,
+                    confidence=result.confidence,
+                    entities=result.entities or None,
+                )
+            except Exception as exc:
+                logger.warning("Failed to store extracted memory: %s", exc)
+
+    @staticmethod
+    def _on_extraction_done(task: asyncio.Task) -> None:
+        """Log errors from background extraction tasks (never swallow silently)."""
+        exc = task.exception()
+        if exc is not None:
+            logger.warning("Auto-extraction task failed: %s", exc)
 
     def _enqueue(self, event: dict[str, Any]) -> None:
         """Put an event dict onto the internal queue (non-blocking).

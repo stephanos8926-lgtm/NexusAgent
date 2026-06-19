@@ -32,6 +32,9 @@ from typing import Any
 
 import yaml
 
+from nexusagent.infrastructure.config import settings
+from nexusagent.memory.git_ops import MemoryGitOps
+
 logger = logging.getLogger(__name__)
 
 MEMORY_INDEX_MAX_LINES = 200
@@ -70,6 +73,10 @@ class FileMemory:
         self.entities_dir = self.bank_dir / "entities"
         self.index_file = self.workspace / "MEMORY.md"
 
+        # Git ops — non-fatal, enabled via config
+        git_enabled = getattr(settings.agent, "memory_git_enabled", True)
+        self._git = MemoryGitOps(self.workspace) if git_enabled else None
+
     def initialize(self):
         """Create the memory directory structure if it doesn't exist."""
         self.memory_dir.mkdir(parents=True, exist_ok=True)
@@ -92,6 +99,17 @@ class FileMemory:
             gitignore = nexus_dir / ".gitignore"
             if not gitignore.exists():
                 gitignore.write_text("*\n!.gitignore\n")
+
+        # Write .gitignore in memory dir to exclude binary/cache files
+        mem_gitignore = self.memory_dir / ".gitignore"
+        if not mem_gitignore.exists():
+            mem_gitignore.write_text(
+                "*.sqlite\n*.db\n__pycache__/\n"
+            )
+
+        # Initialize git repo if enabled
+        if self._git is not None:
+            self._git.init_repo()
 
     def write_entry(
         self,
@@ -161,6 +179,13 @@ class FileMemory:
         if entities:
             for entity in entities:
                 self._update_entity(entity, content, entry_type)
+
+        # Auto-commit if enabled
+        if self._git is not None and getattr(settings.agent, "memory_git_auto_commit", True):
+            self._git.commit(
+                f"memory: add {description[:60]}",
+                files=[str(filepath.relative_to(self.workspace))],
+            )
 
         return str(filepath)
 
@@ -327,3 +352,42 @@ class FileMemory:
         if self.memory_dir.exists():
             files.extend(str(f.relative_to(self.workspace)) for f in self.memory_dir.glob("*.md"))
         return files
+
+    def delete_by_file(self, relative_path: str) -> bool:
+        """Delete a memory file and auto-commit.
+
+        Args:
+            relative_path: Relative path of the file (e.g. ``bank/foo.md``).
+
+        Returns:
+            True if the file was deleted, False if it didn't exist or deletion failed.
+        """
+        filepath = self.workspace / relative_path
+        if not filepath.exists():
+            return False
+        try:
+            filepath.unlink()
+            # Remove from index
+            self._remove_index_entry(relative_path)
+
+            # Auto-commit if enabled
+            if self._git is not None and getattr(settings.agent, "memory_git_auto_commit", True):
+                self._git.commit(
+                    f"memory: delete {relative_path}",
+                    files=[relative_path],
+                )
+            return True
+        except Exception as e:
+            logger.warning("Failed to delete %s: %s", relative_path, e)
+            return False
+
+    def _remove_index_entry(self, relative_path: str):
+        """Remove pointer lines from MEMORY.md matching the given file path."""
+        if not self.index_file.exists():
+            return
+        content = self.index_file.read_text()
+        lines = content.split("\n")
+        prefix = f" → {relative_path}"
+        filtered = [ln for ln in lines if not ln.endswith(prefix)]
+        if len(filtered) != len(lines):
+            self.index_file.write_text("\n".join(filtered))

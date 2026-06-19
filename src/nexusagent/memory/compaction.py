@@ -1,10 +1,13 @@
 """Context compaction pipeline for managing conversation history size.
 
- Applies graduated compaction strategies from cheapest to most expensive:
+Applies graduated compaction strategies from cheapest to most expensive:
   1. Clear old tool results
   2. Microcompact (remove old tool result content)
   3. Summarize oldest messages
   4. Emergency truncation (last resort)
+
+After graduated compaction, a SummaryDAG can be applied for hierarchical
+context compression (depth-0 leaves → depth-1 arcs → depth-2 narratives).
 
 The pipeline is stateless — it takes messages in, returns compacted messages out.
 It is designed to be called BEFORE each model invocation.
@@ -13,8 +16,14 @@ It is designed to be called BEFORE each model invocation.
 from __future__ import annotations
 
 import logging
+from typing import Any, Awaitable, Callable
+
+from nexusagent.memory.dag import SummaryDAG
 
 logger = logging.getLogger(__name__)
+
+# LLM call signature: (system_prompt, user_prompt) -> text
+_DAGLLMCallable = Callable[[str, str], Awaitable[str]]
 
 
 # ---------------------------------------------------------------------------
@@ -100,6 +109,66 @@ class CompactionPipeline:
         # Level 4: emergency truncation (last resort)
         messages = self._emergency_truncate(messages)
         return messages
+
+    # -- DAG-based hierarchical compaction ------------------------------------
+
+    def compress_with_dag(
+        self,
+        messages: list[dict],
+        llm_call: _DAGLLMCallable | None = None,
+        fresh_tail: int | None = None,
+    ) -> list[dict]:
+        """Apply graduated compaction, then DAG-based hierarchical summarization.
+
+        This is a convenience method that:
+        1. Runs the graduated pipeline (levels 1-4) first.
+        2. Builds a SummaryDAG from the result.
+        3. Compresses the DAG (leaves → arcs → narratives).
+        4. Returns the DAG as a message list.
+
+        Args:
+            messages: The conversation messages to compact.
+            llm_call: Optional async callable for LLM-based summarization.
+                If None, heuristic summaries are used.
+            fresh_tail: Override the DAG fresh_tail. Defaults to the
+                pipeline's context-derived heuristic (32 messages).
+
+        Returns:
+            A message list with hierarchical summaries and fresh tail.
+        """
+        from nexusagent.memory.dag import SummaryDAG
+
+        # Step 1: graduated compaction
+        messages = self.compact(messages)
+
+        if len(messages) <= 1:
+            return messages
+
+        # Step 2: build and compress DAG
+        tail = fresh_tail if fresh_tail is not None else 32
+        dag = SummaryDAG(fresh_tail=max(tail, 1))
+        for msg in messages:
+            dag.add_message(msg)
+
+        # DAG compression is async — run synchronously if no event loop
+        import asyncio
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+
+        if loop and loop.is_running():
+            # We're inside an async context — create a task
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor() as pool:
+                future = pool.submit(
+                    asyncio.run, dag.compress(llm_call=llm_call)
+                )
+                future.result()
+        else:
+            asyncio.run(dag.compress(llm_call=llm_call))
+
+        return dag.to_messages()
 
     # -- strategy 1: clear old tool results ----------------------------------
 
