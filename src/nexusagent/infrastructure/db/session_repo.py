@@ -25,13 +25,17 @@ class SessionRepository:
         self.db_manager = db_manager
 
     async def create_session(
-        self, working_dir: str = ".", memory_id: str | None = None
+        self,
+        working_dir: str = ".",
+        memory_id: str | None = None,
+        memory_dir: str | None = None,
     ) -> str:
         """Create a new session record and return its UUID.
 
         Args:
             working_dir: The project working directory for the session.
             memory_id: Optional identifier for the hybrid memory store.
+            memory_dir: Optional path to the session's memory directory.
 
         Returns:
             The newly generated session UUID.
@@ -42,6 +46,7 @@ class SessionRepository:
                 id=session_id,
                 working_dir=working_dir,
                 memory_id=memory_id,
+                memory_dir=memory_dir,
             )
             session.add(sess)
         return session_id
@@ -66,6 +71,7 @@ class SessionRepository:
                 "id": s.id,
                 "working_dir": s.working_dir,
                 "memory_id": s.memory_id,
+                "memory_dir": s.memory_dir,
                 "status": s.status,
                 "created_at": s.created_at.isoformat() if s.created_at else None,
                 "updated_at": s.updated_at.isoformat() if s.updated_at else None,
@@ -175,6 +181,7 @@ class SessionRepository:
                     "id": s.id,
                     "working_dir": s.working_dir,
                     "memory_id": s.memory_id,
+                    "memory_dir": s.memory_dir,
                     "status": s.status,
                     "created_at": s.created_at.isoformat() if s.created_at else None,
                     "updated_at": s.updated_at.isoformat() if s.updated_at else None,
@@ -236,6 +243,7 @@ class SessionRepository:
                 id=new_id,
                 working_dir=new_working_dir or src_sess.working_dir,
                 memory_id=src_sess.memory_id,
+                memory_dir=src_sess.memory_dir,
                 status="active",
             )
             session.add(new_sess)

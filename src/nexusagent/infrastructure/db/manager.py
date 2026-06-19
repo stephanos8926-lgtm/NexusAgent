@@ -84,7 +84,37 @@ class DatabaseManager:
         """Create all ORM tables (idempotent — safe to call at startup)."""
         async with self.engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
+            await self._run_migrations(conn)
         logger.info(f"Database initialized at {self.db_url}")
+
+    async def _run_migrations(self, conn) -> None:
+        """Run incremental schema migrations.
+
+        Each migration is a named SQL block that runs only once,
+        tracked in a ``_migrations`` table.
+        """
+        # Ensure the migrations tracking table exists
+        await conn.execute(text(
+            "CREATE TABLE IF NOT EXISTS _migrations ("
+            "  name TEXT PRIMARY KEY,"
+            "  applied_at TEXT NOT NULL DEFAULT (datetime('now'))"
+            ")"))
+
+        # Migration: add memory_dir column to sessions table
+        row = await conn.execute(text(
+            "SELECT name FROM _migrations WHERE name = 'add_memory_dir'"
+        ))
+        if row.scalar_one_or_none() is None:
+            # Check if the column already exists (in case of pre-existing DB)
+            pragma = await conn.execute(text("PRAGMA table_info(sessions)"))
+            columns = [r[1] for r in pragma.fetchall()]
+            if "memory_dir" not in columns:
+                await conn.execute(text(
+                    "ALTER TABLE sessions ADD COLUMN memory_dir TEXT"
+                ))
+            await conn.execute(text(
+                "INSERT INTO _migrations (name) VALUES ('add_memory_dir')"
+            ))
 
     async def close(self) -> None:
         """Dispose the engine (call on shutdown)."""

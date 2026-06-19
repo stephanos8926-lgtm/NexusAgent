@@ -46,6 +46,7 @@ class SessionModel(Base):
     id = Column(String, primary_key=True)
     working_dir = Column(String, nullable=False, default=".")
     memory_id = Column(String, nullable=True)
+    memory_dir = Column(String, nullable=True)
     status = Column(String, default="active")
     created_at = Column(DateTime, default=lambda: datetime.now(UTC))
     updated_at = Column(
