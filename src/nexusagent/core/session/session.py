@@ -353,12 +353,13 @@ class Session:
     # ── Close ──────────────────────────────────────────────────────────
 
     async def close(self) -> None:
-        """Close the session: update status and persist to DB."""
+        """Close the session: update status, persist to DB, and clean up memory."""
         self.status = "closed"
         try:
             await self.db_repo.update_status(self.session_id, "closed")
         except Exception as exc:
             logger.warning("Failed to update session status in DB: %s", exc)
+        self.hybrid_memory.close()
         self._enqueue({"type": "session_closed"})
 
     # ── Event stream ───────────────────────────────────────────────────

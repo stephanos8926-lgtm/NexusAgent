@@ -97,3 +97,13 @@ class HybridMemoryManager:
         today = datetime.now(UTC).strftime("%Y-%m-%d")
         rel_path = f"memory/{today}.md"
         await self.index.async_index_file(rel_path)
+
+    def close(self):
+        """Close the memory manager and clean up resources.
+
+        Releases the embedding provider and index references so that
+        the SQLite connections (opened/closed per-method) and the
+        embedder's thread pool can be garbage-collected.
+        """
+        if self.index is not None:
+            self.index.embedder = None  # type: ignore[assignment]
