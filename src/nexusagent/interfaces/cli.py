@@ -350,5 +350,225 @@ def hooks_disable(hook_name):
         click.echo(f"Hook '{hook_name}' not found.", err=True)
 
 
+@main.group("memory")
+def memory_cmd():
+    """Manage and inspect memory health."""
+
+
+@memory_cmd.command("health")
+@click.option(
+    "--workspace",
+    "-w",
+    default=".",
+    help="Workspace directory (defaults to current directory)",
+)
+def memory_health(workspace):
+    """Show memory health report for a workspace.
+
+    Scans the memory bank and displays health metrics including
+    duplicates, stale entries, type distribution, and top entities.
+
+    Example:
+        nexus memory health
+        nexus memory health --workspace /path/to/project
+    """
+    from nexusagent.memory.dream import DreamCycle
+
+    workspace_path = Path(workspace).resolve()
+    if not workspace_path.is_dir():
+        click.echo(f"Error: '{workspace}' is not a valid directory", err=True)
+        raise SystemExit(1)
+
+    cycle = DreamCycle(workspace_path)
+    report = cycle.scan()
+    patterns = cycle.find_patterns()
+
+    # Format health score as percentage
+    health_pct = int(report["health_score"] * 100)
+    if health_pct >= 80:
+        health_status = "GOOD"
+    elif health_pct >= 50:
+        health_status = "FAIR"
+    else:
+        health_status = "POOR"
+
+    click.echo("=" * 60)
+    click.echo("  MEMORY HEALTH REPORT")
+    click.echo("=" * 60)
+    click.echo(f"  Workspace: {workspace_path}")
+    click.echo("")
+    click.echo(f"  Total Memories:   {report['total']}")
+    click.echo(f"  Total Entities:   {report.get('total_entities', 0)}")
+    click.echo(f"  Health Score:      {health_pct}% [{health_status}]")
+    click.echo("")
+    click.echo("── Issues ──────────────────────────────────────────")
+    click.echo(f"  Duplicates:        {len(report['duplicates'])}")
+    click.echo(f"  Stale Entries:     {len(report['stale'])}")
+    click.echo(f"  Low Quality:       {len(report['low_quality'])}")
+
+    # Show duplicate details
+    if report["duplicates"]:
+        click.echo("")
+        click.echo("── Duplicate Files ────────────────────────────────")
+        for dup in report["duplicates"][:5]:
+            click.echo(f"  {dup['duplicate']} (original: {dup['original']})")
+        if len(report["duplicates"]) > 5:
+            click.echo(f"  ... and {len(report['duplicates']) - 5} more")
+
+    # Show stale details
+    if report["stale"]:
+        click.echo("")
+        click.echo("── Stale Entries (older than 30 days) ─────────────")
+        for stale in report["stale"][:5]:
+            click.echo(f"  {stale['file']}: {stale['age_days']} days old")
+        if len(report["stale"]) > 5:
+            click.echo(f"  ... and {len(report['stale']) - 5} more")
+
+    # Show low quality details
+    if report["low_quality"]:
+        click.echo("")
+        click.echo("── Low Quality Entries (score < 0.2) ─────────────")
+        for lq in report["low_quality"][:5]:
+            click.echo(f"  {lq['file']}: score={lq['score']}")
+        if len(report["low_quality"]) > 5:
+            click.echo(f"  ... and {len(report['low_quality']) - 5} more")
+
+    # Type distribution
+    type_dist = patterns.get("type_distribution", {})
+    if type_dist:
+        click.echo("")
+        click.echo("── Type Distribution ──────────────────────────────")
+        for entry_type, count in sorted(
+            type_dist.items(), key=lambda x: x[1], reverse=True
+        ):
+            bar = "█" * min(count * 2, 30)
+            click.echo(f"  {entry_type:<20} {count:>4}  {bar}")
+
+    # Top entities by frequency
+    entity_freq = patterns.get("entity_frequency", {})
+    if entity_freq:
+        click.echo("")
+        click.echo("── Top Entities by Frequency ─────────────────────")
+        top_entities = sorted(
+            entity_freq.items(), key=lambda x: x[1], reverse=True
+        )[:10]
+        for entity, count in top_entities:
+            click.echo(f"  {entity:<25} mentioned {count} time(s)")
+
+    click.echo("")
+    click.echo("=" * 60)
+
+
+@memory_cmd.command("stats")
+@click.option(
+    "--workspace",
+    "-w",
+    default=".",
+    help="Workspace directory (defaults to current directory)",
+)
+def memory_stats(workspace):
+    """Show memory statistics for a workspace.
+
+    Displays counts by type, average confidence/freshness,
+    and git commit count for the memory repo.
+
+    Example:
+        nexus memory stats
+        nexus memory stats --workspace /path/to/project
+    """
+    import subprocess
+
+    from nexusagent.memory.dream import DreamCycle
+
+    workspace_path = Path(workspace).resolve()
+    if not workspace_path.is_dir():
+        click.echo(f"Error: '{workspace}' is not a valid directory", err=True)
+        raise SystemExit(1)
+
+    cycle = DreamCycle(workspace_path)
+    report = cycle.scan()
+    patterns = cycle.find_patterns()
+
+    click.echo("=" * 60)
+    click.echo("  MEMORY STATISTICS")
+    click.echo("=" * 60)
+    click.echo(f"  Workspace: {workspace_path}")
+    click.echo("")
+    click.echo(f"  Total Memory Files:  {report['total']}")
+    click.echo(f"  Entity Files:        {report.get('total_entities', 0)}")
+
+    # Type distribution
+    type_dist = patterns.get("type_distribution", {})
+    if type_dist:
+        click.echo("")
+        click.echo("── Memory Count by Type ──────────────────────────")
+        total = sum(type_dist.values())
+        for entry_type, count in sorted(
+            type_dist.items(), key=lambda x: x[1], reverse=True
+        ):
+            pct = (count / total * 100) if total > 0 else 0
+            click.echo(f"  {entry_type:<20} {count:>4}  ({pct:.1f}%)")
+        click.echo(f"  {'─' * 46}")
+        click.echo(f"  {'Total':<20} {total:>4}")
+    elif report["total"] == 0:
+        click.echo("")
+        click.echo("  No memory files found.")
+
+    # Average confidence and quality
+    bank_dir = workspace_path / "bank"
+    if bank_dir.exists():
+        confidences = []
+        quality_scores = []
+        for f in bank_dir.glob("*.md"):
+            try:
+                content = f.read_text()
+                fm = DreamCycle._parse_frontmatter(content)
+                if "confidence" in fm:
+                    confidences.append(float(fm["confidence"]))
+                if "quality_score" in fm:
+                    quality_scores.append(float(fm["quality_score"]))
+            except Exception:
+                continue
+
+        click.echo("")
+        click.echo("── Confidence & Quality ──────────────────────────")
+        if confidences:
+            avg_conf = sum(confidences) / len(confidences)
+            click.echo(f"  Average Confidence:  {avg_conf:.2f}  (from {len(confidences)} entries)")
+        else:
+            click.echo("  Average Confidence:  N/A (no entries with confidence)")
+
+        if quality_scores:
+            avg_qs = sum(quality_scores) / len(quality_scores)
+            click.echo(f"  Average Quality:     {avg_qs:.2f}  (from {len(quality_scores)} entries)")
+        else:
+            click.echo("  Average Quality:     N/A (no entries with quality_score)")
+
+    # Git commit count
+    click.echo("")
+    click.echo("── Git History ───────────────────────────────────")
+    git_dir = workspace_path / ".git"
+    if git_dir.exists():
+        try:
+            result = subprocess.run(
+                ["git", "-C", str(workspace_path), "rev-list", "--count", "HEAD"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            if result.returncode == 0:
+                commit_count = result.stdout.strip()
+                click.echo(f"  Memory Repo Commits: {commit_count}")
+            else:
+                click.echo("  Memory Repo Commits: error reading git log")
+        except Exception as e:
+            click.echo(f"  Memory Repo Commits: error ({e})")
+    else:
+        click.echo("  Memory Repo Commits: N/A (no .git directory)")
+
+    click.echo("")
+    click.echo("=" * 60)
+
+
 if __name__ == "__main__":
     main()
