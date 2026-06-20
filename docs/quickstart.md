@@ -1,90 +1,127 @@
-# Tool System
+# Quick Start
 
-NexusAgent's tool system provides **progressive discovery** — agents start lean and unlock tools on demand.
+## Prerequisites
 
-## Core Concepts
+- **Python 3.13+**
+- **NATS Server** (optional, for multi-agent features — `nats-server -js`)
+- **Git**
 
-### Tool Registry
-All tools are registered in a central catalog with metadata:
+## Install
+
+```bash
+git clone https://github.com/stephanos8926-lgtm/NexusAgent.git
+cd NexusAgent
+pip install -e ".[dev]"
+```
+
+## Run the TUI
+
+```bash
+# Start NATS first (if using multi-agent features)
+nats-server -js &
+
+# Launch the TUI
+python -m nexusagent
+```
+
+The TUI connects to the local server at `ws://127.0.0.1:8000`. On first launch it performs a version compatibility check.
+
+### Version Preflight
+
+```bash
+# Check server compatibility
+python -m nexusagent --check-server
+
+# Skip version check
+python -m nexusagent --skip-version-check
+```
+
+## Run Headless
+
+```bash
+# Single task
+python -m nexusagent run "Fix the auth bug in server.py" -d /project
+
+# With model override
+python -m nexusagent run "Add tests for memory.py" -d /project --model gemini-2.0-flash
+```
+
+## Session Management
+
+```bash
+# List sessions
+python -m nexusagent session list
+
+# Memory management
+python -m nexusagent session memory health
+python -m nexusagent session memory stats
+```
+
+## Use the SDK
 
 ```python
-from nexusagent.tools.registry import register_tool
+from nexusagent.sdk import NexusSDK
+from nexusagent.models import TaskSchema, TaskContract
 
-@register_tool(
-    name="read_file",
-    description="Read file contents with optional line-range selection",
-    parameters={"path": "File path", "offset": "Start line", "limit": "Max lines"},
-    example='read_file("src/main.py", offset=10, limit=20)',
-    category="fs",
+sdk = NexusSDK()
+
+# Submit a task
+task = TaskSchema(id="task-1", description="Analyze the memory system")
+result = sdk.submit_and_wait(task, timeout=120)
+print(result.data)
+
+# Spawn an isolated worker
+contract = TaskContract(
+    id="research-1",
+    description="Research best practices for agent memory",
+    working_dir="/home/user/project",
+    model="gemini-2.0-flash",
+    max_depth=2,
 )
-def read_file(path, offset=1, limit=None):
-    ...
+result = sdk.submit_and_wait(contract)
 ```
 
-### Tool Search
-Agents discover tools via `tool_search()`:
+## Run Tests
 
-```python
-# List all available tools
-tool_search()
+```bash
+# All tests
+pytest tests/ -q
 
-# Search by use case
-tool_search("run tests")
+# With coverage
+pytest tests/ --cov=src/nexusagent --cov-report=term-missing
 
-# Get specific tool details
-tool_search("read_file", exact=True)
-
-# Filter by category
-tool_search(category="git")
+# Specific test file
+pytest tests/test_memory_e2e.py -v
 ```
 
-## Available Tools
+## Configuration
 
-### Core Tools
-| Tool | Description |
-|---|---|
-| `tool_search` | Search for tools by name or use case |
-| `auto_correct` | Validate tool calls and get corrections |
+Configuration is loaded from (in order):
+1. `config/nexusagent.yaml` — project defaults
+2. Environment variables (`NEXUS_*__`)
+3. `~/.nexusagent/config.yaml` — user overrides
 
-### File System Tools
-| Tool | Description |
-|---|---|
-| `read_file` | Read file with line-range support |
-| `write_file` | Full file replacement (requires read-first) |
-| `edit_file` | Surgical line-range edit |
-| `list_directory` | Recursive directory listing |
-| `apply_patch` | Apply unified diff |
+Key config sections:
+```yaml
+server:
+  host: "0.0.0.0"
+  port: 8000
+  nats_url: "nats://localhost:4222"
 
-### Git Tools
-| Tool | Description |
-|---|---|
-| `git_status` | Working tree status |
-| `git_diff` | Show changes |
-| `git_log` | Commit history |
-| `git_commit` | Stage and commit |
-| `git_checkout_branch` | Checkout/create branches |
+agent:
+  default_model: "gemini-2.0-flash"
+  max_depth: 3
 
-### Test Tools
-| Tool | Description |
-|---|---|
-| `run_tests` | Auto-detect framework and run |
-| `run_single_test` | Run specific test file |
+memory:
+  enabled: true
+  extraction: true
+  git: true
+  workspace: "~/.nexusagent/memory"
+```
 
-### Search Tools
-| Tool | Description |
-|---|---|
-| `search_code` | ripgrep-based code search |
-| `find_symbol` | Multi-language symbol search |
-| `find_references` | Find all references to a symbol |
+## Next Steps
 
-### Shell Tools
-| Tool | Description |
-|---|---|
-| `run_shell` | Execute shell command |
-| `run_shell_streaming` | Streaming output for long commands |
-
-### Research Tools
-| Tool | Description |
-|---|---|
-| `search_web` | Web search (Exa + Tavily) |
-| `search_local_docs` | Local documentation search |
+- [Architecture Overview](architecture/overview.md) — System design
+- [Codebase Map](CODEBASE_MAP.md) — Module inventory and coupling analysis
+- [Memory System v2](../src/nexusagent/memory/) — File+vector memory with dream cycle
+- [ADRs](adrs/index.md) — Architecture decision records

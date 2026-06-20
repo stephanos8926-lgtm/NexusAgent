@@ -2,25 +2,27 @@
 
 **Multi-agent orchestration framework with NATS messaging.**
 
-NexusAgent is a lightweight, self-hosted agent platform that runs anywhere — from a Dell Optiplex to a Bobcat Miner. It features:
+NexusAgent is a lightweight, self-hosted agent platform that runs anywhere. It features:
 
 - **NATS-native**: Async messaging without Kafka's operational weight
 - **Multi-interface**: CLI, TUI, Web UI, and API out of the box
 - **Policy-aware tool system**: Progressive discovery with per-agent access control
 - **Multi-agent parallelism**: Dynamic sub-agent spawning with memory slicing
-- **Production-grade**: Circuit breakers, encrypted credentials, observability
+- **Memory v2**: Hybrid file+vector memory with dream cycle consolidation
+- **Production-grade**: Circuit breakers, encrypted credentials, version handshake
 
 ## Quick Start
 
 ```bash
 # Install
-pip install -e .
+pip install -e ".[dev]"
 
 # Run tests
-make test
+pytest tests/ -q
 
 # Start dev server
-make dev
+nats-server -js &
+python -m nexusagent
 ```
 
 ## Documentation
@@ -28,19 +30,18 @@ make dev
 ### Getting Started
 - [Installation](installation.md) — Install NexusAgent
 - [Quick Start](quickstart.md) — Get up and running fast
-- [Configuration](configuration.md) — Configure your setup
 - [Getting Started Guide](getting_started.md) — Detailed first-setup walkthrough
 - [Local Development](local_development.md) — Contributor workflow guide
-- [Environment & Execution](env_execution_guide.md) — Execution environment reference
 
 ### Architecture
-- [Architecture Overview](architecture/overview.md) — System components and design
-- [Tool System](architecture/tools.md) — Tool registry, policies, and role manifests
-- [Policy System](architecture/policies.md) — Permissive/restricted/strict access control
-- [Multi-Agent](architecture/multi-agent.md) — Sub-agent spawning and parallelism
+- [Codebase Map](CODEBASE_MAP.md) — Complete source inventory, coupling analysis, extraction candidates
+- [Semantic Index](SEMANTIC_INDEX.md) — Data flows, state management, extension points, tech debt
+- [Refactoring Plan](REFACTORING_PLAN.md) — Prioritized refactoring roadmap with completion status
 
 ### Codebase
-- [Codebase Map](CODEBASE_MAP.md) — Complete source inventory, data flow, API reference, and issues
+- [State](STATE.md) — Module-by-module inventory with data flow and key classes
+- [Code Review](CODE_REVIEW_COMPREHENSIVE.md) — Comprehensive multi-audit findings
+- [Assessment](assessment/2026-07-18-independent-codebase-assessment.md) — Independent architecture assessment
 
 ### ADRs (Architecture Decision Records)
 - [ADRs Index](adrs/index.md)
@@ -48,64 +49,34 @@ make dev
 - [ADR 0002: Project Structure](adrs/0002-project-structure-build-modes.md)
 - [ADR 0003: Branding & Config](adrs/0003-project-branding-config.md)
 - [ADR 0004: Documentation Standards](adrs/0004-documentation-standards.md)
+- [ADR 0005: TUI Refactoring](adrs/0005-tui-refactoring.md)
+- [ADR 0006: Memory Session Integration](adrs/0006-memory-session-integration.md)
+- [ADR 0007: Context Compression](adrs/0007-context-compression.md)
+- [ADR 0008: Cross-Session Memory](adrs/0008-cross-session-memory.md)
 
 ### Plans
-- [Assessment & Roadmap](plans/2026-07-12-assessment-and-roadmap.md) — Current strategic roadmap
-- [TUI Parity Sprint](plans/2026-06-11-tui-parity-sprint.md) — Recent sprint plan
+- [Assessment & Roadmap](plans/2026-07-12-assessment-and-roadmap.md) — Strategic roadmap
+- [Memory System v2](plans/2026-07-22-memory-system-v2.md) — Research-backed implementation plan
+- [Memory System Audit](plans/2026-07-22-memory-system-audit-synthesis.md) — Audit synthesis
+- [Memory System Overhaul](plans/2026-07-22-memory-system-overhaul.md) — Overhaul plan
+- [Security Hardening](plans/phase-1-security-hardening.md) — Phase 1 security fixes
+- [Version Handshake](plans/version-handshake-v1.md) — Version system spec
 
 ### Research
 - [Tool Parity](research/TOOL-PARITY-FINAL.md)
 - [TUI Aesthetics](research/TUI-AESTHETICS-FINAL.md)
+- [Feature Parity CLI](research/FEATURE_PARITY_CLI_USER.md)
+- [Feature Parity Arch](research/FEATURE_PARITY_CLI_ARCH.md)
 
 ### Reports
-- [Audit Report](AUDIT_REPORT.md)
-- [Competitive Analysis](competitive-analysis-2026-06-06.md)
-- [Implementation Plan](implementation-plan-2026-07-09.md)
+- [Comprehensive Code Review](CODE_REVIEW_COMPREHENSIVE.md)
+- [Memory System Analysis](MEMORY_SYSTEM_ANALYSIS.md)
+- [Memory System Comprehensive](MEMORY_SYSTEM_COMPREHENSIVE_ANALYSIS.md)
+- [TUI Audit](TUI_AUDIT.md)
+- [Runbook](RUNBOOK.md) — Operations guide
+
+### Roadmap
+- [Interactive Dashboard](ROADMAP/index.html) — Audit results, roadmap, competitor matrix, growth tracking
 
 ### Contributing
 - [Contributing Guide](CONTRIBUTING.md)
-
-## Architecture
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    NexusAgent System                         │
-│                                                             │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐   │
-│  │   CLI    │  │   TUI    │  │  Web UI  │  │ REST API │   │
-│  └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬─────┘   │
-│       └──────────────┴──────────────┴──────────────┘        │
-│                          │                                  │
-│                   ┌──────┴──────┐                           │
-│                   │ Agent (Core)│                           │
-│                   └──────┬──────┘                           │
-│                          │                                  │
-│       ┌──────────────────┼──────────────────┐              │
-│       │                  │                  │              │
-│  ┌────┴────┐      ┌─────┴─────┐     ┌─────┴─────┐        │
-│  │  Tools  │      │   NATS    │     │    DB     │        │
-│  │Registry │      │   Bus     │     │ (SQLite)  │        │
-│  └─────────┘      └───────────┘     └───────────┘        │
-└─────────────────────────────────────────────────────────────┘
-```
-
-## Key Features
-
-### Policy-Aware Tool System
-Agents start with a minimal tool set and discover tools on demand. Three policy levels control access:
-
-- **Permissive**: Auto-unlock on first call (user-spawned agents)
-- **Restricted**: Enforced role boundaries (sub-agents)
-- **Strict**: Locked to initial manifest (sandboxed)
-
-### Multi-Agent Parallelism
-Parent agents can spawn specialized sub-agents that run in parallel:
-
-- Adaptive spawning based on runtime complexity metrics
-- Memory slicing: only relevant context is transferred
-- 3-tier conflict resolution for concurrent edits
-
-### NATS JetStream Backbone
-- 15MB binary vs Kafka's operational weight
-- Built-in clustering and persistence
-- JetStream KV for result storage

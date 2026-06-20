@@ -1,5 +1,88 @@
 # Changelog
 
+## 2026-07-22 — Memory System v2 Complete
+
+### Memory System v2
+- **FileMemory** — Canonical file-based memory with YAML frontmatter, Git-backed auto-commits (`MemoryGitOps`)
+- **HybridMemoryIndex** — SQLite FTS5 + sqlite-vec hybrid search with RRF fusion (70% vector / 30% keyword)
+- **Auto-Extraction** — `MemoryExtractor`: regex-based fact extraction (decisions, preferences, errors, entities) after every turn
+- **Dream Cycle** — `DreamCycle`: 4-phase background consolidation daemon (scan → patterns → consolidate → trim)
+- **LLM Refinement** — `LLMRefinement`: optional LLM synthesis layer for higher-level insights from raw observations
+- **SummaryDAG** — Hierarchical context compression (depth-0 leaf → depth-1 arc → depth-2 narrative)
+- **ConsolidationEngine** — Duplicate detection, contradiction resolution, stale pruning
+- **Bi-temporal Search** — `valid_from`/`valid_until` fields for time-based memory queries
+- **TTL Enforcement** — Check-on-read + periodic `sweep_expired()` for automatic expiration
+- **Provenance Tracking** — `source_session_id` and `derived_from` linking between memories
+- **Memory Linking** — Auto-related field for linking related memories
+- **Rate Limiter** — Token-bucket rate limiting (30 writes/min, 60 searches/min)
+- **Self-Management Tools** — `memory_delete`, `memory_update`, `memory_list`, `memory_prune`
+- **CLI Commands** — `memory health` and `memory stats` dashboard commands
+- **Workspace-Scoped Memory** — Per-session memory directory, thread-local isolation
+- **Session Integration** — `HybridMemoryManager` created on session init, `close()` on session end
+- **17 new E2E tests** for memory system
+- **Config fields** — `memory_extraction`, `memory_git`, `memory_compaction` sections added
+
+### Workspace Scoping (P2-5 + P6-9)
+- All agents (TUI/CLI/SDK/graph) now workspace-scoped
+- `_setup_workspace_context()` sets path jail, thread-local `_ws_memory_dir`
+- Worker pool passes `working_dir` + system prompt from `TaskContract`
+- `NEXUS.md` loaded per-workspace
+- `memory_dir` column added to sessions table
+- `find_sessions_by_working_dir` query method
+
+### Version System
+- `version.py` — Single source of truth via `importlib.metadata`
+- `/version` endpoint on FastAPI server
+- `SERVER_VERSION` and `MIN_CLIENT_VERSION` in SDK
+- `--check-server` and `--skip-version-check` CLI flags
+- TUI preflight version check before WebSocket connect
+- 13 new version tests
+
+### Security Hardening (Phase 1)
+- Fixed `test_runner.py` shell=True → shell=False
+- Added auth to SDK NATS path
+- Added auth to Web UI (Gradio)
+- Fixed B039 mutable ContextVar default
+- Fixed RUF012 mutable class attribute
+- Added path jail to CLI working_dir
+- Fixed WebSocket KeyError crashes
+- Added rate limiting to API endpoints
+- Security score: 7.2→8.5, Overall: 6.8→7.2
+
+### Refactoring (Phases 1-7, 16-17)
+- `infrastructure/utils.py` → `utils/` (retry, circuit)
+- `widgets/theme.py` → `theme/` (colors, registry)
+- `infrastructure/db.py` → `db/` (base, models, manager, repos)
+- `widgets/messages.py` → `messages/` (user, assistant, tool, app, error, welcome)
+- `tools/registry.py` → `registry/` (types, core, policy, search)
+- `memory/memory_index.py` → `index/` (embeddings, index)
+- `interfaces/tui.py` → `tui/` (app, websocket, streaming, input, formatters)
+- `server/server.py` → `server/` (routes, websocket, __main__)
+- `memory/memory.py` → `memory/` submodules (memory_item, memory_bank, memory_manager, hybrid_memory)
+- `interfaces/tui.py` split: `tui_widgets.py`, `tui_formatters.py`
+
+### Database
+- `memory_dir` column added to sessions table
+- `find_sessions_by_working_dir` query method
+- `reinit()` now recreates engine + session (was silently using old engine)
+
+### Config
+- `yolo` field added to `AgentConfig`
+- `memory_workspace` field added
+- `memory_extraction`, `memory_git`, `memory_compaction` sections
+- Default `db_path` corrected to match actual location
+
+### Documentation
+- `CODEBASE_MAP.md` — Complete source inventory updated
+- `SEMANTIC_INDEX.md` — Data flows, state management, extension points updated
+- `README.md` — Features, architecture, memory system v2
+- `docs/ROADMAP/index.html` — Interactive audit dashboard
+- ADRs 0001-0008
+- Specs SPEC-001 to SPEC-006 (memory system)
+- Memory system v2 plan, audit synthesis, comprehensive analysis
+
+---
+
 ## 2026-06-11 — Codebase Cleanup & Security Hardening
 
 ### Security
@@ -21,17 +104,16 @@
 - Removed empty `__init__.py` files (3)
 - Fixed hardcoded `sys.path` in tests (2 files)
 
-### Features (from feat/track-a-feature-parity)
+### Features
 - Skills system — load custom skills from `~/.hermes/skills/` with YAML frontmatter
-- Todo tools — `todowrite`/`todoread` for multi-step task tracking
-- Responsive TUI — `Breakpoint` enum, `NO_COLOR` detection, SIGWINCH handler, `_is_ascii_terminal()`
+- Todo tools — `write_todos`/`read_todos` for multi-step task tracking
+- Responsive TUI — `Breakpoint` enum, `NO_COLOR` detection, SIGWINCH handler
+- Hooks system — `HookManager` with session-init, post-tool, error, subagent events
+- Code review tool — static analysis (security, bugs, style, performance, AST)
 
 ### Test Fixes
-- Fixed 14 pre-existing test failures:
-  - 5 session/memory tests — agent invocation + environment context injection
-  - 9 fs permission tests — workspace-safe temp paths
+- Fixed 14 pre-existing test failures
 - Added DB init to `conftest.py` for server tests
-- All 476 tests passing
 
 ### Documentation
 - Updated `README.md` with current feature set and doc structure

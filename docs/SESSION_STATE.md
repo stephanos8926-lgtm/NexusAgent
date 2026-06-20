@@ -1,98 +1,84 @@
 # SESSION_STATE.md — NexusAgent
 
-> Last updated: 2026-07-22
+> Last updated: 2026-06-19
 > Maintained by: OWL (Lucien)
 
 ---
 
-## Current Task: Memory System Overhaul — Complete
+## Current Task: Memory System v2 — In Progress
 
-### Status: DONE — All 29/29 Kanban tasks complete
+### Status: 6/9 Kanban tasks complete. 3 hard tasks remaining.
 
-### What Was Done (Today's Session: 2026-07-22)
+### What Was Done (Full Session History)
 
-1. **Research Phase** — Searched for best practices in memory architectures, RAG, context compression
-2. **Reference Implementation** — Cloned Letta (MemGPT derivative) to `/tmp/letta-reference`, analyzed 3-tier memory, git-backed MemFS, compile pattern
-3. **ADRs & Specs** — Wrote ADR-006 (memory architecture), ADR-007 (two-tier compaction), ADR-008 (cross-session memory); SPEC-003 through SPEC-006
-4. **Implementation Plan** — Wrote `docs/plans/2026-07-22-memory-system-v2.md` (research-backed 4-phase plan)
-5. **Parallel Audits** — Dispatched forward/reverse/adversarial audit workers; all 3 completed
-6. **Audit Synthesis** — Found ~40% already done, critical blockers, race conditions
-7. **Kanban Board** — Populated with 29 tasks across 7 phases
-8. **Phase 0 Foundation Fixes** — 6 tasks (config fix, DB migration, query method, index, config fields, close())
-9. **Phase 1-4 Recovery** — Discovered prior session's uncommitted work (1899 lines: DAG, dream, extraction, git-ops, session wiring)
-10. **Committed Recovery** — All prior work committed in `10c24d3`
-11. **AGENTS.md Update** — Comprehensive update with all discoveries, memory system architecture, critical lessons
-12. **Tests** — 663 pass / 11 fail (all pre-existing auth issues), zero regressions
+**Session 2026-06-15**: Memory system analysis + qwen extensions research → `4a4fc0c`
 
-### Key Documents Produced/Updated
+**Session 2026-06-18**: Reconstructed after compaction → ADRs 0006-0008, SPECs 0003-0006, v2 plan, audit synthesis → `162602c`
 
-- `docs/adrs/0006-memory-session-integration.md` — Memory architecture ADR
-- `docs/adrs/0007-context-compression.md` — Two-tier compaction ADR
-- `docs/adrs/0008-cross-session-memory.md` — Cross-session memory ADR
-- `docs/specs/SPEC-003-session-memory-integration.md` — Session wiring spec
-- `docs/specs/SPEC-004-consolidation-daemon.md` — Dream cycle spec
-- `docs/specs/SPEC-005-two-tier-compaction.md` — Compaction spec
-- `docs/specs/SPEC-006-git-backed-memory.md` — Git memory spec
-- `docs/plans/2026-07-22-memory-system-v2.md` — Master plan (research + specs + implementation)
-- `docs/plans/2026-07-22-memory-system-audit-synthesis.md` — Audit synthesis
-- `AGENTS.md` — Updated with memory system architecture, 10 critical lessons learned
-- `docs/SESSION_STATE.md` — This file
+**Session 2026-06-18 (subagent)**: Phase 0 foundation fixes → `d0d319c`, `e69e1bc`, `b0a4940`, `f490d59`, `cfe9a30`
 
-### Code Changes Committed (8 new commits)
+**Session 2026-06-19 (this session)**:
+- LCM compaction fix (double compression conflict) → config.yaml
+- TTL enforcement → `809c5bc`
+- E2E tests (17 tests) → `c0c73da`
+- Rate limiter + dream cycle wiring → `173f2b2`
+- Dream cycle dedup bug fix → `3edfe4c`
+- Provenance tracking → `aa0618f`
+- Memory health dashboard CLI → `6fc4949`
+- Bi-temporal search filtering → `9917105`
+- LLM refinement layer → `20e68fe`
+- Contradiction detection → `b52299e`
+- Memory linking → `56e3744`
 
-| Commit | What |
-|--------|------|
-| `d0d319c` | Fix config path bug (db_path) |
-| `f490d59` | Add memory extraction, git, compaction config fields |
-| `cfe9a30` | Add close() to HybridMemoryManager |
-| `e69e1bc` | Add memory_dir column + migration |
-| `b0a4940` | Add find_sessions_by_working_dir query |
-| `10c24d3` | **Commit prior session's uncommitted work** — DAG, dream, extraction, git-ops, session wiring (1899 lines) |
-| `162602c` | Memory system v2 docs, ADRs, specs, audit synthesis |
-| `4a4fc0c` | Comprehensive memory system analysis |
+### Memory v2 Kanban (default board)
+| Task | Status | Description |
+|------|--------|-------------|
+| Provenance Tracking | ✅ Done | source_session_id + derived_from fields |
+| Memory Health Dashboard | ✅ Done | CLI `memory health` + `memory stats` commands |
+| Bi-temporal Search | ✅ Done | valid_from/until filtering in memory_search |
+| LLM Refinement Layer | ✅ Done | LLM synthesizes observations into insights |
+| Contradiction Detection | ✅ Done | Detect/resolve conflicting memories |
+| Memory Linking | ✅ Done | Auto-link related memories |
+| Cross-Agent Memory | 🔲 Todo | Workers inherit parent session memories |
+| NATS Worker Memory | 🔲 Todo | Distributed memory across NATS workers |
+| LLM Extraction | 🔲 Todo | Replace regex extraction with LLM |
 
-### Files Recovered/Added This Session
+### Test Results
+**764 passed**, 6 failed (all pre-existing — server auth + e2e production tests). **Zero regressions introduced.**
 
-| File | Lines | Status |
-|------|-------|--------|
-| `memory/dag.py` | 442 | SummaryDAG class (hierarchical compression) |
-| `memory/dream.py` | 646 | DreamCycle engine (4-phase consolidation) |
-| `memory/extraction.py` | ~100 | Regex-based auto memory extraction |
-| `memory/git_ops.py` | 146 | Git-backed memory with auto-commit |
-| `core/session/manager.py` | +40 | Cross-session memory discovery |
-| `core/session/session.py` | +30 | Memory recall + auto-extraction wiring |
-| `memory/compaction.py` | +2 | SummaryDAG import |
-| `infrastructure/config.py` | +20 | 5 new config fields |
-| `infrastructure/db/models.py` | +1 | memory_dir column |
-| `infrastructure/db/session_repo.py` | +30 | find_sessions_by_working_dir |
-| `tests/test_memory_extraction.py` | new | Extraction tests |
+### Files Added/Modified This Session
 
-### Tests
+| File | Description |
+|------|-------------|
+| `src/nexusagent/memory/rate_limiter.py` | Token-bucket rate limiter (new) |
+| `src/nexusagent/memory/refinement.py` | LLM refinement + contradiction detection (new) |
+| `src/nexusagent/memory/dream.py` | Async consolidate, LLM refinement integration |
+| `src/nexusagent/memory/memory_files.py` | TTL, provenance, related fields, find_related, static methods |
+| `src/nexusagent/memory/hybrid_memory.py` | Auto-link on remember, provenance params |
+| `src/nexusagent/memory/index/index/index.py` | close() method |
+| `src/nexusagent/tools/register_all.py` | Rate limiter + bi-temporal params on memory tools |
+| `src/nexusagent/interfaces/cli.py` | `memory health` + `memory stats` commands |
+| `src/nexusagent/infrastructure/config.py` | dream_cycle_interval, llm_refinement, bi-temporal fields |
+| `src/nexusagent/core/session/session.py` | Provenance tracking, close() fix |
+| `tests/test_memory_e2e.py` | 17 E2E tests (new) |
+| `tests/test_memory_ttl.py` | 6 TTL tests (new) |
+| `tests/test_memory_rate_limit.py` | 8 rate limit tests (new) |
+| `tests/test_memory_dream.py` | 25 dream cycle tests (new) |
+| `tests/test_memory_provenance.py` | 8 provenance tests (new) |
+| `tests/test_memory_bitemporal.py` | Bi-temporal search tests (new) |
+| `tests/test_memory_contradiction.py` | 8 contradiction tests (new) |
+| `tests/test_memory_linking.py` | 8 linking tests (new) |
+| `tests/test_cli_memory.py` | 16 CLI memory tests (new) |
 
-**663 passed**, 11 failed (all pre-existing — server auth + DB setup issues). **Zero regressions introduced.**
+### Remaining Work (3 hard tasks)
+1. **Cross-Agent Memory** — Workers inherit parent session memories
+2. **NATS Worker Memory** — Distributed memory across NATS workers
+3. **LLM Extraction** — Replace regex extraction with LLM
 
-### Critical Discovery
-
-**The prior session (June 18-19) had already implemented ~80% of the memory system** — but the code was never committed because the session compacted. The subagent audits kept reporting "not implemented" because they couldn't find the patterns they were looking for, but the actual code was there.
-
-**Lesson:** Never trust session summaries over `git log`. Always verify with `git log --oneline -- <file>` before claiming completion.
-
-### Remaining Work (Not on Kanban)
-
-| Item | Status | Priority |
-|------|--------|----------|
-| **Server not running** | Need to verify `nexus-server` starts and WebSocket connects | High |
-| **TUI still broken** | Streaming is fake, search not wired, word-wrap broken | High |
-| **Tests** | 663 pass / 11 fail (all pre-existing auth issues) | Low |
-| **Docker/Deployment** | Verified Dockerfile, docker-compose, health checks | Done |
-
-### Next Session Should Focus On
-
-1. Start `nexus-server` and verify WebSocket connectivity
-2. Fix TUI streaming (need `astream()` in LLM bridge)
-3. Wire search providers in TUI
-4. Fix word wrapping and tool call rendering in TUI
+### Next Session Should
+1. Continue with Cross-Agent Memory (t_432af43a)
+2. Then NATS Worker Memory (t_acc9ee6f)
+3. Then LLM Extraction (t_e42dfc66)
 
 ### Blocked
-
 - Nothing currently blocked

@@ -4,8 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>NexusAgent — Roadmap & Audit Dashboard</title>
-
-<!-- Tailwind CSS (CDN) -->
 <script src="https://cdn.tailwindcss.com"></script>
 <script>
   tailwind.config = {
@@ -21,95 +19,84 @@
     }
   }
 </script>
-
-<!-- React (CDN) -->
-<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-
-<!-- Chart.js (CDN) -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-
-<!-- Mermaid (CDN) -->
 <script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.0/dist/mermaid.min.js"></script>
-
-<!-- Lucide Icons (CDN) -->
-<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
-
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
-  
   * { font-family: 'Inter', sans-serif; }
   code, pre, .mono { font-family: 'JetBrains Mono', monospace; }
-  
-  .glass {
-    background: rgba(255,255,255,0.7);
-    backdrop-filter: blur(12px);
-    border: 1px solid rgba(255,255,255,0.3);
-  }
-  .dark .glass {
-    background: rgba(39,39,42,0.7);
-    border: 1px solid rgba(255,255,255,0.08);
-  }
-  
-  .score-ring {
-    transform: rotate(-90deg);
-    transform-origin: 50% 50%;
-  }
-  
-  .tab-active {
-    border-bottom: 2px solid #5E6AD2;
-    color: #5E6AD2;
-  }
-  
+  .glass { background: rgba(255,255,255,0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.3); }
+  .dark .glass { background: rgba(39,39,42,0.7); border: 1px solid rgba(255,255,255,0.08); }
+  .score-ring { transform: rotate(-90deg); transform-origin: 50% 50%; }
+  .tab-active { border-bottom: 2px solid #5E6AD2; color: #5E6AD2; }
   .issue-critical { border-left: 3px solid #ef4444; }
   .issue-high { border-left: 3px solid #f97316; }
   .issue-medium { border-left: 3px solid #f59e0b; }
   .issue-low { border-left: 3px solid #3b82f6; }
-  
-  .mermaid { background: transparent !important; }
-  
-  /* Custom scrollbar */
   ::-webkit-scrollbar { width: 6px; height: 6px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: #a1a1aa; border-radius: 3px; }
   .dark ::-webkit-scrollbar-thumb { background: #52525b; }
-  
   .fade-in { animation: fadeIn 0.3s ease-in; }
   @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-  
   .pulse-dot { animation: pulse 2s infinite; }
   @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
+  .mermaid-container { background: transparent !important; }
 </style>
 </head>
 <body class="bg-surface-50 text-surface-800 dark:bg-surface-900 dark:text-surface-100 min-h-screen">
-<div id="root"></div>
 
-<script type="text/babel" data-type="module">
-const { useState, useEffect, useRef, useMemo, createContext, useContext } = React;
+<header class="glass sticky top-0 z-50 border-b border-surface-200/50 dark:border-surface-700/50">
+  <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-xl bg-primary-500 flex items-center justify-center text-white font-bold text-lg">N</div>
+      <div>
+        <h1 class="text-lg font-bold leading-tight">NexusAgent</h1>
+        <p class="text-xs text-surface-400">Roadmap & Audit Dashboard · 2026-07-22</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-3">
+      <span class="text-xs text-surface-400 hidden sm:block">106 source files, ~18.5K LOC, 52 test files</span>
+      <button id="darkToggle" class="w-8 h-8 rounded-lg bg-surface-200 dark:bg-surface-700 flex items-center justify-center text-sm hover:bg-surface-300 dark:hover:bg-surface-600 transition-colors">🌙</button>
+    </div>
+  </div>
+  <div class="max-w-7xl mx-auto px-4">
+    <nav class="flex gap-1 overflow-x-auto" id="tabs">
+      <button class="tab-btn px-4 py-2.5 text-sm font-medium transition-all relative tab-active" data-tab="dashboard">Dashboard</button>
+      <button class="tab-btn px-4 py-2.5 text-sm font-medium transition-all relative text-surface-500 hover:text-surface-700 dark:hover:text-surface-300" data-tab="issues">Issues <span class="ml-1.5 text-xs bg-surface-200 dark:bg-surface-700 px-1.5 py-0.5 rounded-full">52</span></button>
+      <button class="tab-btn px-4 py-2.5 text-sm font-medium transition-all relative text-surface-500 hover:text-surface-700 dark:hover:text-surface-300" data-tab="architecture">Architecture</button>
+      <button class="tab-btn px-4 py-2.5 text-sm font-medium transition-all relative text-surface-500 hover:text-surface-700 dark:hover:text-surface-300" data-tab="competitor">Competitors</button>
+      <button class="tab-btn px-4 py-2.5 text-sm font-medium transition-all relative text-surface-500 hover:text-surface-700 dark:hover:text-surface-300" data-tab="roadmap">Roadmap</button>
+      <button class="tab-btn px-4 py-2.5 text-sm font-medium transition-all relative text-surface-500 hover:text-surface-700 dark:hover:text-surface-300" data-tab="growth">Growth</button>
+    </nav>
+  </div>
+</header>
 
+<main class="max-w-7xl mx-auto px-4 py-6" id="content"></main>
+
+<footer class="max-w-7xl mx-auto px-4 py-8 text-center">
+  <p class="text-xs text-surface-400">
+    NexusAgent Audit Dashboard · Generated 2026-07-22 ·
+    <a href="https://github.com/stephanos8926-lgtm/NexusAgent" class="text-primary-500 hover:underline ml-1">GitHub</a>
+  </p>
+</footer>
+
+<script>
 // ═══════════════════════════════════════════════════════════════
-// DATA — All audit results consolidated
+// DATA
 // ═══════════════════════════════════════════════════════════════
 
 const AUDIT_DATA = {
-  meta: {
-    date: "2026-07-19",
-    codebase: "82 source files, ~13.6K LOC, 50 test files, ~7.6K LOC",
-    testBaseline: "529 pass / 14 fail / 1 error (all pre-existing)",
-    overallScore: 6.8
-  },
-
+  meta: { date: "2026-07-22", codebase: "106 source files, ~18.5K LOC, 52 test files", testBaseline: "680 pass / 11 fail (all pre-existing)", overallScore: 7.2 },
   scores: [
-    { name: "Security", score: 7.2, max: 10, trend: "+0.7", color: "#ef4444" },
-    { name: "Code Quality", score: 6.9, max: 10, trend: "+0.3", color: "#f59e0b" },
-    { name: "Architecture", score: 6.6, max: 10, trend: "+0.2", color: "#3b82f6" },
-    { name: "Test Coverage", score: 5.5, max: 10, trend: "+0.2", color: "#8b5cf6" },
-    { name: "Documentation", score: 7.1, max: 10, trend: "+0.3", color: "#06b6d4" },
-    { name: "Type Safety", score: 8.8, max: 10, trend: "+0.3", color: "#22c55e" },
+    { name: "Security", score: 8.5, max: 10, trend: "+1.3", color: "#ef4444" },
+    { name: "Code Quality", score: 7.2, max: 10, trend: "+0.3", color: "#f59e0b" },
+    { name: "Architecture", score: 6.8, max: 10, trend: "+0.2", color: "#3b82f6" },
+    { name: "Test Coverage", score: 6.1, max: 10, trend: "+0.6", color: "#8b5cf6" },
+    { name: "Documentation", score: 7.8, max: 10, trend: "+0.7", color: "#06b6d4" },
+    { name: "Type Safety", score: 9.0, max: 10, trend: "+0.2", color: "#22c55e" },
     { name: "Competitive", score: 6.5, max: 10, trend: "—", color: "#ec4899" },
   ],
-
   issues: {
     critical: [
       { id: 1, source: "Adversarial", file: "test_runner.py:149", issue: "shell=True with user input", impact: "Arbitrary code execution", effort: "S", severity: "critical" },
@@ -172,7 +159,6 @@ const AUDIT_DATA = {
       { id: 52, source: "Birdseye", issue: "No protocol abstractions for interfaces", severity: "low" },
     ]
   },
-
   capabilityMatrix: [
     { capability: "CLI interface", have: true, target: true, gap: false, priority: null },
     { capability: "TUI interface", have: true, target: true, gap: false, priority: "P1", note: "Needs polish" },
@@ -196,95 +182,81 @@ const AUDIT_DATA = {
     { capability: "NATS clustering", have: false, target: true, gap: true, priority: "P3" },
     { capability: "Multi-tenancy", have: false, target: true, gap: true, priority: "P3" },
   ],
-
   velocityMetrics: [
-    { metric: "Source LOC", current: 13600, lastSprint: 13200, delta: 400, target: null },
-    { metric: "Test LOC", current: 7649, lastSprint: 7200, delta: 449, target: null },
-    { metric: "Test pass rate", current: 97.4, lastSprint: 97.3, delta: 0.1, target: 98 },
-    { metric: "Test coverage %", current: 55, lastSprint: 53, delta: 2, target: 80 },
-    { metric: "Docstring coverage %", current: 71, lastSprint: 68, delta: 3, target: 90 },
-    { metric: "Type annotation %", current: 88, lastSprint: 85, delta: 3, target: 95 },
+    { metric: "Source LOC", current: 18500, lastSprint: 13600, delta: 4900, target: null },
+    { metric: "Test LOC", current: 9500, lastSprint: 7649, delta: 1851, target: null },
+    { metric: "Test pass rate", current: 98.4, lastSprint: 97.4, delta: 1.0, target: 99 },
+    { metric: "Test coverage %", current: 61, lastSprint: 55, delta: 6, target: 80 },
+    { metric: "Docstring coverage %", current: 78, lastSprint: 71, delta: 7, target: 90 },
+    { metric: "Type annotation %", current: 90, lastSprint: 88, delta: 2, target: 95 },
     { metric: "Critical issues", current: 7, lastSprint: 14, delta: -7, target: 0 },
     { metric: "High issues", current: 12, lastSprint: 18, delta: -6, target: 0 },
     { metric: "Medium issues", current: 17, lastSprint: 22, delta: -5, target: 10 },
-    { metric: "Security score", current: 7.2, lastSprint: 6.5, delta: 0.7, target: 9 },
-    { metric: "Architecture score", current: 6.6, lastSprint: 6.4, delta: 0.2, target: 8 },
+    { metric: "Security score", current: 8.5, lastSprint: 7.2, delta: 1.3, target: 9 },
+    { metric: "Architecture score", current: 6.8, lastSprint: 6.6, delta: 0.2, target: 8 },
   ],
-
   roadmap: [
-    {
-      phase: "Phase 1: Security Hardening",
-      weeks: "Week 1-2",
-      color: "#ef4444",
-      items: [
-        { task: "Fix test_runner.py shell=True → shell=False", done: false },
-        { task: "Add auth to SDK NATS path", done: false },
-        { task: "Add auth to Web UI (Gradio)", done: false },
-        { task: "Fix B039 mutable ContextVar default", done: false },
-        { task: "Fix RUF012 mutable class attribute", done: false },
-        { task: "Add path jail to CLI working_dir", done: false },
-        { task: "Fix WebSocket KeyError crashes", done: false },
-        { task: "Add rate limiting to API endpoints", done: false },
-      ]
-    },
-    {
-      phase: "Phase 2: Test Coverage",
-      weeks: "Week 2-4",
-      color: "#f59e0b",
-      items: [
-        { task: "Add tests for core/agent.py", done: false },
-        { task: "Add tests for core/worker.py", done: false },
-        { task: "Add tests for tools/shell.py", done: false },
-        { task: "Add tests for tools/fs.py", done: false },
-        { task: "Add tests for tools/git.py", done: false },
-        { task: "Add tests for infrastructure/auth.py", done: false },
-        { task: "Add tests for infrastructure/bus.py", done: false },
-        { task: "Add tests for llm/llm.py", done: false },
-        { task: "Target: 65% coverage", done: false },
-      ]
-    },
-    {
-      phase: "Phase 3: Code Quality",
-      weeks: "Week 3-4",
-      color: "#3b82f6",
-      items: [
-        { task: "Run ruff check --fix for 94 auto-fixable violations", done: false },
-        { task: "Add docstrings to 100 undocumented functions", done: false },
-        { task: "Add return types to 55 unannotated functions", done: false },
-        { task: "Fix 4 wildcard imports in compat shims", done: false },
-        { task: "Add lock file for dependencies", done: false },
-        { task: "Run pip-audit for vulnerability scan", done: false },
-      ]
-    },
-    {
-      phase: "Phase 4: Competitive Gaps",
-      weeks: "Month 2-3",
-      color: "#8b5cf6",
-      items: [
-        { task: "P0: MCP support — implement MCP client + server", done: false },
-        { task: "P0: Codebase indexing — add Tree-sitter + embedding index", done: false },
-        { task: "P1: Sandboxing — add subprocess sandboxing for tool execution", done: false },
-        { task: "P1: Skills/plugins — build extensible skill marketplace", done: false },
-        { task: "P2: IDE extension — VS Code extension", done: false },
-        { task: "P2: Auto-commit — Git workflow automation", done: false },
-        { task: "P2: Structured logging — JSON logging with correlation IDs", done: false },
-      ]
-    },
-    {
-      phase: "Phase 5: Architecture Evolution",
-      weeks: "Month 3-6",
-      color: "#22c55e",
-      items: [
-        { task: "Replace global singletons with DI container", done: false },
-        { task: "Add protocol abstractions for interfaces", done: false },
-        { task: "Migrate from SQLite to PostgreSQL", done: false },
-        { task: "Add NATS clustering", done: false },
-        { task: "Add multi-tenancy support", done: false },
-        { task: "Split monolithic server into microservices", done: false },
-      ]
-    }
+    { phase: "Phase 1: Security Hardening", weeks: "Week 1-2", color: "#ef4444", done: true, items: [
+      { task: "Fix test_runner.py shell=True → shell=False", done: true },
+      { task: "Add auth to SDK NATS path", done: true },
+      { task: "Add auth to Web UI (Gradio)", done: true },
+      { task: "Fix B039 mutable ContextVar default", done: true },
+      { task: "Fix RUF012 mutable class attribute", done: true },
+      { task: "Add path jail to CLI working_dir", done: true },
+      { task: "Fix WebSocket KeyError crashes", done: true },
+      { task: "Add rate limiting to API endpoints", done: true },
+    ]},
+    { phase: "Phase 2: Refactoring Complete", weeks: "Week 2-6", color: "#f59e0b", done: true, items: [
+      { task: "Extract infrastructure/utils → utils/ subpackage", done: true },
+      { task: "Extract widgets/theme → theme/ subpackage", done: true },
+      { task: "Extract infrastructure/db → db/ subpackage", done: true },
+      { task: "Extract widgets/messages → messages/ subpackage", done: true },
+      { task: "Extract tools/registry → registry/ subpackage", done: true },
+      { task: "Extract memory/memory_index → index/ subpackage", done: true },
+      { task: "Split interfaces/tui → tui/ subpackage", done: true },
+      { task: "Extract server/server → server/ subpackage", done: true },
+      { task: "Extract memory/memory → memory/ submodules", done: true },
+    ]},
+    { phase: "Phase 3: Memory System v2", weeks: "Week 4-8", color: "#3b82f6", done: true, items: [
+      { task: "FileMemory — canonical file-based memory with YAML frontmatter", done: true },
+      { task: "HybridMemoryIndex — FTS5 + sqlite-vec hybrid search", done: true },
+      { task: "Auto-extraction — regex-based fact extraction after every turn", done: true },
+      { task: "Dream Cycle — 4-phase background consolidation daemon", done: true },
+      { task: "LLM Refinement — optional LLM synthesis layer", done: true },
+      { task: "SummaryDAG — hierarchical context compression", done: true },
+      { task: "Bi-temporal search — valid_from/valid_until fields", done: true },
+      { task: "TTL enforcement — check-on-read + periodic sweep", done: true },
+      { task: "Git-backed auto-commit after memory writes", done: true },
+      { task: "Rate limiter — token-bucket protection", done: true },
+      { task: "Workspace-scoped memory with per-session isolation", done: true },
+      { task: "17 new E2E tests for memory system", done: true },
+    ]},
+    { phase: "Phase 4: Test Coverage", weeks: "Week 8-12", color: "#8b5cf6", done: false, items: [
+      { task: "Add tests for DreamCycle end-to-end", done: false },
+      { task: "Add tests for ConsolidationEngine", done: false },
+      { task: "Add tests for LLMRefinement layer", done: false },
+      { task: "Add tests for CompactionPipeline edge cases", done: false },
+      { task: "Add tests for policy enforcement across all roles", done: false },
+      { task: "Add CLI integration tests (CliRunner)", done: false },
+      { task: "Add SDK integration tests", done: false },
+      { task: "Target: 80% coverage", done: false },
+    ]},
+    { phase: "Phase 5: Competitive Gaps", weeks: "Month 3-4", color: "#22c55e", done: false, items: [
+      { task: "P0: MCP support — implement MCP client + server", done: false },
+      { task: "P0: Codebase indexing — add Tree-sitter + embedding index", done: false },
+      { task: "P1: Sandboxing — add subprocess sandboxing for tool execution", done: false },
+      { task: "P1: Skills/plugins — build extensible skill marketplace", done: false },
+      { task: "P2: IDE extension — VS Code extension", done: false },
+      { task: "P2: Structured logging — JSON logging with correlation IDs", done: false },
+    ]},
+    { phase: "Phase 6: Architecture Evolution", weeks: "Month 4-6", color: "#06b6d4", done: false, items: [
+      { task: "Replace global singletons with DI container", done: false },
+      { task: "Add protocol abstractions for interfaces", done: false },
+      { task: "Migrate from SQLite to PostgreSQL", done: false },
+      { task: "Add NATS clustering", done: false },
+      { task: "Add multi-tenancy support", done: false },
+    ]},
   ],
-
   competitorMatrix: [
     { feature: "CLI interface", nexusagent: true, claudeCode: true, geminiCLI: true, codex: true, windsurf: false, cursor: false, aider: true, continue: false, sweAgent: true },
     { feature: "TUI interface", nexusagent: true, claudeCode: true, geminiCLI: true, codex: true, windsurf: true, cursor: true, aider: true, continue: true, sweAgent: false },
@@ -299,122 +271,9 @@ const AUDIT_DATA = {
     { feature: "Model agnostic", nexusagent: true, claudeCode: false, geminiCLI: false, codex: false, windsurf: false, cursor: true, aider: true, continue: true, sweAgent: true },
     { feature: "WebSocket server", nexusagent: true, claudeCode: false, geminiCLI: false, codex: false, windsurf: false, cursor: false, aider: false, continue: false, sweAgent: false },
     { feature: "SDK", nexusagent: true, claudeCode: true, geminiCLI: false, codex: true, windsurf: false, cursor: false, aider: false, continue: false, sweAgent: false },
-    { feature: "Auto-commit/Git", nexusagent: false, claudeCode: false, geminiCLI: false, codex: false, windsurf: false, cursor: false, aider: true, continue: false, sweAgent: false },
-    { feature: "Skills/plugins", nexusagent: false, claudeCode: true, geminiCLI: true, codex: false, windsurf: false, cursor: false, aider: false, continue: true, sweAgent: false },
+    { feature: "Auto-commit/Git", nexusagent: true, claudeCode: false, geminiCLI: false, codex: false, windsurf: false, cursor: false, aider: true, continue: false, sweAgent: false },
+    { feature: "Skills/plugins", nexusagent: true, claudeCode: true, geminiCLI: true, codex: false, windsurf: false, cursor: false, aider: false, continue: true, sweAgent: false },
   ],
-
-  architectureDiagram: `graph TB
-    subgraph Interfaces["🌐 Interfaces"]
-        CLI[CLI<br/>Click]
-        TUI[TUI<br/>Textual]
-        WS[WebSocket<br/>FastAPI]
-        SDK[SDK<br/>NexusSDK]
-        WEB[Web UI<br/>Gradio]
-    end
-
-    subgraph Core["⚙️ Core"]
-        AGENT[Agent<br/>Role-based]
-        SESSION[Session<br/>Manager]
-        WORKER[Worker<br/>Pool]
-        ORCH[Orchestrator<br/>Deep Research]
-    end
-
-    subgraph Tools["🔧 Tools"]
-        FS[Filesystem]
-        SHELL[Shell]
-        GIT[Git]
-        PATCH[Patch]
-        RESEARCH[Research]
-        MEMORY[Memory]
-        CODE[Code<br/>Search]
-    end
-
-    subgraph Infrastructure["🏗️ Infrastructure"]
-        CONFIG[Config<br/>Pydantic]
-        BUS[Bus<br/>NATS]
-        DB[(Database<br/>SQLite)]
-        AUTH[Auth<br/>Fernet]
-        LLM[LLM Bridge<br/>Multi-provider]
-    end
-
-    CLI --> SDK
-    TUI --> WS
-    WEB --> SDK
-    SDK --> BUS
-    WS --> SESSION
-    CLI --> WORKER
-    SESSION --> AGENT
-    WORKER --> AGENT
-    AGENT --> Tools
-    AGENT --> LLM
-    AGENT --> MEMORY
-    Tools --> CONFIG
-    Tools --> BUS
-    Tools --> DB
-    BUS --> DB
-    AUTH --> CONFIG
-    SESSION --> DB
-    SESSION --> ORCH
-    ORCH --> RESEARCH
-    ORCH --> LLM
-
-    style Interfaces fill:#5E6AD2,color:#fff
-    style Core fill:#3b82f6,color:#fff
-    style Tools fill:#22c55e,color:#fff
-    style Infrastructure fill:#f59e0b,color:#fff`,
-
-  dataFlowDiagram: `flowchart LR
-    USER([👤 User]) -->|input| TUI[TUI/CLI]
-    TUI -->|WebSocket| SERVER[FastAPI Server]
-    TUI -->|direct| SDK[SDK]
-    SDK -->|publish| NATS[NATS JetStream]
-    NATS -->|subscribe| WORKER[Worker Pool]
-    WORKER -->|execute| AGENT[Agent]
-    AGENT -->|call| TOOLS[Tools]
-    TOOLS -->|read/write| FS[Filesystem]
-    TOOLS -->|run| SHELL[Shell]
-    TOOLS -->|query| DB[(SQLite)]
-    AGENT -->|generate| LLM[LLM Provider]
-    AGENT -->|store| MEM[Hybrid Memory]
-    WORKER -->|result| NATS
-    NATS -->|notify| SERVER
-    SERVER -->|stream| TUI
-    TUI -->|render| USER
-
-    style USER fill:#5E6AD2,color:#fff
-    style TUI fill:#8b5cf6,color:#fff
-    style SERVER fill:#3b82f6,color:#fff
-    style NATS fill:#ef4444,color:#fff
-    style WORKER fill:#f59e0b,color:#000
-    style AGENT fill:#22c55e,color:#fff
-    style TOOLS fill:#06b6d4,color:#fff
-    style LLM fill:#ec4899,color:#fff
-    style MEM fill:#8b5cf6,color:#fff
-    style DB fill:#64748b,color:#fff`,
-
-  vennDiagram: `%%{init: {'theme': 'base', 'themeVariables': {'primaryColor': '#5E6AD2', 'primaryTextColor': '#fff', 'primaryBorderColor': '#5E6AD2', 'lineColor': '#a1a1aa', 'secondaryColor': '#3b82f6', 'tertiaryColor': '#22c55e'}}}%%
-graph LR
-    subgraph Unique["NexusAgent Unique Strengths"]
-        U1[NATS-backed<br/>Task Bus]
-        U2[Policy-aware<br/>Multi-agent]
-        U3[Multi-interface<br/>by Design]
-        U4[Deep Research<br/>Orchestrator]
-    end
-    
-    subgraph Shared["Shared with Competitors"]
-        S1[CLI/TUI]
-        S2[Tool Registry]
-        S3[Sub-agents]
-        S4[Memory System]
-    end
-    
-    subgraph Missing["Critical Gaps"]
-        M1[MCP Support]
-        M2[Codebase<br/>Indexing]
-        M3[Sandboxing]
-        M4[IDE Extension]
-    end`,
-
   scalabilityCeilings: [
     { component: "NATS", limit: "~10K msg/s", bottleneck: "Single node, no clustering" },
     { component: "SQLite", limit: "~1K writes/s", bottleneck: "Write contention, no connection pooling" },
@@ -422,711 +281,451 @@ graph LR
     { component: "WebSocket", limit: "~100 concurrent", bottleneck: "Single-process asyncio" },
     { component: "Memory index", limit: "~10K files", bottleneck: "Embedding API rate limits" },
   ],
-
   lintViolations: [
     { category: "I001 (import sorting)", count: 32, severity: "low" },
     { category: "F401 (unused imports)", count: 12, severity: "medium" },
     { category: "E402 (import not at top)", count: 8, severity: "medium" },
     { category: "RUF100 (unused noqa)", count: 8, severity: "low" },
     { category: "RUF022 (unsorted __all__)", count: 5, severity: "low" },
-    { category: "UP037 (quoted annotations)", count: 2, severity: "low" },
-    { category: "SIM (simplify)", count: 4, severity: "low" },
-    { category: "N801 (class naming)", count: 1, severity: "low" },
-    { category: "B039 (mutable ContextVar)", count: 1, severity: "high" },
-    { category: "RUF012 (mutable class attr)", count: 1, severity: "medium" },
-    { category: "RUF001 (ambiguous unicode)", count: 1, severity: "low" },
-    { category: "F541 (f-string no placeholders)", count: 1, severity: "low" },
   ]
 };
 
+const COMPETITOR_NAMES = ['NexusAgent', 'Claude Code', 'Gemini CLI', 'Codex', 'Windsurf', 'Cursor', 'Aider', 'Continue', 'SWE-agent'];
+const COMPETITOR_KEYS = ['nexusagent', 'claudeCode', 'geminiCLI', 'codex', 'windsurf', 'cursor', 'aider', 'continue', 'sweAgent'];
 
 // ═══════════════════════════════════════════════════════════════
-// COMPONENTS
+// CHARTS
 // ═══════════════════════════════════════════════════════════════
+const charts = [];
 
-// ── Score Ring ──
-function ScoreRing({ score, max, size = 80, color = '#5E6AD2', label }) {
-  const radius = (size - 8) / 2;
-  const circumference = 2 * Math.PI * radius;
-  const progress = (score / max) * circumference;
-  const offset = circumference - progress;
-
-  return (
-    <div className="flex flex-col items-center gap-1">
-      <svg width={size} height={size} className="score-ring">
-        <circle cx={size/2} cy={size/2} r={radius} fill="none" stroke="currentColor" strokeWidth="4" className="text-surface-200 dark:text-surface-700" />
-        <circle cx={size/2} cy={size/2} r={radius} fill="none" stroke={color} strokeWidth="4"
-          strokeDasharray={circumference} strokeDashoffset={offset} strokeLinecap="round"
-          style={{ transition: 'stroke-dashoffset 1s ease-in-out' }} />
-        <text x={size/2} y={size/2} textAnchor="middle" dy="0.35em" className="text-sm font-semibold fill-current">
-          {score}
-        </text>
-      </svg>
-      {label && <span className="text-xs text-surface-500">{label}</span>}
-    </div>
-  );
+function createChart(canvasId, type, data, options) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  charts.push(new Chart(ctx, { type, data, options }));
 }
 
-// ── Stat Card ──
-function StatCard({ title, value, subtitle, trend, icon, color = 'primary' }) {
-  const colorMap = {
-    primary: 'bg-primary-500',
-    success: 'bg-success',
-    warning: 'bg-warning',
-    danger: 'bg-danger',
-    info: 'bg-info',
-  };
-  return (
-    <div className="glass rounded-xl p-4 fade-in">
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-xs text-surface-500 uppercase tracking-wide">{title}</p>
-          <p className="text-2xl font-bold mt-1">{value}</p>
-          {subtitle && <p className="text-xs text-surface-400 mt-1">{subtitle}</p>}
-          {trend && (
-            <span className={`text-xs font-medium ${trend.startsWith('+') || trend.startsWith('↑') ? 'text-success' : trend.startsWith('-') || trend.startsWith('↓') ? 'text-danger' : 'text-surface-400'}`}>
-              {trend}
-            </span>
-          )}
-        </div>
-        <div className={`w-10 h-10 rounded-lg ${colorMap[color]} flex items-center justify-center text-white text-lg`}>
-          {icon}
-        </div>
-      </div>
-    </div>
-  );
+function destroyCharts() {
+  charts.forEach(c => c.destroy());
+  charts.length = 0;
 }
 
-// ── Issue Row ──
-function IssueRow({ issue }) {
-  const severityColors = {
-    critical: 'issue-critical bg-red-50 dark:bg-red-900/20',
-    high: 'issue-high bg-orange-50 dark:bg-orange-900/20',
-    medium: 'issue-medium bg-yellow-50 dark:bg-yellow-900/20',
-    low: 'issue-low bg-blue-50 dark:bg-blue-900/20',
-  };
-  const severityBadge = {
-    critical: 'bg-danger text-white',
-    high: 'bg-orange-500 text-white',
-    medium: 'bg-warning text-white',
-    low: 'bg-info text-white',
-  };
-  return (
-    <div className={`p-3 rounded-lg mb-2 ${severityColors[issue.severity]} fade-in`}>
-      <div className="flex items-start gap-3">
-        <span className={`text-xs font-bold px-2 py-0.5 rounded ${severityBadge[issue.severity]}`}>
-          #{issue.id}
-        </span>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium">{issue.issue}</p>
-          <div className="flex items-center gap-2 mt-1 flex-wrap">
-            {issue.file && <code className="text-xs bg-surface-200/50 dark:bg-surface-700/50 px-1.5 py-0.5 rounded">{issue.file}</code>}
-            {issue.source && <span className="text-xs text-surface-400">{issue.source}</span>}
-            {issue.impact && <span className="text-xs text-surface-500">→ {issue.impact}</span>}
-            {issue.effort && <span className="text-xs bg-surface-200 dark:bg-surface-700 px-1.5 py-0.5 rounded">{issue.effort}</span>}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Chart Hook ──
-function useChartRef(type, data, options) {
-  const canvasRef = useRef(null);
-  const chartRef = useRef(null);
-
-  useEffect(() => {
-    if (!canvasRef.current) return;
-    if (chartRef.current) chartRef.current.destroy();
-    
-    const ctx = canvasRef.current.getContext('2d');
-    chartRef.current = new Chart(ctx, { type, data, options });
-    
-    return () => { if (chartRef.current) chartRef.current.destroy(); };
-  }, [type, JSON.stringify(data), JSON.stringify(options)]);
-
-  return canvasRef;
-}
-
-// ── Radar Chart ──
-function RadarChart() {
-  const canvasRef = useChartRef('radar', {
+function initRadarChart() {
+  createChart('radarChart', 'radar', {
     labels: AUDIT_DATA.scores.map(s => s.name),
     datasets: [{
       label: 'Current',
       data: AUDIT_DATA.scores.map(s => s.score),
       backgroundColor: 'rgba(94, 106, 210, 0.15)',
-      borderColor: '#5E6AD2',
-      borderWidth: 2,
-      pointBackgroundColor: '#5E6AD2',
-      pointBorderColor: '#fff',
-      pointBorderWidth: 2,
-      pointRadius: 4,
+      borderColor: '#5E6AD2', borderWidth: 2,
+      pointBackgroundColor: '#5E6AD2', pointBorderColor: '#fff', pointBorderWidth: 2, pointRadius: 4,
     }, {
       label: 'Target',
       data: AUDIT_DATA.scores.map(() => 9),
       backgroundColor: 'rgba(34, 197, 94, 0.05)',
-      borderColor: '#22c55e',
-      borderWidth: 1,
-      borderDash: [4, 4],
-      pointRadius: 0,
+      borderColor: '#22c55e', borderWidth: 1, borderDash: [4, 4], pointRadius: 0,
     }]
   }, {
-    responsive: true,
-    maintainAspectRatio: false,
-    scales: {
-      r: { min: 0, max: 10, ticks: { stepSize: 2, color: '#a1a1aa' }, grid: { color: '#e4e4e7' }, pointLabels: { color: '#52525b', font: { size: 11 } } },
-    },
+    responsive: true, maintainAspectRatio: false,
+    scales: { r: { min: 0, max: 10, ticks: { stepSize: 2, color: '#a1a1aa' }, grid: { color: '#e4e4e7' }, pointLabels: { color: '#52525b', font: { size: 11 } } } },
     plugins: { legend: { labels: { color: '#52525b', font: { size: 11 } } } }
   });
-
-  return <canvas ref={canvasRef} className="w-full h-full" />;
 }
 
-// ── Bar Chart ──
-function IssuesBarChart() {
-  const canvasRef = useChartRef('bar', {
+function initBarChart() {
+  createChart('barChart', 'bar', {
     labels: ['Critical', 'High', 'Medium', 'Low'],
     datasets: [{
       label: 'Issues',
-      data: [
-        AUDIT_DATA.issues.critical.length,
-        AUDIT_DATA.issues.high.length,
-        AUDIT_DATA.issues.medium.length,
-        AUDIT_DATA.issues.low.length,
-      ],
+      data: [AUDIT_DATA.issues.critical.length, AUDIT_DATA.issues.high.length, AUDIT_DATA.issues.medium.length, AUDIT_DATA.issues.low.length],
       backgroundColor: ['#ef4444', '#f97316', '#f59e0b', '#3b82f6'],
-      borderRadius: 6,
-      borderSkipped: false,
+      borderRadius: 6, borderSkipped: false,
     }]
   }, {
-    responsive: true,
-    maintainAspectRatio: false,
-    scales: {
-      y: { beginAtZero: true, ticks: { color: '#a1a1aa', stepSize: 2 }, grid: { color: '#e4e4e7' } },
-      x: { ticks: { color: '#52525b', font: { size: 11 } }, grid: { display: false } },
-    },
+    responsive: true, maintainAspectRatio: false,
+    scales: { y: { beginAtZero: true, ticks: { color: '#a1a1aa', stepSize: 2 }, grid: { color: '#e4e4e7' } }, x: { ticks: { color: '#52525b', font: { size: 11 } }, grid: { display: false } } },
     plugins: { legend: { display: false } }
   });
-
-  return <canvas ref={canvasRef} className="w-full h-full" />;
 }
 
-// ── Line Chart (Velocity) ──
-function VelocityLineChart() {
-  const canvasRef = useChartRef('line', {
+function initVelocityChart() {
+  createChart('velocityChart', 'line', {
     labels: ['Sprint -3', 'Sprint -2', 'Sprint -1', 'Current'],
     datasets: [
-      {
-        label: 'Critical Issues',
-        data: [20, 18, 14, 7],
-        borderColor: '#ef4444',
-        backgroundColor: 'rgba(239,68,68,0.1)',
-        fill: true,
-        tension: 0.3,
-        pointRadius: 4,
-      },
-      {
-        label: 'High Issues',
-        data: [25, 22, 18, 12],
-        borderColor: '#f97316',
-        backgroundColor: 'rgba(249,115,22,0.1)',
-        fill: true,
-        tension: 0.3,
-        pointRadius: 4,
-      },
-      {
-        label: 'Medium Issues',
-        data: [30, 28, 22, 17],
-        borderColor: '#f59e0b',
-        backgroundColor: 'rgba(245,158,11,0.1)',
-        fill: true,
-        tension: 0.3,
-        pointRadius: 4,
-      },
+      { label: 'Critical Issues', data: [20, 18, 14, 7], borderColor: '#ef4444', backgroundColor: 'rgba(239,68,68,0.1)', fill: true, tension: 0.3, pointRadius: 4 },
+      { label: 'High Issues', data: [25, 22, 18, 12], borderColor: '#f97316', backgroundColor: 'rgba(249,115,22,0.1)', fill: true, tension: 0.3, pointRadius: 4 },
+      { label: 'Medium Issues', data: [30, 28, 22, 17], borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.1)', fill: true, tension: 0.3, pointRadius: 4 },
     ]
   }, {
-    responsive: true,
-    maintainAspectRatio: false,
-    scales: {
-      y: { beginAtZero: true, ticks: { color: '#a1a1aa' }, grid: { color: '#e4e4e7' } },
-      x: { ticks: { color: '#52525b', font: { size: 10 } }, grid: { display: false } },
-    },
+    responsive: true, maintainAspectRatio: false,
+    scales: { y: { beginAtZero: true, ticks: { color: '#a1a1aa' }, grid: { color: '#e4e4e7' } }, x: { ticks: { color: '#52525b', font: { size: 10 } }, grid: { display: false } } },
     plugins: { legend: { labels: { color: '#52525b', font: { size: 10 } } } }
   });
-
-  return <canvas ref={canvasRef} className="w-full h-full" />;
 }
 
-// ── Doughnut Chart ──
-function TestCoverageChart() {
-  const canvasRef = useChartRef('doughnut', {
+function initCoverageChart() {
+  createChart('coverageChart', 'doughnut', {
     labels: ['Tested', 'Untested'],
-    datasets: [{
-      data: [55, 45],
-      backgroundColor: ['#5E6AD2', '#e4e4e7'],
-      borderWidth: 0,
-      cutout: '75%',
-    }]
+    datasets: [{ data: [61, 39], backgroundColor: ['#5E6AD2', '#e4e4e7'], borderWidth: 0, cutout: '75%' }]
   }, {
-    responsive: true,
-    maintainAspectRatio: false,
+    responsive: true, maintainAspectRatio: false,
     plugins: { legend: { display: false } }
   });
-
-  return <canvas ref={canvasRef} className="w-full h-full" />;
 }
 
-// ── Mermaid Diagram ──
-function MermaidDiagram({ chart, id }) {
-  const ref = useRef(null);
-  
-  useEffect(() => {
-    if (!ref.current) return;
-    mermaid.initialize({ startOnLoad: false, theme: 'base', themeVariables: { primaryColor: '#5E6AD2', primaryTextColor: '#fff', primaryBorderColor: '#5E6AD2', lineColor: '#a1a1aa', secondaryColor: '#3b82f6', tertiaryColor: '#22c55e' } });
-    mermaid.render(id, chart).then(({ svg }) => {
-      if (ref.current) ref.current.innerHTML = svg;
-    });
-  }, [chart, id]);
-
-  return <div ref={ref} className="mermaid-container overflow-auto" />;
+function initLintChart() {
+  createChart('lintChart', 'bar', {
+    labels: AUDIT_DATA.lintViolations.map(l => l.category.split(' ')[0]),
+    datasets: [{
+      label: 'Violations',
+      data: AUDIT_DATA.lintViolations.map(l => l.count),
+      backgroundColor: AUDIT_DATA.lintViolations.map(l => l.severity === 'high' ? '#ef4444' : l.severity === 'medium' ? '#f59e0b' : '#3b82f6'),
+      borderRadius: 4, borderSkipped: false,
+    }]
+  }, {
+    responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+    scales: { x: { beginAtZero: true, ticks: { color: '#a1a1aa' }, grid: { color: '#e4e4e7' } }, y: { ticks: { color: '#52525b', font: { size: 10 } }, grid: { display: false } } },
+    plugins: { legend: { display: false } }
+  });
 }
 
-// ── Tab Button ──
-function TabButton({ active, onClick, children, badge }) {
-  return (
-    <button onClick={onClick}
-      className={`px-4 py-2.5 text-sm font-medium transition-all relative ${active ? 'tab-active text-primary-600 dark:text-primary-400' : 'text-surface-500 hover:text-surface-700 dark:hover:text-surface-300'}`}>
-      {children}
-      {badge !== undefined && (
-        <span className="ml-1.5 text-xs bg-surface-200 dark:bg-surface-700 px-1.5 py-0.5 rounded-full">{badge}</span>
-      )}
-    </button>
-  );
+// ═══════════════════════════════════════════════════════════════
+// RENDERERS
+// ═══════════════════════════════════════════════════════════════
+
+function renderScoreRing(score, max, color, label, size = 80) {
+  const radius = (size - 8) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const progress = (score / max) * circumference;
+  const offset = circumference - progress;
+  return `<div class="flex flex-col items-center gap-1">
+    <svg width="${size}" height="${size}" class="score-ring">
+      <circle cx="${size/2}" cy="${size/2}" r="${radius}" fill="none" stroke="currentColor" stroke-width="4" class="text-surface-200 dark:text-surface-700"/>
+      <circle cx="${size/2}" cy="${size/2}" r="${radius}" fill="none" stroke="${color}" stroke-width="4" stroke-dasharray="${circumference}" stroke-dashoffset="${offset}" stroke-linecap="round" style="transition: stroke-dashoffset 1s ease-in-out"/>
+      <text x="${size/2}" y="${size/2}" text-anchor="middle" dy="0.35em" class="text-sm font-semibold fill-current">${score}</text>
+    </svg>
+    <span class="text-xs text-surface-500">${label}</span>
+  </div>`;
 }
 
-// ── Roadmap Phase ──
-function RoadmapPhase({ phase, index }) {
-  const [expanded, setExpanded] = useState(index === 0);
+function renderIssueRow(issue) {
+  const colors = { critical: 'issue-critical bg-red-50 dark:bg-red-900/20', high: 'issue-high bg-orange-50 dark:bg-orange-900/20', medium: 'issue-medium bg-yellow-50 dark:bg-yellow-900/20', low: 'issue-low bg-blue-50 dark:bg-blue-900/20' };
+  const badges = { critical: 'bg-danger text-white', high: 'bg-orange-500 text-white', medium: 'bg-warning text-white', low: 'bg-info text-white' };
+  return `<div class="p-3 rounded-lg mb-2 ${colors[issue.severity]} fade-in">
+    <div class="flex items-start gap-3">
+      <span class="text-xs font-bold px-2 py-0.5 rounded ${badges[issue.severity]}">#${issue.id}</span>
+      <div class="flex-1 min-w-0">
+        <p class="text-sm font-medium">${issue.issue}</p>
+        <div class="flex items-center gap-2 mt-1 flex-wrap">
+          ${issue.file ? `<code class="text-xs bg-surface-200/50 dark:bg-surface-700/50 px-1.5 py-0.5 rounded">${issue.file}</code>` : ''}
+          ${issue.source ? `<span class="text-xs text-surface-400">${issue.source}</span>` : ''}
+          ${issue.impact ? `<span class="text-xs text-surface-500">→ ${issue.impact}</span>` : ''}
+          ${issue.effort ? `<span class="text-xs bg-surface-200 dark:bg-surface-700 px-1.5 py-0.5 rounded">${issue.effort}</span>` : ''}
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderRoadmapPhase(phase, index) {
   const doneCount = phase.items.filter(i => i.done).length;
   const totalCount = phase.items.length;
   const pct = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0;
-
-  return (
-    <div className="glass rounded-xl overflow-hidden mb-3 fade-in">
-      <button onClick={() => setExpanded(!expanded)}
-        className="w-full p-4 flex items-center gap-3 text-left hover:bg-surface-100/50 dark:hover:bg-surface-800/50 transition-colors">
-        <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm font-bold" style={{ backgroundColor: phase.color }}>
-          {index + 1}
+  const itemsHtml = phase.items.map(item =>
+    `<label class="flex items-center gap-3 py-2 cursor-pointer hover:bg-surface-100/30 dark:hover:bg-surface-800/30 px-2 rounded">
+      <input type="checkbox" ${item.done ? 'checked' : ''} readonly class="w-4 h-4 rounded border-surface-300 text-primary-500 focus:ring-primary-500"/>
+      <span class="text-sm ${item.done ? 'line-through text-surface-400' : ''}">${item.task}</span>
+    </label>`
+  ).join('');
+  return `<div class="glass rounded-xl overflow-hidden mb-3 fade-in">
+    <button onclick="togglePhase(${index})" class="w-full p-4 flex items-center gap-3 text-left hover:bg-surface-100/50 dark:hover:bg-surface-800/50 transition-colors">
+      <div class="w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm font-bold" style="background-color: ${phase.color}">${index + 1}</div>
+      <div class="flex-1">
+        <p class="text-sm font-semibold">${phase.phase}</p>
+        <p class="text-xs text-surface-400">${phase.weeks} · ${doneCount}/${totalCount} done</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <div class="w-20 h-2 bg-surface-200 dark:bg-surface-700 rounded-full overflow-hidden">
+          <div class="h-full rounded-full transition-all" style="width: ${pct}%; background-color: ${phase.color}"></div>
         </div>
-        <div className="flex-1">
-          <p className="text-sm font-semibold">{phase.phase}</p>
-          <p className="text-xs text-surface-400">{phase.weeks} · {doneCount}/{totalCount} done</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-20 h-2 bg-surface-200 dark:bg-surface-700 rounded-full overflow-hidden">
-            <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: phase.color }} />
-          </div>
-          <span className="text-xs text-surface-400 w-8 text-right">{pct}%</span>
-          <span className="text-surface-400">{expanded ? '▾' : '▸'}</span>
-        </div>
-      </button>
-      {expanded && (
-        <div className="px-4 pb-4 border-t border-surface-200/50 dark:border-surface-700/50">
-          {phase.items.map((item, i) => (
-            <label key={i} className="flex items-center gap-3 py-2 cursor-pointer hover:bg-surface-100/30 dark:hover:bg-surface-800/30 px-2 rounded">
-              <input type="checkbox" checked={item.done} readOnly className="w-4 h-4 rounded border-surface-300 text-primary-500 focus:ring-primary-500" />
-              <span className={`text-sm ${item.done ? 'line-through text-surface-400' : ''}`}>{item.task}</span>
-            </label>
-          ))}
-        </div>
-      )}
-    </div>
-  );
+        <span class="text-xs text-surface-400 w-8 text-right">${pct}%</span>
+        <span class="text-surface-400" id="phase-arrow-${index}">▸</span>
+      </div>
+    </button>
+    <div id="phase-items-${index}" class="hidden px-4 pb-4 border-t border-surface-200/50 dark:border-surface-700/50">${itemsHtml}</div>
+  </div>`;
 }
 
-// ── Competitor Matrix Row ──
-function CompetitorRow({ feature, data }) {
-  const competitors = ['nexusagent', 'claudeCode', 'geminiCLI', 'codex', 'windsurf', 'cursor', 'aider', 'continue', 'sweAgent'];
-  const names = ['NexusAgent', 'Claude Code', 'Gemini CLI', 'Codex', 'Windsurf', 'Cursor', 'Aider', 'Continue', 'SWE-agent'];
-  
-  return (
-    <tr className="border-b border-surface-200/50 dark:border-surface-700/50 hover:bg-surface-100/30 dark:hover:bg-surface-800/30">
-      <td className="py-2 px-3 text-sm font-medium">{feature}</td>
-      {competitors.map((key, i) => (
-        <td key={key} className="py-2 px-2 text-center">
-          {i === 0 ? (
-            <span className={`inline-block w-5 h-5 rounded text-xs leading-5 ${data[key] ? 'bg-success text-white' : 'bg-danger text-white'}`}>
-              {data[key] ? '✓' : '✗'}
-            </span>
-          ) : (
-            <span className={`inline-block w-5 h-5 rounded text-xs leading-5 ${data[key] ? 'bg-success/80 text-white' : 'bg-surface-300 dark:bg-surface-600 text-surface-500'}`}>
-              {data[key] ? '✓' : '✗'}
-            </span>
-          )}
-        </td>
-      ))}
-    </tr>
-  );
+function togglePhase(index) {
+  const el = document.getElementById(`phase-items-${index}`);
+  const arrow = document.getElementById(`phase-arrow-${index}`);
+  if (el.classList.contains('hidden')) {
+    el.classList.remove('hidden');
+    arrow.textContent = '▾';
+  } else {
+    el.classList.add('hidden');
+    arrow.textContent = '▸';
+  }
 }
-
 
 // ═══════════════════════════════════════════════════════════════
-// MAIN APP
+// TAB RENDERERS
 // ═══════════════════════════════════════════════════════════════
 
-function App() {
-  const [activeTab, setActiveTab] = useState('dashboard');
-  const [darkMode, setDarkMode] = useState(false);
-  const [issueFilter, setIssueFilter] = useState('all');
-
-  useEffect(() => {
-    if (darkMode) document.documentElement.classList.add('dark');
-    else document.documentElement.classList.remove('dark');
-  }, [darkMode]);
-
-  const tabs = [
-    { id: 'dashboard', label: 'Dashboard' },
-    { id: 'issues', label: 'Issues', badge: AUDIT_DATA.issues.critical.length + AUDIT_DATA.issues.high.length + AUDIT_DATA.issues.medium.length + AUDIT_DATA.issues.low.length },
-    { id: 'architecture', label: 'Architecture' },
-    { id: 'competitor', label: 'Competitors' },
-    { id: 'roadmap', label: 'Roadmap' },
-    { id: 'growth', label: 'Growth' },
-  ];
-
-  const filteredIssues = issueFilter === 'all'
-    ? [...AUDIT_DATA.issues.critical, ...AUDIT_DATA.issues.high, ...AUDIT_DATA.issues.medium, ...AUDIT_DATA.issues.low]
-    : AUDIT_DATA.issues[issueFilter] || [];
-
-  return (
-    <div className="min-h-screen">
-      {/* Header */}
-      <header className="glass sticky top-0 z-50 border-b border-surface-200/50 dark:border-surface-700/50">
-        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-primary-500 flex items-center justify-center text-white font-bold text-lg">N</div>
-            <div>
-              <h1 className="text-lg font-bold leading-tight">NexusAgent</h1>
-              <p className="text-xs text-surface-400">Roadmap & Audit Dashboard · {AUDIT_DATA.meta.date}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="text-xs text-surface-400 hidden sm:block">{AUDIT_DATA.meta.codebase}</span>
-            <button onClick={() => setDarkMode(!darkMode)}
-              className="w-8 h-8 rounded-lg bg-surface-200 dark:bg-surface-700 flex items-center justify-center text-sm hover:bg-surface-300 dark:hover:bg-surface-600 transition-colors">
-              {darkMode ? '☀️' : '🌙'}
-            </button>
-          </div>
-        </div>
-        
-        {/* Tabs */}
-        <div className="max-w-7xl mx-auto px-4">
-          <nav className="flex gap-1 overflow-x-auto">
-            {tabs.map(tab => (
-              <TabButton key={tab.id} active={activeTab === tab.id} onClick={() => setActiveTab(tab.id)} badge={tab.badge}>
-                {tab.label}
-              </TabButton>
-            ))}
-          </nav>
-        </div>
-      </header>
-
-      {/* Content */}
-      <main className="max-w-7xl mx-auto px-4 py-6">
-
-        {/* ═══ DASHBOARD ═══ */}
-        {activeTab === 'dashboard' && (
-          <div className="fade-in space-y-6">
-            {/* Score Overview */}
-            <div className="glass rounded-2xl p-6">
-              <h2 className="text-lg font-semibold mb-4">Executive Dashboard</h2>
-              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-4 mb-6">
-                {AUDIT_DATA.scores.map(s => (
-                  <ScoreRing key={s.name} score={s.score} max={s.max} color={s.color} label={s.name} />
-                ))}
-              </div>
-              <div className="flex items-center justify-center gap-2 mt-4">
-                <span className="text-3xl font-bold text-primary-500">{AUDIT_DATA.meta.overallScore}</span>
-                <span className="text-surface-400">/10 Overall</span>
-              </div>
-            </div>
-
-            {/* Stat Cards */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <StatCard title="Critical Issues" value={AUDIT_DATA.issues.critical.length} subtitle="Fix immediately" trend="↓ 7" icon="🔴" color="danger" />
-              <StatCard title="High Issues" value={AUDIT_DATA.issues.high.length} subtitle="This sprint" trend="↓ 6" icon="🟠" color="warning" />
-              <StatCard title="Test Coverage" value="55%" subtitle="Target: 80%" trend="↑ 2%" icon="📊" color="info" />
-              <StatCard title="Modules Untested" value="42" subtitle="of 67 source modules" trend="" icon="🧪" color="warning" />
-            </div>
-
-            {/* Charts Row */}
-            <div className="grid lg:grid-cols-2 gap-6">
-              <div className="glass rounded-2xl p-6">
-                <h3 className="text-sm font-semibold mb-3">Score Radar</h3>
-                <div className="h-64"><RadarChart /></div>
-              </div>
-              <div className="glass rounded-2xl p-6">
-                <h3 className="text-sm font-semibold mb-3">Issues by Severity</h3>
-                <div className="h-64"><IssuesBarChart /></div>
-              </div>
-            </div>
-
-            {/* Quick Capability Matrix */}
-            <div className="glass rounded-2xl p-6">
-              <h3 className="text-sm font-semibold mb-3">Capability Gap</h3>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-                {AUDIT_DATA.capabilityMatrix.filter(c => c.gap).map(c => (
-                  <div key={c.capability} className="flex items-center gap-2 p-2 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200/50 dark:border-red-800/50">
-                    <span className="w-2 h-2 rounded-full bg-danger pulse-dot"></span>
-                    <span className="text-xs font-medium">{c.capability}</span>
-                    <span className="text-xs text-danger ml-auto">{c.priority}</span>
-                  </div>
-                ))}
-                {AUDIT_DATA.capabilityMatrix.filter(c => !c.gap).slice(0, 8).map(c => (
-                  <div key={c.capability} className="flex items-center gap-2 p-2 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200/50 dark:border-green-800/50">
-                    <span className="w-2 h-2 rounded-full bg-success"></span>
-                    <span className="text-xs font-medium">{c.capability}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ═══ ISSUES ═══ */}
-        {activeTab === 'issues' && (
-          <div className="fade-in space-y-4">
-            <div className="flex items-center gap-2 flex-wrap">
-              {['all', 'critical', 'high', 'medium', 'low'].map(f => (
-                <button key={f} onClick={() => setIssueFilter(f)}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${issueFilter === f ? 'bg-primary-500 text-white' : 'bg-surface-200 dark:bg-surface-700 text-surface-600 dark:text-surface-300 hover:bg-surface-300 dark:hover:bg-surface-600'}`}>
-                  {f.charAt(0).toUpperCase() + f.slice(1)}
-                  {f !== 'all' && <span className="ml-1 opacity-70">({AUDIT_DATA.issues[f]?.length || 0})</span>}
-                </button>
-              ))}
-            </div>
-            <p className="text-xs text-surface-400">{filteredIssues.length} issues shown</p>
-            {filteredIssues.map(issue => <IssueRow key={issue.id} issue={issue} />)}
-          </div>
-        )}
-
-        {/* ═══ ARCHITECTURE ═══ */}
-        {activeTab === 'architecture' && (
-          <div className="fade-in space-y-6">
-            <div className="glass rounded-2xl p-6">
-              <h3 className="text-sm font-semibold mb-3">System Architecture</h3>
-              <div className="min-h-[400px] overflow-auto">
-                <MermaidDiagram chart={AUDIT_DATA.architectureDiagram} id="arch-diagram" />
-              </div>
-            </div>
-            <div className="glass rounded-2xl p-6">
-              <h3 className="text-sm font-semibold mb-3">Data Flow</h3>
-              <div className="min-h-[300px] overflow-auto">
-                <MermaidDiagram chart={AUDIT_DATA.dataFlowDiagram} id="flow-diagram" />
-              </div>
-            </div>
-            <div className="glass rounded-2xl p-6">
-              <h3 className="text-sm font-semibold mb-3">Scalability Ceilings</h3>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-surface-200 dark:border-surface-700">
-                      <th className="text-left py-2 px-3 font-medium">Component</th>
-                      <th className="text-left py-2 px-3 font-medium">Current Limit</th>
-                      <th className="text-left py-2 px-3 font-medium">Bottleneck</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {AUDIT_DATA.scalabilityCeilings.map(s => (
-                      <tr key={s.component} className="border-b border-surface-200/50 dark:border-surface-700/50">
-                        <td className="py-2 px-3 font-medium">{s.component}</td>
-                        <td className="py-2 px-3"><code className="text-xs bg-surface-200/50 dark:bg-surface-700/50 px-1.5 py-0.5 rounded">{s.limit}</code></td>
-                        <td className="py-2 px-3 text-surface-500">{s.bottleneck}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-            <div className="glass rounded-2xl p-6">
-              <h3 className="text-sm font-semibold mb-3">Lint Violations</h3>
-              <div className="h-48"><canvas ref={useChartRef('bar', {
-                labels: AUDIT_DATA.lintViolations.map(l => l.category.split(' ')[0]),
-                datasets: [{
-                  label: 'Violations',
-                  data: AUDIT_DATA.lintViolations.map(l => l.count),
-                  backgroundColor: AUDIT_DATA.lintViolations.map(l => l.severity === 'high' ? '#ef4444' : l.severity === 'medium' ? '#f59e0b' : '#3b82f6'),
-                  borderRadius: 4,
-                  borderSkipped: false,
-                }]
-              }, {
-                responsive: true,
-                maintainAspectRatio: false,
-                indexAxis: 'y',
-                scales: { x: { beginAtZero: true, ticks: { color: '#a1a1aa' }, grid: { color: '#e4e4e7' } }, y: { ticks: { color: '#52525b', font: { size: 10 } }, grid: { display: false } } },
-                plugins: { legend: { display: false } }
-              })} className="w-full h-full" /></div>
-            </div>
-          </div>
-        )}
-
-        {/* ═══ COMPETITORS ═══ */}
-        {activeTab === 'competitor' && (
-          <div className="fade-in space-y-6">
-            <div className="glass rounded-2xl p-6">
-              <h3 className="text-sm font-semibold mb-3">Feature Comparison Matrix</h3>
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="border-b border-surface-200 dark:border-surface-700">
-                      <th className="text-left py-2 px-3 font-medium sticky left-0 bg-inherit">Feature</th>
-                      <th className="py-2 px-2 font-medium text-primary-500">NexusAgent</th>
-                      <th className="py-2 px-2 font-medium">Claude Code</th>
-                      <th className="py-2 px-2 font-medium">Gemini CLI</th>
-                      <th className="py-2 px-2 font-medium">Codex</th>
-                      <th className="py-2 px-2 font-medium">Windsurf</th>
-                      <th className="py-2 px-2 font-medium">Cursor</th>
-                      <th className="py-2 px-2 font-medium">Aider</th>
-                      <th className="py-2 px-2 font-medium">Continue</th>
-                      <th className="py-2 px-2 font-medium">SWE-agent</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {AUDIT_DATA.competitorMatrix.map(row => <CompetitorRow key={row.feature} {...row} />)}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-            <div className="grid lg:grid-cols-2 gap-6">
-              <div className="glass rounded-2xl p-6">
-                <h3 className="text-sm font-semibold mb-3">NexusAgent Strengths</h3>
-                <ul className="space-y-2">
-                  {['Multi-interface by design (TUI + CLI + WebSocket + SDK + Web UI)', 'Policy-aware multi-agent system (permissive/restricted/strict)', 'Hybrid memory architecture (file + vector index)', 'NATS-backed task bus with circuit breakers', 'Deep Research orchestrator (intent→plan→refine→execute→synthesize)', 'Open source & model-agnostic'].map((s, i) => (
-                    <li key={i} className="flex items-start gap-2 text-sm"><span className="text-success mt-0.5">✓</span>{s}</li>
-                  ))}
-                </ul>
-              </div>
-              <div className="glass rounded-2xl p-6">
-                <h3 className="text-sm font-semibold mb-3">Critical Gaps</h3>
-                <ul className="space-y-2">
-                  {['No MCP support — the #1 ecosystem gap in 2026', 'No codebase indexing/RAG — agent is "blind" vs competitors', 'No sandboxing — security risk', 'No IDE extension — limits reach to terminal-only users', 'No built-in model — requires external API key', 'No auto-commit/Git workflow automation'].map((s, i) => (
-                    <li key={i} className="flex items-start gap-2 text-sm"><span className="text-danger mt-0.5">✗</span>{s}</li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ═══ ROADMAP ═══ */}
-        {activeTab === 'roadmap' && (
-          <div className="fade-in space-y-4">
-            <div className="glass rounded-2xl p-6 mb-6">
-              <h2 className="text-lg font-semibold mb-2">Improvement Roadmap</h2>
-              <p className="text-sm text-surface-500">5 phases, 37 tasks. Click each phase to expand.</p>
-            </div>
-            {AUDIT_DATA.roadmap.map((phase, i) => (
-              <RoadmapPhase key={i} phase={phase} index={i} />
-            ))}
-          </div>
-        )}
-
-        {/* ═══ GROWTH ═══ */}
-        {activeTab === 'growth' && (
-          <div className="fade-in space-y-6">
-            <div className="grid lg:grid-cols-2 gap-6">
-              <div className="glass rounded-2xl p-6">
-                <h3 className="text-sm font-semibold mb-3">Issue Trend (Sprints)</h3>
-                <div className="h-64"><VelocityLineChart /></div>
-              </div>
-              <div className="glass rounded-2xl p-6">
-                <h3 className="text-sm font-semibold mb-3">Test Coverage</h3>
-                <div className="h-64 flex items-center justify-center">
-                  <div className="relative">
-                    <TestCoverageChart />
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <span className="text-2xl font-bold">55%</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="glass rounded-2xl p-6">
-              <h3 className="text-sm font-semibold mb-3">Velocity Metrics</h3>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-surface-200 dark:border-surface-700">
-                      <th className="text-left py-2 px-3 font-medium">Metric</th>
-                      <th className="text-right py-2 px-3 font-medium">Current</th>
-                      <th className="text-right py-2 px-3 font-medium">Last Sprint</th>
-                      <th className="text-right py-2 px-3 font-medium">Delta</th>
-                      <th className="text-right py-2 px-3 font-medium">Target</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {AUDIT_DATA.velocityMetrics.map(m => (
-                      <tr key={m.metric} className="border-b border-surface-200/50 dark:border-surface-700/50">
-                        <td className="py-2 px-3 font-medium">{m.metric}</td>
-                        <td className="py-2 px-3 text-right">{m.current}{m.metric.includes('%') ? '%' : ''}</td>
-                        <td className="py-2 px-3 text-right text-surface-400">{m.lastSprint}{m.metric.includes('%') ? '%' : ''}</td>
-                        <td className={`py-2 px-3 text-right font-medium ${m.delta > 0 && !m.metric.includes('issues') && !m.metric.includes('Issues') ? 'text-success' : m.delta < 0 ? 'text-success' : 'text-surface-400'}`}>
-                          {m.delta > 0 ? '+' : ''}{m.delta}{m.metric.includes('%') ? '%' : ''}
-                        </td>
-                        <td className="py-2 px-3 text-right text-primary-500">{m.target || '—'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-            <div className="glass rounded-2xl p-6">
-              <h3 className="text-sm font-semibold mb-3">Full Capability Matrix</h3>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-surface-200 dark:border-surface-700">
-                      <th className="text-left py-2 px-3 font-medium">Capability</th>
-                      <th className="text-center py-2 px-3 font-medium">Have</th>
-                      <th className="text-center py-2 px-3 font-medium">Target</th>
-                      <th className="text-center py-2 px-3 font-medium">Gap</th>
-                      <th className="text-center py-2 px-3 font-medium">Priority</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {AUDIT_DATA.capabilityMatrix.map(c => (
-                      <tr key={c.capability} className={`border-b border-surface-200/50 dark:border-surface-700/50 ${c.gap ? 'bg-red-50/50 dark:bg-red-900/10' : ''}`}>
-                        <td className="py-2 px-3 font-medium">{c.capability}</td>
-                        <td className="py-2 px-3 text-center">{c.have ? '✅' : '❌'}</td>
-                        <td className="py-2 px-3 text-center">{c.target ? '✅' : '❌'}</td>
-                        <td className="py-2 px-3 text-center">{c.gap ? '🔴' : '—'}</td>
-                        <td className="py-2 px-3 text-center">{c.priority || '—'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        )}
-
-      </main>
-
-      {/* Footer */}
-      <footer className="max-w-7xl mx-auto px-4 py-8 text-center">
-        <p className="text-xs text-surface-400">
-          NexusAgent Audit Dashboard · Generated {AUDIT_DATA.meta.date} · 
-          <a href="https://github.com/stephanos8926-lgtm/NexusAgent" className="text-primary-500 hover:underline ml-1">GitHub</a>
-        </p>
-      </footer>
+function renderDashboard() {
+  const scoresHtml = AUDIT_DATA.scores.map(s => renderScoreRing(s.score, s.max, s.color, s.name)).join('');
+  const gaps = AUDIT_DATA.capabilityMatrix.filter(c => c.gap);
+  const haves = AUDIT_DATA.capabilityMatrix.filter(c => !c.gap);
+  return `<div class="fade-in space-y-6">
+    <div class="glass rounded-2xl p-6">
+      <h2 class="text-lg font-semibold mb-4">Executive Dashboard</h2>
+      <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-4 mb-6">${scoresHtml}</div>
+      <div class="flex items-center justify-center gap-2 mt-4">
+        <span class="text-3xl font-bold text-primary-500">${AUDIT_DATA.meta.overallScore}</span>
+        <span class="text-surface-400">/10 Overall</span>
+      </div>
     </div>
-  );
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div class="glass rounded-xl p-4 fade-in">
+        <p class="text-xs text-surface-500 uppercase tracking-wide">Critical Issues</p>
+        <p class="text-2xl font-bold mt-1">${AUDIT_DATA.issues.critical.length}</p>
+        <span class="text-xs font-medium text-success">↓ 7 from last audit</span>
+      </div>
+      <div class="glass rounded-xl p-4 fade-in">
+        <p class="text-xs text-surface-500 uppercase tracking-wide">High Issues</p>
+        <p class="text-2xl font-bold mt-1">${AUDIT_DATA.issues.high.length}</p>
+        <span class="text-xs font-medium text-success">↓ 6 from last audit</span>
+      </div>
+      <div class="glass rounded-xl p-4 fade-in">
+        <p class="text-xs text-surface-500 uppercase tracking-wide">Test Coverage</p>
+        <p class="text-2xl font-bold mt-1">61%</p>
+        <span class="text-xs font-medium text-success">↑ 6%</span>
+      </div>
+      <div class="glass rounded-xl p-4 fade-in">
+        <p class="text-xs text-surface-500 uppercase tracking-wide">Security Score</p>
+        <p class="text-2xl font-bold mt-1">8.5</p>
+        <span class="text-xs font-medium text-success">↑ 1.3</span>
+      </div>
+    </div>
+    <div class="grid lg:grid-cols-2 gap-6">
+      <div class="glass rounded-2xl p-6">
+        <h3 class="text-sm font-semibold mb-3">Score Radar</h3>
+        <div class="h-64"><canvas id="radarChart"></canvas></div>
+      </div>
+      <div class="glass rounded-2xl p-6">
+        <h3 class="text-sm font-semibold mb-3">Issues by Severity</h3>
+        <div class="h-64"><canvas id="barChart"></canvas></div>
+      </div>
+    </div>
+    <div class="glass rounded-2xl p-6">
+      <h3 class="text-sm font-semibold mb-3">Capability Gap</h3>
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+        ${gaps.map(c => `<div class="flex items-center gap-2 p-2 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200/50 dark:border-red-800/50"><span class="w-2 h-2 rounded-full bg-danger pulse-dot"></span><span class="text-xs font-medium">${c.capability}</span><span class="text-xs text-danger ml-auto">${c.priority}</span></div>`).join('')}
+        ${haves.slice(0, 8).map(c => `<div class="flex items-center gap-2 p-2 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200/50 dark:border-green-800/50"><span class="w-2 h-2 rounded-full bg-success"></span><span class="text-xs font-medium">${c.capability}</span></div>`).join('')}
+      </div>
+    </div>
+  </div>`;
 }
 
-// Mount
-const root = ReactDOM.createRoot(document.getElementById('root'));
-root.render(<App />);
+function renderIssues() {
+  const all = [...AUDIT_DATA.issues.critical, ...AUDIT_DATA.issues.high, ...AUDIT_DATA.issues.medium, ...AUDIT_DATA.issues.low];
+  return `<div class="fade-in space-y-4">
+    <div class="flex items-center gap-2 flex-wrap">
+      ${['all', 'critical', 'high', 'medium', 'low'].map(f => {
+        const count = f === 'all' ? all.length : (AUDIT_DATA.issues[f]?.length || 0);
+        return `<button onclick="filterIssues('${f}')" class="issue-filter-btn px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${f === 'all' ? 'bg-primary-500 text-white' : 'bg-surface-200 dark:bg-surface-700 text-surface-600 dark:text-surface-300 hover:bg-surface-300 dark:hover:bg-surface-600'}" data-filter="${f}">${f.charAt(0).toUpperCase() + f.slice(1)} <span class="ml-1 opacity-70">(${count})</span></button>`;
+      }).join('')}
+    </div>
+    <div id="issues-list">${all.map(renderIssueRow).join('')}</div>
+  </div>`;
+}
+
+function filterIssues(filter) {
+  const all = [...AUDIT_DATA.issues.critical, ...AUDIT_DATA.issues.high, ...AUDIT_DATA.issues.medium, ...AUDIT_DATA.issues.low];
+  const filtered = filter === 'all' ? all : (AUDIT_DATA.issues[filter] || []);
+  document.getElementById('issues-list').innerHTML = filtered.map(renderIssueRow).join('');
+  document.querySelectorAll('.issue-filter-btn').forEach(btn => {
+    const isActive = btn.dataset.filter === filter;
+    btn.className = `issue-filter-btn px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${isActive ? 'bg-primary-500 text-white' : 'bg-surface-200 dark:bg-surface-700 text-surface-600 dark:text-surface-300 hover:bg-surface-300 dark:hover:bg-surface-600'}`;
+  });
+}
+
+function renderArchitecture() {
+  return `<div class="fade-in space-y-6">
+    <div class="glass rounded-2xl p-6">
+      <h3 class="text-sm font-semibold mb-3">System Architecture</h3>
+      <div class="min-h-[400px] overflow-auto" id="arch-diagram"></div>
+    </div>
+    <div class="glass rounded-2xl p-6">
+      <h3 class="text-sm font-semibold mb-3">Data Flow</h3>
+      <div class="min-h-[300px] overflow-auto" id="flow-diagram"></div>
+    </div>
+    <div class="glass rounded-2xl p-6">
+      <h3 class="text-sm font-semibold mb-3">Scalability Ceilings</h3>
+      <div class="overflow-x-auto"><table class="w-full text-sm">
+        <thead><tr class="border-b border-surface-200 dark:border-surface-700"><th class="text-left py-2 px-3 font-medium">Component</th><th class="text-left py-2 px-3 font-medium">Current Limit</th><th class="text-left py-2 px-3 font-medium">Bottleneck</th></tr></thead>
+        <tbody>${AUDIT_DATA.scalabilityCeilings.map(s => `<tr class="border-b border-surface-200/50 dark:border-surface-700/50"><td class="py-2 px-3 font-medium">${s.component}</td><td class="py-2 px-3"><code class="text-xs bg-surface-200/50 dark:bg-surface-700/50 px-1.5 py-0.5 rounded">${s.limit}</code></td><td class="py-2 px-3 text-surface-500">${s.bottleneck}</td></tr>`).join('')}</tbody>
+      </table></div>
+    </div>
+    <div class="glass rounded-2xl p-6">
+      <h3 class="text-sm font-semibold mb-3">Lint Violations</h3>
+      <div class="h-48"><canvas id="lintChart"></canvas></div>
+    </div>
+  </div>`;
+}
+
+function renderCompetitor() {
+  const strengths = ['Multi-interface by design (TUI + CLI + WebSocket + SDK + Web UI)', 'Policy-aware multi-agent system (permissive/restricted/strict)', 'Hybrid memory architecture v2 (file + vector index + dream cycle)', 'NATS-backed task bus with circuit breakers', 'Deep Research orchestrator (intent→plan→refine→execute→synthesize)', 'Open source & model-agnostic', 'Workspace-scoped sessions with path jail', 'Version handshake with compatibility warnings'];
+  const gaps = ['No MCP support — the #1 ecosystem gap in 2026', 'No codebase indexing/RAG — agent is "blind" vs competitors', 'No sandboxing — security risk', 'No IDE extension — limits reach to terminal-only users', 'No built-in model — requires external API key'];
+  return `<div class="fade-in space-y-6">
+    <div class="glass rounded-2xl p-6">
+      <h3 class="text-sm font-semibold mb-3">Feature Comparison Matrix</h3>
+      <div class="overflow-x-auto"><table class="w-full text-xs">
+        <thead><tr class="border-b border-surface-200 dark:border-surface-700">
+          <th class="text-left py-2 px-3 font-medium sticky left-0 bg-inherit">Feature</th>
+          ${COMPETITOR_NAMES.map((n, i) => `<th class="py-2 px-2 font-medium ${i === 0 ? 'text-primary-500' : ''}">${n}</th>`).join('')}
+        </tr></thead>
+        <tbody>${AUDIT_DATA.competitorMatrix.map(row => `<tr class="border-b border-surface-200/50 dark:border-surface-700/50 hover:bg-surface-100/30 dark:hover:bg-surface-800/30">
+          <td class="py-2 px-3 text-sm font-medium">${row.feature}</td>
+          ${COMPETITOR_KEYS.map((key, i) => `<td class="py-2 px-2 text-center"><span class="inline-block w-5 h-5 rounded text-xs leading-5 ${row[key] ? (i === 0 ? 'bg-success text-white' : 'bg-success/80 text-white') : (i === 0 ? 'bg-danger text-white' : 'bg-surface-300 dark:bg-surface-600 text-surface-500')}">${row[key] ? '✓' : '✗'}</span></td>`).join('')}
+        </tr>`).join('')}</tbody>
+      </table></div>
+    </div>
+    <div class="grid lg:grid-cols-2 gap-6">
+      <div class="glass rounded-2xl p-6">
+        <h3 class="text-sm font-semibold mb-3">NexusAgent Strengths</h3>
+        <ul class="space-y-2">${strengths.map(s => `<li class="flex items-start gap-2 text-sm"><span class="text-success mt-0.5">✓</span>${s}</li>`).join('')}</ul>
+      </div>
+      <div class="glass rounded-2xl p-6">
+        <h3 class="text-sm font-semibold mb-3">Critical Gaps</h3>
+        <ul class="space-y-2">${gaps.map(s => `<li class="flex items-start gap-2 text-sm"><span class="text-danger mt-0.5">✗</span>${s}</li>`).join('')}</ul>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderRoadmap() {
+  return `<div class="fade-in space-y-4">
+    <div class="glass rounded-2xl p-6 mb-6">
+      <h2 class="text-lg font-semibold mb-2">Improvement Roadmap</h2>
+      <p class="text-sm text-surface-500">6 phases, 50+ tasks. Click each phase to expand.</p>
+    </div>
+    ${AUDIT_DATA.roadmap.map((phase, i) => renderRoadmapPhase(phase, i)).join('')}
+  </div>`;
+}
+
+function renderGrowth() {
+  return `<div class="fade-in space-y-6">
+    <div class="grid lg:grid-cols-2 gap-6">
+      <div class="glass rounded-2xl p-6">
+        <h3 class="text-sm font-semibold mb-3">Issue Trend (Sprints)</h3>
+        <div class="h-64"><canvas id="velocityChart"></canvas></div>
+      </div>
+      <div class="glass rounded-2xl p-6">
+        <h3 class="text-sm font-semibold mb-3">Test Coverage</h3>
+        <div class="h-64 flex items-center justify-center relative">
+          <canvas id="coverageChart"></canvas>
+          <div class="absolute inset-0 flex items-center justify-center"><span class="text-2xl font-bold">61%</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="glass rounded-2xl p-6">
+      <h3 class="text-sm font-semibold mb-3">Velocity Metrics</h3>
+      <div class="overflow-x-auto"><table class="w-full text-sm">
+        <thead><tr class="border-b border-surface-200 dark:border-surface-700"><th class="text-left py-2 px-3 font-medium">Metric</th><th class="text-right py-2 px-3 font-medium">Current</th><th class="text-right py-2 px-3 font-medium">Last Sprint</th><th class="text-right py-2 px-3 font-medium">Delta</th><th class="text-right py-2 px-3 font-medium">Target</th></tr></thead>
+        <tbody>${AUDIT_DATA.velocityMetrics.map(m => {
+          const isGood = m.delta > 0 && !m.metric.toLowerCase().includes('issue');
+          const deltaClass = m.delta > 0 ? (isGood ? 'text-success' : 'text-danger') : (m.delta < 0 ? 'text-success' : 'text-surface-400');
+          return `<tr class="border-b border-surface-200/50 dark:border-surface-700/50"><td class="py-2 px-3 font-medium">${m.metric}</td><td class="py-2 px-3 text-right">${m.current}${m.metric.includes('%') ? '%' : ''}</td><td class="py-2 px-3 text-right text-surface-400">${m.lastSprint}${m.metric.includes('%') ? '%' : ''}</td><td class="py-2 px-3 text-right font-medium ${deltaClass}">${m.delta > 0 ? '+' : ''}${m.delta}${m.metric.includes('%') ? '%' : ''}</td><td class="py-2 px-3 text-right text-primary-500">${m.target || '—'}</td></tr>`;
+        }).join('')}</tbody>
+      </table></div>
+    </div>
+    <div class="glass rounded-2xl p-6">
+      <h3 class="text-sm font-semibold mb-3">Full Capability Matrix</h3>
+      <div class="overflow-x-auto"><table class="w-full text-sm">
+        <thead><tr class="border-b border-surface-200 dark:border-surface-700"><th class="text-left py-2 px-3 font-medium">Capability</th><th class="text-center py-2 px-3 font-medium">Have</th><th class="text-center py-2 px-3 font-medium">Target</th><th class="text-center py-2 px-3 font-medium">Gap</th><th class="text-center py-2 px-3 font-medium">Priority</th></tr></thead>
+        <tbody>${AUDIT_DATA.capabilityMatrix.map(c => `<tr class="border-b border-surface-200/50 dark:border-surface-700/50 ${c.gap ? 'bg-red-50/50 dark:bg-red-900/10' : ''}"><td class="py-2 px-3 font-medium">${c.capability}</td><td class="py-2 px-3 text-center">${c.have ? '✅' : '❌'}</td><td class="py-2 px-3 text-center">${c.target ? '✅' : '❌'}</td><td class="py-2 px-3 text-center">${c.gap ? '🔴' : '—'}</td><td class="py-2 px-3 text-center">${c.priority || '—'}</td></tr>`).join('')}</tbody>
+      </table></div>
+    </div>
+  </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MAIN
+// ═══════════════════════════════════════════════════════════════
+
+let currentTab = 'dashboard';
+
+function switchTab(tabId) {
+  currentTab = tabId;
+  destroyCharts();
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    const isActive = btn.dataset.tab === tabId;
+    btn.className = `tab-btn px-4 py-2.5 text-sm font-medium transition-all relative ${isActive ? 'tab-active text-primary-600 dark:text-primary-400' : 'text-surface-500 hover:text-surface-700 dark:hover:text-surface-300'}`;
+  });
+
+  const content = document.getElementById('content');
+  switch(tabId) {
+    case 'dashboard': content.innerHTML = renderDashboard(); initRadarChart(); initBarChart(); break;
+    case 'issues': content.innerHTML = renderIssues(); break;
+    case 'architecture': content.innerHTML = renderArchitecture(); initLintChart(); renderMermaid(); break;
+    case 'competitor': content.innerHTML = renderCompetitor(); break;
+    case 'roadmap': content.innerHTML = renderRoadmap(); break;
+    case 'growth': content.innerHTML = renderGrowth(); initVelocityChart(); initCoverageChart(); break;
+  }
+}
+
+function renderMermaid() {
+  if (typeof mermaid === 'undefined') return;
+  mermaid.initialize({ startOnLoad: false, theme: 'base', themeVariables: { primaryColor: '#5E6AD2', primaryTextColor: '#fff', primaryBorderColor: '#5E6AD2', lineColor: '#a1a1aa', secondaryColor: '#3b82f6', tertiaryColor: '#22c55e' } });
+  const archDiagram = `graph TB
+    subgraph Interfaces["Interfaces"]
+        CLI[CLI<br/>Click] ; TUI[TUI<br/>Textual] ; WS[WebSocket<br/>FastAPI] ; SDK[SDK<br/>NexusSDK] ; WEB[Web UI<br/>Gradio]
+    end
+    subgraph Core["Core"]
+        AGENT[Agent<br/>Role-based] ; SESSION[Session<br/>Manager] ; WORKER[Worker<br/>Pool]
+    end
+    subgraph Memory["Memory v2"]
+        FM[FileMemory] ; HI[HybridIndex] ; DC[DreamCycle] ; DAG[SummaryDAG]
+    end
+    subgraph Infrastructure["Infrastructure"]
+        CONFIG[Config] ; BUS[NATS Bus] ; DB[(SQLite)] ; AUTH[Auth]
+    end
+    CLI --> SDK ; TUI --> WS ; WEB --> SDK ; SDK --> BUS ; WS --> SESSION
+    CLI --> WORKER ; SESSION --> AGENT ; WORKER --> AGENT
+    AGENT --> Memory ; AGENT --> CONFIG ; BUS --> DB ; SESSION --> DB
+    style Interfaces fill:#5E6AD2,color:#fff ; style Core fill:#3b82f6,color:#fff ; style Memory fill:#22c55e,color:#fff ; style Infrastructure fill:#f59e0b,color:#fff`;
+  const flowDiagram = `flowchart LR
+    USER([User]) -->|input| TUI[TUI/CLI] ; TUI -->|WebSocket| SERVER[FastAPI]
+    TUI -->|direct| SDK[SDK] ; SDK -->|publish| NATS[NATS] ; NATS -->|subscribe| WORKER[Worker]
+    WORKER -->|execute| AGENT[Agent] ; AGENT -->|call| TOOLS[Tools] ; AGENT -->|store| MEM[Memory v2]
+    WORKER -->|result| NATS ; NATS -->|notify| SERVER ; SERVER -->|stream| TUI ; TUI -->|render| USER
+    style USER fill:#5E6AD2,color:#fff ; style TUI fill:#8b5cf6,color:#fff ; style SERVER fill:#3b82f6,color:#fff
+    style NATS fill:#ef4444,color:#fff ; style WORKER fill:#f59e0b,color:#000 ; style AGENT fill:#22c55e,color:#fff
+    style MEM fill:#8b5cf6,color:#fff`;
+  mermaid.render('arch-svg', archDiagram).then(({ svg }) => {
+    const el = document.getElementById('arch-diagram');
+    if (el) el.innerHTML = svg;
+  });
+  mermaid.render('flow-svg', flowDiagram).then(({ svg }) => {
+    const el = document.getElementById('flow-diagram');
+    if (el) el.innerHTML = svg;
+  });
+}
+
+// Tab click handlers
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+});
+
+// Dark mode toggle
+document.getElementById('darkToggle').addEventListener('click', function() {
+  document.documentElement.classList.toggle('dark');
+  this.textContent = document.documentElement.classList.contains('dark') ? '☀️' : '🌙';
+});
+
+// Init
+switchTab('dashboard');
 </script>
 </body>
 </html>
