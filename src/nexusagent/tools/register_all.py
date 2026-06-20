@@ -396,18 +396,28 @@ def _get_memory_workspace() -> str:
         "query": "Search query string",
         "max_results": "Maximum results to return (default: 6)",
         "workspace": "Override workspace path (optional, defaults to config or global)",
+        "valid_from": "Optional ISO datetime — only return memories with valid_from >= this date",
+        "valid_until": "Optional ISO datetime — only return memories with valid_until <= this date",
     },
-    example='memory_search("authentication", max_results=5)',
+    example='memory_search("authentication", max_results=5, valid_from="2026-01-01T00:00:00")',
     category="memory",
     returns="Formatted search results with citations.",
 )
-async def memory_search(query: str, max_results: int = 6, workspace: str | None = None) -> str:
+async def memory_search(
+    query: str,
+    max_results: int = 6,
+    workspace: str | None = None,
+    valid_from: str | None = None,
+    valid_until: str | None = None,
+) -> str:
     """Search memory using hybrid keyword + vector search.
 
     Args:
         query: Search query string.
         max_results: Maximum results to return per workspace (default: 6).
         workspace: Override workspace path, or "all" to search all workspaces.
+        valid_from: Optional ISO datetime — filter memories with valid_from >= this date.
+        valid_until: Optional ISO datetime — filter memories with valid_until <= this date.
     """
     rate_limit_msg = _memory_rate_limiter.check_search()
     if rate_limit_msg:
@@ -428,7 +438,9 @@ async def memory_search(query: str, max_results: int = 6, workspace: str | None 
         try:
             mgr = HybridMemoryManager(ws)
             mgr.initialize()
-            results = await mgr.recall(query, max_results=max_results)
+            results = await mgr.recall(
+                query, max_results=max_results, valid_from=valid_from, valid_until=valid_until
+            )
             for r in results:
                 r["_workspace"] = ws
             all_results.extend(results)

@@ -122,7 +122,9 @@ class HybridMemoryIndex:
                     file_path TEXT PRIMARY KEY,
                     mtime REAL,
                     hash TEXT,
-                    last_indexed TEXT
+                    last_indexed TEXT,
+                    valid_from TEXT,
+                    valid_until TEXT
                 )
                 """
             )
@@ -680,5 +682,11 @@ class HybridMemoryIndex:
         for pattern in ["bank/**/*.md", "memory/**/*.md"]:
             for filepath in self.workspace.glob(pattern):
                 self.index_file(str(filepath.relative_to(self.workspace)))
+
+    def close(self):
+        """Close the index and clean up resources."""
+        # The SQLite connections are opened and closed per-method,
+        # but we can clear any cached embedder references.
+        self.embedder = None  # type: ignore[assignment]
 
         logger.info("Rebuilt index from workspace files")

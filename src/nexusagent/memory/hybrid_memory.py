@@ -1,10 +1,28 @@
-# src/nexusagent/memory/hybrid_memory.py
-"""HybridMemoryManager — combines FileMemory + HybridMemoryIndex."""
+"""HybridMemoryManager — combines FileMemory (canonical) with HybridMemoryIndex (derived).
 
+This is the top-level memory interface for the hybrid memory system.
+Files are the source of truth; the SQLite index is rebuilt from them.
+"""
+
+import asyncio
 import logging
-from datetime import UTC, datetime
+from datetime import datetime, UTC
+from pathlib import Path
+from typing import Any
+
+from nexusagent.memory.compaction import CompactionPipeline, pre_compaction_flush
+from nexusagent.memory.extraction import MemoryExtractor
+from nexusagent.memory.memory_files import FileMemory
+from nexusagent.memory.memory_index import HybridMemoryIndex
 
 logger = logging.getLogger(__name__)
+
+# Maximum extraction queue size
+_MAX_EXTRACTION_QUEUE = 3
+
+# Stale threshold for dream cycle (30 days)
+STALE_THRESHOLD_DAYS = 30
+LOW_QUALITY_THRESHOLD = 0.3
 
 
 class HybridMemoryManager:
@@ -14,31 +32,31 @@ class HybridMemoryManager:
     Files are the source of truth; the SQLite index is rebuilt from them.
     """
 
-    def __init__(self, workspace_dir: str):
-        """Initialize the hybrid memory manager.
+    def __init__(self, workspace_dir: str | Path):
+        self.workspace_dir = Path(workspace_dir)
+        self.workspace_dir.mkdir(parents=True, exist_ok=True)
+        self.file_memory = FileMemory(str(self.workspace_dir))
+        self.index = HybridMemoryIndex(str(self.workspace_dir))
 
-        Args:
-            workspace_dir: Path to the workspace root. Memory files live
-                under this directory; the SQLite index is derived from them.
-        """
-        from nexusagent.memory.memory_files import FileMemory
-        from nexusagent.memory.memory_index import HybridMemoryIndex
+        # Extraction queue — bounded to prevent unbounded growth
+        self._extraction_queue: asyncio.Queue = asyncio.Queue(maxsize=_MAX_EXTRACTION_QUEUE)
+        self._extractor = MemoryExtractor()
+        self._turn_count: int = 0
 
-        self.workspace_dir = workspace_dir
-        self.file_memory = FileMemory(workspace_dir)
-        self.index = HybridMemoryIndex(workspace_dir)
-
-    def initialize(self):
+    def initialize(self) -> None:
         """Initialize the file memory layer."""
         self.file_memory.initialize()
 
     async def remember(
         self,
         content: str,
-        type: str,
-        description: str,
+        type: str = "observation",
+        description: str = "",
         confidence: float | None = None,
         entities: list[str] | None = None,
+        ttl_hours: int | None = None,
+        valid_from: str | None = None,
+        valid_until: str | None = None,
         source_session_id: str | None = None,
         derived_from: list[str] | None = None,
     ) -> str:
@@ -47,28 +65,94 @@ class HybridMemoryManager:
         Returns the file path of the written entry.
         """
         from nexusagent.memory.memory_files import MemoryEntryType
-
-        entry_type = MemoryEntryType(type)
+        entry_type = MemoryEntryType(type) if isinstance(type, str) else type
         filepath = self.file_memory.write_entry(
             content=content,
             entry_type=entry_type,
             description=description,
             confidence=confidence,
-            entities=entities,
+            entities=entities or None,
+            ttl_hours=ttl_hours,
+            valid_from=valid_from,
+            valid_until=valid_until,
             source_session_id=source_session_id,
             derived_from=derived_from,
         )
         # Index the file that was just written — async with Gemini embeddings
-        rel_path = filepath.replace(self.workspace_dir, "").lstrip("/")
+        rel_path = str(filepath).replace(str(self.workspace_dir), "").lstrip("/")
         await self.index.async_index_file(rel_path)
         return filepath
 
-    async def recall(self, query: str, max_results: int = 6) -> list[dict]:
+    async def recall(
+        self,
+        query: str,
+        max_results: int = 6,
+        valid_from: str | None = None,
+        valid_until: str | None = None,
+    ) -> list[dict]:
         """Search memory using hybrid keyword + vector search.
 
         Returns results with citations (file, content, score).
+
+        Args:
+            query: Search query string.
+            max_results: Maximum results to return.
+            valid_from: Optional ISO datetime — filter memories with valid_from >= this date.
+            valid_until: Optional ISO datetime — filter memories with valid_until <= this date.
         """
-        return await self.index.search(query, max_results=max_results)
+        results = await self.index.search(query, max_results=max_results * 3)  # Fetch more to filter
+
+        # Apply bi-temporal filtering
+        if valid_from or valid_until:
+            from datetime import datetime, UTC
+            valid_from_dt = datetime.fromisoformat(valid_from) if valid_from else None
+            valid_until_dt = datetime.fromisoformat(valid_until) if valid_until else None
+
+            filtered = []
+            for r in results:
+                file_path = r.get("file", "")
+                # Read frontmatter to check temporal fields
+                vf, vu = await self._get_entry_temporal_fields(file_path)
+                if valid_from_dt and (vf is None or vf < valid_from_dt):
+                    continue
+                if valid_until_dt and (vu is None or vu is None or vu > valid_until_dt):
+                    continue
+                filtered.append(r)
+            results = filtered
+
+        return results[:max_results]
+
+    async def _get_entry_temporal_fields(self, file_path: str) -> tuple:
+        """Extract valid_from and valid_until from a memory file's frontmatter.
+
+        Args:
+            file_path: Relative path to the memory file (e.g., "bank/obs-123.md")
+
+        Returns:
+            Tuple of (valid_from, valid_until) as datetime objects or None if not present.
+        """
+        import yaml
+        from datetime import datetime, UTC
+
+        full_path = self.workspace_dir / file_path
+        if not full_path.exists():
+            return None, None
+
+        try:
+            content = full_path.read_text()
+            # Extract YAML frontmatter
+            if content.startswith("---"):
+                parts = content.split("---", 2)
+                if len(parts) >= 3:
+                    frontmatter = yaml.safe_load(parts[1]) or {}
+                    vf = frontmatter.get("valid_from")
+                    vu = frontmatter.get("valid_until")
+                    vf_dt = datetime.fromisoformat(vf) if vf else None
+                    vu_dt = datetime.fromisoformat(vu) if vu else None
+                    return vf_dt, vu_dt
+        except Exception:
+            pass
+        return None, None
 
     async def get_memory_context(self, query: str, max_results: int = 5) -> str:
         """Format recall results as a context string for prompt injection.
@@ -105,9 +189,38 @@ class HybridMemoryManager:
     def close(self):
         """Close the memory manager and clean up resources.
 
-        Releases the embedding provider and index references so that
-        the SQLite connections (opened/closed per-method) and the
-        embedder's thread pool can be garbage-collected.
+        Closes the database connections in the underlying index.
         """
-        if self.index is not None:
-            self.index.embedder = None  # type: ignore[assignment]
+        self.index.close()
+
+    async def _get_entry_temporal_fields(self, file_path: str) -> tuple:
+        """Extract valid_from and valid_until from a memory file's frontmatter.
+
+        Args:
+            file_path: Relative path to the memory file (e.g., "bank/obs-123.md")
+
+        Returns:
+            Tuple of (valid_from, valid_until) as datetime objects or None if not present.
+        """
+        import yaml
+        from datetime import datetime, UTC
+
+        full_path = self.workspace_dir / file_path
+        if not full_path.exists():
+            return None, None
+
+        try:
+            content = full_path.read_text()
+            # Extract YAML frontmatter
+            if content.startswith("---"):
+                parts = content.split("---", 2)
+                if len(parts) >= 3:
+                    frontmatter = yaml.safe_load(parts[1]) or {}
+                    vf = frontmatter.get("valid_from")
+                    vu = frontmatter.get("valid_until")
+                    vf_dt = datetime.fromisoformat(vf) if vf else None
+                    vu_dt = datetime.fromisoformat(vu) if vu else None
+                    return vf_dt, vu_dt
+        except Exception:
+            pass
+        return None, None
