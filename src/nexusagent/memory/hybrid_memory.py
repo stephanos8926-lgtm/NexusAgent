@@ -59,6 +59,7 @@ class HybridMemoryManager:
         valid_until: str | None = None,
         source_session_id: str | None = None,
         derived_from: list[str] | None = None,
+        related: list[str] | None = None,
     ) -> str:
         """Write a memory entry and index it using the full async embedding chain.
 
@@ -66,6 +67,15 @@ class HybridMemoryManager:
         """
         from nexusagent.memory.memory_files import MemoryEntryType
         entry_type = MemoryEntryType(type) if isinstance(type, str) else type
+
+        # Auto-link to related memories if not explicitly provided
+        if related is None:
+            related = self.file_memory.find_related(
+                content=content,
+                entities=entities,
+                max_results=3,
+            )
+
         filepath = self.file_memory.write_entry(
             content=content,
             entry_type=entry_type,
@@ -77,6 +87,7 @@ class HybridMemoryManager:
             valid_until=valid_until,
             source_session_id=source_session_id,
             derived_from=derived_from,
+            related=related,
         )
         # Index the file that was just written — async with Gemini embeddings
         rel_path = str(filepath).replace(str(self.workspace_dir), "").lstrip("/")

@@ -145,6 +145,7 @@ class FileMemory:
         valid_until: str | None = None,
         source_session_id: str | None = None,
         derived_from: list[str] | None = None,
+        related: list[str] | None = None,
     ) -> str:
         """Write a memory entry to a topic file and update the index.
 
@@ -160,6 +161,7 @@ class FileMemory:
             source_session_id: Optional session ID that created this memory.
             derived_from: Optional list of source memory file paths this
                 entry was derived from (for provenance tracking).
+            related: Optional list of related memory file paths.
         """
         # Generate a filename from the description
         slug = re.sub(r"[^a-z0-9]+", "-", description.lower())[:40].strip("-")
@@ -192,6 +194,8 @@ class FileMemory:
             frontmatter["source_session_id"] = source_session_id
         if derived_from:
             frontmatter["derived_from"] = derived_from
+        if related:
+            frontmatter["related"] = related
 
         # Write topic file
         file_content = f"---\n{yaml.dump(frontmatter, default_flow_style=False)}---\n\n{content}\n"
@@ -375,6 +379,16 @@ class FileMemory:
         except yaml.YAMLError:
             return {}
 
+    @staticmethod
+    def _strip_frontmatter(content: str) -> str:
+        """Strip YAML frontmatter from a memory file, returning just the body."""
+        if not content.startswith("---"):
+            return content
+        parts = content.split("---", 2)
+        if len(parts) < 3:
+            return content
+        return parts[2].strip()
+
     def read_topic_file(self, filename: str) -> str | None:
         """Read a topic file from the bank/ directory."""
         filepath = self.bank_dir / filename
@@ -417,6 +431,102 @@ class FileMemory:
         if self.memory_dir.exists():
             files.extend(str(f.relative_to(self.workspace)) for f in self.memory_dir.glob("*.md"))
         return files
+
+    def find_related(
+        self,
+        content: str,
+        entities: list[str] | None = None,
+        max_results: int = 5,
+    ) -> list[str]:
+        """Find memories related to the given content or entities.
+
+        Searches for memories that share entities or have similar content.
+
+        Args:
+            content: The content to find related memories for.
+            entities: Optional list of entities to match against.
+            max_results: Maximum number of related memories to return.
+
+        Returns:
+            List of related memory file paths (relative to workspace).
+        """
+        if not self.bank_dir.exists():
+            return []
+
+        # Build set of significant words from content
+        content_words = set(content.lower().split()) - {
+            "the", "a", "an", "is", "are", "was", "were", "in", "on", "at",
+            "to", "for", "of", "and", "or", "but", "with", "by", "from", "as",
+            "it", "this", "that", "i", "we", "you", "he", "she", "they",
+        }
+
+        # Score each memory file
+        scores: list[tuple[float, str]] = []
+        for f in self.bank_dir.glob("*.md"):
+            try:
+                file_content = f.read_text()
+                frontmatter = self._parse_frontmatter(file_content)
+                score = 0.0
+
+                # Entity match (highest weight)
+                file_entities = frontmatter.get("entities", [])
+                if entities:
+                    matching = set(entities) & set(file_entities)
+                    score += len(matching) * 3.0
+
+                # Content word overlap
+                body = self._strip_frontmatter(file_content)
+                if body:
+                    file_words = set(body.lower().split()) - {
+                        "the", "a", "an", "is", "are", "was", "were", "in", "on", "at",
+                        "to", "for", "of", "and", "or", "but", "with", "by", "from", "as",
+                        "it", "this", "that",
+                    }
+                    overlap = len(content_words & file_words)
+                    score += overlap * 0.5
+
+                # Already linked (related field)
+                related = frontmatter.get("related", [])
+                if related:
+                    score += 0.1  # Small bonus for already-linked memories
+
+                if score > 0:
+                    scores.append((score, str(f.relative_to(self.workspace))))
+            except Exception:
+                continue
+
+        # Sort by score (highest first) and return top N
+        scores.sort(key=lambda x: x[0], reverse=True)
+        return [path for _, path in scores[:max_results]]
+
+    def add_related_link(self, file_path: str, related_path: str) -> bool:
+        """Add a bidirectional related link between two memory files.
+
+        Args:
+            file_path: Relative path to the memory file.
+            related_path: Relative path to the related memory file.
+
+        Returns:
+            True if the link was added successfully.
+        """
+        filepath = self.workspace / file_path
+        if not filepath.exists():
+            return False
+
+        try:
+            content = filepath.read_text()
+            frontmatter = self._parse_frontmatter(content)
+            related = frontmatter.get("related", [])
+            if related_path not in related:
+                related.append(related_path)
+                frontmatter["related"] = related
+                # Rebuild the file content
+                body = self._strip_frontmatter(content)
+                new_content = f"---\n{yaml.dump(frontmatter, default_flow_style=False)}---\n\n{body}"
+                filepath.write_text(new_content)
+            return True
+        except Exception:
+            return False
 
     def delete_by_file(self, relative_path: str) -> bool:
         """Delete a memory file and auto-commit.
