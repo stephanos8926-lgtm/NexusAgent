@@ -238,3 +238,138 @@ Respond with ONLY the JSON array, no other text."""
                 )
 
         return results
+
+    async def detect_contradictions(
+        self,
+        memories: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        """Detect contradictions in memories about the same entity.
+
+        Groups memories by entity and uses LLM to detect conflicting facts.
+
+        Args:
+            memories: List of memory dicts with 'content', 'entities', 'confidence' keys.
+
+        Returns:
+            List of contradiction dicts with:
+                - entity: The entity name
+                - memories: List of conflicting memory contents
+                - resolution: LLM's suggested resolution
+                - keep: Index of the memory to keep
+                - remove: List of indices of memories to mark as superseded
+        """
+        if len(memories) < 2:
+            return []
+
+        # Group memories by entity
+        entity_memories: dict[str, list[tuple[int, dict]]] = {}
+        for i, mem in enumerate(memories):
+            for entity in mem.get("entities", []):
+                entity_memories.setdefault(entity, []).append((i, mem))
+
+        # Only check entities with multiple memories
+        contradictions = []
+        for entity, mems in entity_memories.items():
+            if len(mems) < 2:
+                continue
+
+            # Check for contradictions using LLM
+            if self._llm_call is not None:
+                try:
+                    contradiction = await self._check_contradiction_llm(entity, mems)
+                    if contradiction:
+                        contradictions.append(contradiction)
+                except Exception as exc:
+                    logger.warning("LLM contradiction check failed for %s: %s", entity, exc)
+            else:
+                # Heuristic: check for obvious conflicts (same entity, different values)
+                contradiction = self._check_contradiction_heuristic(entity, mems)
+                if contradiction:
+                    contradictions.append(contradiction)
+
+        return contradictions
+
+    async def _check_contradiction_llm(
+        self,
+        entity: str,
+        memories: list[tuple[int, dict[str, Any]]],
+    ) -> dict[str, Any] | None:
+        """Use LLM to check if memories about an entity contradict each other."""
+        system_prompt = """You are a contradiction detection agent. Given multiple memories about the same entity, determine if any contradict each other.
+
+A contradiction occurs when two memories make conflicting claims about the same thing (e.g., "User prefers pytest" vs "User prefers unittest").
+
+Output format (JSON):
+{
+  "has_contradiction": true/false,
+  "resolution": "Brief explanation of which memory is correct and why",
+  "keep": <index of memory to keep>,
+  "remove": [<indices of memories to mark as superseded>]
+}
+
+If no contradiction, output: {"has_contradiction": false}
+Respond with ONLY the JSON, no other text."""
+
+        user_prompt = f"Entity: {entity}\n\nMemories:\n"
+        for idx, (i, mem) in enumerate(memories):
+            content = mem.get("content", "")
+            confidence = mem.get("confidence", 0.5)
+            user_prompt += f"[{idx}] (confidence: {confidence}) {content}\n"
+
+        try:
+            response = await self._llm_call(
+                system=system_prompt,
+                user=user_prompt,
+                max_tokens=500,
+                temperature=0.1,
+            )
+            text = response.strip()
+            if text.startswith("```"):
+                text = text.split("\n", 1)[1]
+                if text.endswith("```"):
+                    text = text[:-3]
+            text = text.strip()
+
+            data = json.loads(text)
+            if not data.get("has_contradiction", False):
+                return None
+
+            return {
+                "entity": entity,
+                "memories": [mem.get("content", "") for _, mem in memories],
+                "resolution": data.get("resolution", ""),
+                "keep": data.get("keep", 0),
+                "remove": data.get("remove", []),
+            }
+        except Exception as exc:
+            logger.warning("Failed to parse LLM contradiction response: %s", exc)
+            return None
+
+    def _check_contradiction_heuristic(
+        self,
+        entity: str,
+        memories: list[tuple[int, dict[str, Any]]],
+    ) -> dict[str, Any] | None:
+        """Heuristic contradiction detection (no LLM).
+
+        Simple approach: if two memories have very different confidence scores
+        for the same entity, flag the lower-confidence one.
+        """
+        if len(memories) < 2:
+            return None
+
+        # Sort by confidence (highest first)
+        sorted_mems = sorted(memories, key=lambda x: x[1].get("confidence", 0.5), reverse=True)
+        highest = sorted_mems[0]
+        lowest = sorted_mems[-1]
+
+        # If there's a significant confidence gap, flag as potential contradiction
+        if highest[1].get("confidence", 0.5) - lowest[1].get("confidence", 0.5) > 0.3:
+            return {
+                "entity": entity,
+                "memories": [mem.get("content", "") for _, mem in memories],
+                "resolution": f"Heuristic: keeping higher-confidence memory ({highest[1].get('confidence', 0.5):.2f} vs {lowest[1].get('confidence', 0.5):.2f})",
+                "keep": 0,
+                "remove": [i for i, _ in sorted_mems[1:]],
+            }
+        return None

@@ -349,7 +349,23 @@ class DreamCycle:
 
     # ── Phase 3: Consolidate ────────────────────────────────────────────
 
-    def consolidate(
+    def consolidate(self, scan_report, patterns=None):
+        """Synchronous wrapper for consolidate_async."""
+        import asyncio
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+        if loop and loop.is_running():
+            # We're inside an async context — create a task
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor() as pool:
+                future = pool.submit(asyncio.run, self._consolidate_async(scan_report, patterns))
+                return future.result()
+        else:
+            return asyncio.run(self._consolidate_async(scan_report, patterns))
+
+    async def _consolidate_async(
         self,
         scan_report: dict[str, Any],
         patterns: dict[str, Any] | None = None,
@@ -391,6 +407,52 @@ class DreamCycle:
                     logger.warning(
                         "Failed to remove duplicate %s: %s", dup["duplicate"], e
                     )
+
+        # Resolve contradictions
+        if self._llm_refinement and self._refinement:
+            try:
+                # Load all memory files for contradiction detection
+                memories = []
+                for f in self.bank_dir.glob("*.md"):
+                    try:
+                        content = f.read_text()
+                        frontmatter = self._parse_frontmatter(content)
+                        body = self._strip_frontmatter(content)
+                        memories.append({
+                            "file": str(f.name),
+                            "content": body.strip() if body else "",
+                            "entities": frontmatter.get("entities", []),
+                            "confidence": frontmatter.get("confidence", 0.5),
+                        })
+                    except Exception:
+                        continue
+
+                contradictions = await self._refinement.detect_contradictions(memories)
+                for contradiction in contradictions:
+                    remove_indices = contradiction.get("remove", [])
+                    for idx in remove_indices:
+                        if idx < len(memories):
+                            mem = memories[idx]
+                            mem_path = self.bank_dir / mem["file"]
+                            if mem_path.exists():
+                                try:
+                                    mem_path.unlink()
+                                    actions["contradictions_resolved"] += 1
+                                    actions["files_affected"].append(mem["file"])
+                                    self._remove_index_entry(f"bank/{mem['file']}")
+                                    logger.info(
+                                        "Resolved contradiction for %s: removed %s",
+                                        contradiction.get("entity", "unknown"),
+                                        mem["file"],
+                                    )
+                                except Exception as e:
+                                    logger.warning(
+                                        "Failed to remove contradicted memory %s: %s",
+                                        mem["file"],
+                                    e,
+                                    )
+            except Exception as e:
+                logger.warning("Contradiction detection failed: %s", e)
 
         # Prune stale entries
         for stale in scan_report.get("stale", []):
@@ -617,7 +679,7 @@ class DreamCycle:
                 "would_remove_low_quality": len(scan_report["low_quality"]),
             }
         else:
-            consolidate_report = self.consolidate(scan_report, patterns)
+            consolidate_report = await self._consolidate_async(scan_report, patterns)
 
         # Phase 4: Trim
         logger.info("Dream cycle Phase 4: Trim")
