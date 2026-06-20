@@ -143,6 +143,8 @@ class FileMemory:
         ttl_hours: int | None = None,
         valid_from: str | None = None,
         valid_until: str | None = None,
+        source_session_id: str | None = None,
+        derived_from: list[str] | None = None,
     ) -> str:
         """Write a memory entry to a topic file and update the index.
 
@@ -155,6 +157,9 @@ class FileMemory:
             ttl_hours: Optional TTL in hours. Entry expires after this time.
             valid_from: Optional ISO date when this knowledge becomes valid.
             valid_until: Optional ISO date when this knowledge expires.
+            source_session_id: Optional session ID that created this memory.
+            derived_from: Optional list of source memory file paths this
+                entry was derived from (for provenance tracking).
         """
         # Generate a filename from the description
         slug = re.sub(r"[^a-z0-9]+", "-", description.lower())[:40].strip("-")
@@ -183,6 +188,10 @@ class FileMemory:
             frontmatter["valid_from"] = valid_from
         if valid_until:
             frontmatter["valid_until"] = valid_until
+        if source_session_id is not None:
+            frontmatter["source_session_id"] = source_session_id
+        if derived_from:
+            frontmatter["derived_from"] = derived_from
 
         # Write topic file
         file_content = f"---\n{yaml.dump(frontmatter, default_flow_style=False)}---\n\n{content}\n"

@@ -39,6 +39,8 @@ class HybridMemoryManager:
         description: str,
         confidence: float | None = None,
         entities: list[str] | None = None,
+        source_session_id: str | None = None,
+        derived_from: list[str] | None = None,
     ) -> str:
         """Write a memory entry and index it using the full async embedding chain.
 
@@ -53,6 +55,8 @@ class HybridMemoryManager:
             description=description,
             confidence=confidence,
             entities=entities,
+            source_session_id=source_session_id,
+            derived_from=derived_from,
         )
         # Index the file that was just written — async with Gemini embeddings
         rel_path = filepath.replace(self.workspace_dir, "").lstrip("/")

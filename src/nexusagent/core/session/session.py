@@ -436,6 +436,7 @@ class Session:
                     description=result.description,
                     confidence=result.confidence,
                     entities=result.entities or None,
+                    source_session_id=self.session_id,
                 )
             except Exception as exc:
                 logger.warning("Failed to store extracted memory: %s", exc)
