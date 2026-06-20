@@ -25,6 +25,7 @@ from typing import Any
 import yaml
 
 from nexusagent.memory.git_ops import MemoryGitOps
+from nexusagent.memory.refinement import LLMRefinement
 
 logger = logging.getLogger(__name__)
 
@@ -88,7 +89,6 @@ class DreamLock:
             await asyncio.sleep(LOCK_POLL_INTERVAL)
         return False
 
-
 class DreamCycle:
     """4-phase memory consolidation daemon.
 
@@ -102,7 +102,7 @@ class DreamCycle:
     (bank/, memory/, MEMORY.md), never to source code.
     """
 
-    def __init__(self, workspace_dir: str | Path):
+    def __init__(self, workspace_dir: str | Path, llm_refinement: bool = True):
         self.workspace = Path(workspace_dir)
         self.bank_dir = self.workspace / "bank"
         self.memory_dir = self.workspace / "memory"
@@ -110,8 +110,100 @@ class DreamCycle:
         self.index_file = self.workspace / "MEMORY.md"
         self.lock = DreamLock(workspace_dir)
         self._git = MemoryGitOps(workspace_dir)
+        self._llm_refinement = llm_refinement
+        self._refinement = LLMRefinement() if llm_refinement else None
+
+    async def _load_existing_insights(self) -> list[str]:
+        """Load existing insight memories to avoid duplication."""
+        if not self.bank_dir.exists():
+            return []
+        insights = []
+        for f in self.bank_dir.glob("*.md"):
+            try:
+                content = f.read_text()
+                if "type: insight" in content or "type: synthesis" in content:
+                    # Extract the content after frontmatter
+                    if content.startswith("---"):
+                        parts = content.split("---", 2)
+                        if len(parts) >= 3:
+                            body = parts[2].strip()
+                            if body:
+                                insights.append(body[:200])
+            except Exception:
+                continue
+        return insights
+
+    async def _store_refinement_results(self, results) -> None:
+        """Store LLM refinement results as new insight memories."""
+        for r in results:
+            content = r.content
+            description = f"Synthesized from {r.source_count} observations"
+            await self._write_insight(
+                content=content,
+                description=description,
+                confidence=r.confidence,
+                entities=r.entities,
+            )
+
+    async def _write_insight(self, content: str, description: str, confidence: float, entities: list[str]):
+        """Write a synthesized insight as a new memory file."""
+        from nexusagent.memory.memory_files import FileMemory, MemoryEntryType
+
+        fm = FileMemory(str(self.workspace))
+        fm.initialize()
+        fm.write_entry(
+            content=content,
+            entry_type=MemoryEntryType.OBSERVATION,
+            description=description,
+            confidence=0.8,
+            entities=entities or None,
+        )
 
     # ── Phase 1: Scan ───────────────────────────────────────────────────
+        """Load existing insight memories to avoid duplication."""
+        if not self.bank_dir.exists():
+            return []
+        insights = []
+        for f in self.bank_dir.glob("*.md"):
+            try:
+                content = f.read_text()
+                if "type: insight" in content or "type: synthesis" in content:
+                    # Extract the content after frontmatter
+                    if content.startswith("---"):
+                        parts = content.split("---", 2)
+                        if len(parts) >= 3:
+                            body = parts[2].strip()
+                            if body:
+                                insights.append(body[:200])
+            except Exception:
+                continue
+        return insights
+
+    async def _store_refinement_results(self, results) -> None:
+        """Store LLM refinement results as new insight memories."""
+        for r in results:
+            content = r.content
+            description = f"Synthesized from {r.source_count} observations"
+            await self._write_insight(
+                content=content,
+                description=description,
+                confidence=r.confidence,
+                entities=r.entities,
+            )
+
+    async def _write_insight(self, content: str, description: str, confidence: float, entities: list[str]):
+        """Write a synthesized insight as a new memory file."""
+        from nexusagent.memory.memory_files import FileMemory, MemoryEntryType
+
+        fm = FileMemory(str(self.workspace_dir))
+        fm.initialize()
+        fm.write_entry(
+            content=content,
+            entry_type="insight",
+            description=description,
+            confidence=0.8,
+            entities=entities or None,
+        )
 
     def scan(self) -> dict[str, Any]:
         """Scan all memory files and compute health metrics.
@@ -481,6 +573,34 @@ class DreamCycle:
         # Phase 2: Patterns
         logger.info("Dream cycle Phase 2: Patterns")
         patterns = self.find_patterns()
+
+        # LLM-based refinement (Phase 2b)
+        if self._llm_refinement and self._refinement:
+            logger.info("Dream cycle Phase 2b: LLM Refinement")
+            observations = patterns.get("observations", [])
+            if observations:
+                try:
+                    existing_insights = await self._load_existing_insights()
+                    refinement_results = await self._refinement.synthesize(
+                        observations=observations,
+                        existing_insights=existing_insights,
+                    )
+                    if refinement_results:
+                        await self._store_refinement_results(refinement_results)
+                        patterns["refinement_results"] = [
+                            {
+                                "content": r.content,
+                                "confidence": r.confidence,
+                                "entities": r.entities,
+                                "source_count": r.source_count,
+                            }
+                            for r in refinement_results
+                        ]
+                        logger.info(
+                            "LLM refinement synthesized %d insights", len(refinement_results)
+                        )
+                except Exception as exc:
+                    logger.warning("LLM refinement failed: %s", exc)
 
         # Phase 3: Consolidate
         logger.info("Dream cycle Phase 3: Consolidate (dry_run=%s)", dry_run)
