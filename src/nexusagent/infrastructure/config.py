@@ -20,13 +20,16 @@ def _load_dotenv() -> None:
     """Load API keys from .env files into os.environ.
 
     Searches in order (later overrides earlier):
-    1. ~/.nexusagent/.env (project-specific)
-    2. ~/.hermes/.env (shared Hermes keys — EXA_API_KEY, etc.)
+    1. ~/.nexusagent/.env (runtime data)
+    2. <project_root>/.env (product repo — API keys committed to .gitignore)
+    3. ~/.hermes/.env (shared Hermes keys — EXA_API_KEY, etc.)
 
     Only sets keys that are not already in os.environ (env vars win).
     """
+    project_root = Path(__file__).parent.parent.parent.parent.absolute()
     env_paths = [
         Path.home() / ".nexusagent" / ".env",
+        project_root / ".env",
         Path.home() / ".hermes" / ".env",
     ]
     for env_path in env_paths:
