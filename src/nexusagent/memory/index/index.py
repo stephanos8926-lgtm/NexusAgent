@@ -172,6 +172,8 @@ class HybridMemoryIndex:
             for oid in old_ids:
                 conn.execute("DELETE FROM chunks_vec WHERE id = ?", (oid,))
 
+            # Collect vec inserts to do after main commit (separate connection avoids locking)
+            vec_inserts: list[tuple[str, bytes]] = []
             now = datetime.now(UTC).isoformat()
 
             for i, chunk in enumerate(chunks):
@@ -205,13 +207,7 @@ class HybridMemoryIndex:
                 )
 
                 if vec_blob:
-                    try:
-                        conn.execute(
-                            "INSERT OR REPLACE INTO chunks_vec (id, embedding) VALUES (?, ?)",
-                            (chunk_id, vec_blob),
-                        )
-                    except Exception as e:
-                        logger.warning("Vector insert failed: %s", e)
+                    vec_inserts.append((chunk_id, vec_blob))
 
             # Update file meta
             file_hash = hashlib.md5(filepath.read_bytes()).hexdigest()
@@ -221,6 +217,22 @@ class HybridMemoryIndex:
             )
 
             conn.commit()
+
+            # Optional vector inserts in a separate connection (after main commit)
+            for chunk_id, vec_blob in vec_inserts:
+                try:
+                    vec_conn = sqlite3.connect(str(self.db_path))
+                    vec_conn.enable_load_extension(True)
+                    sqlite_vec.load(vec_conn)
+                    vec_conn.enable_load_extension(False)
+                    vec_conn.execute(
+                        "INSERT OR REPLACE INTO chunks_vec (id, embedding) VALUES (?, ?)",
+                        (chunk_id, vec_blob),
+                    )
+                    vec_conn.commit()
+                    vec_conn.close()
+                except Exception as e:
+                    logger.warning("Vector insert failed: %s", e)
         finally:
             conn.close()
 
@@ -267,6 +279,8 @@ class HybridMemoryIndex:
             for oid in old_ids:
                 conn.execute("DELETE FROM chunks_vec WHERE id = ?", (oid,))
 
+            # Collect vec inserts to do after main commit (separate connection avoids locking)
+            vec_inserts: list[tuple[str, bytes]] = []
             now = datetime.now(UTC).isoformat()
 
             for i, chunk in enumerate(chunks):
@@ -300,13 +314,7 @@ class HybridMemoryIndex:
                 )
 
                 if vec_blob:
-                    try:
-                        conn.execute(
-                            "INSERT OR REPLACE INTO chunks_vec (id, embedding) VALUES (?, ?)",
-                            (chunk_id, vec_blob),
-                        )
-                    except Exception as e:
-                        logger.warning("Vector insert failed: %s", e)
+                    vec_inserts.append((chunk_id, vec_blob))
 
             # Update file meta
             file_hash = hashlib.md5(filepath.read_bytes()).hexdigest()
@@ -316,6 +324,22 @@ class HybridMemoryIndex:
             )
 
             conn.commit()
+
+            # Optional vector inserts in a separate connection (after main commit)
+            for chunk_id, vec_blob in vec_inserts:
+                try:
+                    vec_conn = sqlite3.connect(str(self.db_path))
+                    vec_conn.enable_load_extension(True)
+                    sqlite_vec.load(vec_conn)
+                    vec_conn.enable_load_extension(False)
+                    vec_conn.execute(
+                        "INSERT OR REPLACE INTO chunks_vec (id, embedding) VALUES (?, ?)",
+                        (chunk_id, vec_blob),
+                    )
+                    vec_conn.commit()
+                    vec_conn.close()
+                except Exception as e:
+                    logger.warning("Vector insert failed: %s", e)
         finally:
             conn.close()
 
