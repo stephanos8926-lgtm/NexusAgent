@@ -50,8 +50,6 @@ NexusAgent/
 │   │   ├── __init__.py
 │   │   ├── memory.py        # Compat shim → submodules
 │   │   ├── memory_item.py   # MemoryItem model + _hash_embed
-│   │   ├── memory_bank.py   # Memory class (scoped SQLite bank)
-│   │   ├── memory_manager.py # MemoryManager (lifecycle)
 │   │   ├── hybrid_memory.py # HybridMemoryManager (file + index)
 │   │   ├── memory_files.py  # FileMemory (canonical, git-backed)
 │   │   ├── memory_index.py  # Compat shim → index/ subpackage
@@ -178,7 +176,7 @@ See CODEBASE_MAP.md for details. Established pattern: extract to subpackage → 
 | Phase | What | Result |
 |-------|------|--------|
 | 16 | Server split (508L) | `server/` subpackage: server.py (app factory), routes.py (REST), websocket.py (WS handler), __main__.py |
-| 17 | Memory split (474L) | `memory/` subpackage: memory_item.py, memory_bank.py, memory_manager.py, hybrid_memory.py; memory.py = compat shim |
+|| 17 | Memory split (474L) | `memory/` subpackage: memory_item.py, hybrid_memory.py, memory_files.py, memory_index.py + index/ subpackage; memory.py = compat shim. NOTE: memory_bank.py and memory_manager.py were later removed as dead code (Phases 25). |
 
 ### Phases 18-24 (2026-07-22) — Memory System Overhaul (Recovered from prior session)
 | Phase | What | Result |
@@ -223,7 +221,8 @@ See CODEBASE_MAP.md for details. Established pattern: extract to subpackage → 
 - **⚠️ Known broken**: Streaming is fake (accumulates then dumps as single event), search providers not wired, word wrapping broken, tool calls show raw JSON, welcome message may not render. See `docs/CODE_REVIEW_COMPREHENSIVE.md` for full TUI audit.
 
 ### Memory System
-- **Two systems coexist**: Old SQLite `Memory` class (in `memory.py`) and new file-based `HybridMemoryManager` (also in `memory.py`). Session uses the hybrid system.
+- **Single active system**: `HybridMemoryManager` (file + SQLite index). Session and tools use this exclusively.
+- **Legacy code removed**: Old `Memory` bank and `MemoryManager` classes were deleted (dead code, never wired to tools).
 - **Embedding fallback chain**: Gemini API → local sentence-transformers → SHA256 hash (deterministic, low quality)
 - **sqlite-vec**: Virtual table for vector search. Requires `sqlite_vec.load(conn)` at startup.
 - **3-tier architecture**: Core (session-scoped, in-memory) + Recall (file-backed, `FileMemory`) + Archival (consolidated, `DreamCycle`)
