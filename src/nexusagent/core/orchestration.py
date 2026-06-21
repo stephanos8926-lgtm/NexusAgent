@@ -8,7 +8,7 @@ import json
 import logging
 import re
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from nexusagent.llm.llm import llm
 
@@ -162,11 +162,17 @@ class DeepResearchOrchestrator:
         Review this plan for blind spots, redundancy, or missing perspectives.
         Refine the steps to be more precise and exhaustive.
 
-        Respond ONLY in JSON format matching the ResearchPlan schema."""
+        Respond ONLY in this exact JSON format (no other text):
+        {{
+            "thesis": "<refined thesis>",
+            "objective": "<refined objective>",
+            "steps": ["<step 1>", "<step 2>", "..."],
+            "expected_outcomes": ["<outcome 1>", "<outcome 2>", "..."]
+        }}"""
         response = await llm.generate(prompt, system_prompt="You are a critical peer reviewer.")
         try:
             return self._parse_plan_response(response.content, plan.thesis)
-        except (json.JSONDecodeError, KeyError, TypeError) as e:
+        except (json.JSONDecodeError, KeyError, TypeError, ValidationError) as e:
             logger.error(f"Failed to parse LLM refine response: {e}")
             return plan
 

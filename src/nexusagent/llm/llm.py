@@ -109,7 +109,8 @@ class LLMProvider:
     ) -> LLMResponse:
         try:
             model = genai.GenerativeModel(model_name=model_id, system_instruction=system_prompt)
-            response = await model.generate_content_async(prompt, timeout=timeout)
+            # google-genai's generate_content_async does not accept timeout kwarg
+            response = await model.generate_content_async(prompt)
             return LLMResponse(content=response.text, model_used=model_id, provider="gemini")
         except TimeoutError:
             raise TimeoutError(f"LLM request timed out after {timeout}s") from None

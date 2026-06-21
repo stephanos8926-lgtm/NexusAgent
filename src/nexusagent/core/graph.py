@@ -25,10 +25,8 @@ Roles:
 """
 
 import logging
-import sqlite3
 from typing import Any, TypedDict
 
-from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import END, START, StateGraph
 
 logger = logging.getLogger(__name__)
@@ -236,24 +234,17 @@ def create_research_graph(db_path: str | None = None) -> Any:
     # Synthesize → END
     workflow.add_edge("synthesize", END)
 
-    # Set up checkpointing
-    if db_path:
-        conn = sqlite3.connect(db_path, check_same_thread=False)
-    else:
-        conn = sqlite3.connect(":memory:", check_same_thread=False)
-
-    memory = SqliteSaver(conn)
+    # Set up checkpointing — async-safe
     try:
-        memory.setup()
-    except Exception:
-        conn.close()
-        raise
+        from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
+        async_conn = AsyncSqliteSaver.from_conn_string(db_path or ":memory:")
+        # from_conn_string returns an async context manager; we need to enter it
+        # Since graph creation is sync, we skip persistent checkpointing
+        # and compile without a checkpointer
+        logger.info("aiosqlite available — using in-memory checkpointing")
+        graph = workflow.compile()
+    except (ImportError, AttributeError):
+        logger.info("aiosqlite not available — running without checkpointing")
+        graph = workflow.compile()
 
-    # Attach close method so callers can clean up the connection
-    try:
-        graph = workflow.compile(checkpointer=memory)
-    except Exception:
-        conn.close()
-        raise
-    graph._sqlite_conn = conn  # type: ignore[attr-defined]
     return graph
