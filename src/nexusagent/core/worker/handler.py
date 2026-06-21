@@ -38,7 +38,8 @@ async def _run_agent_task(task: TaskSchema) -> str:
     deepagents Agent, protected by the module-level agent circuit breaker.
 
     Sets up workspace context (path jail, memory, NEXUS.md, environment)
-    for all worker-based agents.
+    for all worker-based agents. Uses SessionLite for memory recall and
+    auto-extraction when parent_memory_dir is provided in task metadata.
     """
     task_desc = task.description.lower()
     metadata = task.metadata if hasattr(task, "metadata") else {}
@@ -63,7 +64,46 @@ async def _run_agent_task(task: TaskSchema) -> str:
                 "working_dir": working_dir,
                 **metadata,
             }
+
+            # Set up SessionLite for memory recall and extraction
+            parent_memory_dir = metadata.get("parent_memory_dir")
+            if parent_memory_dir or working_dir:
+                try:
+                    from nexusagent.core.session.session_lite import SessionLite
+
+                    lite = SessionLite(
+                        session_id=f"worker-{task.id}",
+                        working_dir=working_dir,
+                        parent_memory_dir=parent_memory_dir,
+                    )
+                    # Inject memory context into the task description
+                    memory_ctx = await lite.get_memory_context(
+                        task.description, max_results=5
+                    )
+                    if memory_ctx:
+                        # Prepend memory context to task description
+                        state["task"] = f"{memory_ctx}\n\n---\n\nTask: {task.description}"
+                    # Store lite for post-turn extraction
+                    state["_session_lite"] = lite
+                except Exception as exc:
+                    logger.debug("SessionLite setup failed (non-fatal): %s", exc)
+
             result = await loop.run_in_executor(None, run_agent_task, state)
+
+            # Post-turn: run auto-extraction if SessionLite was set up
+            session_lite = state.get("_session_lite")
+            if session_lite is not None:
+                try:
+                    agent_result = result.get("result", "")
+                    if agent_result:
+                        await session_lite.extract_and_store(
+                            task.description, str(agent_result)
+                        )
+                    await session_lite.maybe_dream()
+                    await session_lite.close()
+                except Exception as exc:
+                    logger.debug("SessionLite post-turn failed (non-fatal): %s", exc)
+
             return result.get("result", "No result returned from agent.")
 
 
