@@ -81,8 +81,12 @@ def _search_exa(query: str) -> str | None:
         from exa_py import Exa  # type: ignore[import-untyped]
 
         client = Exa(api_key=api_key)
-        # Use the newer search() API (search_and_contents is deprecated)
-        response = client.search(query, num_results=5, text=True)
+        # Use search() API — text parameter depends on exa_py version
+        try:
+            response = client.search(query, num_results=5, text=True, contents={"text": {"max_characters": 600}})
+        except TypeError:
+            # Older exa_py — text and contents not supported
+            response = client.search(query, num_results=5)
         results = response.results
         if not results:
             return f"No results for: {query}"
@@ -90,7 +94,7 @@ def _search_exa(query: str) -> str | None:
         for r in results:
             title = getattr(r, "title", "Untitled")
             url = getattr(r, "url", "")
-            text = getattr(r, "text", "")[:600]
+            text = getattr(r, "text", "")[:600] or getattr(r, "highlights", [""])[0][:600] if hasattr(r, "highlights") else ""
             parts.append(f"Title: {title}\nURL: {url}\n{text}")
         return "\n\n".join(parts)
     except ImportError:

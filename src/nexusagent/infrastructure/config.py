@@ -16,6 +16,40 @@ from pydantic import BaseModel, Field, ValidationError
 logger = logging.getLogger(__name__)
 
 
+def _load_dotenv() -> None:
+    """Load API keys from .env files into os.environ.
+
+    Searches in order (later overrides earlier):
+    1. ~/.nexusagent/.env (project-specific)
+    2. ~/.hermes/.env (shared Hermes keys — EXA_API_KEY, etc.)
+
+    Only sets keys that are not already in os.environ (env vars win).
+    """
+    env_paths = [
+        Path.home() / ".nexusagent" / ".env",
+        Path.home() / ".hermes" / ".env",
+    ]
+    for env_path in env_paths:
+        if not env_path.exists():
+            continue
+        try:
+            for line in env_path.read_text().splitlines():
+                line = line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                key, _, value = line.partition("=")
+                key = key.strip()
+                value = value.strip().strip('"').strip("'")
+                if key and value and key not in os.environ:
+                    os.environ[key] = value
+        except Exception as exc:
+            logger.debug("Failed to load %s: %s", env_path, exc)
+
+
+# Load .env files at module import time (before settings singleton is created)
+_load_dotenv()
+
+
 class ServerConfig(BaseModel):
     """Server-side configuration for NATS, database, and API settings."""
 

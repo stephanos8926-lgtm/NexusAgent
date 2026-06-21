@@ -224,6 +224,43 @@ async def handle_slash_command(app, cmd: str) -> bool:
     if command in ("/help", "/h"):
         show_help(app)
         return True
+    if command in ("/search", "/s"):
+        query = " ".join(rest)
+        if not query:
+            msg = AppMessage("Usage: /search <query>")
+            _mount_with_limit(app, msg)
+            return True
+        # Run search_web in background
+        import asyncio
+        from nexusagent.tools.research import search_web
+
+        async def _do_search():
+            result = search_web(query)
+            msg = AppMessage(f"Search results for: {query}\n\n{result}")
+            _mount_with_limit(app, msg)
+
+        asyncio.create_task(_do_search())  # noqa: RUF006
+        msg = AppMessage(f"Searching for: {query}...")
+        _mount_with_limit(app, msg)
+        return True
+    if command in ("/fetch", "/f"):
+        url = " ".join(rest)
+        if not url:
+            msg = AppMessage("Usage: /fetch <url>")
+            _mount_with_limit(app, msg)
+            return True
+        import asyncio
+        from nexusagent.tools.research import fetch_url
+
+        async def _do_fetch():
+            result = fetch_url(url)
+            msg = AppMessage(f"Fetched: {url}\n\n{result}")
+            _mount_with_limit(app, msg)
+
+        asyncio.create_task(_do_fetch())  # noqa: RUF006
+        msg = AppMessage(f"Fetching: {url}...")
+        _mount_with_limit(app, msg)
+        return True
     if command in ("/new", "/n"):
         app.messages_container.clear()
         app._show_greeting()
@@ -370,6 +407,8 @@ def show_help(app) -> None:
     lines = [
         "Available Commands",
         "  /help      Show this help",
+        "  /search <q> Web search (Exa/Tavily)",
+        "  /fetch <url> Fetch URL content",
         "  /new       New conversation",
         "  /clear     Clear messages",
         "  /expand    Expand all",
