@@ -164,33 +164,73 @@ def get_project_root() -> Path:
     return Path(__file__).parent.parent.parent.parent.absolute()
 
 
-def load_config(config_file: str = "~/.nexusagent/config/nexusagent.yaml") -> ConfigSchema:
-    """Load and validate configuration from file, env vars, and defaults.
+def _deep_merge(base: dict, override: dict) -> dict:
+    """Deep merge two dicts. Override values win; nested dicts are merged recursively."""
+    result = base.copy()
+    for key, value in override.items():
+        if key in result and isinstance(result[key], dict) and isinstance(value, dict):
+            result[key] = _deep_merge(result[key], value)
+        else:
+            result[key] = value
+    return result
 
-    Resolution order:
+
+def load_config(config_file: str | None = None) -> ConfigSchema:
+    """Load and validate configuration from defaults, project file, user file, and env vars.
+
+    Resolution order (later overrides earlier):
         1. Pydantic model defaults
-        2. YAML config file values
-        3. ``NEXUS_*`` environment variables (double underscore = nested key)
+        2. Project config: ``config/nexusagent.yaml`` (repo defaults)
+        3. User config: ``~/.nexusagent/config/nexusagent.yaml`` (user overrides)
+        4. ``NEXUS_*`` environment variables (double underscore = nested key)
 
     Args:
-        config_file: Path to the YAML config file. ``~`` is expanded to the
-            user home directory.
+        config_file: Optional explicit path to a YAML config file. If provided,
+            it replaces both project and user config files. ``~`` is expanded.
 
     Returns:
         A validated ``ConfigSchema`` instance.
     """
-    # Resolve ~ in config file path
-    config_path = Path(config_file).expanduser()
+    # Resolve config file paths
+    project_root = get_project_root()
+    project_config = project_root / "config" / "nexusagent.yaml"
+    user_config = Path("~/.nexusagent/config/nexusagent.yaml").expanduser()
 
-    raw_data = {}
-    if config_path.exists():
+    # Load and merge: project defaults < user overrides < explicit file
+    raw_data: dict = {}
+
+    # Layer 1: Project config (committed defaults)
+    if project_config.exists():
         try:
-            with open(config_path) as f:
+            with open(project_config) as f:
                 raw_data = yaml.safe_load(f) or {}
+            logger.debug("Loaded project config from %s", project_config)
         except Exception as e:
-            logger.error(f"Failed to load config file {config_path}: {e}")
-    else:
-        logger.warning(f"Configuration file not found at {config_path}, using defaults.")
+            logger.warning("Failed to load project config: %s", e)
+
+    # Layer 2: User config (user overrides)
+    if user_config.exists():
+        try:
+            with open(user_config) as f:
+                user_data = yaml.safe_load(f) or {}
+            # Deep merge user overrides on top of project defaults
+            raw_data = _deep_merge(raw_data, user_data)
+            logger.debug("Loaded user config from %s", user_config)
+        except Exception as e:
+            logger.warning("Failed to load user config: %s", e)
+
+    # Layer 3: Explicit config file (if provided, replaces both)
+    if config_file is not None:
+        explicit_path = Path(config_file).expanduser()
+        if explicit_path.exists():
+            try:
+                with open(explicit_path) as f:
+                    raw_data = yaml.safe_load(f) or {}
+                logger.debug("Loaded explicit config from %s", explicit_path)
+            except Exception as e:
+                logger.error("Failed to load explicit config file %s: %s", explicit_path, e)
+        else:
+            logger.warning("Explicit config file not found at %s", explicit_path)
 
     def override_from_env(prefix: str, data: dict, current_level: dict):
         for key, value in os.environ.items():

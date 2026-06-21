@@ -1,14 +1,17 @@
 """Session — a single interactive conversation between user and agent.
 
-Manages message flow, event streaming, approval gates, cancellation,
-and real-time token streaming via LangGraph's astream().
+Extends SessionBase (shared memory logic) with:
+- Event streaming (WebSocket/TUI)
+- Approval gates
+- Conversation history
+- Hooks integration
+- Real-time token streaming via LangGraph's astream()
 """
 
 from __future__ import annotations
 
 import asyncio
 import logging
-import os
 from pathlib import Path
 from typing import Any
 
@@ -18,24 +21,37 @@ from nexusagent.core.session.helpers import (
     _build_environment_context,
     _build_session_history_context,
 )
+from nexusagent.core.session.session_base import SessionBase
+from nexusagent.memory.dream import DreamCycle
 from nexusagent.hooks import HookEvent, get_hook_manager
 from nexusagent.infrastructure.config import settings
 from nexusagent.infrastructure.prompt_loader import inject_file_at_reference, load_nexus_prompt
 from nexusagent.llm.models import ErrorEvent, ResponseEvent, ThinkingEvent
-from nexusagent.memory.compaction import CompactionPipeline, pre_compaction_flush
-from nexusagent.memory.dream import DreamCycle
-from nexusagent.memory.extraction import MemoryExtractor
-from nexusagent.memory.memory import HybridMemoryManager
 
 logger = logging.getLogger(__name__)
 
 _MAX_EXTRACTION_QUEUE = 3
 
 
-class Session:
-    """A single interactive session between a user and the agent.
+class Session(SessionBase):
+    """Interactive session with event streaming, approval gates, and conversation history.
 
-    Manages message flow, event streaming, approval gates, and cancellation.
+    Extends SessionBase with TUI-specific features:
+    - Event queue for WebSocket/TUI streaming
+    - Approval gates for tool calls
+    - Conversation history management
+    - Hooks integration
+    - Real-time token streaming
+
+    Args:
+        session_id: Unique identifier for this session.
+        working_dir: Absolute path to the project working directory.
+        agent: The agent instance used to process user messages.
+        db_repo: Database repository for persisting session and message data.
+        memory_dir: Optional override for the hybrid memory directory.
+        injected_memories: Optional list of memory context strings from previous sessions.
+        parent_memory_dir: Optional path to a parent workspace whose memory to inherit.
+        llm_call: Optional async callable for LLM invocations (extraction).
     """
 
     def __init__(
@@ -48,57 +64,22 @@ class Session:
         injected_memories: list[str] | None = None,
         parent_memory_dir: str | Path | None = None,
         llm_call: Any = None,
-    ) -> None:
-        """Initialize a new interactive session.
+    ):
+        # Initialize base class (memory, extraction, dream cycle, compaction)
+        super().__init__(
+            session_id=session_id,
+            working_dir=working_dir,
+            memory_dir=memory_dir,
+            parent_memory_dir=parent_memory_dir,
+            llm_call=llm_call,
+        )
 
-        Args:
-            session_id: Unique identifier for this session.
-            working_dir: Absolute path to the project working directory.
-            agent: The agent instance used to process user messages.
-            db_repo: Database repository for persisting session and message data.
-            memory_dir: Optional override for the hybrid memory directory path.
-                Defaults to ``~/.nexusagent/sessions/{session_id}/memory``.
-            injected_memories: Optional list of memory context strings from
-                previous sessions in the same workspace, to be injected as
-                SystemMessages during agent calls.
-            parent_memory_dir: Optional path to a parent workspace whose memory
-                index this session should inherit from.
-            llm_call: Optional async callable for LLM invocations.
-                      Signature: async (system: str, user: str, **kwargs) -> str
-                      Used for LLM-powered memory extraction when enabled.
-        """
-        self.session_id = session_id
-        self.working_dir = working_dir
+        # Session-specific attributes
         self.agent = agent
         self.db_repo = db_repo
-
-        if memory_dir is None:
-            memory_dir = os.path.expanduser(f"~/.nexusagent/sessions/{session_id}/memory")
-        self._memory_dir = Path(memory_dir)
-        self._memory_dir.mkdir(parents=True, exist_ok=True)
-
-        self._parent_memory_dir: Path | None = None
-        if parent_memory_dir is not None:
-            self._parent_memory_dir = Path(parent_memory_dir)
-
-        self.hybrid_memory = HybridMemoryManager(
-            str(self._memory_dir),
-            parent_memory_dir=parent_memory_dir,
-        )
-        self.hybrid_memory.initialize()
-
-        # LLM extraction (optional)
-        self._llm_call = llm_call
-        self._llm_extractor = None
-        if llm_call is not None:
-            from nexusagent.memory.llm_extraction import LLMExtractor
-            self._llm_extractor = LLMExtractor(llm_call=llm_call)
-
-        if self.parent_memory_dir is not None:
-            self.hybrid_memory.inherit_from(self.parent_memory_dir)
-
         self.injected_memories: list[str] = injected_memories or []
 
+        # TUI/Event streaming
         self.status: str = "active"
         self._cancel_flag: bool = False
         self._event_queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue(maxsize=1000)
@@ -107,21 +88,7 @@ class Session:
         self._seen_tool_results: set[str] = set()
         self._seen_tool_calls: set[str] = set()
         self._conversation_history: list[Any] = []
-        self._extractor = MemoryExtractor()
         self._extraction_queue: asyncio.Queue = asyncio.Queue(maxsize=_MAX_EXTRACTION_QUEUE)
-        self._turn_count: int = 0
-
-    # ── Properties ───────────────────────────────────────────────────────
-
-    @property
-    def memory_dir(self) -> Path:
-        """Return the session's hybrid memory directory."""
-        return self._memory_dir
-
-    @property
-    def parent_memory_dir(self) -> Path | None:
-        """Return the parent workspace memory directory, if configured."""
-        return self._parent_memory_dir
 
     # ── Prompt & Context ─────────────────────────────────────────────────
 
@@ -148,7 +115,7 @@ class Session:
             parts.append(f"\n## Recent Session History\n{history_ctx}")
         return "\n".join(parts)
 
-    # ── Send a user message ────────────────────────────────────────────
+    # ── Send a user message ─────────────────────────────────────────────
 
     def _process_chat_input(self, user_message: str) -> str:
         """Process chat input: handle @file injection if enabled."""
@@ -199,11 +166,7 @@ class Session:
         return HumanMessage(content=content_blocks)
 
     async def send(self, user_message: str, images: list[str] | None = None) -> None:
-        """Process a user message: store in DB, recall memory, stream agent response.
-
-        Uses LangGraph's astream() with stream_mode="messages" for real-time
-        streaming of tool calls, tool results, and tokens.
-        """
+        """Process a user message: store in DB, recall memory, stream agent response."""
         if self.status != "active":
             self._enqueue(ErrorEvent(message="Session is not active").model_dump())
             return
@@ -233,7 +196,7 @@ class Session:
             system_prompt = system_prompt + "\n\n" + context_block
         messages = [SystemMessage(content=system_prompt)]
 
-        # Inject cross-session memories from previous sessions in same workspace
+        # Inject cross-session memories
         if self.injected_memories:
             cross_session_ctx = (
                 "[Previous Session Context]\n"
@@ -242,6 +205,7 @@ class Session:
             )
             messages.append(SystemMessage(content=cross_session_ctx))
 
+        # Inject memory context from HybridMemoryManager
         try:
             hybrid_context = await self.hybrid_memory.get_memory_context(user_message, max_results=5)
             if hybrid_context:
@@ -254,13 +218,13 @@ class Session:
         messages.append(user_msg)
 
         # Compaction
-        _compaction = CompactionPipeline()
+        _compaction = self._compaction.__class__()  # Fresh instance
         if settings.agent.compaction_enabled and _compaction.should_compact(
             [{"role": "system" if isinstance(m, SystemMessage) else "user" if isinstance(m, HumanMessage) else "assistant", "content": m.content} for m in messages]
         ):
             summary = f"Session {self.session_id} turn: {user_message[:100]}"
             try:
-                flush_ctx = await pre_compaction_flush(self, summary)
+                flush_ctx = await self.pre_compaction_flush()
                 messages.insert(1, SystemMessage(content=flush_ctx))
             except Exception as exc:
                 logger.warning("Pre-compaction flush failed: %s", exc)
@@ -383,17 +347,6 @@ class Session:
                     "content": chunk_text,
                 })
 
-    # ── Pre-compaction flush ───────────────────────────────────────────
-
-    async def pre_compaction_flush(self) -> str:
-        """Flush session state to daily log before context compaction."""
-        summary = f"Session {self.session_id} compaction flush at {asyncio.get_event_loop().time()}"
-        try:
-            await self.hybrid_memory.flush(summary)
-        except Exception as exc:
-            logger.warning("Pre-compaction flush failed: %s", exc)
-        return summary
-
     # ── Approval gate ──────────────────────────────────────────────────
 
     async def approve(self, call_id: str, approved: bool) -> None:
@@ -424,7 +377,7 @@ class Session:
             await self.db_repo.update_status(self.session_id, "closed")
         except Exception as exc:
             logger.warning("Failed to update session status in DB: %s", exc)
-        self.hybrid_memory.close()
+        await super().close()
         self._enqueue({"type": "session_closed"})
 
     # ── Event stream ───────────────────────────────────────────────────
@@ -439,8 +392,25 @@ class Session:
 
     # ── Internal helpers ───────────────────────────────────────────────
 
+    def _enqueue(self, event: dict) -> None:
+        """Put an event dict onto the internal queue (non-blocking)."""
+        try:
+            self._event_queue.put_nowait(event)
+        except asyncio.QueueFull:
+            # Drop oldest event to make room (prevents deadlock on slow consumers)
+            try:
+                self._event_queue.get_nowait()
+            except asyncio.QueueEmpty:
+                pass
+            try:
+                self._event_queue.put_nowait(event)
+            except asyncio.QueueFull:
+                logger.warning("Event queue full — dropping event for session %s", self.session_id)
+
+    # ── Background extraction ──────────────────────────────────────────────
+
     def _schedule_extraction(self, user_message: str, response: str) -> None:
-        """Schedule fire-and-forget memory extraction from a turn.
+        """Schedule fire-and-forget memory extraction from a conversation turn.
 
         Uses a bounded queue (max 3 pending). If the queue is full,
         drops the oldest extraction to prevent unbounded growth.
@@ -462,31 +432,9 @@ class Session:
             task.cancel()
 
     async def _run_extraction(self, text: str) -> None:
-        """Run memory extraction and store results as observation memories.
-
-        Uses LLM extraction when llm_call is configured and enabled,
-        otherwise falls back to regex-based extraction.
-        """
-        # Choose extractor
-        extractor = self._llm_extractor if self._llm_extractor is not None else self._extractor
-
-        if self._llm_extractor is not None:
-            results = await self._llm_extractor.extract(text)
-        else:
-            results = self._extractor.extract(text)
-
-        for result in results:
-            try:
-                await self.hybrid_memory.remember(
-                    content=result.content,
-                    type=result.type,
-                    description=result.description,
-                    confidence=result.confidence,
-                    entities=result.entities or None,
-                    source_session_id=self.session_id,
-                )
-            except Exception as exc:
-                logger.warning("Failed to store extracted memory: %s", exc)
+        """Run memory extraction and store results."""
+        # Use base class method
+        await self.extract_and_store("", text)  # Empty user_msg, full text as response
 
     @staticmethod
     def _on_extraction_done(task: asyncio.Task) -> None:
@@ -496,59 +444,27 @@ class Session:
             logger.warning("Auto-extraction task failed: %s", exc)
 
     def _maybe_trigger_dream_cycle(self) -> None:
-        """Auto-trigger dream cycle every N turns (fire-and-forget).
-
-        Uses ``settings.agent.dream_cycle_interval`` to determine frequency.
-        Runs as a background task — never blocks the session turn.
-        """
+        """Auto-trigger dream cycle every N turns (fire-and-forget)."""
         interval = settings.agent.dream_cycle_interval
         if interval <= 0:
             return
         if self._turn_count % interval != 0:
             return
-        task = asyncio.create_task(self._run_dream_cycle())
-        task.add_done_callback(self._on_dream_cycle_done)
+        if self._turn_count == 0:
+            return
+
+        # Fire-and-forget: create task without awaiting
+        asyncio.create_task(self._run_dream_cycle())
 
     async def _run_dream_cycle(self) -> None:
-        """Run the dream cycle on the session's hybrid memory directory."""
+        """Run dream cycle in background."""
         try:
-            cycle = DreamCycle(str(self._memory_dir))
+            cycle = DreamCycle(str(self.memory_dir))
             report = await cycle.run(dry_run=False)
             logger.info(
-                "Dream cycle completed for session %s: "
-                "duplicates=%d stale=%d patterns=%d health=%.2f->%.2f",
+                "Dream cycle completed for session %s: %s",
                 self.session_id,
-                report.get("duplicates_removed", 0),
-                report.get("stale_pruned", 0),
-                report.get("patterns_extracted", 0),
-                report.get("health_before", 1.0),
-                report.get("health_after", 1.0),
+                report,
             )
         except Exception as exc:
-            logger.warning("Dream cycle failed for session %s: %s", self.session_id, exc)
-
-    @staticmethod
-    def _on_dream_cycle_done(task: asyncio.Task) -> None:
-        """Log errors from background dream cycle tasks."""
-        exc = task.exception()
-        if exc is not None:
-            logger.warning("Dream cycle task failed: %s", exc)
-
-    def _enqueue(self, event: dict[str, Any]) -> None:
-        """Put an event dict onto the internal queue (non-blocking).
-
-        If the queue is full (consumer is slow), drop the oldest event
-        to prevent memory growth and potential deadlock.
-        """
-        try:
-            self._event_queue.put_nowait(event)
-        except asyncio.QueueFull:
-            # Drop oldest event to make room (prevents deadlock on slow consumers)
-            try:
-                self._event_queue.get_nowait()
-            except asyncio.QueueEmpty:
-                pass
-            try:
-                self._event_queue.put_nowait(event)
-            except asyncio.QueueFull:
-                logger.warning("Event queue full — dropping event for session %s", self.session_id)
+            logger.warning("Dream cycle failed: %s", exc)

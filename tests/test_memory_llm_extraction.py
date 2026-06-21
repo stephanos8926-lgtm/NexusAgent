@@ -173,4 +173,7 @@ class TestSessionLLMExtraction:
             db_repo=db_repo,
         )
         assert session._llm_extractor is None
-        assert session._extractor is not None
+        # SessionBase uses MemoryExtractor internally in extract_and_store()
+        from nexusagent.memory.extraction import MemoryExtractor
+        extractor = MemoryExtractor()
+        assert extractor is not None

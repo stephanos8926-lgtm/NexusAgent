@@ -383,7 +383,7 @@ async def test_pre_compaction_flush_async(db_and_repo, mock_agent, mock_memory):
     # Should not raise - flush is now async
     result = await session.pre_compaction_flush()
     assert isinstance(result, str)
-    assert "compaction flush" in result
+    assert "Before compaction" in result
 
 
 @pytest.mark.asyncio
