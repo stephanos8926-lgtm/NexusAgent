@@ -73,10 +73,13 @@ async def _discover_cross_session_memories(
             from nexusagent.memory.memory_index import HybridMemoryIndex
 
             index = HybridMemoryIndex(mem_dir)
-            results = await asyncio.to_thread(
-                index.search_sync, "recent work and decisions", max_results=6
-            )
-            return results
+            try:
+                results = await asyncio.to_thread(
+                    index.search_sync, "recent work and decisions", max_results=6
+                )
+                return results
+            finally:
+                index.close()
         except Exception as exc:
             logger.debug(
                 "Failed to search memory for session %s: %s",
@@ -142,6 +145,7 @@ class SessionManager:
         agent=None,
         db_repo=None,
         memory_dir: str | None = None,
+        parent_memory_dir: str | None = None,
     ) -> Session:
         """Get existing session or create new one (thread-safe).
 
@@ -153,6 +157,8 @@ class SessionManager:
             memory_dir: Optional override for the hybrid memory directory path.
                 When None, defaults to ``~/.nexusagent/sessions/{session_id}/memory``.
                 When set, uses this path directly (for workspace-scoped memory).
+            parent_memory_dir: Optional path to a parent workspace whose memory
+                index this session should inherit from (cross-agent memory sharing).
         """
         # Fast path: no lock needed for read
         existing = self._sessions.get(session_id)
@@ -160,6 +166,8 @@ class SessionManager:
             return existing
 
         # Slow path: acquire lock to prevent duplicate creation
+        # Initialize injected_memories here so it's available in the recursive call
+        injected_memories: list[str] | None = None
         async with self._lock:
             # Double-check after acquiring lock
             existing = self._sessions.get(session_id)
@@ -172,7 +180,6 @@ class SessionManager:
                 self._creating.add(session_id)
                 try:
                     # Discover cross-session memories from previous sessions
-                    injected_memories: list[str] | None = None
                     try:
                         cached = _get_cached_memories(working_dir)
                         if cached is not None:
@@ -193,6 +200,7 @@ class SessionManager:
                         db_repo=db_repo,
                         memory_dir=memory_dir,
                         injected_memories=injected_memories,
+                        parent_memory_dir=parent_memory_dir,
                     )
                     # Final double-check
                     existing = self._sessions.get(session_id)
@@ -225,6 +233,9 @@ class SessionManager:
             working_dir=working_dir,
             agent=agent,
             db_repo=db_repo,
+            memory_dir=memory_dir,
+            injected_memories=injected_memories,
+            parent_memory_dir=parent_memory_dir,
         )
 
     async def mark_idle(self, session_id: str) -> None:

@@ -46,6 +46,7 @@ class Session:
         db_repo: Any,
         memory_dir: str | Path | None = None,
         injected_memories: list[str] | None = None,
+        parent_memory_dir: str | Path | None = None,
     ) -> None:
         """Initialize a new interactive session.
 
@@ -59,6 +60,8 @@ class Session:
             injected_memories: Optional list of memory context strings from
                 previous sessions in the same workspace, to be injected as
                 SystemMessages during agent calls.
+            parent_memory_dir: Optional path to a parent workspace whose memory
+                index this session should inherit from.
         """
         self.session_id = session_id
         self.working_dir = working_dir
@@ -67,11 +70,21 @@ class Session:
 
         if memory_dir is None:
             memory_dir = os.path.expanduser(f"~/.nexusagent/sessions/{session_id}/memory")
-        self.memory_dir = Path(memory_dir)
-        self.memory_dir.mkdir(parents=True, exist_ok=True)
+        self._memory_dir = Path(memory_dir)
+        self._memory_dir.mkdir(parents=True, exist_ok=True)
 
-        self.hybrid_memory = HybridMemoryManager(str(self.memory_dir))
+        self._parent_memory_dir: Path | None = None
+        if parent_memory_dir is not None:
+            self._parent_memory_dir = Path(parent_memory_dir)
+
+        self.hybrid_memory = HybridMemoryManager(
+            str(self._memory_dir),
+            parent_memory_dir=parent_memory_dir,
+        )
         self.hybrid_memory.initialize()
+
+        if self.parent_memory_dir is not None:
+            self.hybrid_memory.inherit_from(self.parent_memory_dir)
 
         self.injected_memories: list[str] = injected_memories or []
 
@@ -86,6 +99,18 @@ class Session:
         self._extractor = MemoryExtractor()
         self._extraction_queue: asyncio.Queue = asyncio.Queue(maxsize=_MAX_EXTRACTION_QUEUE)
         self._turn_count: int = 0
+
+    # ── Properties ───────────────────────────────────────────────────────
+
+    @property
+    def memory_dir(self) -> Path:
+        """Return the session's hybrid memory directory."""
+        return self._memory_dir
+
+    @property
+    def parent_memory_dir(self) -> Path | None:
+        """Return the parent workspace memory directory, if configured."""
+        return self._parent_memory_dir
 
     # ── Prompt & Context ─────────────────────────────────────────────────
 
@@ -465,7 +490,7 @@ class Session:
     async def _run_dream_cycle(self) -> None:
         """Run the dream cycle on the session's hybrid memory directory."""
         try:
-            cycle = DreamCycle(str(self.memory_dir))
+            cycle = DreamCycle(str(self._memory_dir))
             report = await cycle.run(dry_run=False)
             logger.info(
                 "Dream cycle completed for session %s: "

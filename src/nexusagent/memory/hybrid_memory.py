@@ -5,12 +5,12 @@ Files are the source of truth; the SQLite index is rebuilt from them.
 """
 
 import asyncio
+import fcntl
 import logging
-from datetime import datetime, UTC
+import shutil
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
 
-from nexusagent.memory.compaction import CompactionPipeline, pre_compaction_flush
 from nexusagent.memory.extraction import MemoryExtractor
 from nexusagent.memory.memory_files import FileMemory
 from nexusagent.memory.memory_index import HybridMemoryIndex
@@ -32,11 +32,21 @@ class HybridMemoryManager:
     Files are the source of truth; the SQLite index is rebuilt from them.
     """
 
-    def __init__(self, workspace_dir: str | Path):
+    def __init__(
+        self,
+        workspace_dir: str | Path,
+        parent_memory_dir: str | Path | None = None,
+    ):
         self.workspace_dir = Path(workspace_dir)
         self.workspace_dir.mkdir(parents=True, exist_ok=True)
         self.file_memory = FileMemory(str(self.workspace_dir))
         self.index = HybridMemoryIndex(str(self.workspace_dir))
+
+        # Parent memory support
+        self.parent_memory_dir: Path | None = None
+        self._parent_index: HybridMemoryIndex | None = None
+        if parent_memory_dir is not None:
+            self.parent_memory_dir = Path(parent_memory_dir)
 
         # Extraction queue — bounded to prevent unbounded growth
         self._extraction_queue: asyncio.Queue = asyncio.Queue(maxsize=_MAX_EXTRACTION_QUEUE)
@@ -103,6 +113,9 @@ class HybridMemoryManager:
     ) -> list[dict]:
         """Search memory using hybrid keyword + vector search.
 
+        Searches both the own index and the parent index (if configured),
+        merging results with parent results marked with origin="parent".
+
         Returns results with citations (file, content, score).
 
         Args:
@@ -111,11 +124,31 @@ class HybridMemoryManager:
             valid_from: Optional ISO datetime — filter memories with valid_from >= this date.
             valid_until: Optional ISO datetime — filter memories with valid_until <= this date.
         """
-        results = await self.index.search(query, max_results=max_results * 3)  # Fetch more to filter
+        fetch_count = max_results * 3  # Fetch extra for filtering
+        results = await self.index.search(query, max_results=fetch_count)
+
+        # Search parent index if configured
+        parent_results: list[dict] = []
+        if self._parent_index is not None:
+            try:
+                parent_results = await self._parent_index.search(
+                    query, max_results=fetch_count
+                )
+                for r in parent_results:
+                    r["origin"] = "parent"
+            except Exception as exc:
+                logger.warning("Parent index search failed: %s", exc)
+
+        # Merge: own results first, then parent results, dedup by file
+        seen_files: set[str] = {r.get("file", "") for r in results}
+        for r in parent_results:
+            f = r.get("file", "")
+            if f not in seen_files:
+                seen_files.add(f)
+                results.append(r)
 
         # Apply bi-temporal filtering
         if valid_from or valid_until:
-            from datetime import datetime, UTC
             valid_from_dt = datetime.fromisoformat(valid_from) if valid_from else None
             valid_until_dt = datetime.fromisoformat(valid_until) if valid_until else None
 
@@ -131,47 +164,18 @@ class HybridMemoryManager:
                 filtered.append(r)
             results = filtered
 
+        # Sort by score descending and trim
+        results.sort(key=lambda r: r.get("score", 0.0), reverse=True)
         return results[:max_results]
-
-    async def _get_entry_temporal_fields(self, file_path: str) -> tuple:
-        """Extract valid_from and valid_until from a memory file's frontmatter.
-
-        Args:
-            file_path: Relative path to the memory file (e.g., "bank/obs-123.md")
-
-        Returns:
-            Tuple of (valid_from, valid_until) as datetime objects or None if not present.
-        """
-        import yaml
-        from datetime import datetime, UTC
-
-        full_path = self.workspace_dir / file_path
-        if not full_path.exists():
-            return None, None
-
-        try:
-            content = full_path.read_text()
-            # Extract YAML frontmatter
-            if content.startswith("---"):
-                parts = content.split("---", 2)
-                if len(parts) >= 3:
-                    frontmatter = yaml.safe_load(parts[1]) or {}
-                    vf = frontmatter.get("valid_from")
-                    vu = frontmatter.get("valid_until")
-                    vf_dt = datetime.fromisoformat(vf) if vf else None
-                    vu_dt = datetime.fromisoformat(vu) if vu else None
-                    return vf_dt, vu_dt
-        except Exception:
-            pass
-        return None, None
 
     async def get_memory_context(self, query: str, max_results: int = 5) -> str:
         """Format recall results as a context string for prompt injection.
 
         Includes source citations in the format 'Source: bank/filename.md'.
+        Parent memories are prefixed with '[Parent Memory]'.
         Uses async search to avoid blocking the event loop.
         """
-        results = await self.index.search(query, max_results=max_results)
+        results = await self.recall(query, max_results=max_results)
         if not results:
             return ""
 
@@ -180,7 +184,9 @@ class HybridMemoryManager:
             source = r.get("file", "unknown")
             content = r.get("content", "").strip()
             score = r.get("score", 0)
-            lines.append(f"Source: {source} (score: {score:.2f})")
+            origin = r.get("origin", "")
+            prefix = "[Parent Memory] " if origin == "parent" else ""
+            lines.append(f"{prefix}Source: {source} (score: {score:.2f})")
             lines.append(f"{content}\n")
 
         return "\n".join(lines)
@@ -200,9 +206,121 @@ class HybridMemoryManager:
     def close(self):
         """Close the memory manager and clean up resources.
 
-        Closes the database connections in the underlying index.
+        Closes the database connections in the underlying index
+        and the parent index if one is configured.
         """
         self.index.close()
+        if self._parent_index is not None:
+            self._parent_index.close()
+            self._parent_index = None
+
+    def inherit_from(self, parent_dir: str | Path) -> None:
+        """Configure this manager to inherit memories from a parent workspace.
+
+        Validates the parent directory, checks it contains a valid memory index,
+        and ensures it is not the same as the own workspace directory.
+
+        Args:
+            parent_dir: Path to the parent workspace directory containing
+                ``.memory/index.sqlite``.
+
+        Raises:
+            FileNotFoundError: If parent_dir does not exist or lacks a memory index.
+            ValueError: If parent_dir resolves to the same path as workspace_dir.
+        """
+        resolved_path = Path(parent_dir).resolve()
+
+        # Validate path exists
+        if not resolved_path.exists():
+            raise FileNotFoundError(
+                f"Parent memory directory does not exist: {resolved_path}"
+            )
+
+        # Validate it contains a memory index
+        index_path = resolved_path / ".memory" / "index.sqlite"
+        if not index_path.exists():
+            raise FileNotFoundError(
+                f"Parent memory directory missing index: {index_path}"
+            )
+
+        # Prevent self-inheritance
+        if resolved_path == self.workspace_dir.resolve():
+            raise ValueError(
+                "Cannot inherit from own workspace: "
+                f"{resolved_path} == {self.workspace_dir}"
+            )
+
+        # Close previous parent index if replacing
+        if self._parent_index is not None:
+            self._parent_index.close()
+
+        self.parent_memory_dir = resolved_path
+        self._parent_index = HybridMemoryIndex(str(resolved_path))
+        logger.info("Configured parent memory inheritance from %s", resolved_path)
+
+    def promote_to_parent(
+        self, filter_fn=None
+    ) -> int:
+        """Copy selected markdown memories from own bank/ to parent's bank/.
+
+        Uses file-based locking for concurrency safety. After copying,
+        re-indexes the parent index for the new files.
+
+        Args:
+            filter_fn: Optional callable that takes a Path and returns True
+                for files that should be promoted. If None, all ``*.md`` files
+                in ``bank/`` are promoted.
+
+        Returns:
+            Number of memory files promoted.
+        """
+        if self.parent_memory_dir is None:
+            logger.warning("No parent memory directory configured — nothing to promote")
+            return 0
+
+        own_bank = self.workspace_dir / "bank"
+        if not own_bank.exists():
+            return 0
+
+        parent_bank = self.parent_memory_dir / "bank"
+        parent_bank.mkdir(parents=True, exist_ok=True)
+
+        lock_path = self.workspace_dir / ".memory" / "promote.lock"
+
+        return self._promote_with_lock(own_bank, parent_bank, lock_path, filter_fn)
+
+    def _promote_with_lock(
+        self,
+        own_bank: Path,
+        parent_bank: Path,
+        lock_path: Path,
+        filter_fn,
+    ) -> int:
+        """Acquire file lock and perform the actual promotion."""
+        lock_path.parent.mkdir(parents=True, exist_ok=True)
+        count = 0
+
+        with open(lock_path, "w") as lf:
+            fcntl.flock(lf, fcntl.LOCK_EX)
+            try:
+                for md_file in sorted(own_bank.glob("*.md")):
+                    if filter_fn is not None and not filter_fn(md_file):
+                        continue
+                    dest = parent_bank / md_file.name
+                    shutil.copy2(md_file, dest)
+                    count += 1
+
+                # Re-index parent for new files
+                if count > 0 and self._parent_index is not None and self.parent_memory_dir is not None:
+                    for md_file in parent_bank.glob("*.md"):
+                        rel = md_file.relative_to(self.parent_memory_dir)
+                        self._parent_index.index_file(str(rel))
+            finally:
+                fcntl.flock(lf, fcntl.LOCK_UN)
+
+        if count:
+            logger.info("Promoted %d memories to parent %s", count, self.parent_memory_dir)
+        return count
 
     async def _get_entry_temporal_fields(self, file_path: str) -> tuple:
         """Extract valid_from and valid_until from a memory file's frontmatter.
@@ -213,8 +331,9 @@ class HybridMemoryManager:
         Returns:
             Tuple of (valid_from, valid_until) as datetime objects or None if not present.
         """
+        from datetime import datetime
+
         import yaml
-        from datetime import datetime, UTC
 
         full_path = self.workspace_dir / file_path
         if not full_path.exists():
@@ -224,8 +343,12 @@ class HybridMemoryManager:
             content = full_path.read_text()
             # Extract YAML frontmatter
             if content.startswith("---"):
+                import yaml
+
                 parts = content.split("---", 2)
                 if len(parts) >= 3:
+                    import yaml
+
                     frontmatter = yaml.safe_load(parts[1]) or {}
                     vf = frontmatter.get("valid_from")
                     vu = frontmatter.get("valid_until")
