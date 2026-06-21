@@ -81,6 +81,10 @@ class AgentConfig(BaseModel):
     compaction_tier2_model: str = Field(default="", description="Model for tier-2 LLM summarization; empty string uses the current agent model")
     # Dream cycle
     dream_cycle_interval: int = Field(default=20, ge=1, description="Number of turns between automatic dream cycle consolidations")
+    # NATS distributed memory
+    nats_memory_enabled: bool = Field(default=False, description="Enable NATS-based distributed memory sharing across workers")
+    nats_memory_subject_prefix: str = Field(default="nexus.memory", description="NATS subject prefix for memory events")
+    nats_memory_filter_own_events: bool = Field(default=True, description="Filter out own session's memory events when receiving from NATS")
     # Image input settings
     max_image_size_mb: int = Field(default=10, ge=1, le=50)
     supported_image_types: list[str] = Field(

@@ -10,6 +10,7 @@ import logging
 import shutil
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 from nexusagent.memory.extraction import MemoryExtractor
 from nexusagent.memory.memory_files import FileMemory
@@ -48,10 +49,22 @@ class HybridMemoryManager:
         if parent_memory_dir is not None:
             self.parent_memory_dir = Path(parent_memory_dir)
 
+        # NATS distributed memory bus (optional)
+        self._nats_memory_bus: Any = None
+
         # Extraction queue — bounded to prevent unbounded growth
         self._extraction_queue: asyncio.Queue = asyncio.Queue(maxsize=_MAX_EXTRACTION_QUEUE)
         self._extractor = MemoryExtractor()
         self._turn_count: int = 0
+
+    def set_nats_memory_bus(self, nats_memory_bus: Any) -> None:
+        """Set the NATS memory bus for publishing memory events.
+
+        Args:
+            nats_memory_bus: A NatsMemoryBus instance configured with
+                             the worker's NATS client and session ID.
+        """
+        self._nats_memory_bus = nats_memory_bus
 
     def initialize(self) -> None:
         """Initialize the file memory layer."""
@@ -102,6 +115,21 @@ class HybridMemoryManager:
         # Index the file that was just written — async with Gemini embeddings
         rel_path = str(filepath).replace(str(self.workspace_dir), "").lstrip("/")
         await self.index.async_index_file(rel_path)
+
+        # Publish to NATS if enabled (fire-and-forget)
+        if self._nats_memory_bus is not None:
+            try:
+                await self._nats_memory_bus.publish_remember(
+                    content=content,
+                    memory_type=type,
+                    description=description,
+                    confidence=confidence,
+                    entities=entities,
+                    source_path=rel_path,
+                )
+            except Exception as exc:
+                logger.warning("Failed to publish memory to NATS: %s", exc)
+
         return filepath
 
     async def recall(
