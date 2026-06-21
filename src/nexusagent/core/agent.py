@@ -13,7 +13,8 @@ from typing import Any
 from deepagents import create_deep_agent
 
 # Run registration (populates _REGISTRY)
-import nexusagent.tools.register_all  # noqa: F401
+from nexusagent.tools.register_all import register_all
+register_all()
 from nexusagent.infrastructure.config import settings
 
 # Import tool modules
@@ -297,7 +298,29 @@ def run_agent_task(state: dict) -> dict:
         if custom_prompt:
             state["_system_prompt"] = custom_prompt
 
-        result = agent(state)
+        # Build proper agent state with messages list
+        from langchain_core.messages import HumanMessage, SystemMessage
+
+        messages: list = []
+
+        # Add system prompts first
+        system_parts = []
+        if custom_prompt:
+            system_parts.append(custom_prompt)
+        if state.get("_nexus_prompt"):
+            system_parts.append(state["_nexus_prompt"])
+        if state.get("environment_context"):
+            system_parts.append(state["environment_context"])
+
+        if system_parts:
+            messages.append(SystemMessage(content="\n\n".join(system_parts)))
+
+        # Add the user message (the task)
+        messages.append(HumanMessage(content=task_desc))
+
+        # AgentState expects a dict with "messages" key
+        agent_state = {"messages": messages}
+        result = agent(agent_state)
         return {"result": result, "success": True}
     except Exception as e:
         logger = logging.getLogger(__name__)
