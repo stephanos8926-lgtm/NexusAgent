@@ -85,6 +85,10 @@ class AgentConfig(BaseModel):
     nats_memory_enabled: bool = Field(default=False, description="Enable NATS-based distributed memory sharing across workers")
     nats_memory_subject_prefix: str = Field(default="nexus.memory", description="NATS subject prefix for memory events")
     nats_memory_filter_own_events: bool = Field(default=True, description="Filter out own session's memory events when receiving from NATS")
+    # LLM memory extraction
+    llm_extraction_enabled: bool = Field(default=False, description="Enable LLM-powered memory extraction (replaces regex-based)")
+    llm_extraction_model: str = Field(default="", description="Model for LLM extraction; empty string uses the current agent model")
+    llm_extraction_min_confidence: float = Field(default=0.5, ge=0.0, le=1.0, description="Minimum confidence threshold for LLM-extracted facts")
     # Image input settings
     max_image_size_mb: int = Field(default=10, ge=1, le=50)
     supported_image_types: list[str] = Field(

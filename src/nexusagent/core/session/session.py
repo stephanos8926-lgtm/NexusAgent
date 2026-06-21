@@ -47,6 +47,7 @@ class Session:
         memory_dir: str | Path | None = None,
         injected_memories: list[str] | None = None,
         parent_memory_dir: str | Path | None = None,
+        llm_call: Any = None,
     ) -> None:
         """Initialize a new interactive session.
 
@@ -62,6 +63,9 @@ class Session:
                 SystemMessages during agent calls.
             parent_memory_dir: Optional path to a parent workspace whose memory
                 index this session should inherit from.
+            llm_call: Optional async callable for LLM invocations.
+                      Signature: async (system: str, user: str, **kwargs) -> str
+                      Used for LLM-powered memory extraction when enabled.
         """
         self.session_id = session_id
         self.working_dir = working_dir
@@ -82,6 +86,13 @@ class Session:
             parent_memory_dir=parent_memory_dir,
         )
         self.hybrid_memory.initialize()
+
+        # LLM extraction (optional)
+        self._llm_call = llm_call
+        self._llm_extractor = None
+        if llm_call is not None:
+            from nexusagent.memory.llm_extraction import LLMExtractor
+            self._llm_extractor = LLMExtractor(llm_call=llm_call)
 
         if self.parent_memory_dir is not None:
             self.hybrid_memory.inherit_from(self.parent_memory_dir)
@@ -451,8 +462,19 @@ class Session:
             task.cancel()
 
     async def _run_extraction(self, text: str) -> None:
-        """Run regex extraction and store results as observation memories."""
-        results = self._extractor.extract(text)
+        """Run memory extraction and store results as observation memories.
+
+        Uses LLM extraction when llm_call is configured and enabled,
+        otherwise falls back to regex-based extraction.
+        """
+        # Choose extractor
+        extractor = self._llm_extractor if self._llm_extractor is not None else self._extractor
+
+        if self._llm_extractor is not None:
+            results = await self._llm_extractor.extract(text)
+        else:
+            results = self._extractor.extract(text)
+
         for result in results:
             try:
                 await self.hybrid_memory.remember(
