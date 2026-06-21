@@ -149,23 +149,13 @@ def _handle_tool_call_event(app, event: dict) -> None:
         app: The NexusApp instance.
         event: The tool_call event dict.
     """
-    from nexusagent.interfaces.tui_formatters import format_arg_value, truncate
-
     tool = event.get("tool", "?")
     args = event.get("args", {})
     app._last_tool_name = tool
 
-    if isinstance(args, dict):
-        args_display = ", ".join(
-            f"{k}={truncate(format_arg_value(v), 60)}"
-            for k, v in args.items()
-        )
-    else:
-        args_display = truncate(format_arg_value(args), 80)
-
     msg = ToolCallMessage(
         tool=tool,
-        args=args_display,
+        args=args,
         status="running",
     )
     app._current_tool = msg

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import Any
 
-from textual.content import Content
 from textual.widgets import Markdown, Static
 
 
@@ -44,12 +43,12 @@ class AssistantMessage(Static):
     async def append_token(self, token: str) -> None:
         """Append a streaming token — renders as plain text during stream."""
         self._buffer += token
-        self.app.call_next(self._render_streaming)
-
-    def _render_streaming(self) -> None:
-        """Render buffer as plain text while streaming (fast path)."""
+        # Direct update without call_next — call_next schedules for the next
+        # Textual message pump which may not run if we're in a tight async loop.
+        # update() with plain string is thread-safe and triggers immediate render.
+        # Using string instead of Content() ensures CSS text-wrap: wrap is respected.
         if not self._finalized:
-            self.update(Content(self._buffer))
+            self.update(self._buffer)
 
     def finalize(self, content: str) -> None:
         """Swap to a Markdown widget for full rich rendering."""
@@ -62,7 +61,7 @@ class AssistantMessage(Static):
             self.mount(md)
         except Exception:
             # Fallback: plain text if Markdown widget fails
-            self.update(Content(content))
+            self.update(content)
 
     def render(self) -> Content:
         """Render the buffered content as plain text.
@@ -70,4 +69,5 @@ class AssistantMessage(Static):
         Returns:
             Content wrapping the current buffer string.
         """
+        from textual.content import Content
         return Content(self._buffer)

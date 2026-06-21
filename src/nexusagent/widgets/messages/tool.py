@@ -73,7 +73,7 @@ class ToolCallMessage(Static):
     def __init__(
         self,
         tool: str,
-        args: str,
+        args: str | dict,
         output: str = "",
         status: str = "running",
         **kwargs: Any,
@@ -82,14 +82,15 @@ class ToolCallMessage(Static):
 
         Args:
             tool: Name of the tool that was called.
-            args: Stringified arguments passed to the tool.
+            args: Arguments passed to the tool (dict or string).
             output: Initial output text (may be empty for streaming).
             status: One of STATUS_RUNNING, STATUS_SUCCESS, STATUS_FAILED.
             **kwargs: Additional keyword arguments passed to Static.
         """
         super().__init__(**kwargs)
         self._tool = tool
-        self._args = args
+        # Store raw args for formatting
+        self._args_raw = args
         self._output = output
         self._status = status
         # Determine if output should be collapsed by default
@@ -102,19 +103,25 @@ class ToolCallMessage(Static):
         line_count = len(_NEWLINE_RE.findall(output))
         return line_count >= _COLLAPSE_LINE_THRESHOLD or len(output) >= _COLLAPSE_CHAR_THRESHOLD
 
-    def _format_args(self, raw_args: str) -> str:
+    def _format_args(self) -> str:
         """Pretty-print args if they look like JSON, otherwise return as-is."""
-        stripped = raw_args.strip()
+        # Handle dict args — pretty-print as JSON
+        if isinstance(self._args_raw, dict):
+            try:
+                return json.dumps(self._args_raw, indent=None, ensure_ascii=False)
+            except (json.JSONDecodeError, ValueError):
+                return str(self._args_raw)
+        # Handle string args — try to parse as JSON
+        stripped = str(self._args_raw).strip()
         if not stripped:
             return ""
-        # Try to parse as JSON for pretty-printing
         if stripped.startswith(("{", "[")):
             try:
                 parsed = json.loads(stripped)
                 return json.dumps(parsed, indent=None, ensure_ascii=False)
             except (json.JSONDecodeError, ValueError):
                 pass
-        return raw_args
+        return stripped
 
     def _detect_code(self, text: str) -> bool:
         """Return True if the output contains code blocks or inline code."""
@@ -176,7 +183,7 @@ class ToolCallMessage(Static):
         icon = self._STATUS_ICONS.get(self._status, "⚙")
         style = self._STATUS_STYLES.get(self._status, "bold warning")
 
-        formatted_args = self._format_args(self._args)
+        formatted_args = self._format_args()
         header = f"{icon} {self._tool}({formatted_args})"
 
         if not self._output:
