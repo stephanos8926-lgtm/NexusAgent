@@ -117,10 +117,11 @@ async def handle_event(app, event: dict) -> None:
         process_next_in_queue(app)
         app.status_bar.set_status("Ready")
         app._current_tool = None
-        # Auto-scroll to bottom after response
+        # Auto-scroll to bottom after response — use call_later because
+        # layout dimensions haven't updated yet when widgets were just mounted
         try:
             chat = app.query_one("#chat")
-            chat.scroll_end(animate=False)
+            app.call_later(chat.scroll_end, animate=False)
         except Exception:
             pass
 
