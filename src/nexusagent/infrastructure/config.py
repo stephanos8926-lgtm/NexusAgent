@@ -97,6 +97,7 @@ class AgentConfig(BaseModel):
     """Agent runtime configuration (model, provider, tools, compaction, images)."""
 
     default_model: str = Field(default="gemini-2.5-flash")
+    primary_provider: str = Field(default="gemini", description="LLM provider: 'gemini' or 'openrouter'")
     # Primary model for Gemini provider (used when provider is "gemini")
     gemini_model: str = Field(default="gemini-2.5-flash")
     openrouter_default_model: str = Field(default="openrouter/auto")
@@ -333,3 +334,13 @@ def load_config(config_file: str | None = None) -> ConfigSchema:
 
 # Singleton settings instance
 settings = load_config()
+
+
+def reload_settings() -> ConfigSchema:
+    """Reload settings from config files and environment variables.
+    
+    Use this after modifying config files to pick up changes without restarting.
+    """
+    global settings
+    settings = load_config()
+    return settings
