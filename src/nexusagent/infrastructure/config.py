@@ -100,7 +100,7 @@ class AgentConfig(BaseModel):
     primary_provider: str = Field(default="gemini", description="LLM provider: 'gemini' or 'openrouter'")
     # Primary model for Gemini provider (used when provider is "gemini")
     gemini_model: str = Field(default="gemini-2.5-flash")
-    openrouter_default_model: str = Field(default="google/gemini-2.5-flash-preview")
+    openrouter_default_model: str = Field(default="openrouter/owl-alpha")
     openrouter_override_model: str | None = None
     enabled_tools: list[str] = Field(
         default_factory=lambda: ["read_file", "write_file", "run_shell"]
@@ -122,12 +122,12 @@ class AgentConfig(BaseModel):
     # Dream cycle
     dream_cycle_interval: int = Field(default=20, ge=1, description="Number of turns between automatic dream cycle consolidations")
     # NATS distributed memory
-    nats_memory_enabled: bool = Field(default=False, description="Enable NATS-based distributed memory sharing across workers")
+    nats_memory_enabled: bool = Field(default=True, description="Enable NATS-based distributed memory sharing across workers")
     nats_memory_subject_prefix: str = Field(default="nexus.memory", description="NATS subject prefix for memory events")
     nats_memory_filter_own_events: bool = Field(default=True, description="Filter out own session's memory events when receiving from NATS")
     # LLM memory extraction
-    llm_extraction_enabled: bool = Field(default=False, description="Enable LLM-powered memory extraction (replaces regex-based)")
-    llm_extraction_model: str = Field(default="", description="Model for LLM extraction; empty string uses the current agent model")
+    llm_extraction_enabled: bool = Field(default=True, description="Enable LLM-powered memory extraction (replaces regex-based)")
+    llm_extraction_model: str = Field(default="gemini-2.5-flash", description="Model for LLM extraction; empty string uses the current agent model")
     llm_extraction_min_confidence: float = Field(default=0.5, ge=0.0, le=1.0, description="Minimum confidence threshold for LLM-extracted facts")
     # Image input settings
     max_image_size_mb: int = Field(default=10, ge=1, le=50)

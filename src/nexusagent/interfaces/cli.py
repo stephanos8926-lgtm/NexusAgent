@@ -570,5 +570,26 @@ def memory_stats(workspace):
     click.echo("=" * 60)
 
 
+@main.command()
+@click.option("--host", default="0.0.0.0", help="Bind host (default: 0.0.0.0)")
+@click.option("--port", default=8000, type=int, help="Bind port (default: 8000)")
+@click.option("--reload", is_flag=True, default=False, help="Enable auto-reload (dev mode)")
+def server(host, port, reload):
+    """Start the NexusAgent server.
+
+    Example:
+        nexus server
+        nexus server --port 9000 --reload
+    """
+    import uvicorn
+
+    from nexusagent.server.server import app
+
+    click.echo(f"Starting NexusAgent server on {host}:{port}")
+    if reload:
+        click.echo("Auto-reload enabled (dev mode)")
+    uvicorn.run(app, host=host, port=port, reload=reload)
+
+
 if __name__ == "__main__":
     main()
