@@ -226,8 +226,46 @@ class Agent:
         # Get tools for this role
         tools = _ROLE_TOOLS.get(role, _ROLE_TOOLS["full"])
 
+        # Build the chat model explicitly with a request timeout + retry
+        # policy, rather than handing create_deep_agent a bare model string.
+        # A bare string goes through deepagents.resolve_model() ->
+        # init_chat_model() with provider defaults — which, for several
+        # providers including the OpenAI-compatible client OpenRouter uses,
+        # means NO timeout at all. A slow or hung free-tier endpoint then
+        # blocks the entire turn indefinitely with no exception ever raised,
+        # which is what causes sessions to silently stall with nothing
+        # surfaced to the user.
+        #
+        # We still go through deepagents' own apply_provider_profile() so
+        # provider-specific behavior (OpenAI Responses API defaults,
+        # OpenRouter app-attribution headers, version checks) is preserved —
+        # we're only layering timeout/max_retries on top, not replacing
+        # deepagents' provider resolution.
+        try:
+            from langchain.chat_models import init_chat_model
+            from deepagents.profiles.provider.provider_profiles import apply_provider_profile
+
+            init_kwargs = apply_provider_profile(
+                model_name,
+                {
+                    "timeout": settings.agent.llm_request_timeout,
+                    "max_retries": settings.agent.llm_max_retries,
+                },
+            )
+            model = init_chat_model(model_name, **init_kwargs)
+        except Exception:
+            # Fall back to the bare string if a given provider/model
+            # combination rejects timeout/max_retries kwargs — better to
+            # run without the safety net than fail agent construction.
+            logging.getLogger(__name__).warning(
+                "init_chat_model rejected timeout/max_retries for %r; "
+                "falling back to unbounded model string", model_name,
+                exc_info=True,
+            )
+            model = model_name
+
         self._inner = create_deep_agent(
-            model=model_name,
+            model=model,
             tools=tools,
         )
         self._role = role
@@ -345,9 +383,10 @@ def _setup_workspace_context(working_dir: str) -> None:
     import os
     from pathlib import Path
 
-    if not working_dir or working_dir == ".":
+    if not working_dir:
         return
 
+    # Resolve "." and relative paths to absolute
     working_dir = str(Path(working_dir).resolve())
 
     # 1. Set path jail

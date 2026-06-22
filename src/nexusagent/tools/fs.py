@@ -14,7 +14,6 @@ from pathlib import Path
 # Shared utilities from fs_base (single source of truth)
 from nexusagent.tools.fs_base import (
     _DEFAULT_DIR_EXCLUDES,
-    _WORKSPACE_ROOT,  # noqa: F401 — re-exported for backward compatibility
     _check_read,
     _get_read_files,
     _resolve,
@@ -22,9 +21,23 @@ from nexusagent.tools.fs_base import (
     reset_read_tracking,
     set_workspace_root,  # noqa: F401 — re-exported for backward compatibility
 )
+from nexusagent.tools import fs_base as _fs_base
+
 
 # Re-export edit_file from the editor subpackage for backward compatibility
 from nexusagent.tools.editor import edit_file  # noqa: F401
+
+
+def __getattr__(name: str):
+    """PEP 562 re-export of _WORKSPACE_ROOT — see fs_base.__getattr__.
+
+    Not a static import: _WORKSPACE_ROOT now lives in a per-task
+    ContextVar, so this must delegate live rather than freeze a
+    snapshot taken at fs.py's import time.
+    """
+    if name == "_WORKSPACE_ROOT":
+        return _fs_base._workspace_root_var.get()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def read_file(path: str, offset: int = 1, limit: int | None = None) -> str:

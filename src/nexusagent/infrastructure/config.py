@@ -137,6 +137,20 @@ class AgentConfig(BaseModel):
     supported_image_types: list[str] = Field(
         default_factory=lambda: [".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp"]
     )
+    # LLM request resilience — without these, create_deep_agent's bare model
+    # string goes through init_chat_model() with provider defaults, which for
+    # several providers (including OpenRouter's OpenAI-compatible client) is
+    # NO timeout at all. A slow/hanging free-tier endpoint then blocks the
+    # entire turn indefinitely with no exception ever raised, leaving the
+    # session stalled with nothing surfaced to the user.
+    llm_request_timeout: float = Field(
+        default=90.0, gt=0,
+        description="Max seconds to wait for an agent LLM response before raising TimeoutError",
+    )
+    llm_max_retries: int = Field(
+        default=2, ge=0,
+        description="Number of automatic retries on transient LLM request failures",
+    )
 
 
 class PromptConfig(BaseModel):

@@ -31,20 +31,32 @@ _DEFAULT_DIR_EXCLUDES = frozenset(
     }
 )
 
-# Workspace root — all file operations are jailed to this directory
-_WORKSPACE_ROOT: Path | None = None
+# Workspace root — all file operations are jailed to this directory.
+#
+# MUST be a ContextVar, not a plain global. WorkerPool runs up to
+# `max_workers` subagents concurrently in the same process via
+# asyncio.create_task() (see core/worker/pool.py). A plain global here
+# means whichever concurrent worker calls set_workspace_root() last wins
+# for *every* task in the process — including the main interactive
+# session — causing ls/glob to silently jail to the wrong directory and
+# legitimate paths to trip the traversal guard. ContextVar is copied at
+# task-creation boundaries, so each asyncio task gets its own isolated
+# value and writes never leak across concurrent workers.
+_workspace_root_var: contextvars.ContextVar[Path | None] = contextvars.ContextVar(
+    "workspace_root", default=None
+)
 
 
 def set_workspace_root(path: str) -> None:
-    """Set the workspace root directory for path jail."""
-    global _WORKSPACE_ROOT
-    _WORKSPACE_ROOT = Path(path).resolve()
+    """Set the workspace root directory for path jail (current task only)."""
+    _workspace_root_var.set(Path(path).resolve())
 
 
 def _get_workspace_root() -> Path:
-    """Get the workspace root, defaulting to CWD if not set."""
-    if _WORKSPACE_ROOT is not None:
-        return _WORKSPACE_ROOT
+    """Get the workspace root for the current task, defaulting to CWD if unset."""
+    root = _workspace_root_var.get()
+    if root is not None:
+        return root
     return Path.cwd().resolve()
 
 
@@ -89,3 +101,16 @@ def get_read_files() -> list[str]:
 def reset_read_tracking() -> None:
     """Reset the read-file tracking. Use when starting a new task/session."""
     _get_read_files().clear()
+
+
+def __getattr__(name: str):
+    """PEP 562 module-level dynamic attribute access.
+
+    Preserves backward compatibility for ``from fs_base import _WORKSPACE_ROOT``
+    (and the re-export in fs.py) now that the value lives in a ContextVar
+    rather than a plain global. Always returns the *current* task's value
+    instead of a stale snapshot.
+    """
+    if name == "_WORKSPACE_ROOT":
+        return _workspace_root_var.get()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
