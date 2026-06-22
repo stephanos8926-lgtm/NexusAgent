@@ -1,5 +1,9 @@
 """Tests for the LangGraph research workflow."""
 
+import asyncio
+
+import pytest
+
 from nexusagent.core.graph import create_research_graph, route_after_execute
 
 
@@ -42,11 +46,11 @@ class TestGraphConstruction:
 
     def test_create_research_graph_compiles(self):
         """Graph should compile without errors."""
-        graph = create_research_graph()
+        graph = asyncio.run(create_research_graph())
         assert graph is not None
 
     def test_create_research_graph_with_db(self, tmp_path):
         """Graph should compile with a real DB path."""
         db_path = str(tmp_path / "test_checkpoints.db")
-        graph = create_research_graph(db_path=db_path)
+        graph = asyncio.run(create_research_graph(db_path=db_path))
         assert graph is not None

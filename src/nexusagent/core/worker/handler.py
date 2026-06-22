@@ -116,7 +116,7 @@ async def _run_research_workflow(task: TaskSchema, working_dir: str = ".") -> st
     if working_dir and working_dir != ".":
         set_workspace_root(working_dir)
 
-    graph = create_research_graph()
+    graph = await create_research_graph()
     config = {"configurable": {"thread_id": task.id}}
 
     initial_state = {

@@ -202,7 +202,7 @@ def route_after_execute(state: dict) -> str:
     return "execute"
 
 
-def create_research_graph(db_path: str | None = None) -> Any:
+async def create_research_graph(db_path: str | None = None) -> Any:
     """Build and compile the research state machine.
 
     Args:
@@ -234,15 +234,12 @@ def create_research_graph(db_path: str | None = None) -> Any:
     # Synthesize → END
     workflow.add_edge("synthesize", END)
 
-    # Set up checkpointing — async-safe
+    # Set up async checkpointing for durable research workflows
     try:
         from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
-        async_conn = AsyncSqliteSaver.from_conn_string(db_path or ":memory:")
-        # from_conn_string returns an async context manager; we need to enter it
-        # Since graph creation is sync, we skip persistent checkpointing
-        # and compile without a checkpointer
-        logger.info("aiosqlite available — using in-memory checkpointing")
-        graph = workflow.compile()
+        async with AsyncSqliteSaver.from_conn_string(db_path or ":memory:") as memory:
+            await memory.setup()
+            graph = workflow.compile(checkpointer=memory)
     except (ImportError, AttributeError):
         logger.info("aiosqlite not available — running without checkpointing")
         graph = workflow.compile()
