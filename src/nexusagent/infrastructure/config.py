@@ -103,7 +103,7 @@ class AgentConfig(BaseModel):
     gemini_model: str = Field(default="gemini-2.5-flash")
     # Gemini API key (optional, defaults to GEMINI_API_KEY env var if not set)
     gemini_api_key: str | None = Field(default=None, description="Gemini API key (overrides GEMINI_API_KEY env var)")
-    openrouter_default_model: str = Field(default="openrouter/owl-alpha")
+    openrouter_default_model: str = Field(default="google/gemini-2.5-flash-preview")
     openrouter_override_model: str | None = None
     enabled_tools: list[str] = Field(
         default_factory=lambda: ["read_file", "write_file", "run_shell"]
