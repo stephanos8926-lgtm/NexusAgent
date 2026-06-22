@@ -105,7 +105,13 @@ class ToolCallMessage(Static):
 
     def _format_args(self) -> str:
         """Pretty-print args if they look like JSON, otherwise return as-is."""
-        # Handle dict args — pretty-print as JSON
+        # Special formatting for memory tools — show description instead of raw JSON
+        if self._tool.startswith("memory_") and isinstance(self._args_raw, dict):
+            desc = self._args_raw.get("description") or self._args_raw.get("content", "")
+            if desc:
+                return desc[:60] + ("..." if len(desc) > 60 else "")
+            return self._tool
+        # Handle dict args — pretty-print as compact JSON
         if isinstance(self._args_raw, dict):
             try:
                 return json.dumps(self._args_raw, indent=None, ensure_ascii=False)
