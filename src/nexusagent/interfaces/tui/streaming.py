@@ -101,19 +101,29 @@ async def handle_event(app, event: dict) -> None:
     elif etype == "response":
         content = event.get("content", "")
         if app._current_assistant:
-            from nexusagent.interfaces.tui_formatters import render_markdown
-            final = render_markdown(content) if content else None
+            # Pass raw content to AssistantMessage — it uses Textual Markdown widget
+            final = content if content else None
             if final:
                 app._current_assistant.finalize(final)
             app._current_assistant = None
         elif content:
-            from nexusagent.interfaces.tui_formatters import render_markdown
             from nexusagent.widgets.messages import AssistantMessage
             msg = AssistantMessage()
-            msg.finalize(render_markdown(content))
+            msg.finalize(content)
             _mount_with_limit(app, msg)
 
         app._busy = False
+        app.status_bar.set_spinner(False)
+        process_next_in_queue(app)
+        app.status_bar.set_status("Ready")
+        app._current_tool = None
+        # Auto-scroll to bottom after response
+        try:
+            chat = app.query_one("#chat")
+            chat.scroll_end(animate=False)
+        except Exception:
+            pass
+
         app._request_count += 1
         tokens = event.get("tokens_used", 0)
         if tokens:
@@ -125,7 +135,8 @@ async def handle_event(app, event: dict) -> None:
             app._context_used = ctx_used
             app._context_limit = ctx_limit
             app.status_bar.set_context(ctx_used, ctx_limit)
-
+        app._busy = False
+        app.status_bar.set_spinner(False)
         process_next_in_queue(app)
         app.status_bar.set_status("Ready")
         app._current_tool = None
@@ -134,12 +145,14 @@ async def handle_event(app, event: dict) -> None:
         message = event.get("message", "Unknown error")
         _mount_error(app, message)
         app._busy = False
+        app.status_bar.set_spinner(False)
         process_next_in_queue(app)
         app.status_bar.set_status("Error")
 
     elif etype == "session_closed":
         app.status_bar.set_status("Disconnected")
         app._busy = False
+        app.status_bar.set_spinner(False)
         app._ws = None
 
     elif etype == "session_list":

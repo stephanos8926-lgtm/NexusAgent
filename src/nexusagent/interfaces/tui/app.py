@@ -101,7 +101,8 @@ class NexusApp(App):
     }
     #messages {
         layout: stream;
-        height: auto;
+        height: 1fr;
+        min-height: 0;
     }
     #input-area {
         height: auto;

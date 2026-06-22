@@ -56,10 +56,11 @@ class AssistantMessage(Static):
             return  # Guard against double-finalize
         self._buffer = content
         self._finalized = True
-        # Replace our plain-text content with a mounted Markdown widget
+        # Clear the Static content before mounting Markdown
         self.update("")
         try:
-            md = Markdown(content)
+            from textual.widgets import Markdown as TextualMarkdown
+            md = TextualMarkdown(content)
             self.mount(md)
         except Exception:
             # Fallback: plain text if Markdown widget fails
