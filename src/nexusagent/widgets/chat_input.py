@@ -235,7 +235,7 @@ class ChatInput(TextArea):
         self._update_hint()
 
         # Notify parent
-        self.post_message(self.Submitted(text, images))
+        self.post_message(self.Submitted(text, images, input_widget=self))
 
     def action_cancel(self) -> None:
         """Cancel current input."""
@@ -301,25 +301,18 @@ class ChatInput(TextArea):
     class Submitted(TextArea.Changed):
         """Message posted when input is submitted."""
 
-        # NOTE: We extend TextArea.Changed only to reuse Textual's message routing.
-        # The `text` and `images` attributes below are the only fields callers
-        # should use; the inherited Changed state is irrelevant.
         BUBBLE = True
 
-        def __init__(self, text: str, images: list[str]) -> None:
+        def __init__(self, text: str, images: list[str], input_widget: Any = None) -> None:
             """Initialize a Submitted message.
-
-            Bypasses the TextArea.Changed contract by calling
-            Message.__init__ directly.
 
             Args:
                 text: The submitted message text.
                 images: List of image paths/URLs extracted from the text.
+                input_widget: Reference to the ChatInput widget (for clearing).
             """
-            # TextArea.Changed requires a TextArea instance; pass None and let
-            # Textual set `control` via the normal message routing machinery.
-            # We call Message.__init__ directly to avoid the Changed contract.
             from textual.message import Message
             Message.__init__(self)
             self.text = text
             self.images = images
+            self.input = input_widget

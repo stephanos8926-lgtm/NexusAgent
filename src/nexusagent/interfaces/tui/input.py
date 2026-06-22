@@ -29,7 +29,8 @@ async def on_chat_input_submitted(app, event) -> None:
         return
 
     if message.startswith("/"):
-        event.input.value = ""
+        if event.input is not None:
+            event.input.value = ""
         await handle_slash_command(app, message)
         return
 
