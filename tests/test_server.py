@@ -1,12 +1,47 @@
 """Tests for NexusAgent API endpoints."""
 
+import tempfile
+
 import pytest
 from httpx import ASGITransport, AsyncClient
 
 from nexusagent.server.server import app
 
-# All non-health endpoints require X-API-Key
-API_HEADERS = {"X-API-Key": "test-key"}
+# Use a unique test key per test to avoid auth state leakage
+_TEST_API_KEY = "test-server-key-2026"
+
+
+@pytest.fixture(autouse=True)
+def _setup_test_auth():
+    """Ensure auth manager is initialized with the test key before each test."""
+    import secrets as _secrets
+    from pathlib import Path as _Path
+    from nexusagent.infrastructure.auth import AuthManager, set_auth_manager
+
+    _test_dir = tempfile.mkdtemp()
+    _master = _Path(_test_dir) / ".master.secret"
+    _salt = _Path(_test_dir) / ".master.salt"
+    _keystore = _Path(_test_dir) / "keystore.json"
+
+    _master.write_bytes(b"test-master-secret-for-tests")
+    _salt.write_bytes(_secrets.token_bytes(16))
+
+    _auth = AuthManager()
+    _auth.master_secret_path = _master
+    _auth.salt_path = _salt
+    _auth.keystore_path = _keystore
+    _auth.initialize_wizard(force=True)
+    _auth.save_key("api", _TEST_API_KEY)
+    set_auth_manager(_auth)
+
+    yield
+
+    # Cleanup
+    import shutil
+    shutil.rmtree(_test_dir, ignore_errors=True)
+
+
+API_HEADERS = {"X-API-Key": _TEST_API_KEY}
 
 
 @pytest.mark.asyncio
