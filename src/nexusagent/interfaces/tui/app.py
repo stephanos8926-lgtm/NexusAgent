@@ -98,11 +98,11 @@ class NexusApp(App):
         height: 1fr;
         padding: 0 1;
         background: $background;
+        overflow-y: scroll;
     }
     #messages {
         layout: stream;
-        height: 1fr;
-        min-height: 0;
+        height: auto;
     }
     #input-area {
         height: auto;
@@ -224,6 +224,13 @@ class NexusApp(App):
         """Show welcome banner at top of message stream (scrolls away as chat grows)."""
         welcome = WelcomeBanner(session_id=self.session_id)
         self._mount_message(welcome)
+        # Show connection error as a hint (not as a message widget)
+        if getattr(self, "_connection_error", None):
+            from nexusagent.widgets.messages import AppMessage
+            hint = AppMessage(
+                f"⚠ {self._connection_error} Start the server with: nexusagent.server"
+            )
+            self._mount_message(hint)
 
     # ── SIGWINCH (responsive resize) ────────────────────────────────────
 
