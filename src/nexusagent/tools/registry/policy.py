@@ -194,9 +194,9 @@ def _is_tool_allowed(tool_name: str) -> tuple[bool, str]:
     from .core import _REGISTRY
 
     ctx = _get_ctx()
-    role = ctx.role
-    policy = ctx.policy
-    unlocked = ctx.unlocked
+    role = ctx["role"]
+    policy = ctx["policy"]
+    unlocked = ctx["unlocked"]
 
     manifest = get_manifest(role)
 

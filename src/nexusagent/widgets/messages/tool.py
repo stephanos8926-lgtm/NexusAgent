@@ -186,7 +186,12 @@ class ToolCallMessage(Static):
     def toggle_collapse(self) -> None:
         """Toggle the collapsed state of the output."""
         self._collapsed = not self._collapsed
+        # Force layout recalculation by clearing cached height
+        self.styles.height = None
         self.refresh()
+        # Schedule a layout refresh on the parent to reflow
+        if self.parent is not None:
+            self.parent.refresh()
 
     def on_click(self) -> None:
         """Click anywhere on the widget to toggle output collapse."""

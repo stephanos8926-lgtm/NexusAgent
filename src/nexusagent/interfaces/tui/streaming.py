@@ -58,10 +58,11 @@ async def handle_event(app, event: dict) -> None:
 
     elif etype == "thinking":
         content = event.get("content", "")
-        if content and content != "Processing...":
-            thinking = AppMessage(message=content)
-            _mount_with_limit(app, thinking)
-            app.status_bar.set_status("Thinking...")
+        # Show thinking as a visible message widget in the chat
+        thinking_msg = AppMessage(message=f"💭 {content}")
+        _mount_with_limit(app, thinking_msg)
+        app.status_bar.set_status("Thinking...")
+        app._thinking_visible = True
 
     elif etype == "tool_call":
         _handle_tool_call_event(app, event)

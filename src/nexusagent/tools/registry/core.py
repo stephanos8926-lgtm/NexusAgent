@@ -110,11 +110,11 @@ def auto_correct(tool_name: str, kwargs: dict[str, Any] | None = None) -> str:
     if tool_name not in _REGISTRY:
         # Fuzzy match within available tools
         ctx = _get_ctx()
-        manifest = get_manifest(ctx.role)
-        if ctx.policy == "strict":
+        manifest = get_manifest(ctx["role"])
+        if ctx["policy"] == "strict":
             available = {n: _REGISTRY[n] for n in manifest if n in _REGISTRY}
         else:
-            available = {n: _REGISTRY[n] for n in (manifest | ctx.unlocked) if n in _REGISTRY}
+            available = {n: _REGISTRY[n] for n in (manifest | ctx["unlocked"]) if n in _REGISTRY}
 
         for cutoff in [0.5, 0.4, 0.3]:
             close = difflib.get_close_matches(tool_name, available.keys(), n=3, cutoff=cutoff)
