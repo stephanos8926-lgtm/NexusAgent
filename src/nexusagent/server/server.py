@@ -6,7 +6,7 @@ import logging
 import time
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, WebSocket
 
 from nexusagent.infrastructure.bus import get_bus
 from nexusagent.infrastructure.config import settings
@@ -72,7 +72,7 @@ def create_app() -> FastAPI:
 
     # Register WebSocket endpoint
     @app.websocket("/sessions/{session_id}/ws")
-    async def ws_endpoint(websocket, session_id: str):
+    async def ws_endpoint(websocket: WebSocket, session_id: str):
         await session_websocket(websocket, session_id)
 
     return app
@@ -93,6 +93,7 @@ def run(reload: bool = False) -> None:
         reload=settings.server.reload,
         ssl_certfile=settings.server.tls_certfile if settings.server.tls_enabled else None,
         ssl_keyfile=settings.server.tls_keyfile if settings.server.tls_enabled else None,
+        ws="websockets",
     )
 
 

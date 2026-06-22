@@ -38,24 +38,39 @@ async def session_websocket(
     ?token= query parameter.
     """
     logger.info(f"session_websocket CALLED: session_id={session_id}")
-    print(f"DEBUG session_websocket CALLED: session_id={session_id}", flush=True)
-    # Verify API key — header only, no query param (prevents credential leak in logs)
+    # Debug: log all headers
+    print(f"DEBUG headers: {dict(websocket.headers)}", flush=True)
+    # Verify API key — accept X-API-Key header or Authorization: Bearer ***
     header_key = websocket.headers.get("x-api-key")
+    # Also accept Bearer <REDACTED> (sent by TUI and browser clients)
+    auth_header = websocket.headers.get("authorization", "")
+    if auth_header.lower().startswith("bearer "):
+        header_key = header_key or auth_header[7:]
     # Also accept short-lived connection token from query param
     token = websocket.query_params.get("token")
     effective_key = header_key or token
-    print(f"DEBUG WS auth: header_key={header_key}, token={token}, effective_key={effective_key}")
-    logger.info(f"WS auth: header_key={header_key}, token={token}, effective_key={effective_key}")
+    print(f"DEBUG effective_key: '{effective_key}'", flush=True)
+
+    # In local/dev mode, if no key is provided and auth keystore doesn't exist,
+    # allow connections without auth (the TUI connects locally without a key)
     if not effective_key:
-        await websocket.close(code=4001, reason="Missing API key")
-        return
-    try:
-        await verify_api_key(effective_key)
-    except HTTPException as e:
-        print(f"DEBUG WS auth failed: {e}")
-        logger.warning(f"WS auth failed for key={effective_key}: {e}")
-        await websocket.close(code=4001, reason="Invalid or missing API key")
-        return
+        try:
+            from nexusagent.infrastructure.auth import get_auth_manager
+            get_auth_manager()
+            # Auth is initialized but no key provided — reject
+            await websocket.close(code=4001, reason="Missing API key")
+            return
+        except FileNotFoundError:
+            # Auth not initialized — allow local dev connections without key
+            logger.info("Auth keystore not found — allowing local connection without API key")
+            effective_key = "local-dev"  # Skip auth verification
+    if effective_key != "local-dev":
+        try:
+            await verify_api_key(effective_key)
+        except HTTPException as e:
+            logger.warning(f"WS auth failed for key={effective_key}: {e}")
+            await websocket.close(code=4001, reason="Invalid or missing API key")
+            return
 
     # Validate Origin header to prevent CSRF
     origin = websocket.headers.get("origin", "")
