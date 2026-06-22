@@ -27,7 +27,8 @@ def _mount_with_limit(app, widget) -> None:
     if hasattr(app, "_mount_message"):
         app._mount_message(widget)
     else:
-        _mount_with_limit(app, widget)
+        # Fallback: direct mount with manual sliding window cleanup
+        app.messages_container.mount(widget)
         children = list(app.messages_container.children)
         while len(children) > _STREAMING_MAX_WIDGETS:
             oldest = children.pop(0)
@@ -140,6 +141,30 @@ async def handle_event(app, event: dict) -> None:
         app.status_bar.set_status("Disconnected")
         app._busy = False
         app._ws = None
+
+    elif etype == "session_list":
+        sessions = event.get("sessions", [])
+        if sessions:
+            lines = [f"Active Sessions ({len(sessions)})"]
+            for s in sessions[:10]:
+                sid = s.get("id", "?")[:12]
+                status = s.get("status", "?")
+                lines.append(f"  {sid}... [{status}]")
+            msg = AppMessage("\n".join(lines))
+            _mount_with_limit(app, msg)
+
+    elif etype == "compact_result":
+        status = event.get("status", "unknown")
+        if status == "ok":
+            summary = event.get("summary", "")[:100]
+            msg = AppMessage(f"Compaction complete. {summary}")
+            app.status_bar.set_status("Compaction done")
+        else:
+            error = event.get("error", "Unknown error")
+            msg = AppMessage(f"Compaction failed: {error}")
+            app.status_bar.set_status("Compaction failed")
+        _mount_with_limit(app, msg)
+        app._busy = False
 
 
 def _handle_tool_call_event(app, event: dict) -> None:
@@ -263,6 +288,10 @@ async def handle_slash_command(app, cmd: str) -> bool:
         return True
     if command in ("/new", "/n"):
         app.messages_container.clear()
+        app._current_assistant = None
+        app._current_tool = None
+        app._seen_tool_calls.clear()
+        app._seen_tool_results.clear()
         app._show_greeting()
         return True
     if command == "/clear":

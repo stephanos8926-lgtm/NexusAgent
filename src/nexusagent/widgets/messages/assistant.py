@@ -52,6 +52,8 @@ class AssistantMessage(Static):
 
     def finalize(self, content: str) -> None:
         """Swap to a Markdown widget for full rich rendering."""
+        if self._finalized:
+            return  # Guard against double-finalize
         self._buffer = content
         self._finalized = True
         # Replace our plain-text content with a mounted Markdown widget

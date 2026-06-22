@@ -8,6 +8,7 @@ Handles:
 from __future__ import annotations
 
 from nexusagent.interfaces.tui.streaming import (  # noqa: I001
+    _mount_with_limit,
     handle_slash_command,
     update_queue_status,
 )
@@ -37,14 +38,14 @@ async def on_chat_input_submitted(app, event) -> None:
     if app._busy:
         app._pending_inputs.append(message)
         msg = AppMessage(f"Queued: {message}")
-        app.messages_container.mount(msg)
+        _mount_with_limit(app, msg)
         update_queue_status(app)
-        event.input.value = ""
+        if event.input is not None:
+            event.input.value = ""
         return
-
     app._busy = True
     user_msg = UserMessage(content=message)
-    app.messages_container.mount(user_msg)
+    _mount_with_limit(app, user_msg)
     app.chat_input.text = ""
     app.status_bar.set_status("Thinking...")
     app.status_bar.set_spinner(True)

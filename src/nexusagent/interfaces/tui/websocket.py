@@ -105,9 +105,10 @@ async def ws_loop(app) -> None:
     api_key = settings.client.api_key
     ws_url = f"ws://127.0.0.1:{settings.server.api_port}/sessions/{app.session_id}/ws"
     # Pass working_dir as query param for workspace-scoped memory
-    if app.working_dir and app.working_dir != ".":
+    working_dir = getattr(app, "working_dir", None) or "."
+    if working_dir != ".":
         from urllib.parse import quote as _quote
-        ws_url += f"?working_dir={_quote(app.working_dir, safe='')}"
+        ws_url += f"?working_dir={_quote(working_dir, safe='')}"
     extra_headers: dict[str, str] = {}
     if api_key:
         extra_headers["Authorization"] = f"Bearer {api_key}"
@@ -135,7 +136,10 @@ async def ws_loop(app) -> None:
                         msg = await app._input_queue.get()
                         if msg is None:
                             break
-                        await ws.send(json.dumps({"type": "user_input", "content": msg}))
+                        try:
+                            await ws.send(json.dumps({"type": "user_input", "content": msg}))
+                        except Exception:
+                            break
 
                 async def receive_events():
                     from nexusagent.interfaces.tui.streaming import handle_event
@@ -144,7 +148,10 @@ async def ws_loop(app) -> None:
                             event = json.loads(raw)
                         except json.JSONDecodeError:
                             continue
-                        await handle_event(app, event)
+                        try:
+                            await handle_event(app, event)
+                        except Exception as exc:
+                            logger.warning("handle_event failed for %s: %s", event.get("type"), exc)
 
                 await asyncio.gather(send_messages(), receive_events())
                 # Clean close — no retry needed
@@ -164,6 +171,7 @@ async def ws_loop(app) -> None:
 
         except websockets.exceptions.ConnectionClosedOK:
             app.status_bar.set_status("Disconnected")
+            app._busy = False
             return
 
         except websockets.exceptions.ConnectionClosedError as e:
@@ -172,6 +180,7 @@ async def ws_loop(app) -> None:
             if remaining == 0:
                 app.status_bar.set_status("Connection lost")
                 _mount_error(app, f"Connection lost: {e}")
+                app._busy = False
                 return
             app.status_bar.set_status(f"Reconnecting ({remaining} left)…")
             await asyncio.sleep(delay)
