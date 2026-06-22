@@ -96,9 +96,9 @@ class AuthConfig(BaseModel):
 class AgentConfig(BaseModel):
     """Agent runtime configuration (model, provider, tools, compaction, images)."""
 
-    default_model: str = Field(default="gemini-3.1-flash-lite")
-    primary_provider: str = Field(default="gemini")
-    gemini_model: str = Field(default="gemini-3.1-flash-lite")
+    default_model: str = Field(default="gemini-2.5-flash")
+    # Primary model for Gemini provider (used when provider is "gemini")
+    gemini_model: str = Field(default="gemini-2.5-flash")
     openrouter_default_model: str = Field(default="openrouter/auto")
     openrouter_override_model: str | None = None
     enabled_tools: list[str] = Field(

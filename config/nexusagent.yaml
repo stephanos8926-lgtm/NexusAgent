@@ -9,7 +9,7 @@ client:
   retry_limit: 3
 
 agent:
-  default_model: "gemma-4-31b-it"
+  default_model: "gemini-2.5-flash"
   primary_provider: "gemini"
   max_tool_output_chars: 400
   max_conversation_history: 40
