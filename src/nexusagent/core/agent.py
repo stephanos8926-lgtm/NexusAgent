@@ -247,6 +247,11 @@ class Agent:
         """Invoke the inner deepagents agent with the given arguments."""
         return self._inner.invoke(*args, **kwargs)
 
+    async def astream(self, *args: Any, **kwargs: Any) -> Any:
+        """Stream tokens from the inner deepagents agent."""
+        async for chunk in self._inner.astream(*args, **kwargs):
+            yield chunk
+
 
 def run_agent_task(state: dict) -> dict:
     """Process a task through the agent.
