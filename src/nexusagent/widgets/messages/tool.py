@@ -104,29 +104,42 @@ class ToolCallMessage(Static):
         return line_count >= _COLLAPSE_LINE_THRESHOLD or len(output) >= _COLLAPSE_CHAR_THRESHOLD
 
     def _format_args(self) -> str:
-        """Pretty-print args if they look like JSON, otherwise return as-is."""
-        # Special formatting for memory tools — show description instead of raw JSON
+        """Pretty-print args for display — human-readable, not raw JSON."""
+        # Special formatting for memory tools — show description
         if self._tool.startswith("memory_") and isinstance(self._args_raw, dict):
             desc = self._args_raw.get("description") or self._args_raw.get("content", "")
             if desc:
                 return desc[:60] + ("..." if len(desc) > 60 else "")
             return self._tool
-        # Handle dict args — pretty-print as compact JSON
+        # Handle dict args — show as key=value pairs
         if isinstance(self._args_raw, dict):
-            try:
-                return json.dumps(self._args_raw, indent=None, ensure_ascii=False)
-            except (json.JSONDecodeError, ValueError):
-                return str(self._args_raw)
-        # Handle string args — try to parse as JSON
+            parts = []
+            for k, v in self._args_raw.items():
+                v_str = str(v)
+                if len(v_str) > 80:
+                    v_str = v_str[:77] + "..."
+                parts.append(f"{k}={v_str}")
+            return ", ".join(parts)
+        # Handle string args — try to parse as JSON for pretty-printing
         stripped = str(self._args_raw).strip()
         if not stripped:
             return ""
         if stripped.startswith(("{", "[")):
             try:
                 parsed = json.loads(stripped)
-                return json.dumps(parsed, indent=None, ensure_ascii=False)
+                if isinstance(parsed, dict):
+                    parts = []
+                    for k, v in parsed.items():
+                        v_str = str(v)
+                        if len(v_str) > 80:
+                            v_str = v_str[:77] + "..."
+                        parts.append(f"{k}={v_str}")
+                    return ", ".join(parts)
             except (json.JSONDecodeError, ValueError):
                 pass
+        # Plain string — return as-is
+        if len(stripped) > 120:
+            return stripped[:117] + "..."
         return stripped
 
     def _detect_code(self, text: str) -> bool:

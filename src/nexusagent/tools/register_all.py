@@ -314,12 +314,25 @@ async def spawn_subagent(
     returns="str — the user's response",
 )
 def ask_user(question: str, options: list[str] | None = None) -> str:
-    """Ask the user a question. Returns their response or a fallback."""
+    """Ask the user a question. In TUI mode, pauses for user input.
+    
+    Returns the user's response, or a fallback if non-interactive.
+    """
+    # Check if we're running in TUI mode (event loop available)
+    try:
+        import asyncio
+        loop = asyncio.get_running_loop()
+        # We're in an async context — this is the TUI
+        # Return a signal that the TUI will handle via push_screen_wait
+        return f"__ASK_USER__{question}__OPTIONS__{','.join(options or [])}__"
+    except RuntimeError:
+        pass
+    
+    # Non-interactive fallback
     if options:
-        opt_str = ", ".join(options)
         return (
             f"[ask_user] {question}\n"
-            f"Options: {opt_str}\n"
+            f"Options: {', '.join(options)}\n"
             f"[No interactive session — returning default: {options[0]}]"
         )
     return f"[ask_user] {question}\n[No interactive session — please respond in the TUI]"
