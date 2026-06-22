@@ -33,10 +33,11 @@ class LLMProvider:
     Handles routing between Gemini and OpenRouter using official SDKs.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the LLM provider with configured API keys and model settings."""
-        # Gemini Setup
-        self.gemini_key = os.environ.get("GEMINI_API_KEY")
+        # Prefer project settings over environment variables (Hermes loads
+        # its own .env which may contain a different GEMINI_API_KEY for Gemma)
+        self.gemini_key = settings.gemini_api_key or os.environ.get("GEMINI_API_KEY")
         if self.gemini_key:
             genai.configure(api_key=self.gemini_key)
 

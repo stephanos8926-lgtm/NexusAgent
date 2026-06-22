@@ -45,7 +45,8 @@ def _load_dotenv() -> None:
                 key, _, value = line.partition("=")
                 key = key.strip()
                 value = value.strip().strip('"').strip("'")
-                if key and value and key not in os.environ:
+                if key and value:
+                    # Always override: project .env should win over parent env
                     os.environ[key] = value
         except Exception as exc:
             logger.debug("Failed to load %s: %s", env_path, exc)
@@ -100,6 +101,8 @@ class AgentConfig(BaseModel):
     primary_provider: str = Field(default="gemini", description="LLM provider: 'gemini' or 'openrouter'")
     # Primary model for Gemini provider (used when provider is "gemini")
     gemini_model: str = Field(default="gemini-2.5-flash")
+    # Gemini API key (optional, defaults to GEMINI_API_KEY env var if not set)
+    gemini_api_key: str | None = Field(default=None, description="Gemini API key (overrides GEMINI_API_KEY env var)")
     openrouter_default_model: str = Field(default="openrouter/owl-alpha")
     openrouter_override_model: str | None = None
     enabled_tools: list[str] = Field(
