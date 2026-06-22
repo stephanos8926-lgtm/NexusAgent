@@ -100,7 +100,7 @@ class AgentConfig(BaseModel):
     primary_provider: str = Field(default="gemini", description="LLM provider: 'gemini' or 'openrouter'")
     # Primary model for Gemini provider (used when provider is "gemini")
     gemini_model: str = Field(default="gemini-2.5-flash")
-    openrouter_default_model: str = Field(default="openrouter/auto")
+    openrouter_default_model: str = Field(default="google/gemini-2.5-flash-preview")
     openrouter_override_model: str | None = None
     enabled_tools: list[str] = Field(
         default_factory=lambda: ["read_file", "write_file", "run_shell"]

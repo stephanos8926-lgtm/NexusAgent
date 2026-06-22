@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
 import difflib
+import functools
 from collections.abc import Callable
 from typing import Any
 
@@ -22,19 +24,41 @@ def register_tool(
     returns: str = "",
     requires: str = "",
 ) -> Callable:
-    """Decorator to register a tool in the global registry."""
+    """Decorator to register a tool in the global registry.
+
+    Async functions are wrapped to ensure results are awaited before returning
+    to the agent framework (prevents coroutine object display in TUI).
+    """
 
     def decorator(func: Callable) -> Callable:
-        _REGISTRY[name] = ToolInfo(
-            name=name,
-            func=func,
-            description=description,
-            parameters=parameters,
-            example=example,
-            category=category,
-            returns=returns,
-            requires=requires,
-        )
+        if asyncio.iscoroutinefunction(func):
+            # Wrap async functions to ensure the agent framework gets
+            # the actual result, not the coroutine object.
+            @functools.wraps(func)
+            async def async_wrapper(*args, **kwargs):
+                return await func(*args, **kwargs)
+
+            _REGISTRY[name] = ToolInfo(
+                name=name,
+                func=async_wrapper,
+                description=description,
+                parameters=parameters,
+                example=example,
+                category=category,
+                returns=returns,
+                requires=requires,
+            )
+        else:
+            _REGISTRY[name] = ToolInfo(
+                name=name,
+                func=func,
+                description=description,
+                parameters=parameters,
+                example=example,
+                category=category,
+                returns=returns,
+                requires=requires,
+            )
         return func
 
     return decorator
