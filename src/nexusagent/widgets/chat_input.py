@@ -188,21 +188,25 @@ class ChatInput(TextArea):
     def on_key(self, event: KeyEvent) -> None:
         """Intercept Enter before TextArea's internal handler.
 
-        TextArea._on_key() inserts '\\n' on Enter and stops the event,
-        preventing our Binding("enter", "submit") from ever firing.
-        We handle Enter/Shift+Enter here instead.
+        TextArea handles keys internally via its _on_key method.
+        We intercept Enter/Shift+Enter here and delegate the rest.
         """
-        if event.key == "enter" and not event.shift:
+        if event.key == "enter":
             # Submit on Enter (without Shift)
-            event.stop()
-            event.prevent_default()
-            self.action_submit()
-        elif event.key == "enter" and event.shift:
-            # Allow newline on Shift+Enter (let TextArea handle it)
-            pass
-        else:
-            # Delegate everything else to TextArea
-            super().on_key(event)
+            # NOTE: Textual's Key event doesn't have a .shift attribute;
+            # Shift+Enter is identified by the key name "shift+enter"
+            if event.is_printable:
+                # Printable Enter = Shift+Enter in Textual
+                pass
+            else:
+                event.stop()
+                event.prevent_default()
+                self.action_submit()
+        # For all other keys, let TextArea handle via its internal method
+        # NOTE: TextArea doesn't expose on_key in newer Textual versions,
+        # so we call the internal _on_key directly.
+        elif hasattr(self, "_on_key"):
+            self._on_key(event)
 
     def action_submit(self) -> None:
         """Submit the current input."""
