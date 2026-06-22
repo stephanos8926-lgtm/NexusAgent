@@ -56,20 +56,11 @@ async def check_server_version(app) -> bool:
     """
     data = await app._fetch_server_version()
     if data is None:
-        from nexusagent.widgets.messages import AppMessage
-        msg = AppMessage("⚠ Server unreachable. Retrying…")
-        app.messages_container.mount(msg)
-        logger.warning("Version check failed: server unreachable")
+        logger.warning("Version check failed: server unreachable (will retry via WebSocket)")
         return False
 
     server_ver = data.get("version", "unknown")
     if not is_compatible(server_ver, CLIENT_VERSION):
-        from nexusagent.widgets.messages import AppMessage
-        msg = AppMessage(
-            f"⚠ Version mismatch: server={server_ver} "
-            f"client={CLIENT_VERSION}. Consider upgrading."
-        )
-        app.messages_container.mount(msg)
         logger.warning(
             "Version mismatch: server=%s client=%s",
             server_ver, CLIENT_VERSION,
@@ -162,8 +153,7 @@ async def ws_loop(app) -> None:
             remaining = max_retries - attempt - 1
             if remaining == 0:
                 app.status_bar.set_status("Connection refused")
-                _mount_error(app, f"Cannot connect to server at port {settings.server.api_port} "
-                                  f"after {max_retries} attempts.")
+                app._connection_error = f"Cannot connect to server at port {settings.server.api_port}. Is the server running?"
                 return
             app.status_bar.set_status(f"Reconnecting ({remaining} left)…")
             await asyncio.sleep(delay)
@@ -179,7 +169,7 @@ async def ws_loop(app) -> None:
             remaining = max_retries - attempt - 1
             if remaining == 0:
                 app.status_bar.set_status("Connection lost")
-                _mount_error(app, f"Connection lost: {e}")
+                app._connection_error = f"Connection lost: {e}"
                 app._busy = False
                 return
             app.status_bar.set_status(f"Reconnecting ({remaining} left)…")
