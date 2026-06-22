@@ -35,9 +35,15 @@ class LLMProvider:
 
     def __init__(self) -> None:
         """Initialize the LLM provider with configured API keys and model settings."""
+        # Reload settings to get the latest config (avoids stale singleton)
+        import importlib
+        import nexusagent.infrastructure.config as _cfg
+        importlib.reload(_cfg)
+        _settings = _cfg.settings
+
         # Prefer project settings over environment variables (Hermes loads
         # its own .env which may contain a different GEMINI_API_KEY for Gemma)
-        self.gemini_key = settings.gemini_api_key or os.environ.get("GEMINI_API_KEY")
+        self.gemini_key = _settings.agent.gemini_api_key or os.environ.get("GEMINI_API_KEY")
         if self.gemini_key:
             genai.configure(api_key=self.gemini_key)
 

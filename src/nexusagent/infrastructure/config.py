@@ -298,8 +298,26 @@ def load_config(config_file: str | None = None) -> ConfigSchema:
     if "log_level" in raw_data and "logging" not in raw_data:
         raw_data.setdefault("logging", {})["level"] = raw_data["log_level"]
 
-    # Global overrides (NEXUS_SERVER__API_PORT etc.)
+    # Layer 4: Environment variable overrides (highest priority)
+    # Map known env vars to config fields
+    env_overrides: dict = {}
+    _env_mapping = {
+        "GEMINI_API_KEY": "gemini_api_key",
+        "OPENROUTER_API_KEY": None,  # Not a config field, just env var
+        "EXA_API_KEY": None,
+        "TAVILY_API_KEY": None,
+    }
+    for env_key, config_field in _env_mapping.items():
+        val = os.environ.get(env_key)
+        if val and config_field:
+            # These fields belong to the agent section
+            env_overrides.setdefault("agent", {})[config_field] = val
+
+    # Also load NEXUS_* env vars (existing pattern)
     override_from_env("NEXUS_", raw_data, raw_data)
+
+    # Apply env overrides on top (deep merge)
+    raw_data = _deep_merge(raw_data, env_overrides)
 
     # Coerce tui_responsive_enabled from string env var
     _resp = raw_data.get("client", {}).get("tui_responsive_enabled")
