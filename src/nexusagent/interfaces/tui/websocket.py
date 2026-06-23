@@ -163,15 +163,19 @@ async def ws_loop(app) -> None:
         except websockets.exceptions.ConnectionClosedOK:
             app.status_bar.set_status("Disconnected")
             app._busy = False
+            app._current_assistant = None
+            app._current_tool = None
             return
 
         except websockets.exceptions.ConnectionClosedError as e:
             delay = base_delay * (2 ** attempt)
             remaining = max_retries - attempt - 1
+            app._busy = False
+            app._current_assistant = None
+            app._current_tool = None
             if remaining == 0:
                 app.status_bar.set_status("Connection lost")
                 app._connection_error = f"Connection lost: {e}"
-                app._busy = False
                 return
             app.status_bar.set_status(f"Reconnecting ({remaining} left)…")
             await asyncio.sleep(delay)
@@ -179,6 +183,9 @@ async def ws_loop(app) -> None:
 
         except Exception as e:
             app.status_bar.set_status("Error")
+            app._busy = False
+            app._current_assistant = None
+            app._current_tool = None
             _mount_error(app, f"Error: {e}")
             return
 
@@ -187,12 +194,8 @@ async def ws_loop(app) -> None:
 
 
 def _mount_error(app, message: str) -> None:
-    """Mount an error message in the TUI.
-
-    Args:
-        app: The NexusApp instance.
-        message: The error message to display.
-    """
+    """Mount an error message in the TUI with sliding window enforcement."""
     from nexusagent.widgets.messages import ErrorMessage
+    from nexusagent.interfaces.tui.streaming import _mount_with_limit
     err = ErrorMessage(message=message)
-    app.messages_container.mount(err)
+    _mount_with_limit(app, err)

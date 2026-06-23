@@ -81,17 +81,23 @@ async def handle_event(app, event: dict) -> None:
         app.status_bar.set_status(f"Error in {tool}")
 
     elif etype == "approval_request":
-        tool = event.get("tool", "?")
-        args = event.get("args", {})
         call_id = event.get("call_id", "")
-        app.status_bar.set_status("Awaiting approval...")
-        from nexusagent.interfaces.tui_widgets import ApprovalModal
-        approved = await app.push_screen_wait(
-            ApprovalModal(tool, args, call_id)
-        )
-        from nexusagent.interfaces.tui.websocket import send_approval
-        await send_approval(app, call_id, approved)
-        app.status_bar.set_status("Ready")
+        if app._auto_approve:
+            # Auto-approve: skip the modal, send approval directly
+            from nexusagent.interfaces.tui.websocket import send_approval
+            await send_approval(app, call_id, True)
+            app.status_bar.set_status("Ready")
+        else:
+            tool = event.get("tool", "?")
+            args = event.get("args", {})
+            app.status_bar.set_status("Awaiting approval...")
+            from nexusagent.interfaces.tui_widgets import ApprovalModal
+            approved = await app.push_screen_wait(
+                ApprovalModal(tool, args, call_id)
+            )
+            from nexusagent.interfaces.tui.websocket import send_approval
+            await send_approval(app, call_id, approved)
+            app.status_bar.set_status("Ready")
 
     elif etype == "response_chunk":
         content = event.get("content", "")
@@ -314,6 +320,8 @@ async def handle_slash_command(app, cmd: str) -> bool:
         return True
     if command == "/clear":
         app.messages_container.clear()
+        app._current_assistant = None
+        app._current_tool = None
         app._show_greeting()
         return True
     if command in ("/expand", "/e"):

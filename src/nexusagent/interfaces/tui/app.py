@@ -135,6 +135,7 @@ class NexusApp(App):
         self._yolo_default = yolo
         self._busy = False
         self._pending_inputs: list[str] = []
+        self._pending_inputs_max = 100  # Prevent memory exhaustion from spam
         self._current_assistant: AssistantMessage | None = None
         self._current_tool: ToolCallMessage | None = None
         self._theme_name = "nexus-dark"
@@ -166,7 +167,7 @@ class NexusApp(App):
 
     def on_mount(self) -> None:
         """Set up the TUI on mount: initialize queues, widgets, and start WebSocket loop."""
-        self._input_queue: asyncio.Queue[str | None] = asyncio.Queue()
+        self._input_queue: asyncio.Queue[str | None] = asyncio.Queue(maxsize=100)
         self._ws: websockets.WebSocketClientProtocol | None = None
         self._ws_task: asyncio.Task | None = None
         self._auto_approve_task: asyncio.Task | None = None
