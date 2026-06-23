@@ -4,8 +4,7 @@ Verifies that all global singletons support get_X/set_X injection
 for testability, and that backward-compatible aliases work.
 """
 
-import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 
 def test_worker_pool_injection():
@@ -14,7 +13,6 @@ def test_worker_pool_injection():
         WorkerPool,
         get_worker_pool,
         set_worker_pool,
-        worker_pool,
     )
 
     # get_worker_pool returns a WorkerPool instance
@@ -40,7 +38,6 @@ def test_worker_injection():
         NexusWorker,
         get_worker,
         set_worker,
-        worker,
     )
 
     w = get_worker()
@@ -62,7 +59,6 @@ def test_auth_manager_injection():
         AuthManager,
         get_auth_manager,
         set_auth_manager,
-        auth_manager,
     )
 
     am = get_auth_manager()
@@ -84,7 +80,6 @@ def test_db_manager_injection():
         DatabaseManager,
         get_db_manager,
         set_db_manager,
-        db_manager,
     )
 
     dm = get_db_manager()
@@ -106,7 +101,6 @@ def test_session_manager_injection():
         SessionManager,
         get_session_manager,
         set_session_manager,
-        session_manager,
     )
 
     sm = get_session_manager()
@@ -128,7 +122,6 @@ def test_deep_research_orchestrator_injection():
         DeepResearchOrchestrator,
         get_deep_research_orchestrator,
         set_deep_research_orchestrator,
-        deep_research_orchestrator,
     )
 
     o = get_deep_research_orchestrator()
@@ -146,11 +139,11 @@ def test_deep_research_orchestrator_injection():
 
 def test_backward_compat_aliases():
     """Backward-compatible aliases return the same instances."""
-    from nexusagent.core.worker import worker, worker_pool
+    from nexusagent.core.orchestration import deep_research_orchestrator
     from nexusagent.core.session import session_manager
+    from nexusagent.core.worker import worker, worker_pool
     from nexusagent.infrastructure.auth import auth_manager
     from nexusagent.infrastructure.db import db_manager
-    from nexusagent.core.orchestration import deep_research_orchestrator
 
     # These should all be real instances (not None)
     assert worker is not None

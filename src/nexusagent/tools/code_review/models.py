@@ -25,7 +25,7 @@ _SEVERITY_ICON = {
     SEVERITY_HIGH: "🟠",
     SEVERITY_MEDIUM: "🟡",
     SEVERITY_LOW: "🔵",
-    SEVERITY_INFO: "ℹ️",
+    SEVERITY_INFO: "ℹ️",  # noqa: RUF001
 }
 
 

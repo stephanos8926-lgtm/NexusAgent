@@ -71,7 +71,7 @@ async def register_mcp_tools() -> list[str]:
         return registered
 
     try:
-        import httpx
+        import httpx  # noqa: F401 — used below for MCP tool loading
     except ImportError:
         logger.warning("httpx not installed — MCP tool loading skipped")
         return registered
@@ -780,7 +780,8 @@ def memory_update(
         return f"File not found: {path}"
 
     # Read existing file to preserve frontmatter if needed
-    existing_content = open(full_path).read()
+    with open(full_path) as _f:
+        existing_content = _f.read()
     existing_fm = {}
 
     # Parse existing frontmatter
@@ -882,7 +883,8 @@ def memory_list(
             continue
         filepath = os.path.join(bank_dir, md_file)
         try:
-            content = open(filepath).read()
+            with open(filepath) as _f:
+                content = _f.read()
         except OSError:
             continue
 
@@ -985,7 +987,8 @@ def memory_prune(
         rel_path = f"bank/{md_file}"
 
         try:
-            content = open(filepath).read()
+            with open(filepath) as _f:
+                content = _f.read()
         except OSError:
             continue
 

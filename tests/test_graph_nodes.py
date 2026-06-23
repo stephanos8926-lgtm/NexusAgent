@@ -5,7 +5,6 @@ Each test patches the DeepResearchOrchestrator methods to isolate graph logic.
 """
 
 import sys
-import unittest.mock as mock
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
@@ -22,10 +21,8 @@ from nexusagent.core.graph import (
 from nexusagent.core.orchestration import (
     DeepResearchOrchestrator,
     ResearchPlan,
-    ResearchState,
     SearchResult,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers

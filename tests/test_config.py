@@ -34,8 +34,9 @@ def test_agent_memory_workspace_default():
 
 
 def test_agent_memory_workspace_from_yaml(tmp_path):
-    from nexusagent.infrastructure.config import load_config
     from unittest.mock import patch
+
+    from nexusagent.infrastructure.config import load_config
 
     config_file = tmp_path / "nexusagent.yaml"
     config_file.write_text("agent:\n  memory_workspace: /tmp/my_workspace")
@@ -46,8 +47,9 @@ def test_agent_memory_workspace_from_yaml(tmp_path):
 
 
 def test_agent_memory_workspace_from_env(tmp_path, monkeypatch):
-    from nexusagent.infrastructure.config import load_config
     from unittest.mock import patch
+
+    from nexusagent.infrastructure.config import load_config
 
     config_file = tmp_path / "nexusagent.yaml"
     config_file.write_text("agent:\n  default_model: gemini-3.1-flash-lite")

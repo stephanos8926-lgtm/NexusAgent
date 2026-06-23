@@ -11,8 +11,8 @@ from __future__ import annotations
 
 from nexusagent.tools.code_review import review_code
 from nexusagent.tools.code_search import find_references, find_symbol, search_code
+from nexusagent.tools.editor import edit_file
 from nexusagent.tools.fs import (
-    edit_file,
     list_directory,
     read_file,
     read_multiple_files,

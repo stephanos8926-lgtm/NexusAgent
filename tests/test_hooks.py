@@ -2,11 +2,8 @@
 """Tests for the NexusAgent hooks system."""
 
 import asyncio
-import json
 import os
-import tempfile
-from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -16,10 +13,9 @@ from nexusagent.hooks import (
     HookRegistration,
     get_hook_manager,
     register_hook,
-    run_hooks,
     reset_hook_manager,
+    run_hooks,
 )
-
 
 # ── Fixtures ────────────────────────────────────────────────────────────────
 

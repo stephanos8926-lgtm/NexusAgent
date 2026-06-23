@@ -13,8 +13,8 @@ from __future__ import annotations
 import asyncio  # Re-exported for test patching (test_worker_pool patches worker.asyncio.sleep)
 
 from nexusagent.core.worker.handler import (
-    _agent_breaker,
-    _nats_breaker,
+    _agent_breaker,  # noqa: F401 — exported for test patching
+    _nats_breaker,  # noqa: F401 — exported for test patching
     _run_agent_task,
     _run_research_workflow,
 )

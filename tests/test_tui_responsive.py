@@ -15,8 +15,6 @@ from __future__ import annotations
 import os
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from nexusagent.infrastructure.config import ClientConfig, ConfigSchema, load_config
 from nexusagent.interfaces.tui import (
     NO_COLOR,
@@ -26,7 +24,6 @@ from nexusagent.interfaces.tui import (
     debounce_resize,
     is_no_color,
 )
-
 
 # ---------------------------------------------------------------------------
 # Breakpoint classification

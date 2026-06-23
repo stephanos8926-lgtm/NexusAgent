@@ -1,6 +1,5 @@
 """Tests for version comparison and compatibility logic."""
 
-import pytest
 
 
 class TestParseVersion:
@@ -66,8 +65,9 @@ class TestVersionSync:
         """VERSION file, version.py, server, and SDK must all match."""
         from importlib.metadata import version as pkg_version
         from pathlib import Path
-        from nexusagent.version import VERSION
+
         from nexusagent.server.sdk import SERVER_VERSION
+        from nexusagent.version import VERSION
 
         # Read VERSION file
         version_file = Path(__file__).resolve().parent.parent / "VERSION"
@@ -75,6 +75,6 @@ class TestVersionSync:
 
         # All must match
         pkg_ver = pkg_version("nexusagent")
-        assert VERSION == pkg_ver, f"version.py={VERSION} != pyproject={pkg_ver}"
-        assert SERVER_VERSION == pkg_ver, f"sdk={SERVER_VERSION} != pyproject={pkg_ver}"
+        assert pkg_ver == VERSION, f"version.py={VERSION} != pyproject={pkg_ver}"
+        assert pkg_ver == SERVER_VERSION, f"sdk={SERVER_VERSION} != pyproject={pkg_ver}"
         assert file_ver == pkg_ver, f"VERSION={file_ver} != pyproject={pkg_ver}"

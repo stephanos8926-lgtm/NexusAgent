@@ -7,7 +7,6 @@ Delegates to the Click CLI in ``nexusagent.cli``.  Supports::
     python -m nexusagent run "task"
 """
 
-import sys
 
 from nexusagent.interfaces.cli import main
 

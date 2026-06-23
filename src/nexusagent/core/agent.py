@@ -16,11 +16,11 @@ from deepagents import create_deep_agent
 from nexusagent.tools.register_all import register_all
 
 register_all()
-from nexusagent.infrastructure.config import settings
+from nexusagent.infrastructure.config import settings  # noqa: E402
 
 # Import tool modules
 # Import registry + discovery
-from nexusagent.tools.registry import (
+from nexusagent.tools.registry import (  # noqa: E402
     _REGISTRY,
     ROLE_MANIFESTS,
     get_manifest,
@@ -216,7 +216,7 @@ class Agent:
         try:
             loop = asyncio.get_running_loop()
             # Schedule MCP loading; agent creation is sync so we fire-and-forget
-            _ = loop.create_task(_ensure_mcp_tools_loaded())
+            _ = loop.create_task(_ensure_mcp_tools_loaded())  # noqa: RUF006
         except RuntimeError:
             # No event loop — skip async MCP loading (tools already in registry)
             pass
@@ -403,7 +403,7 @@ def _setup_workspace_context(working_dir: str) -> None:
 
 
 # Thread-local override for per-worker memory directory
-import contextvars
+import contextvars  # noqa: E402
 
 _ws_memory_dir: contextvars.ContextVar[str | None] = contextvars.ContextVar(
     "ws_memory_dir", default=None

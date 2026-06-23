@@ -1,5 +1,4 @@
-"""
-Comprehensive unit tests for the DeepResearchOrchestrator.
+"""Comprehensive unit tests for the DeepResearchOrchestrator.
 
 Covers parsing, plan generation, refinement, search/fetch placeholders,
 synthesis, and the full run_deep_research pipeline.
@@ -7,9 +6,8 @@ synthesis, and the full run_deep_research pipeline.
 
 import json
 import sys
-import unittest.mock as mock
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -22,7 +20,6 @@ from nexusagent.core.orchestration import (
     ResearchState,
     SearchResult,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers

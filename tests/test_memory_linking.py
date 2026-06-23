@@ -1,8 +1,6 @@
 # tests/test_memory_linking.py
 """Tests for memory linking (related field)."""
 
-import asyncio
-import os
 import shutil
 import tempfile
 from pathlib import Path
@@ -19,7 +17,6 @@ def temp_workspace():
 
 def _write_memory(workspace, name, content, entities=None, confidence=0.5, related=None):
     """Write a memory file with frontmatter."""
-    import yaml
     from nexusagent.memory.memory_files import FileMemory, MemoryEntryType
 
     fm = FileMemory(workspace)

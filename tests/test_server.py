@@ -16,6 +16,7 @@ def _setup_test_auth():
     """Ensure auth manager is initialized with the test key before each test."""
     import secrets as _secrets
     from pathlib import Path as _Path
+
     from nexusagent.infrastructure.auth import AuthManager, set_auth_manager
 
     _test_dir = tempfile.mkdtemp()

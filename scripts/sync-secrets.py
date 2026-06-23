@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-sync-secrets.py — Sync local .env files to remote servers via SSH.
+"""sync-secrets.py — Sync local .env files to remote servers via SSH.
 
 Usage:
     python scripts/sync-secrets.py --server rapidwebs-01
@@ -11,8 +10,8 @@ Usage:
 import argparse
 import datetime
 import os
-import sys
 import subprocess
+import sys
 import tempfile
 
 import yaml
@@ -32,7 +31,7 @@ def load_config(config_path: str) -> dict:
         print(f"[ERROR] Config file not found: {config_path}", file=sys.stderr)
         sys.exit(1)
 
-    with open(config_path, "r") as fh:
+    with open(config_path) as fh:
         config = yaml.safe_load(fh)
 
     if not config or "servers" not in config:
@@ -142,7 +141,7 @@ def sync(server_name: str, config_path: str, dry_run: bool = False,
         print(f"[ERROR] Local .env not found at {LOCAL_ENV_PATH}", file=sys.stderr)
         sys.exit(1)
 
-    with open(LOCAL_ENV_PATH, "r") as fh:
+    with open(LOCAL_ENV_PATH) as fh:
         env_content = fh.read()
 
     if not env_content.strip():
@@ -170,7 +169,7 @@ def sync(server_name: str, config_path: str, dry_run: bool = False,
         print("  No existing remote .env — skipping backup.")
 
     # --- upload new .env ---------------------------------------------------
-    print(f"  Uploading new .env (permissions 600)")
+    print("  Uploading new .env (permissions 600)")
     ssh_upload_string(server, env_content, remote_env, permissions="600", dry_run=dry_run)
 
     # --- verify ------------------------------------------------------------

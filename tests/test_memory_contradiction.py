@@ -2,11 +2,9 @@
 """Tests for contradiction detection in the memory system."""
 
 import asyncio
-import os
 import shutil
 import tempfile
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 

@@ -5,4 +5,4 @@ Re-exports from the worker/ subpackage for backward compatibility.
 
 from __future__ import annotations
 
-from nexusagent.core.worker import *
+from nexusagent.core.worker import *  # noqa: F403

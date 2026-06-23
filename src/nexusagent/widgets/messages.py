@@ -5,7 +5,7 @@ to work. New code should import from ``nexusagent.widgets.messages`` (the
 subpackage) directly.
 """
 
-from nexusagent.widgets.messages import *
+from nexusagent.widgets.messages import *  # noqa: F403
 from nexusagent.widgets.messages import (
     AppMessage,
     AssistantMessage,

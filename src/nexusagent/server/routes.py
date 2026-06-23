@@ -150,7 +150,7 @@ def register_routes(app: FastAPI) -> None:
 
     # ─── Version ────────────────────────────────────────────────────────
 
-    _SERVER_START_TIME = None  # set at module level below
+    server_start_time = None  # noqa: F841 — set at module level, read by health check
 
     @app.get("/version")
     def version_endpoint():

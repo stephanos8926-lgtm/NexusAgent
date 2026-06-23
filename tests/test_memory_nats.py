@@ -1,12 +1,10 @@
 # tests/test_memory_nats.py
 """Tests for NATS-based distributed memory sharing."""
 
-import asyncio
 import json
 import tempfile
-from datetime import UTC, datetime
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 

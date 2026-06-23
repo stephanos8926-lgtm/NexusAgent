@@ -1,14 +1,11 @@
 """Tests for image input support — ImageAttachment, encode_image_to_content, and session integration."""
 
 import base64
-import tempfile
-from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
 from nexusagent.llm.models import ImageAttachment, encode_image_to_content
-
 
 # ── ImageAttachment ──────────────────────────────────────────────────────
 
@@ -189,6 +186,7 @@ class TestBuildUserMessage:
     def test_multimodal_message_with_multiple_images(self, tmp_path):
         """Test building a multimodal message with text + multiple images."""
         from langchain_core.messages import HumanMessage
+
         from nexusagent.llm.models import encode_image_to_content
 
         # Create test images
@@ -213,6 +211,7 @@ class TestBuildUserMessage:
     def test_multimodal_message_with_url(self):
         """Test building a multimodal message with a URL image."""
         from langchain_core.messages import HumanMessage
+
         from nexusagent.llm.models import encode_image_to_content
 
         content_blocks = [{"type": "text", "text": "Describe this image"}]
@@ -225,6 +224,7 @@ class TestBuildUserMessage:
     def test_multimodal_message_with_missing_image_fallback(self, tmp_path):
         """Test that a missing image produces a text fallback block."""
         from langchain_core.messages import HumanMessage
+
         from nexusagent.llm.models import encode_image_to_content
 
         content_blocks = [{"type": "text", "text": "What's this?"}]

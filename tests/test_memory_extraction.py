@@ -3,7 +3,7 @@
 
 import pytest
 
-from nexusagent.memory.extraction import MemoryExtractor, ExtractionResult
+from nexusagent.memory.extraction import ExtractionResult, MemoryExtractor
 
 
 @pytest.fixture

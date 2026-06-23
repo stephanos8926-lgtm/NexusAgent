@@ -1,7 +1,6 @@
 # tests/test_session_base
 """Tests for SessionBase — shared memory logic for interactive sessions and workers."""
 
-import asyncio
 import tempfile
 from pathlib import Path
 

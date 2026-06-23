@@ -1,6 +1,5 @@
 # tests/test_nats_durable.py
-"""
-Unit tests for JetStream durable consumer support in AgentBus.subscribe_durable().
+"""Unit tests for JetStream durable consumer support in AgentBus.subscribe_durable().
 
 These tests verify the method signature, parameter defaults, error paths,
 and mock-based stream/consumer setup without requiring a live NATS server.
@@ -13,7 +12,6 @@ from unittest.mock import AsyncMock
 import pytest
 
 from nexusagent.infrastructure.bus import AgentBus
-
 
 # ─── Helpers ───────────────────────────────────────────────────────────────────
 

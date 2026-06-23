@@ -1,6 +1,5 @@
 """Tests for Phase 2: workspace-scoped memory."""
 
-import os
 import shutil
 import tempfile
 from pathlib import Path
@@ -9,7 +8,7 @@ import pytest
 
 import nexusagent.tools.register_all  # noqa: F401
 from nexusagent.infrastructure.config import AgentConfig, load_config
-from nexusagent.memory.memory_files import FileMemory, MemoryEntryType
+from nexusagent.memory.memory_files import FileMemory
 
 
 @pytest.fixture
@@ -58,8 +57,8 @@ def test_memory_workspace_from_yaml(tmp_path):
 
 def test_session_manager_accepts_memory_dir():
     """SessionManager.get_or_create accepts memory_dir parameter."""
-    import asyncio
     import inspect
+
     from nexusagent.core.session import SessionManager
 
     mgr = SessionManager()
@@ -108,7 +107,8 @@ def test_gitignore_not_overwritten(tmp_workspace):
 
 def test_get_memory_workspace_uses_config(tmp_path):
     """_get_memory_workspace checks config when set."""
-    from unittest.mock import patch, MagicMock
+    from unittest.mock import MagicMock, patch
+
     from nexusagent.tools.register_all import _get_memory_workspace
 
     mock_settings = MagicMock()
@@ -122,7 +122,8 @@ def test_get_memory_workspace_uses_config(tmp_path):
 
 def test_get_memory_workspace_fallback(tmp_path):
     """_get_memory_workspace falls back to global default."""
-    from unittest.mock import patch, MagicMock
+    from unittest.mock import MagicMock, patch
+
     from nexusagent.tools.register_all import _get_memory_workspace
 
     mock_settings = MagicMock()
@@ -183,6 +184,7 @@ async def test_memory_search_all_workspaces():
 def test_memory_write_with_workspace_param(tmp_workspace):
     """memory_write accepts workspace param and writes to correct workspace."""
     import asyncio
+
     from nexusagent.tools.register_all import memory_write
 
     result = asyncio.run(memory_write("workspace-scoped memory test", type="world",
@@ -198,6 +200,7 @@ def test_memory_write_with_workspace_param(tmp_workspace):
 def test_memory_write_without_workspace_uses_default():
     """memory_write without workspace uses default global workspace."""
     import asyncio
+
     from nexusagent.tools.register_all import memory_write
 
     result = asyncio.run(memory_write("global memory test", type="world",

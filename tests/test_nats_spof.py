@@ -4,8 +4,8 @@ Verifies health tracking, reconnect caps, and graceful degradation.
 """
 
 import asyncio
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 
 
 def test_reconnect_cap_effective():
@@ -65,6 +65,7 @@ def test_check_health_returns_dict():
 def test_subscribe_durable_signature():
     """subscribe_durable has the expected signature."""
     import inspect
+
     from nexusagent.infrastructure.bus import AgentBus
 
     sig = inspect.signature(AgentBus.subscribe_durable)

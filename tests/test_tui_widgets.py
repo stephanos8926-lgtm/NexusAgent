@@ -13,12 +13,8 @@ Covers:
 
 from __future__ import annotations
 
-import json
-import tempfile
 from pathlib import Path
 from unittest.mock import patch
-
-import pytest
 
 from nexusagent.widgets.chat_input import (
     SLASH_COMMANDS,
@@ -27,14 +23,13 @@ from nexusagent.widgets.chat_input import (
     _save_history,
 )
 from nexusagent.widgets.messages import (
-    UserMessage,
-    AssistantMessage,
-    ToolCallMessage,
     AppMessage,
+    AssistantMessage,
     ErrorMessage,
+    ToolCallMessage,
+    UserMessage,
     WelcomeBanner,
 )
-
 
 # ---------------------------------------------------------------------------
 # UserMessage tests

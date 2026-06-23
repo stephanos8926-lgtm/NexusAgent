@@ -1,11 +1,10 @@
 """Tests for NATSJSONEncoder and put_result size handling."""
 
 import json
-import pytest
-from datetime import datetime, date
+from datetime import date, datetime
 from pathlib import Path
 
-from nexusagent.infrastructure.bus import NATSJSONEncoder, NATS_MAX_MESSAGE_SIZE
+from nexusagent.infrastructure.bus import NATS_MAX_MESSAGE_SIZE, NATSJSONEncoder
 
 
 class TestNATSJSONEncoder:

@@ -5,7 +5,7 @@ New code should import directly from nexusagent.interfaces.tui app.
 """
 
 # Re-export everything from the tui subpackage
-from nexusagent.interfaces.tui import *
+from nexusagent.interfaces.tui import *  # noqa: F403
 
 # ── Formatters ──
 # ── Message widgets (needed by tests and external imports) ──

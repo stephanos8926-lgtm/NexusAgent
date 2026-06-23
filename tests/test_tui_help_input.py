@@ -8,10 +8,7 @@ Covers:
 
 from __future__ import annotations
 
-import pytest
-
 from nexusagent.widgets.chat_input import SLASH_COMMANDS, ChatInput
-
 
 # ---------------------------------------------------------------------------
 # HelpScreen search & category data
@@ -314,7 +311,7 @@ class TestChatInputHintDropdown:
 
     def test_slash_commands_sorted(self):
         """SLASH_COMMANDS list is sorted for consistent display."""
-        assert SLASH_COMMANDS == sorted(SLASH_COMMANDS)
+        assert sorted(SLASH_COMMANDS) == SLASH_COMMANDS
 
     def test_autocomplete_exists(self):
         """ChatInput has action_autocomplete method."""

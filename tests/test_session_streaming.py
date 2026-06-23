@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import os
 import tempfile
 from unittest.mock import AsyncMock, MagicMock
@@ -10,8 +9,8 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from langchain_core.messages import AIMessageChunk
 
+from nexusagent.core.session import SessionManager
 from nexusagent.infrastructure.db import DatabaseManager, SessionRepository
-from nexusagent.core.session import Session, SessionManager
 
 
 @pytest.fixture

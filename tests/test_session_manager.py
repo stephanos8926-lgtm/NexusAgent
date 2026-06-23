@@ -9,9 +9,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from nexusagent.core.session import SessionManager
 from nexusagent.infrastructure.db import DatabaseManager, SessionRepository
-from nexusagent.core.session import Session, SessionManager
-
 
 # ── Fixtures ───────────────────────────────────────────────────────────
 

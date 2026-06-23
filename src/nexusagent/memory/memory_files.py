@@ -236,10 +236,7 @@ class FileMemory:
         length_score = min(math.log(max(len(content), 1)) / math.log(1000), 1.0)
 
         # Confidence bonus
-        if confidence is not None:
-            confidence_score = confidence
-        else:
-            confidence_score = 0.5  # Default for non-opinion entries
+        confidence_score = confidence if confidence is not None else 0.5
 
         # Weighted average: 60% length, 40% confidence
         score = 0.6 * length_score + 0.4 * confidence_score

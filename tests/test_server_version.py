@@ -30,8 +30,9 @@ class TestVersionConstant:
     def test_version_module_matches_pyproject(self):
         """version.VERSION must match pyproject.toml."""
         from importlib.metadata import version as pkg_version
+
         from nexusagent.version import VERSION
-        assert VERSION == pkg_version("nexusagent")
+        assert pkg_version("nexusagent") == VERSION
 
 
 class TestServerVersionEndpoint:
@@ -41,6 +42,7 @@ class TestServerVersionEndpoint:
     def client(self):
         """Create a TestClient for the FastAPI app."""
         from fastapi.testclient import TestClient
+
         # Import after version module is created to avoid import errors
         from nexusagent.server.server import app
         return TestClient(app)
@@ -73,6 +75,7 @@ class TestServerHealthEnhancement:
     @pytest.fixture
     def client(self):
         from fastapi.testclient import TestClient
+
         from nexusagent.server.server import app
         return TestClient(app)
 

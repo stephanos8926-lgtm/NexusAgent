@@ -7,7 +7,7 @@ import contextvars
 from pathlib import Path
 
 _read_files_var: contextvars.ContextVar[set[str]] = contextvars.ContextVar(
-    "read_files", default=set()
+    "read_files", default=frozenset()
 )
 
 

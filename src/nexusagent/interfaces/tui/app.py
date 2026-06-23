@@ -264,7 +264,7 @@ class NexusApp(App):
 
     def action_quit(self) -> None:
         """Quit the TUI application, canceling background tasks."""
-        _ = asyncio.create_task(self._input_queue.put(None))
+        _ = asyncio.create_task(self._input_queue.put(None))  # noqa: RUF006
         if hasattr(self, '_ws_task'):
             self._ws_task.cancel()
         self.exit()

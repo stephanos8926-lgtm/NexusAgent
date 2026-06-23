@@ -1,15 +1,13 @@
 # tests/test_memory_llm_extraction.py
 """Tests for LLM-powered memory extraction."""
 
-import asyncio
 import json
 import tempfile
-from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from nexusagent.memory.extraction import ExtractionResult, MemoryExtractor
+from nexusagent.memory.extraction import MemoryExtractor
 from nexusagent.memory.llm_extraction import LLMExtractor
 
 
@@ -174,6 +172,5 @@ class TestSessionLLMExtraction:
         )
         assert session._llm_extractor is None
         # SessionBase uses MemoryExtractor internally in extract_and_store()
-        from nexusagent.memory.extraction import MemoryExtractor
         extractor = MemoryExtractor()
         assert extractor is not None

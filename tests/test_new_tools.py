@@ -1,17 +1,12 @@
-"""
-Tests for new tools: code_review, write_todos, read_todos.
+"""Tests for new tools: code_review, write_todos, read_todos.
 
 TDD: tests written first, then tool implementations.
 """
 
 import json
 import os
-import tempfile
-from pathlib import Path
-from unittest.mock import patch
 
 import pytest
-
 
 # ─── Fixtures ────────────────────────────────────────────────────────────
 
@@ -104,7 +99,7 @@ class TestReviewCode:
         result = review_code(code=buggy)
         assert isinstance(result, str)
         # Should contain some form of severity marker
-        has_severity = any(marker in result for marker in ["HIGH", "MEDIUM", "LOW", "CRITICAL", "⚠", "🔴", "🟡", "ℹ"])
+        has_severity = any(marker in result for marker in ["HIGH", "MEDIUM", "LOW", "CRITICAL", "⚠", "🔴", "🟡", "ℹ"])  # noqa: RUF001
         assert has_severity, f"Expected severity markers in output: {result}"
 
 
@@ -181,8 +176,7 @@ class TestReadTodos:
 
     def test_read_todos_returns_list(self, tmp_todos_file):
         """read_todos should return the stored todos."""
-        from nexusagent.tools.write_todos import write_todos
-        from nexusagent.tools.write_todos import read_todos
+        from nexusagent.tools.write_todos import read_todos, write_todos
 
         todos = [
             {"task": "Fix bug", "status": "pending"},
@@ -203,8 +197,7 @@ class TestReadTodos:
 
     def test_read_todos_preserves_status(self, tmp_todos_file):
         """read_todos should preserve all todo fields."""
-        from nexusagent.tools.write_todos import write_todos
-        from nexusagent.tools.write_todos import read_todos
+        from nexusagent.tools.write_todos import read_todos, write_todos
 
         todos = [
             {"task": "Task A", "status": "in_progress", "priority": "high"},

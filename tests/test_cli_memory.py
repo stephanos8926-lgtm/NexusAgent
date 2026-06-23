@@ -19,7 +19,6 @@ from click.testing import CliRunner
 
 from nexusagent.interfaces.cli import main
 
-
 # ── Fixtures ────────────────────────────────────────────────────────────
 
 

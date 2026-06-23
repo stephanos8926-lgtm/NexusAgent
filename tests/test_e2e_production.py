@@ -6,7 +6,7 @@ import pytest
 import pytest_asyncio
 from httpx import AsyncClient
 
-from nexusagent.infrastructure.bus import AgentBus, get_bus
+from nexusagent.infrastructure.bus import get_bus
 from nexusagent.infrastructure.db import db_manager
 from nexusagent.llm.models import ResultSchema, TaskStatus
 from nexusagent.server.sdk import sdk
@@ -18,8 +18,7 @@ TEST_DB_PATH = "/tmp/nexus_e2e_test.db"
 
 @pytest_asyncio.fixture(scope="function", autouse=True)
 async def setup_system():
-    """
-    Initialize the system for E2E testing.
+    """Initialize the system for E2E testing.
     Overwrites the db path for testing.
     """
     from nexusagent.infrastructure.config import settings
@@ -65,8 +64,7 @@ async def setup_system():
 
 @pytest.mark.asyncio
 async def test_sdk_end_to_end_flow():
-    """
-    Tests the full flow: SDK Submit -> Worker Processing -> SDK Get Status/Result
+    """Tests the full flow: SDK Submit -> Worker Processing -> SDK Get Status/Result
     """
     # 1. Submit a task via SDK
     task_data = {
@@ -121,8 +119,7 @@ AUTH_HEADERS = {"X-API-Key": "test-key"}
 
 @pytest.mark.asyncio
 async def test_api_end_to_end_flow():
-    """
-    Tests the full flow: API POST /tasks -> API GET /status -> API GET /result
+    """Tests the full flow: API POST /tasks -> API GET /status -> API GET /result
     """
     async with AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as ac:
         # 1. Submit task via API
@@ -157,8 +154,7 @@ async def test_api_end_to_end_flow():
 
 @pytest.mark.asyncio
 async def test_invalid_task_failure():
-    """
-    Tests failure scenarios.
+    """Tests failure scenarios.
     Since current system is simple, 'invalid' might be something the agent can't handle.
     We can test if an empty description causes an issue or if we can force a failure.
     """
@@ -171,8 +167,7 @@ async def test_invalid_task_failure():
 
 @pytest.mark.asyncio
 async def test_multiple_concurrent_tasks():
-    """
-    Submits multiple tasks simultaneously to verify worker reliability.
+    """Submits multiple tasks simultaneously to verify worker reliability.
     """
     tasks_count = 5
     task_ids = []

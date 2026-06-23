@@ -121,9 +121,7 @@ class DreamCycle:
         for f in self.bank_dir.glob("*.md"):
             try:
                 content = f.read_text()
-                if "type: insight" in content or "type: synthesis" in content:
-                    # Extract the content after frontmatter
-                    if content.startswith("---"):
+                if ("type: insight" in content or "type: synthesis" in content) and content.startswith("---"):
                         parts = content.split("---", 2)
                         if len(parts) >= 3:
                             body = parts[2].strip()
@@ -167,9 +165,7 @@ class DreamCycle:
         for f in self.bank_dir.glob("*.md"):
             try:
                 content = f.read_text()
-                if "type: insight" in content or "type: synthesis" in content:
-                    # Extract the content after frontmatter
-                    if content.startswith("---"):
+                if ("type: insight" in content or "type: synthesis" in content) and content.startswith("---"):
                         parts = content.split("---", 2)
                         if len(parts) >= 3:
                             body = parts[2].strip()

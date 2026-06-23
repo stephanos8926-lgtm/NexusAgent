@@ -44,22 +44,18 @@ async def session_websocket(
     auth_header = websocket.headers.get("authorization", "")
     if auth_header.lower().startswith("bearer "):
         header_key = header_key or auth_header[7:]
-    # Also accept short-lived connection token from query param
-    token = websocket.query_params.get("token")
-    
-    # All WebSocket connections require API key or valid token
-    effective_key = header_key or token
-    
-    # Skip token validation only for SELF-SIGNED JWT with explicit verification
-    # Ensure no unqualified localhost bypasses exist
-    if not effective_key:
-        await websocket.close(code=4001, reason="Missing API key")
+    # DEPRECATED: Query-param token support is removed.
+    # Only Bearer token in Authorization header is accepted.
+    # This prevents API keys from appearing in server logs, browser history,
+    # proxy/CDN logs, and Referer headers.
+    if not header_key:
+        await websocket.close(code=4001, reason="Missing API key — use Authorization: Bearer <key>")
         return
-        
+
     try:
-        await verify_api_key(effective_key)
+        await verify_api_key(header_key)
     except HTTPException as e:
-        logger.warning(f"WS auth failed for key={effective_key}: {e}")
+        logger.warning(f"WS auth failed for key={header_key}: {e}")
         await websocket.close(code=4001, reason="Invalid or missing API key")
         return
 

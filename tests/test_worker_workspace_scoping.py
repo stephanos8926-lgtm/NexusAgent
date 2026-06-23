@@ -1,16 +1,15 @@
 """Tests for worker workspace scoping (P6-P9)."""
 
-import os
 import shutil
 import tempfile
 from pathlib import Path
-from unittest.mock import patch, MagicMock, AsyncMock
+from unittest.mock import MagicMock
 
 import pytest
 
 import nexusagent.tools.register_all  # noqa: F401
-from nexusagent.llm.models import TaskContract, TaskSchema, MemoryScope
 from nexusagent.core.agent import _ws_memory_dir
+from nexusagent.llm.models import MemoryScope, TaskContract, TaskSchema
 
 
 @pytest.fixture
@@ -59,6 +58,7 @@ def test_task_contract_system_prompt_default_none():
 def test_spawn_subagent_tool_has_system_prompt_param():
     """spawn_subagent tool accepts system_prompt parameter."""
     import inspect
+
     from nexusagent.tools.register_all import spawn_subagent
     sig = inspect.signature(spawn_subagent)
     assert "system_prompt" in sig.parameters
@@ -70,8 +70,9 @@ def test_spawn_subagent_tool_has_system_prompt_param():
 
 def test_worker_pool_passes_working_dir_to_metadata():
     """WorkerPool._run_worker passes working_dir from contract to task metadata."""
-    from nexusagent.core.worker.pool import WorkerPool
     import asyncio
+
+    from nexusagent.core.worker.pool import WorkerPool
 
     async def _test():
         pool = WorkerPool(max_workers=1)
@@ -154,8 +155,8 @@ def test_setup_workspace_context_noop_for_dot():
 
 def test_get_memory_workspace_uses_thread_local_override():
     """_get_memory_workspace checks thread-local worker override first."""
-    from nexusagent.tools.register_all import _get_memory_workspace
     from nexusagent.core.agent import _ws_memory_dir
+    from nexusagent.tools.register_all import _get_memory_workspace
 
     with tempfile.TemporaryDirectory() as tmp:
         _ws_memory_dir.set(tmp)
@@ -170,7 +171,6 @@ def test_get_memory_workspace_uses_thread_local_override():
 
 def test_sdk_submit_task_accepts_working_dir():
     """SDK submit_task accepts working_dir in task_data."""
-    from nexusagent.server.sdk import NexusSDK
 
     # Verify TaskSchema can be created with working_dir
     task = TaskSchema(id="t1", description="test", working_dir="/project")

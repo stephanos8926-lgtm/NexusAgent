@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-large-sprint.py — Large Sprint Orchestrator CLI
+"""large-sprint.py — Large Sprint Orchestrator CLI
 
 Companion script for the large-sprint-orchestrator skill.
 Provides CLI entry points for both agents and humans to manage
@@ -22,12 +21,10 @@ License: MIT
 
 import argparse
 import json
-import os
 import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
-
 
 # ── Configuration ──────────────────────────────────────────────────────────────
 
@@ -130,7 +127,7 @@ def cmd_init(args):
 - [ ] Task {i}.3
 
 """
-    plan_content += f"""
+    plan_content += """
 ## Final Phase: Verification
 - [ ] Full test suite passes
 - [ ] All docs updated
@@ -207,7 +204,7 @@ def cmd_dispatch(args):
     # Read the plan for this phase
     plan_file = get_sprint_path(name) / "PLAN.md"
     if not plan_file.exists():
-        print(f"  ✗ No plan file found. Run 'init' first.")
+        print("  ✗ No plan file found. Run 'init' first.")
         sys.exit(1)
 
     plan_content = plan_file.read_text()
@@ -233,7 +230,7 @@ def cmd_dispatch(args):
     save_state(state)
 
     print(f"  ✓ Phase {phase} tasks displayed above.")
-    print(f"    → Dispatch workers via delegate_task() or worktree-worker.py")
+    print("    → Dispatch workers via delegate_task() or worktree-worker.py")
     print(f"    → After completion: python3 {sys.argv[0]} collect --name {name} --phase {phase}")
 
 
@@ -283,7 +280,7 @@ def cmd_collect(args):
     worktrees_dir = sprint_path / "worktrees"
 
     if not worktrees_dir.exists():
-        print(f"  ✗ No worktrees directory found.")
+        print("  ✗ No worktrees directory found.")
         return
 
     print(f"\n═══ Collecting results: {name} — Phase {phase} ═══\n")
@@ -304,7 +301,7 @@ def cmd_collect(args):
             for line in result.stdout.strip().split("\n"):
                 print(f"    {line}")
         else:
-            print(f"    (no commits)")
+            print("    (no commits)")
 
         # Diff summary
         result = run(
@@ -322,7 +319,7 @@ def cmd_collect(args):
     if research_dir.exists():
         research_files = list(research_dir.glob("*.md"))
         if research_files:
-            print(f"  ── Research Reports ──")
+            print("  ── Research Reports ──")
             for f in research_files:
                 print(f"    ✓ {f.name}")
 
@@ -346,13 +343,13 @@ def cmd_verify(args):
     print("\n  ── Check: Test Suite ──")
     result = run("PYTHONPATH=src python3 -m pytest tests/ -q --tb=line 2>&1 | tail -5", check=False)
     if result.returncode == 0:
-        print(f"    ✓ Tests passing")
+        print("    ✓ Tests passing")
         # Extract pass/fail counts
         for line in result.stdout.strip().split("\n"):
             if "passed" in line or "failed" in line:
                 print(f"    {line.strip()}")
     else:
-        print(f"    ✗ Tests failing")
+        print("    ✗ Tests failing")
         print(f"    {result.stdout.strip()[-200:]}")
 
     # Check 3: Docs updated
@@ -363,7 +360,7 @@ def cmd_verify(args):
     if worktrees:
         print(f"    Worktrees: {len(worktrees)} (run 'cleanup' to remove)")
     else:
-        print(f"    ✓ No orphaned worktrees")
+        print("    ✓ No orphaned worktrees")
 
     # Check 4: Commit status
     print("\n  ── Check: Commits ──")
@@ -387,7 +384,7 @@ def cmd_cleanup(args):
     worktrees_dir = sprint_path / "worktrees"
 
     if not worktrees_dir.exists():
-        print(f"  ✗ No worktrees directory.")
+        print("  ✗ No worktrees directory.")
         return
 
     print(f"\n═══ Cleanup: {name} ═══\n")
@@ -412,7 +409,7 @@ def cmd_cleanup(args):
         # Safe to remove
         print(f"  → Removing {wt_dir.name}...")
         run(f"git worktree remove {wt_dir}" + (" --force" if force else ""))
-        print(f"    ✓ Removed")
+        print("    ✓ Removed")
 
     # Update state
     state = load_state()
@@ -421,7 +418,7 @@ def cmd_cleanup(args):
         state["sprints"][name]["status"] = "cleaned"
         save_state(state)
 
-    print(f"\n  ✓ Cleanup complete")
+    print("\n  ✓ Cleanup complete")
 
 
 def cmd_doctor(args):
@@ -496,7 +493,7 @@ def cmd_doctor(args):
     if issues:
         print(f"\n  ⚠ {issues} issue(s) found")
     else:
-        print(f"\n  ✓ All checks passed")
+        print("\n  ✓ All checks passed")
 
     print()
 

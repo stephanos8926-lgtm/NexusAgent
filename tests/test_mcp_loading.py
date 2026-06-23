@@ -1,7 +1,5 @@
 """Tests for MCP tool loading and memory index wiring — Kanban t_3b8d39cb."""
 
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 
 
 def test_memory_search_registered():
@@ -27,8 +25,9 @@ def test_memory_index_rebuild_registered():
 
 def test_register_mcp_tools_is_callable():
     """register_mcp_tools function exists and is idempotent."""
-    from nexusagent.tools.register_all import register_mcp_tools
     import asyncio
+
+    from nexusagent.tools.register_all import register_mcp_tools
     result = asyncio.run(register_mcp_tools())
     assert isinstance(result, list)
 
@@ -36,6 +35,7 @@ def test_register_mcp_tools_is_callable():
 def test_memory_search_returns_string():
     """memory_search tool returns a string result."""
     import asyncio
+
     from nexusagent.tools.register_all import memory_search
 
     async def run():

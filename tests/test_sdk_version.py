@@ -20,8 +20,8 @@ class TestSDKVersionConstants:
 
     def test_sdk_versions_match_module(self):
         """SDK constants must match version.VERSION."""
+        from nexusagent.server.sdk import MIN_CLIENT_VERSION, SERVER_VERSION
         from nexusagent.version import VERSION
-        from nexusagent.server.sdk import SERVER_VERSION, MIN_CLIENT_VERSION
         assert SERVER_VERSION == VERSION
         assert MIN_CLIENT_VERSION == VERSION
 
@@ -42,8 +42,8 @@ class TestSDKHealthCheck:
     @pytest.mark.asyncio
     async def test_health_check_version_matches(self):
         """health_check() version must match VERSION module."""
-        from nexusagent.version import VERSION
         from nexusagent.server.sdk import NexusSDK
+        from nexusagent.version import VERSION
         sdk = NexusSDK()
         result = await sdk.health_check()
         assert result["version"] == VERSION

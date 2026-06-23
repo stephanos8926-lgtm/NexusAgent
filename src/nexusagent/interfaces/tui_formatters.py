@@ -114,7 +114,7 @@ def format_shell_output(output: str) -> str:
     clean_lines = []
     for line in lines:
         if line.startswith("Exit code:") or line.startswith("exit code:"):
-            with contextlib_suppress(ValueError):
+            with ContextlibSuppress(ValueError):
                 exit_code = int(line.split(":")[-1].strip())
         elif not line.startswith("Error:"):
             clean_lines.append(line)
@@ -281,7 +281,7 @@ def _escape(text: str) -> str:
 
 # ── Contextlib suppress helper (avoids import at module level) ─────────────
 
-class contextlib_suppress:
+class ContextlibSuppress:
     """Minimal context manager to suppress specific exceptions."""
 
     def __init__(self, *exceptions):

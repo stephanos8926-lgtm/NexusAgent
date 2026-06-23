@@ -14,6 +14,16 @@ import logging
 from nexusagent.infrastructure.config import settings
 from nexusagent.version import VERSION as CLIENT_VERSION
 
+# Message widgets imported here (not top) to avoid circular import with widgets.messages
+# These are used in slash command handlers defined later in this file.
+from nexusagent.widgets.messages import (
+    AppMessage,
+    ErrorMessage,
+    ToolCallMessage,
+    UserMessage,
+)
+from nexusagent.widgets.theme.colors import ALL_THEMES
+
 # Maximum message widgets mounted in the TUI (sliding window)
 _STREAMING_MAX_WIDGETS = 50
 
@@ -33,13 +43,6 @@ def _mount_with_limit(app, widget) -> None:
         while len(children) > _STREAMING_MAX_WIDGETS:
             oldest = children.pop(0)
             oldest.remove()
-from nexusagent.widgets.messages import (
-    AppMessage,
-    ErrorMessage,
-    ToolCallMessage,
-    UserMessage,
-)
-from nexusagent.widgets.theme.colors import ALL_THEMES
 
 logger = logging.getLogger(__name__)
 
@@ -280,7 +283,7 @@ async def handle_slash_command(app, cmd: str) -> bool:
             msg = AppMessage(f"Search results for: {query}\n\n{result}")
             _mount_with_limit(app, msg)
 
-        _ = asyncio.create_task(_do_search())
+        _ = asyncio.create_task(_do_search())  # noqa: RUF006
         msg = AppMessage(f"Searching for: {query}...")
         _mount_with_limit(app, msg)
         return True
@@ -297,7 +300,7 @@ async def handle_slash_command(app, cmd: str) -> bool:
             msg = AppMessage(f"Fetched: {url}\n\n{result}")
             _mount_with_limit(app, msg)
 
-        _ = asyncio.create_task(_do_fetch())
+        _ = asyncio.create_task(_do_fetch())  # noqa: RUF006
         msg = AppMessage(f"Fetching: {url}...")
         _mount_with_limit(app, msg)
         return True
@@ -514,7 +517,7 @@ def process_next_in_queue(app) -> None:
     app.status_bar.set_status("Thinking...")
     app.status_bar.set_spinner(True)
     import asyncio
-    asyncio.create_task(app._input_queue.put(next_msg))
+    asyncio.create_task(app._input_queue.put(next_msg))  # noqa: RUF006
     update_queue_status(app)
 
 

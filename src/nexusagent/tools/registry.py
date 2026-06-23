@@ -4,7 +4,7 @@ All existing ``from nexusagent.tools.registry import ...`` usage continues
 to work. New code should import from the subpackage directly.
 """
 
-from nexusagent.tools.registry import *
+from nexusagent.tools.registry import *  # noqa: F403
 from nexusagent.tools.registry import (
     ROLE_MANIFESTS,
     ToolInfo,

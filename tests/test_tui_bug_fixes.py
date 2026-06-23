@@ -14,10 +14,7 @@ These tests target the SPECIFIC broken behaviors reported, now fixed:
 from __future__ import annotations
 
 import asyncio
-from unittest.mock import MagicMock, patch
-
-import pytest
-
+from unittest.mock import MagicMock
 
 # ═══════════════════════════════════════════════════════════════════════
 # Bug 1: Streaming — token-by-token via AssistantMessage

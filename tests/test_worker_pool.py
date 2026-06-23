@@ -5,9 +5,9 @@ from unittest.mock import patch
 
 import pytest
 
-from nexusagent.llm.models import TaskContract
 from nexusagent.core.subagent import SubAgentStatus
 from nexusagent.core.worker import WorkerPool
+from nexusagent.llm.models import TaskContract
 
 
 @pytest.fixture

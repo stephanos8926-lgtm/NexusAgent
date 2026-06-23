@@ -19,24 +19,22 @@ from unittest.mock import patch
 
 import pytest
 
-from nexusagent.widgets.theme import (
-    DARK_COLORS,
-    ThemeColors,
-    get_css_variable_defaults,
-    get_theme_colors,
-    TOKYO_NIGHT_COLORS,
-    ROSE_PINE_COLORS,
-    SOLARIZED_DARK_COLORS,
-    ALL_THEMES,
-    THEME_REGISTRY,
-)
 from nexusagent.widgets.status import (
     BrailleSpinner,
     ContextWindowBar,
     GitStatus,
-    NO_COLOR,
 )
-
+from nexusagent.widgets.theme import (
+    ALL_THEMES,
+    DARK_COLORS,
+    ROSE_PINE_COLORS,
+    SOLARIZED_DARK_COLORS,
+    THEME_REGISTRY,
+    TOKYO_NIGHT_COLORS,
+    ThemeColors,
+    get_css_variable_defaults,
+    get_theme_colors,
+)
 
 # ---------------------------------------------------------------------------
 # ThemeColors dataclass
@@ -118,7 +116,6 @@ class TestThemeRegistry:
 
     def test_registry_theme_names(self):
         """Registry has the expected theme names."""
-        from dataclasses import fields
         names = set(THEME_REGISTRY.keys())
         expected = {
             "nexus-dark",
@@ -248,6 +245,7 @@ class TestNoColor:
         with patch.dict(os.environ, {"NO_COLOR": "1"}):
             # Re-import to pick up the env var
             import importlib
+
             import nexusagent.widgets.status as status_mod
             importlib.reload(status_mod)
             assert status_mod.NO_COLOR is True
@@ -256,6 +254,7 @@ class TestNoColor:
         """When NO_COLOR is not set, the flag is False."""
         with patch.dict(os.environ, {}, clear=True):
             import importlib
+
             import nexusagent.widgets.status as status_mod
             importlib.reload(status_mod)
             # Should be False (or empty string is falsy)

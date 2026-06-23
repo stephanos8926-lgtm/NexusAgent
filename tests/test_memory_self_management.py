@@ -6,12 +6,10 @@ Tests memory_delete, memory_update, memory_list, and memory_prune tools.
 import os
 import shutil
 import tempfile
-from pathlib import Path
 
 import pytest
 
 import nexusagent.tools.register_all  # noqa: F401
-from nexusagent.memory.memory import HybridMemoryManager
 from nexusagent.memory.memory_files import FileMemory, MemoryEntryType
 from nexusagent.tools.registry import get_tool_info
 

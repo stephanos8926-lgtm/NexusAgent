@@ -14,18 +14,14 @@ import os
 import shutil
 import tempfile
 import time
-from datetime import UTC, datetime, timedelta
-from pathlib import Path
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 import nexusagent.tools.register_all  # noqa: F401
-from nexusagent.memory.dream import DreamCycle, STALE_THRESHOLD_DAYS
-from nexusagent.memory.memory import HybridMemoryManager
-from nexusagent.memory.memory_files import FileMemory, MemoryEntryType
+from nexusagent.memory.dream import STALE_THRESHOLD_DAYS, DreamCycle
 from nexusagent.tools.registry import get_tool_info
-
 
 # ── Fixtures ────────────────────────────────────────────────────────────
 

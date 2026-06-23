@@ -7,8 +7,8 @@ import asyncio
 
 import pytest
 
-from nexusagent.llm.models import TaskContract
 from nexusagent.core.subagent import SubAgentHandle, SubAgentStatus
+from nexusagent.llm.models import TaskContract
 
 # -- helpers ----------------------------------------------------------------
 
