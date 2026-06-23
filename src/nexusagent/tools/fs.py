@@ -23,6 +23,7 @@ from nexusagent.tools.fs_base import (
     get_read_files,
     reset_read_tracking,
 )
+from nexusagent.tools.editor import edit_file
 
 
 def __getattr__(name: str):

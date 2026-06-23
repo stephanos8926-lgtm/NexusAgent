@@ -6,10 +6,10 @@ from nexusagent.tools.fs import (
     list_directory,
     read_file,
     read_multiple_files,
-    set_workspace_root,
     write_file,
     write_multiple_files,
 )
+from nexusagent.tools.fs_base import set_workspace_root
 
 
 # Set up a temporary directory for tests
