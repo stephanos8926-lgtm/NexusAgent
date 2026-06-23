@@ -10,9 +10,9 @@ from nexusagent.memory.index import _vec_to_blob as _embed_to_blob
 from nexusagent.memory.memory_item import MemoryItem, _hash_embed
 
 __all__ = [
+    "EMBED_DIM",
     "HybridMemoryManager",
     "MemoryItem",
-    "EMBED_DIM",
     "_embed_to_blob",
     "_hash_embed",
 ]

@@ -16,13 +16,10 @@ from typing import Any
 from sqlalchemy import select
 
 from nexusagent.core.worker.handler import (
-    _agent_breaker,
-    _nats_breaker,
     _run_agent_task,
     task_repo,
 )
-from nexusagent.core.subagent import SubAgentHandle
-from nexusagent.infrastructure.bus import AgentBus, get_bus, _NATS_HARD_RECONNECT_CAP
+from nexusagent.infrastructure.bus import _NATS_HARD_RECONNECT_CAP, AgentBus, get_bus
 from nexusagent.infrastructure.db import TaskModel
 from nexusagent.infrastructure.utils.retry import retry_with_backoff
 from nexusagent.llm.models import ResultSchema, TaskSchema, TaskStatus

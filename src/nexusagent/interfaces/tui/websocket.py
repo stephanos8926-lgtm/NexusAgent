@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import pathlib
 import urllib.request
 
 import websockets
@@ -96,7 +97,7 @@ async def ws_loop(app) -> None:
     api_key = settings.client.api_key
     ws_url = f"ws://127.0.0.1:{settings.server.api_port}/sessions/{app.session_id}/ws"
     # Pass working_dir as query param for workspace-scoped memory
-    working_dir = getattr(app, "working_dir", None) or "."
+    working_dir = getattr(app, "working_dir", None) or str(pathlib.Path.cwd())
     if working_dir != ".":
         from urllib.parse import quote as _quote
         ws_url += f"?working_dir={_quote(working_dir, safe='')}"

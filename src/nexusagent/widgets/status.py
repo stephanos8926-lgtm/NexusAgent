@@ -14,6 +14,7 @@ Design: Linear-inspired, uses $surface background, semantic colors.
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import os
 from typing import TYPE_CHECKING, Any
@@ -173,12 +174,10 @@ class StatusBar(Horizontal):
         """Advance the spinner on each timer tick."""
         if self._spinning:
             self._spinner_idx += 1
-            try:
+            with contextlib.suppress(NoMatches):
                 self.query_one("#status-spinner", Static).update(
                     self.SPINNER_CHARS[self._spinner_idx % len(self.SPINNER_CHARS)]
                 )
-            except NoMatches:
-                pass
 
     def _update_widgets(self) -> None:
         try:

@@ -16,9 +16,7 @@ It is designed to be called BEFORE each model invocation.
 from __future__ import annotations
 
 import logging
-from typing import Any, Awaitable, Callable
-
-from nexusagent.memory.dag import SummaryDAG
+from collections.abc import Awaitable, Callable
 
 logger = logging.getLogger(__name__)
 

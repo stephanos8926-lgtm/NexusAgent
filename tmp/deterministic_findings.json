@@ -1,0 +1,33 @@
+{
+  "worktree": "/tmp/nexusagent_review_worktree",
+  "changedFiles": [],
+  "findings": [],
+  "toolsRun": [
+    {
+      "tool": "ruff check --output-format=json .",
+      "source": "linter",
+      "exitCode": 1,
+      "durationMs": 0,
+      "findingsCount": 0,
+      "timedOut": false
+    }
+  ],
+  "toolsSkipped": [
+    {
+      "tool": "npx tsc --noEmit --incremental",
+      "reason": "No detector file found"
+    },
+    {
+      "tool": "npx eslint --format=json .",
+      "reason": "No detector file found"
+    },
+    {
+      "tool": "cargo clippy --message-format=json --quiet",
+      "reason": "No detector file found"
+    },
+    {
+      "tool": "go vet ./...",
+      "reason": "No detector file found"
+    }
+  ]
+}

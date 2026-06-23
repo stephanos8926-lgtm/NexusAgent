@@ -12,7 +12,7 @@ import uuid
 
 from nexusagent.infrastructure.bus import AgentBus, get_bus
 from nexusagent.llm.models import ResultSchema, TaskSchema, TaskStatus
-from nexusagent.version import VERSION, MIN_CLIENT_VERSION
+from nexusagent.version import MIN_CLIENT_VERSION, VERSION
 
 logger = logging.getLogger(__name__)
 

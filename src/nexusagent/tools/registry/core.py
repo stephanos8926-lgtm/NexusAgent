@@ -100,7 +100,7 @@ def auto_correct(tool_name: str, kwargs: dict[str, Any] | None = None) -> str:
         Correction message or validation confirmation.
     """
     # Delayed import to avoid circular dependency with policy module
-    from .policy import _is_tool_allowed, get_manifest, _get_ctx
+    from .policy import _get_ctx, _is_tool_allowed, get_manifest
 
     # Check policy first
     allowed, reason = _is_tool_allowed(tool_name)

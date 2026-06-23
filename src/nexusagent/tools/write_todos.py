@@ -6,8 +6,8 @@ Todos are stored as JSON files for easy parsing and human readability.
 
 import json
 import os
+from datetime import UTC, datetime
 from pathlib import Path
-from datetime import datetime, timezone
 
 
 def write_todos(todos: list[dict], path: str = "./todos.json") -> str:
@@ -43,7 +43,7 @@ def write_todos(todos: list[dict], path: str = "./todos.json") -> str:
     # Build the output structure
     output = {
         "version": 1,
-        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(UTC).isoformat(),
         "todos": todos,
     }
 

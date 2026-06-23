@@ -133,10 +133,7 @@ def run_tests(
             cmd.extend(["--tests", test_path])
 
     elif fw == "go":
-        if test_path:
-            cmd = ["go", "test", test_path]
-        else:
-            cmd = ["go", "test", "./..."]
+        cmd = ["go", "test", test_path] if test_path else ["go", "test", "./..."]
         if verbose:
             cmd.append("-v")
 

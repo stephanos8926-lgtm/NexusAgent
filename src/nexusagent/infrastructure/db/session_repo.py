@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 class SessionRepository:
     """CRUD operations on sessions and messages."""
 
-    def __init__(self, db_manager: "DatabaseManager") -> None:
+    def __init__(self, db_manager: DatabaseManager) -> None:
         """Initialize the repository with a database manager instance.
 
         Args:

@@ -271,12 +271,11 @@ def register_routes(app: FastAPI) -> None:
         should call this endpoint first, then pass the returned token via
         the ?token= query parameter when connecting to /sessions/{id}/ws.
         """
-        import secrets
 
         try:
             await verify_api_key(request.api_key)
         except HTTPException:
-            raise HTTPException(status_code=401, detail="Invalid API key")
+            raise HTTPException(status_code=401, detail="Invalid API key") from None
 
         # Generate a short-lived token (the API key itself, marked as a token)
         # In production, this would be a JWT or similar with expiry

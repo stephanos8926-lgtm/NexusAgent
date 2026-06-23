@@ -25,18 +25,18 @@ Architecture:
         3. Auto-correction: wrong name/params get helpful hints
 """
 
-from .types import ToolInfo
-from .core import _REGISTRY, register_tool, get_tool_info, list_all_tools, auto_correct
+from .core import _REGISTRY, auto_correct, get_tool_info, list_all_tools, register_tool
 from .policy import (
-    set_policy_context,
-    get_policy_context,
+    ROLE_MANIFESTS,
+    check_tool_access,
     clear_policy_context,
     get_manifest,
+    get_policy_context,
     require_policy,
-    check_tool_access,
-    ROLE_MANIFESTS,
+    set_policy_context,
 )
 from .search import tool_search
+from .types import ToolInfo
 
 __all__ = [
     # Roles

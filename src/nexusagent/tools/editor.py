@@ -6,7 +6,7 @@ Extracted from tools/fs.py to separate the complex edit_file logic
 
 from __future__ import annotations
 
-from nexusagent.tools.fs_base import _resolve, _check_read
+from nexusagent.tools.fs_base import _check_read, _resolve
 
 
 def edit_file(

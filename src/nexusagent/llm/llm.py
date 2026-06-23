@@ -37,6 +37,7 @@ class LLMProvider:
         """Initialize the LLM provider with configured API keys and model settings."""
         # Reload settings to get the latest config (avoids stale singleton)
         import importlib
+
         import nexusagent.infrastructure.config as _cfg
         importlib.reload(_cfg)
         _settings = _cfg.settings

@@ -296,6 +296,4 @@ class contextlib_suppress:
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        if exc_type is not None and issubclass(exc_type, self.exceptions):
-            return True
-        return False
+        return bool(exc_type is not None and issubclass(exc_type, self.exceptions))

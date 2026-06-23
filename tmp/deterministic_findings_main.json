@@ -1,0 +1,1670 @@
+{
+  "worktree": "/tmp/nexusagent_review_worktree",
+  "changedFiles": [
+    "config/NEXUS.md",
+    "src/nexusagent/core/agent.py",
+    "src/nexusagent/core/orchestration.py",
+    "src/nexusagent/core/session.py",
+    "src/nexusagent/core/session/__init__.py",
+    "src/nexusagent/core/session/helpers.py",
+    "src/nexusagent/core/session/session.py",
+    "src/nexusagent/core/session/session_base.py",
+    "src/nexusagent/core/session/session_lite.py",
+    "src/nexusagent/core/worker.py",
+    "src/nexusagent/core/worker/__init__.py",
+    "src/nexusagent/core/worker/handler.py",
+    "src/nexusagent/core/worker/pool.py",
+    "src/nexusagent/core/worker/worker.py",
+    "src/nexusagent/infrastructure/config.py",
+    "src/nexusagent/infrastructure/db.py",
+    "src/nexusagent/infrastructure/db/session_repo.py",
+    "src/nexusagent/infrastructure/db/task_repo.py",
+    "src/nexusagent/infrastructure/prompt_loader.py",
+    "src/nexusagent/interfaces/cli.py",
+    "src/nexusagent/interfaces/tui.py",
+    "src/nexusagent/interfaces/tui/__init__.py",
+    "src/nexusagent/interfaces/tui/app.py",
+    "src/nexusagent/interfaces/tui/formatters.py",
+    "src/nexusagent/interfaces/tui/input.py",
+    "src/nexusagent/interfaces/tui/streaming.py",
+    "src/nexusagent/interfaces/tui/websocket.py",
+    "src/nexusagent/interfaces/tui_formatters.py",
+    "src/nexusagent/llm/llm.py",
+    "src/nexusagent/memory/compaction.py",
+    "src/nexusagent/memory/consolidation.py",
+    "src/nexusagent/memory/dag.py",
+    "src/nexusagent/memory/dream.py",
+    "src/nexusagent/memory/extraction.py",
+    "src/nexusagent/memory/index/__init__.py",
+    "src/nexusagent/memory/index/embeddings.py",
+    "src/nexusagent/memory/index/index.py",
+    "src/nexusagent/memory/memory.py",
+    "src/nexusagent/memory/memory_index.py",
+    "src/nexusagent/memory/memory_item.py",
+    "src/nexusagent/memory/nats_bus.py",
+    "src/nexusagent/memory/rate_limiter.py",
+    "src/nexusagent/memory/refinement.py",
+    "src/nexusagent/server/routes.py",
+    "src/nexusagent/server/sdk.py",
+    "src/nexusagent/server/server.py",
+    "src/nexusagent/server/websocket.py",
+    "src/nexusagent/skills.py",
+    "src/nexusagent/tools/code_review.py",
+    "src/nexusagent/tools/code_review/__init__.py",
+    "src/nexusagent/tools/code_review/checks/ast_check.py",
+    "src/nexusagent/tools/code_review/checks/bugs.py",
+    "src/nexusagent/tools/code_review/checks/security.py",
+    "src/nexusagent/tools/code_review/checks/style.py",
+    "src/nexusagent/tools/code_review/models.py",
+    "src/nexusagent/tools/code_review/review_code.py",
+    "src/nexusagent/tools/editor.py",
+    "src/nexusagent/tools/fs.py",
+    "src/nexusagent/tools/fs_base.py",
+    "src/nexusagent/tools/register_all.py",
+    "src/nexusagent/tools/registry/__init__.py",
+    "src/nexusagent/tools/registry/core.py",
+    "src/nexusagent/tools/registry/policy.py",
+    "src/nexusagent/tools/registry/search.py",
+    "src/nexusagent/tools/shell.py",
+    "src/nexusagent/tools/test_runner.py",
+    "src/nexusagent/tools/tool_specs.py",
+    "src/nexusagent/tools/write_todos.py",
+    "src/nexusagent/widgets/messages.py",
+    "src/nexusagent/widgets/messages/__init__.py",
+    "src/nexusagent/widgets/messages/assistant.py",
+    "src/nexusagent/widgets/status.py",
+    "src/nexusagent/widgets/theme.py",
+    "src/nexusagent/widgets/theme/__init__.py",
+    "src/nexusagent/widgets/theme/colors.py"
+  ],
+  "findings": [
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/core/agent.py",
+      "line": 8,
+      "column": 1,
+      "severity": "Critical",
+      "message": "Import block is un-sorted or un-formatted",
+      "ruleId": "I001"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/core/agent.py",
+      "line": 18,
+      "column": 1,
+      "severity": "Critical",
+      "message": "Module level import not at top of file",
+      "ruleId": "E402"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/core/agent.py",
+      "line": 22,
+      "column": 1,
+      "severity": "Critical",
+      "message": "Module level import not at top of file",
+      "ruleId": "E402"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/core/agent.py",
+      "line": 245,
+      "column": 13,
+      "severity": "Critical",
+      "message": "Import block is un-sorted or un-formatted",
+      "ruleId": "I001"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/core/agent.py",
+      "line": 319,
+      "column": 13,
+      "severity": "Critical",
+      "message": "Import block is un-sorted or un-formatted",
+      "ruleId": "I001"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/core/agent.py",
+      "line": 383,
+      "column": 12,
+      "severity": "Critical",
+      "message": "`os` imported but unused",
+      "ruleId": "F401"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/core/agent.py",
+      "line": 397,
+      "column": 50,
+      "severity": "Critical",
+      "message": "`nexusagent.infrastructure.config.settings` imported but unused",
+      "ruleId": "F401"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/core/agent.py",
+      "line": 406,
+      "column": 1,
+      "severity": "Critical",
+      "message": "Module level import not at top of file",
+      "ruleId": "E402"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/core/agent.py",
+      "line": 406,
+      "column": 1,
+      "severity": "Critical",
+      "message": "Import block is un-sorted or un-formatted",
+      "ruleId": "I001"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/core/orchestration.py",
+      "line": 130,
+      "column": 13,
+      "severity": "Critical",
+      "message": "Import block is un-sorted or un-formatted",
+      "ruleId": "I001"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/core/session.py",
+      "line": 6,
+      "column": 1,
+      "severity": "Critical",
+      "message": "`from nexusagent.core.session import *` used; unable to detect undefined names",
+      "ruleId": "F403"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/core/session.py",
+      "line": 6,
+      "column": 40,
+      "severity": "Critical",
+      "message": "Unused `noqa` directive (unused: `F401`, `F402`)",
+      "ruleId": "RUF100"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/core/session/__init__.py",
+      "line": 8,
+      "column": 1,
+      "severity": "Critical",
+      "message": "Import block is un-sorted or un-formatted",
+      "ruleId": "I001"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/core/session/__init__.py",
+      "line": 18,
+      "column": 11,
+      "severity": "Critical",
+      "message": "`__all__` is not sorted",
+      "ruleId": "RUF022"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/core/session/helpers.py",
+      "line": 11,
+      "column": 20,
+      "severity": "Critical",
+      "message": "`typing.Any` imported but unused",
+      "ruleId": "F401"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/core/session/helpers.py",
+      "line": 13,
+      "column": 37,
+      "severity": "Critical",
+      "message": "`langchain_core.messages.AIMessage` imported but unused",
+      "ruleId": "F401"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/core/session/helpers.py",
+      "line": 15,
+      "column": 46,
+      "severity": "Critical",
+      "message": "`nexusagent.infrastructure.config.settings` imported but unused",
+      "ruleId": "F401"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/core/session/helpers.py",
+      "line": 16,
+      "column": 53,
+      "severity": "Critical",
+      "message": "`nexusagent.infrastructure.prompt_loader.inject_file_at_reference` imported but unused",
+      "ruleId": "F401"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/core/session/helpers.py",
+      "line": 16,
+      "column": 79,
+      "severity": "Critical",
+      "message": "`nexusagent.infrastructure.prompt_loader.load_nexus_prompt` imported but unused",
+      "ruleId": "F401"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/core/session/session.py",
+      "line": 11,
+      "column": 1,
+      "severity": "Critical",
+      "message": "Import block is un-sorted or un-formatted",
+      "ruleId": "I001"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/core/session/session.py",
+      "line": 225,
+      "column": 13,
+      "severity": "Critical",
+      "message": "Local variable `summary` is assigned to but never used",
+      "ruleId": "F841"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/core/session/session.py",
+      "line": 401,
+      "column": 13,
+      "severity": "Critical",
+      "message": "Use `contextlib.suppress(asyncio.QueueEmpty)` instead of `try`-`except`-`pass`",
+      "ruleId": "SIM105"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/core/session/session.py",
+      "line": 420,
+      "column": 13,
+      "severity": "Critical",
+      "message": "Use `contextlib.suppress(asyncio.QueueEmpty)` instead of `try`-`except`-`pass`",
+      "ruleId": "SIM105"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/core/session/session.py",
+      "line": 457,
+      "column": 9,
+      "severity": "Critical",
+      "message": "Store a reference to the return value of `asyncio.create_task`",
+      "ruleId": "RUF006"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/core/session/session_base.py",
+      "line": 13,
+      "column": 8,
+      "severity": "Critical",
+      "message": "`asyncio` imported but unused",
+      "ruleId": "F401"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/core/session/session_base.py",
+      "line": 15,
+      "column": 8,
+      "severity": "Critical",
+      "message": "`os` imported but unused",
+      "ruleId": "F401"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/core/session/session_lite.py",
+      "line": 13,
+      "column": 8,
+      "severity": "Critical",
+      "message": "`asyncio` imported but unused",
+      "ruleId": "F401"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/core/worker.py",
+      "line": 8,
+      "column": 1,
+      "severity": "Critical",
+      "message": "`from nexusagent.core.worker import *` used; unable to detect undefined names",
+      "ruleId": "F403"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/core/worker.py",
+      "line": 8,
+      "column": 39,
+      "severity": "Critical",
+      "message": "Unused `noqa` directive (unused: `F401`, `F402`)",
+      "ruleId": "RUF100"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/core/worker/__init__.py",
+      "line": 11,
+      "column": 1,
+      "severity": "Critical",
+      "message": "Import block is un-sorted or un-formatted",
+      "ruleId": "I001"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/core/worker/__init__.py",
+      "line": 18,
+      "column": 5,
+      "severity": "Critical",
+      "message": "`nexusagent.core.worker.handler._agent_breaker` imported but unused; consider removing, adding to `__all__`, or using a redundant alias",
+      "ruleId": "F401"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/core/worker/__init__.py",
+      "line": 19,
+      "column": 5,
+      "severity": "Critical",
+      "message": "`nexusagent.core.worker.handler._nats_breaker` imported but unused; consider removing, adding to `__all__`, or using a redundant alias",
+      "ruleId": "F401"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/core/worker/__init__.py",
+      "line": 24,
+      "column": 11,
+      "severity": "Critical",
+      "message": "`__all__` is not sorted",
+      "ruleId": "RUF022"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/core/worker/handler.py",
+      "line": 7,
+      "column": 1,
+      "severity": "Critical",
+      "message": "Import block is un-sorted or un-formatted",
+      "ruleId": "I001"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/core/worker/handler.py",
+      "line": 11,
+      "column": 8,
+      "severity": "Critical",
+      "message": "`time` imported but unused",
+      "ruleId": "F401"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/core/worker/handler.py",
+      "line": 12,
+      "column": 22,
+      "severity": "Critical",
+      "message": "`datetime.UTC` imported but unused",
+      "ruleId": "F401"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/core/worker/handler.py",
+      "line": 12,
+      "column": 27,
+      "severity": "Critical",
+      "message": "`datetime.datetime` imported but unused",
+      "ruleId": "F401"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/core/worker/handler.py",
+      "line": 13,
+      "column": 20,
+      "severity": "Critical",
+      "message": "`typing.Any` imported but unused",
+      "ruleId": "F401"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/core/worker/handler.py",
+      "line": 15,
+      "column": 24,
+      "severity": "Critical",
+      "message": "`sqlalchemy.select` imported but unused",
+      "ruleId": "F401"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/core/worker/handler.py",
+      "line": 18,
+      "column": 38,
+      "severity": "Critical",
+      "message": "`nexusagent.core.subagent.SubAgentHandle` imported but unused",
+      "ruleId": "F401"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/core/worker/handler.py",
+      "line": 19,
+      "column": 43,
+      "severity": "Critical",
+      "message": "`nexusagent.infrastructure.bus.AgentBus` imported but unused",
+      "ruleId": "F401"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/core/worker/handler.py",
+      "line": 19,
+      "column": 53,
+      "severity": "Critical",
+      "message": "`nexusagent.infrastructure.bus.get_bus` imported but unused",
+      "ruleId": "F401"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/core/worker/handler.py",
+      "line": 19,
+      "column": 62,
+      "severity": "Critical",
+      "message": "`nexusagent.infrastructure.bus._NATS_HARD_RECONNECT_CAP` imported but unused",
+      "ruleId": "F401"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/core/worker/handler.py",
+      "line": 20,
+      "column": 42,
+      "severity": "Critical",
+      "message": "`nexusagent.infrastructure.db.TaskModel` imported but unused",
+      "ruleId": "F401"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/core/worker/handler.py",
+      "line": 22,
+      "column": 51,
+      "severity": "Critical",
+      "message": "`nexusagent.infrastructure.utils.retry.retry_with_backoff` imported but unused",
+      "ruleId": "F401"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/core/worker/handler.py",
+      "line": 23,
+      "column": 35,
+      "severity": "Critical",
+      "message": "`nexusagent.llm.models.ResultSchema` imported but unused",
+      "ruleId": "F401"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/core/worker/handler.py",
+      "line": 23,
+      "column": 49,
+      "severity": "Critical",
+      "message": "`nexusagent.llm.models.TaskContract` imported but unused",
+      "ruleId": "F401"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/core/worker/handler.py",
+      "line": 23,
+      "column": 75,
+      "severity": "Critical",
+      "message": "`nexusagent.llm.models.TaskStatus` imported but unused",
+      "ruleId": "F401"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/core/worker/pool.py",
+      "line": 7,
+      "column": 1,
+      "severity": "Critical",
+      "message": "Import block is un-sorted or un-formatted",
+      "ruleId": "I001"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/core/worker/worker.py",
+      "line": 7,
+      "column": 1,
+      "severity": "Critical",
+      "message": "Import block is un-sorted or un-formatted",
+      "ruleId": "I001"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/core/worker/worker.py",
+      "line": 19,
+      "column": 5,
+      "severity": "Critical",
+      "message": "`nexusagent.core.worker.handler._agent_breaker` imported but unused",
+      "ruleId": "F401"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/core/worker/worker.py",
+      "line": 20,
+      "column": 5,
+      "severity": "Critical",
+      "message": "`nexusagent.core.worker.handler._nats_breaker` imported but unused",
+      "ruleId": "F401"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/core/worker/worker.py",
+      "line": 24,
+      "column": 38,
+      "severity": "Critical",
+      "message": "`nexusagent.core.subagent.SubAgentHandle` imported but unused",
+      "ruleId": "F401"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/infrastructure/config.py",
+      "line": 376,
+      "column": 1,
+      "severity": "Critical",
+      "message": "Blank line contains whitespace",
+      "ruleId": "W293"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/infrastructure/db/session_repo.py",
+      "line": 19,
+      "column": 36,
+      "severity": "Critical",
+      "message": "Remove quotes from type annotation",
+      "ruleId": "UP037"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/infrastructure/db/task_repo.py",
+      "line": 18,
+      "column": 36,
+      "severity": "Critical",
+      "message": "Remove quotes from type annotation",
+      "ruleId": "UP037"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/infrastructure/prompt_loader.py",
+      "line": 14,
+      "column": 1,
+      "severity": "Critical",
+      "message": "Import block is un-sorted or un-formatted",
+      "ruleId": "I001"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/infrastructure/prompt_loader.py",
+      "line": 20,
+      "column": 21,
+      "severity": "Critical",
+      "message": "`nexusagent.infrastructure.template_includes.resolve_path` imported but unused",
+      "ruleId": "F401"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/interfaces/cli.py",
+      "line": 7,
+      "column": 1,
+      "severity": "Critical",
+      "message": "Import block is un-sorted or un-formatted",
+      "ruleId": "I001"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/interfaces/cli.py",
+      "line": 171,
+      "column": 5,
+      "severity": "Critical",
+      "message": "Import block is un-sorted or un-formatted",
+      "ruleId": "I001"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/interfaces/tui.py",
+      "line": 8,
+      "column": 42,
+      "severity": "Critical",
+      "message": "Unused `noqa` directive (unused: `F401`, `F402`)",
+      "ruleId": "RUF100"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/interfaces/tui/__init__.py",
+      "line": 12,
+      "column": 59,
+      "severity": "Critical",
+      "message": "Unused `noqa` directive (unused: `I001`)",
+      "ruleId": "RUF100"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/interfaces/tui/__init__.py",
+      "line": 15,
+      "column": 53,
+      "severity": "Critical",
+      "message": "Unused `noqa` directive (unused: `I001`)",
+      "ruleId": "RUF100"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/interfaces/tui/__init__.py",
+      "line": 22,
+      "column": 50,
+      "severity": "Critical",
+      "message": "Unused `noqa` directive (unused: `I001`)",
+      "ruleId": "RUF100"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/interfaces/tui/__init__.py",
+      "line": 35,
+      "column": 54,
+      "severity": "Critical",
+      "message": "Unused `noqa` directive (unused: `I001`)",
+      "ruleId": "RUF100"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/interfaces/tui/__init__.py",
+      "line": 36,
+      "column": 44,
+      "severity": "Critical",
+      "message": "Unused `noqa` directive (unused: `I001`)",
+      "ruleId": "RUF100"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/interfaces/tui/app.py",
+      "line": 53,
+      "column": 18,
+      "severity": "Critical",
+      "message": "Unused `noqa` directive (unused: `F401`)",
+      "ruleId": "RUF100"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/interfaces/tui/app.py",
+      "line": 54,
+      "column": 24,
+      "severity": "Critical",
+      "message": "Unused `noqa` directive (unused: `F401`)",
+      "ruleId": "RUF100"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/interfaces/tui/app.py",
+      "line": 56,
+      "column": 23,
+      "severity": "Critical",
+      "message": "Unused `noqa` directive (unused: `F401`)",
+      "ruleId": "RUF100"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/interfaces/tui/app.py",
+      "line": 58,
+      "column": 21,
+      "severity": "Critical",
+      "message": "Unused `noqa` directive (unused: `F401`)",
+      "ruleId": "RUF100"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/interfaces/tui/input.py",
+      "line": 10,
+      "column": 52,
+      "severity": "Critical",
+      "message": "Unused `noqa` directive (unused: `I001`)",
+      "ruleId": "RUF100"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/interfaces/tui/input.py",
+      "line": 15,
+      "column": 66,
+      "severity": "Critical",
+      "message": "Unused `noqa` directive (unused: `I001`)",
+      "ruleId": "RUF100"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/interfaces/tui/streaming.py",
+      "line": 36,
+      "column": 1,
+      "severity": "Critical",
+      "message": "Module level import not at top of file",
+      "ruleId": "E402"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/interfaces/tui/streaming.py",
+      "line": 42,
+      "column": 1,
+      "severity": "Critical",
+      "message": "Module level import not at top of file",
+      "ruleId": "E402"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/interfaces/tui/streaming.py",
+      "line": 274,
+      "column": 9,
+      "severity": "Critical",
+      "message": "Import block is un-sorted or un-formatted",
+      "ruleId": "I001"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/interfaces/tui/streaming.py",
+      "line": 292,
+      "column": 9,
+      "severity": "Critical",
+      "message": "Import block is un-sorted or un-formatted",
+      "ruleId": "I001"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/interfaces/tui_formatters.py",
+      "line": 284,
+      "column": 7,
+      "severity": "Critical",
+      "message": "Class name `contextlib_suppress` should use CapWords convention",
+      "ruleId": "N801"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/interfaces/tui_formatters.py",
+      "line": 299,
+      "column": 9,
+      "severity": "Critical",
+      "message": "Return the condition directly",
+      "ruleId": "SIM103"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/llm/llm.py",
+      "line": 39,
+      "column": 9,
+      "severity": "Critical",
+      "message": "Import block is un-sorted or un-formatted",
+      "ruleId": "I001"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/memory/compaction.py",
+      "line": 19,
+      "column": 1,
+      "severity": "Critical",
+      "message": "Import from `collections.abc` instead: `Awaitable`, `Callable`",
+      "ruleId": "UP035"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/memory/compaction.py",
+      "line": 19,
+      "column": 20,
+      "severity": "Critical",
+      "message": "`typing.Any` imported but unused",
+      "ruleId": "F401"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/memory/compaction.py",
+      "line": 21,
+      "column": 35,
+      "severity": "Critical",
+      "message": "`nexusagent.memory.dag.SummaryDAG` imported but unused",
+      "ruleId": "F401"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/memory/compaction.py",
+      "line": 139,
+      "column": 43,
+      "severity": "Critical",
+      "message": "Redefinition of unused `SummaryDAG` from line 21: `SummaryDAG` redefined here",
+      "ruleId": "F811"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/memory/consolidation.py",
+      "line": 14,
+      "column": 8,
+      "severity": "Critical",
+      "message": "`os` imported but unused",
+      "ruleId": "F401"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/memory/consolidation.py",
+      "line": 17,
+      "column": 20,
+      "severity": "Critical",
+      "message": "`typing.Any` imported but unused",
+      "ruleId": "F401"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/memory/dag.py",
+      "line": 22,
+      "column": 1,
+      "severity": "Critical",
+      "message": "Import from `collections.abc` instead: `Awaitable`, `Callable`, `Sequence`",
+      "ruleId": "UP035"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/memory/dag.py",
+      "line": 39,
+      "column": 46,
+      "severity": "Critical",
+      "message": "Use `datetime.UTC` alias",
+      "ruleId": "UP017"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/memory/dream.py",
+      "line": 124,
+      "column": 17,
+      "severity": "Critical",
+      "message": "Use a single `if` statement instead of nested `if` statements",
+      "ruleId": "SIM102"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/memory/dream.py",
+      "line": 170,
+      "column": 17,
+      "severity": "Critical",
+      "message": "Use a single `if` statement instead of nested `if` statements",
+      "ruleId": "SIM102"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/memory/dream.py",
+      "line": 196,
+      "column": 64,
+      "severity": "Critical",
+      "message": "`nexusagent.memory.memory_files.MemoryEntryType` imported but unused",
+      "ruleId": "F401"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/memory/dream.py",
+      "line": 616,
+      "column": 9,
+      "severity": "Critical",
+      "message": "Use a single `if` statement instead of nested `if` statements",
+      "ruleId": "SIM102"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/memory/extraction.py",
+      "line": 38,
+      "column": 237,
+      "severity": "Critical",
+      "message": "Unused `noqa` directive (non-enabled: `E501`)",
+      "ruleId": "RUF100"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/memory/index/__init__.py",
+      "line": 3,
+      "column": 1,
+      "severity": "Critical",
+      "message": "Import block is un-sorted or un-formatted",
+      "ruleId": "I001"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/memory/index/embeddings.py",
+      "line": 6,
+      "column": 1,
+      "severity": "Critical",
+      "message": "Import block is un-sorted or un-formatted",
+      "ruleId": "I001"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/memory/index/index.py",
+      "line": 13,
+      "column": 1,
+      "severity": "Critical",
+      "message": "Import block is un-sorted or un-formatted",
+      "ruleId": "I001"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/memory/memory.py",
+      "line": 12,
+      "column": 11,
+      "severity": "Critical",
+      "message": "`__all__` is not sorted",
+      "ruleId": "RUF022"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/memory/memory_index.py",
+      "line": 8,
+      "column": 1,
+      "severity": "Critical",
+      "message": "Import block is un-sorted or un-formatted",
+      "ruleId": "I001"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/memory/memory_index.py",
+      "line": 29,
+      "column": 5,
+      "severity": "Critical",
+      "message": "`_DB_POOL` may be undefined, or defined from star imports",
+      "ruleId": "F405"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/memory/memory_item.py",
+      "line": 4,
+      "column": 1,
+      "severity": "Critical",
+      "message": "Import block is un-sorted or un-formatted",
+      "ruleId": "I001"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/memory/memory_item.py",
+      "line": 10,
+      "column": 64,
+      "severity": "Critical",
+      "message": "`nexusagent.memory.index._vec_to_blob` imported but unused",
+      "ruleId": "F401"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/memory/nats_bus.py",
+      "line": 18,
+      "column": 1,
+      "severity": "Critical",
+      "message": "Import block is un-sorted or un-formatted",
+      "ruleId": "I001"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/memory/nats_bus.py",
+      "line": 20,
+      "column": 8,
+      "severity": "Critical",
+      "message": "`asyncio` imported but unused",
+      "ruleId": "F401"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/memory/nats_bus.py",
+      "line": 23,
+      "column": 8,
+      "severity": "Critical",
+      "message": "`time` imported but unused",
+      "ruleId": "F401"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/memory/nats_bus.py",
+      "line": 28,
+      "column": 21,
+      "severity": "Critical",
+      "message": "`pathlib.Path` imported but unused",
+      "ruleId": "F401"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/memory/nats_bus.py",
+      "line": 32,
+      "column": 46,
+      "severity": "Critical",
+      "message": "`nexusagent.infrastructure.config.settings` imported but unused",
+      "ruleId": "F401"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/memory/rate_limiter.py",
+      "line": 12,
+      "column": 1,
+      "severity": "Critical",
+      "message": "Import from `collections.abc` instead: `Callable`",
+      "ruleId": "UP035"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/memory/refinement.py",
+      "line": 314,
+      "column": 19,
+      "severity": "Critical",
+      "message": "Loop control variable `i` not used within loop body",
+      "ruleId": "B007"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/server/routes.py",
+      "line": 153,
+      "column": 5,
+      "severity": "Critical",
+      "message": "Variable `_SERVER_START_TIME` in function should be lowercase",
+      "ruleId": "N806"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/server/routes.py",
+      "line": 274,
+      "column": 16,
+      "severity": "Critical",
+      "message": "`secrets` imported but unused",
+      "ruleId": "F401"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/server/routes.py",
+      "line": 279,
+      "column": 13,
+      "severity": "Critical",
+      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling",
+      "ruleId": "B904"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/server/sdk.py",
+      "line": 9,
+      "column": 1,
+      "severity": "Critical",
+      "message": "Import block is un-sorted or un-formatted",
+      "ruleId": "I001"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/server/server.py",
+      "line": 110,
+      "column": 28,
+      "severity": "Critical",
+      "message": "No newline at end of file",
+      "ruleId": "W292"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/server/websocket.py",
+      "line": 92,
+      "column": 5,
+      "severity": "Critical",
+      "message": "Import block is un-sorted or un-formatted",
+      "ruleId": "I001"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/skills.py",
+      "line": 76,
+      "column": 5,
+      "severity": "Critical",
+      "message": "Use ternary operator `body = content[match.end():] if match else content` instead of `if`-`else`-block",
+      "ruleId": "SIM108"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/tools/code_review.py",
+      "line": 7,
+      "column": 1,
+      "severity": "Critical",
+      "message": "`from nexusagent.tools.code_review import *` used; unable to detect undefined names",
+      "ruleId": "F403"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/tools/code_review.py",
+      "line": 7,
+      "column": 45,
+      "severity": "Critical",
+      "message": "Unused `noqa` directive (unused: `F401`, `F402`)",
+      "ruleId": "RUF100"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/tools/code_review/__init__.py",
+      "line": 17,
+      "column": 1,
+      "severity": "Critical",
+      "message": "Import block is un-sorted or un-formatted",
+      "ruleId": "I001"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/tools/code_review/__init__.py",
+      "line": 33,
+      "column": 11,
+      "severity": "Critical",
+      "message": "`__all__` is not sorted",
+      "ruleId": "RUF022"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/tools/code_review/checks/ast_check.py",
+      "line": 3,
+      "column": 1,
+      "severity": "Critical",
+      "message": "Import block is un-sorted or un-formatted",
+      "ruleId": "I001"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/tools/code_review/checks/ast_check.py",
+      "line": 27,
+      "column": 9,
+      "severity": "Critical",
+      "message": "Use a single `if` statement instead of nested `if` statements",
+      "ruleId": "SIM102"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/tools/code_review/checks/bugs.py",
+      "line": 3,
+      "column": 1,
+      "severity": "Critical",
+      "message": "Import block is un-sorted or un-formatted",
+      "ruleId": "I001"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/tools/code_review/checks/security.py",
+      "line": 3,
+      "column": 1,
+      "severity": "Critical",
+      "message": "Import block is un-sorted or un-formatted",
+      "ruleId": "I001"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/tools/code_review/checks/style.py",
+      "line": 3,
+      "column": 1,
+      "severity": "Critical",
+      "message": "Import block is un-sorted or un-formatted",
+      "ruleId": "I001"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/tools/code_review/models.py",
+      "line": 5,
+      "column": 8,
+      "severity": "Critical",
+      "message": "`re` imported but unused",
+      "ruleId": "F401"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/tools/code_review/review_code.py",
+      "line": 3,
+      "column": 1,
+      "severity": "Critical",
+      "message": "Import block is un-sorted or un-formatted",
+      "ruleId": "I001"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/tools/editor.py",
+      "line": 7,
+      "column": 1,
+      "severity": "Critical",
+      "message": "Import block is un-sorted or un-formatted",
+      "ruleId": "I001"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/tools/fs.py",
+      "line": 10,
+      "column": 1,
+      "severity": "Critical",
+      "message": "Import block is un-sorted or un-formatted",
+      "ruleId": "I001"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/tools/fs.py",
+      "line": 192,
+      "column": 5,
+      "severity": "Critical",
+      "message": "Redefinition of unused `get_read_files` from line 20: `get_read_files` redefined here",
+      "ruleId": "F811"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/tools/fs.py",
+      "line": 197,
+      "column": 5,
+      "severity": "Critical",
+      "message": "Redefinition of unused `reset_read_tracking` from line 21: `reset_read_tracking` redefined here",
+      "ruleId": "F811"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/tools/fs_base.py",
+      "line": 3,
+      "column": 1,
+      "severity": "Critical",
+      "message": "Import block is un-sorted or un-formatted",
+      "ruleId": "I001"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/tools/fs_base.py",
+      "line": 11,
+      "column": 27,
+      "severity": "Critical",
+      "message": "Do not use mutable data structures for `ContextVar` defaults",
+      "ruleId": "B039"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/tools/register_all.py",
+      "line": 318,
+      "column": 1,
+      "severity": "Critical",
+      "message": "Blank line contains whitespace",
+      "ruleId": "W293"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/tools/register_all.py",
+      "line": 324,
+      "column": 9,
+      "severity": "Critical",
+      "message": "Local variable `loop` is assigned to but never used",
+      "ruleId": "F841"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/tools/register_all.py",
+      "line": 330,
+      "column": 1,
+      "severity": "Critical",
+      "message": "Blank line contains whitespace",
+      "ruleId": "W293"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/tools/register_all.py",
+      "line": 397,
+      "column": 5,
+      "severity": "Critical",
+      "message": "Use ternary operator `path = os.path.expanduser(ws) if ws else os.path.expanduser(_DEFAULT_MEMORY_WORKSPACE)` instead of `if`-`else`-block",
+      "ruleId": "SIM108"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/tools/register_all.py",
+      "line": 786,
+      "column": 24,
+      "severity": "Critical",
+      "message": "Use a context manager for opening files",
+      "ruleId": "SIM115"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/tools/register_all.py",
+      "line": 888,
+      "column": 23,
+      "severity": "Critical",
+      "message": "Use a context manager for opening files",
+      "ruleId": "SIM115"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/tools/register_all.py",
+      "line": 991,
+      "column": 23,
+      "severity": "Critical",
+      "message": "Use a context manager for opening files",
+      "ruleId": "SIM115"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/tools/registry/__init__.py",
+      "line": 28,
+      "column": 1,
+      "severity": "Critical",
+      "message": "Import block is un-sorted or un-formatted",
+      "ruleId": "I001"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/tools/registry/core.py",
+      "line": 103,
+      "column": 5,
+      "severity": "Critical",
+      "message": "Import block is un-sorted or un-formatted",
+      "ruleId": "I001"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/tools/registry/policy.py",
+      "line": 8,
+      "column": 1,
+      "severity": "Critical",
+      "message": "Import block is un-sorted or un-formatted",
+      "ruleId": "I001"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/tools/registry/search.py",
+      "line": 37,
+      "column": 5,
+      "severity": "Critical",
+      "message": "Import block is un-sorted or un-formatted",
+      "ruleId": "I001"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/tools/shell.py",
+      "line": 37,
+      "column": 9,
+      "severity": "Critical",
+      "message": "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling",
+      "ruleId": "B904"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/tools/test_runner.py",
+      "line": 136,
+      "column": 9,
+      "severity": "Critical",
+      "message": "Use ternary operator `cmd = [\"go\", \"test\", test_path] if test_path else [\"go\", \"test\", \"./...\"]` instead of `if`-`else`-block",
+      "ruleId": "SIM108"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/tools/tool_specs.py",
+      "line": 10,
+      "column": 1,
+      "severity": "Critical",
+      "message": "Import block is un-sorted or un-formatted",
+      "ruleId": "I001"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/tools/tool_specs.py",
+      "line": 39,
+      "column": 42,
+      "severity": "Critical",
+      "message": "`nexusagent.tools.write_todos.read_todos` imported but unused",
+      "ruleId": "F401"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/tools/tool_specs.py",
+      "line": 39,
+      "column": 54,
+      "severity": "Critical",
+      "message": "`nexusagent.tools.write_todos.write_todos` imported but unused",
+      "ruleId": "F401"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/tools/write_todos.py",
+      "line": 7,
+      "column": 1,
+      "severity": "Critical",
+      "message": "Import block is un-sorted or un-formatted",
+      "ruleId": "I001"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/tools/write_todos.py",
+      "line": 46,
+      "column": 36,
+      "severity": "Critical",
+      "message": "Use `datetime.UTC` alias",
+      "ruleId": "UP017"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/widgets/messages/__init__.py",
+      "line": 6,
+      "column": 1,
+      "severity": "Critical",
+      "message": "Import block is un-sorted or un-formatted",
+      "ruleId": "I001"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/widgets/messages/assistant.py",
+      "line": 7,
+      "column": 29,
+      "severity": "Critical",
+      "message": "`textual.widgets.Markdown` imported but unused",
+      "ruleId": "F401"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/widgets/messages/assistant.py",
+      "line": 69,
+      "column": 25,
+      "severity": "Critical",
+      "message": "Undefined name `Content`",
+      "ruleId": "F821"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/widgets/status.py",
+      "line": 176,
+      "column": 13,
+      "severity": "Critical",
+      "message": "Use `contextlib.suppress(NoMatches)` instead of `try`-`except`-`pass`",
+      "ruleId": "SIM105"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/widgets/theme.py",
+      "line": 10,
+      "column": 1,
+      "severity": "Critical",
+      "message": "Import block is un-sorted or un-formatted",
+      "ruleId": "I001"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/widgets/theme/__init__.py",
+      "line": 14,
+      "column": 1,
+      "severity": "Critical",
+      "message": "Import block is un-sorted or un-formatted",
+      "ruleId": "I001"
+    },
+    {
+      "source": "linter",
+      "tool": "ruff",
+      "file": "../../../../tmp/nexusagent_review_worktree/src/nexusagent/widgets/theme/colors.py",
+      "line": 3,
+      "column": 1,
+      "severity": "Critical",
+      "message": "Import block is un-sorted or un-formatted",
+      "ruleId": "I001"
+    }
+  ],
+  "toolsRun": [
+    {
+      "tool": "ruff check --output-format=json .",
+      "source": "linter",
+      "exitCode": 1,
+      "durationMs": 0,
+      "findingsCount": 156,
+      "timedOut": false
+    }
+  ],
+  "toolsSkipped": [
+    {
+      "tool": "npx tsc --noEmit --incremental",
+      "reason": "No detector file found"
+    },
+    {
+      "tool": "npx eslint --format=json .",
+      "reason": "No detector file found"
+    },
+    {
+      "tool": "cargo clippy --message-format=json --quiet",
+      "reason": "No detector file found"
+    },
+    {
+      "tool": "go vet ./...",
+      "reason": "No detector file found"
+    }
+  ]
+}

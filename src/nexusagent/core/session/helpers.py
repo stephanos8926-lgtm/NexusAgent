@@ -8,12 +8,8 @@ import platform
 import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
 
-from langchain_core.messages import AIMessage, SystemMessage
-
-from nexusagent.infrastructure.config import settings
-from nexusagent.infrastructure.prompt_loader import inject_file_at_reference, load_nexus_prompt
+from langchain_core.messages import SystemMessage
 
 logger = logging.getLogger(__name__)
 

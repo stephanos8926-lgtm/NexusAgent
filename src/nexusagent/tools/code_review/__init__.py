@@ -20,9 +20,9 @@ from __future__ import annotations
 from nexusagent.tools.code_review.models import (
     SEVERITY_CRITICAL,
     SEVERITY_HIGH,
-    SEVERITY_MEDIUM,
-    SEVERITY_LOW,
     SEVERITY_INFO,
+    SEVERITY_LOW,
+    SEVERITY_MEDIUM,
     Issue,
     ReviewResult,
 )
@@ -33,9 +33,9 @@ from nexusagent.tools.code_review.review_code import review_code
 __all__ = [
     "SEVERITY_CRITICAL",
     "SEVERITY_HIGH",
-    "SEVERITY_MEDIUM",
-    "SEVERITY_LOW",
     "SEVERITY_INFO",
+    "SEVERITY_LOW",
+    "SEVERITY_MEDIUM",
     "Issue",
     "ReviewResult",
     "review_code",

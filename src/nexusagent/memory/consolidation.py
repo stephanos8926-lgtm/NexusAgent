@@ -11,10 +11,8 @@ Periodically scans all memories and:
 from __future__ import annotations
 
 import logging
-import os
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any
 
 logger = logging.getLogger(__name__)
 

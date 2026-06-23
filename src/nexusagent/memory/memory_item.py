@@ -7,7 +7,7 @@ import struct
 
 from pydantic import BaseModel, Field
 
-from nexusagent.memory.index import EMBED_DIM, _vec_to_blob as _embed_to_blob
+from nexusagent.memory.index import EMBED_DIM
 
 
 def _hash_embed(text: str) -> list[float]:

@@ -8,8 +8,8 @@ separately from read operations (search, get, list).
 from __future__ import annotations
 
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Callable
 
 # Default clock — can be overridden in tests
 _clock: Callable[[], float] = time.monotonic

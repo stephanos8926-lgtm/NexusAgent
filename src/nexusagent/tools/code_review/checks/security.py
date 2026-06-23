@@ -7,8 +7,8 @@ import re
 from nexusagent.tools.code_review.models import (
     SEVERITY_CRITICAL,
     SEVERITY_HIGH,
-    SEVERITY_LOW,
     SEVERITY_INFO,
+    SEVERITY_LOW,
     ReviewResult,
 )
 

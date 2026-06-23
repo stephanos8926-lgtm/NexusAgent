@@ -5,18 +5,18 @@ continues to work. New code should import from ``nexusagent.memory.index``
 (the subpackage) directly.
 """
 
-from nexusagent.memory.index import *  # noqa: F403
+from nexusagent.memory.index import *
 from nexusagent.memory.index import (
-    EMBED_DIM,
-    CHUNK_SIZE,
-    CHUNK_OVERLAP,
     CANDIDATE_MULTIPLIER,
+    CHUNK_OVERLAP,
+    CHUNK_SIZE,
+    EMBED_DIM,
     KEYWORD_WEIGHT,
     VECTOR_WEIGHT,
-    _blob_to_vec,
-    _vec_to_blob,
     EmbeddingProvider,
     HybridMemoryIndex,
+    _blob_to_vec,
+    _vec_to_blob,
 )
 
 __all__ = [

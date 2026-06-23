@@ -14,6 +14,7 @@ from deepagents import create_deep_agent
 
 # Run registration (populates _REGISTRY)
 from nexusagent.tools.register_all import register_all
+
 register_all()
 from nexusagent.infrastructure.config import settings
 
@@ -215,7 +216,7 @@ class Agent:
         try:
             loop = asyncio.get_running_loop()
             # Schedule MCP loading; agent creation is sync so we fire-and-forget
-            loop.create_task(_ensure_mcp_tools_loaded())  # noqa: RUF006
+            _ = loop.create_task(_ensure_mcp_tools_loaded())
         except RuntimeError:
             # No event loop — skip async MCP loading (tools already in registry)
             pass
@@ -242,8 +243,8 @@ class Agent:
         # we're only layering timeout/max_retries on top, not replacing
         # deepagents' provider resolution.
         try:
-            from langchain.chat_models import init_chat_model
             from deepagents.profiles.provider.provider_profiles import apply_provider_profile
+            from langchain.chat_models import init_chat_model
 
             init_kwargs = apply_provider_profile(
                 model_name,
@@ -316,8 +317,9 @@ def run_agent_task(state: dict) -> dict:
         # Inject workspace context into state for the agent
         if working_dir and working_dir != ".":
             # Load NEXUS.md from working_dir
-            from nexusagent.infrastructure.prompt_loader import load_nexus_prompt
             from pathlib import Path
+
+            from nexusagent.infrastructure.prompt_loader import load_nexus_prompt
             try:
                 nexus_prompt = load_nexus_prompt(
                     package_root=Path(__file__).parent.parent,
@@ -380,7 +382,6 @@ def _setup_workspace_context(working_dir: str) -> None:
     - NEXUS.md loading from working_dir
     - Environment context injection
     """
-    import os
     from pathlib import Path
 
     if not working_dir:
@@ -394,7 +395,6 @@ def _setup_workspace_context(working_dir: str) -> None:
     set_workspace_root(working_dir)
 
     # 2. Set workspace-scoped memory directory
-    from nexusagent.infrastructure.config import settings
     ws_memory = Path(working_dir) / ".nexusagent" / "memory"
     ws_memory.mkdir(parents=True, exist_ok=True)
     # Note: memory tools use _get_memory_workspace() which checks config.
@@ -404,6 +404,7 @@ def _setup_workspace_context(working_dir: str) -> None:
 
 # Thread-local override for per-worker memory directory
 import contextvars
+
 _ws_memory_dir: contextvars.ContextVar[str | None] = contextvars.ContextVar(
     "ws_memory_dir", default=None
 )

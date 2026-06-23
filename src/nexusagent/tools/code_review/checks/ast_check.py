@@ -6,8 +6,8 @@ import ast
 
 from nexusagent.tools.code_review.models import (
     SEVERITY_CRITICAL,
-    SEVERITY_MEDIUM,
     SEVERITY_HIGH,
+    SEVERITY_MEDIUM,
     ReviewResult,
 )
 
@@ -24,11 +24,10 @@ def check(code: str, result: ReviewResult):
 
     for node in ast.walk(tree):
         # Check for bare except in AST
-        if isinstance(node, ast.ExceptHandler):
-            if node.type is None:
-                result.add(SEVERITY_MEDIUM, "bug",
-                           "Bare except clause (AST)", node.lineno,
-                           "Use 'except Exception:' or a specific type")
+        if isinstance(node, ast.ExceptHandler) and node.type is None:
+            result.add(SEVERITY_MEDIUM, "bug",
+                       "Bare except clause (AST)", node.lineno,
+                       "Use 'except Exception:' or a specific type")
 
         # Check for return in __init__
         if isinstance(node, ast.FunctionDef) and node.name == "__init__":

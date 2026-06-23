@@ -11,8 +11,8 @@ import logging
 import time
 import uuid
 
-from nexusagent.core.worker.handler import _run_agent_task
 from nexusagent.core.subagent import SubAgentHandle
+from nexusagent.core.worker.handler import _run_agent_task
 from nexusagent.llm.models import TaskSchema
 
 logger = logging.getLogger(__name__)

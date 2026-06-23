@@ -6,9 +6,9 @@ import re
 
 from nexusagent.tools.code_review.models import (
     SEVERITY_HIGH,
-    SEVERITY_MEDIUM,
-    SEVERITY_LOW,
     SEVERITY_INFO,
+    SEVERITY_LOW,
+    SEVERITY_MEDIUM,
     ReviewResult,
 )
 

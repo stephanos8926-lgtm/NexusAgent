@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-from nexusagent.tools.code_review.models import ReviewResult
+from nexusagent.tools.code_review.checks.ast_check import check as _check_python_ast
+from nexusagent.tools.code_review.checks.bugs import check as _check_bugs
+from nexusagent.tools.code_review.checks.performance import check as _check_performance
 
 # Import check functions directly from their modules to avoid circular imports
 from nexusagent.tools.code_review.checks.security import check as _check_security
-from nexusagent.tools.code_review.checks.bugs import check as _check_bugs
 from nexusagent.tools.code_review.checks.style import check as _check_style
-from nexusagent.tools.code_review.checks.performance import check as _check_performance
-from nexusagent.tools.code_review.checks.ast_check import check as _check_python_ast
+from nexusagent.tools.code_review.models import ReviewResult
 
 
 def review_code(code: str, language: str = "python") -> str:

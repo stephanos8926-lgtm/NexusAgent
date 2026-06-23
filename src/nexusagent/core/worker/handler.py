@@ -8,19 +8,11 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import time
-from datetime import UTC, datetime
-from typing import Any
-
-from sqlalchemy import select
 
 from nexusagent.core.agent import run_agent_task
-from nexusagent.core.subagent import SubAgentHandle
-from nexusagent.infrastructure.bus import AgentBus, get_bus, _NATS_HARD_RECONNECT_CAP
-from nexusagent.infrastructure.db import TaskModel, get_task_repo
+from nexusagent.infrastructure.db import get_task_repo
 from nexusagent.infrastructure.utils.circuit import CircuitBreaker
-from nexusagent.infrastructure.utils.retry import retry_with_backoff
-from nexusagent.llm.models import ResultSchema, TaskContract, TaskSchema, TaskStatus
+from nexusagent.llm.models import TaskSchema
 
 task_repo = get_task_repo()  # singleton instance for module-level use
 

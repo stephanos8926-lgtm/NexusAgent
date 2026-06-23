@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 class TaskRepository:
     """CRUD operations on tasks and results."""
 
-    def __init__(self, db_manager: "DatabaseManager") -> None:
+    def __init__(self, db_manager: DatabaseManager) -> None:
         """Initialize the repository with a database manager instance.
 
         Args:

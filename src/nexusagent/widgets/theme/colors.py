@@ -2,7 +2,6 @@
 
 from dataclasses import dataclass
 
-
 # ── Brand Palette (Linear-inspired, indigo accent) ────────────────────────
 
 # Backgrounds — near-black with blue-cool undertone

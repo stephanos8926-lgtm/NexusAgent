@@ -193,7 +193,7 @@ class DreamCycle:
 
     async def _write_insight(self, content: str, description: str, confidence: float, entities: list[str]):
         """Write a synthesized insight as a new memory file."""
-        from nexusagent.memory.memory_files import FileMemory, MemoryEntryType
+        from nexusagent.memory.memory_files import FileMemory
 
         fm = FileMemory(str(self.workspace_dir))
         fm.initialize()
@@ -613,10 +613,9 @@ class DreamCycle:
             self.bank_dir = Path(memory_dir)
 
         # Acquire lock
-        if not dry_run:
-            if not await self.lock.acquire_blocking():
-                logger.error("Could not acquire dream lock — another cycle running?")
-                return {"error": "lock_acquisition_failed", "dry_run": dry_run}
+        if not dry_run and not await self.lock.acquire_blocking():
+            logger.error("Could not acquire dream lock — another cycle running?")
+            return {"error": "lock_acquisition_failed", "dry_run": dry_run}
 
         try:
             return await self._run_locked(dry_run)

@@ -10,7 +10,6 @@ from __future__ import annotations
 import contextvars
 from collections.abc import Callable
 
-
 # Context-local policy context (async-safe, unlike threading.local)
 # NOTE: No mutable default — ContextVar doesn't support default_factory.
 # The default is None; _get_ctx() creates a fresh dict per context.

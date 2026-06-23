@@ -14,7 +14,6 @@ import struct
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-
 from nexusagent.infrastructure.config import settings
 
 logger = logging.getLogger(__name__)

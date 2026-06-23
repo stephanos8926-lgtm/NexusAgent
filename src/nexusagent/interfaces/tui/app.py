@@ -22,17 +22,11 @@ from textual.binding import Binding
 from textual.containers import Container, VerticalScroll
 
 from nexusagent.infrastructure.config import settings
-from nexusagent.interfaces.tui.formatters import (
-    format_arg_value,  # noqa: F401
-    render_markdown,  # noqa: F401
-    truncate,  # noqa: F401
-)
 from nexusagent.interfaces.tui.input import (
     on_chat_input_submitted as _on_chat_input_submitted,
 )
 from nexusagent.interfaces.tui.streaming import (
     cycle_theme,
-    format_args_str,  # noqa: F401
     handle_event,
     handle_slash_command,
     show_help,
@@ -40,22 +34,18 @@ from nexusagent.interfaces.tui.streaming import (
 from nexusagent.interfaces.tui.websocket import (
     check_server_version,
     fetch_server_version,
-    send_approval,  # noqa: F401
     ws_loop,
 )
 from nexusagent.interfaces.tui_widgets import (
     Breakpoint,
     _sigwinch_handler,
 )
-from nexusagent.version import VERSION as CLIENT_VERSION  # noqa: F401
 from nexusagent.widgets.chat_input import ChatInput
 from nexusagent.widgets.messages import (
-    AppMessage,  # noqa: F401
-    AssistantMessage,  # noqa: F401
-    ErrorMessage,  # noqa: F401
-    ToolCallMessage,  # noqa: F401
-    UserMessage,  # noqa: F401
-    WelcomeBanner,  # noqa: F401
+    AppMessage,
+    AssistantMessage,
+    ToolCallMessage,
+    WelcomeBanner,
 )
 from nexusagent.widgets.status import StatusBar
 from nexusagent.widgets.theme import register_themes
@@ -274,7 +264,7 @@ class NexusApp(App):
 
     def action_quit(self) -> None:
         """Quit the TUI application, canceling background tasks."""
-        asyncio.create_task(self._input_queue.put(None))  # noqa: RUF006
+        _ = asyncio.create_task(self._input_queue.put(None))
         if hasattr(self, '_ws_task'):
             self._ws_task.cancel()
         self.exit()

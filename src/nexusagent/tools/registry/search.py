@@ -34,8 +34,8 @@ def tool_search(
         tool_search(category="git")                      # List git tools
     """
     # Delayed imports to avoid circular dependency
-    from .policy import _get_ctx, get_manifest
     from .core import _REGISTRY
+    from .policy import _get_ctx, get_manifest
 
     ctx = _get_ctx()
     manifest = get_manifest(ctx.role)

@@ -11,6 +11,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from nexusagent.tools import fs_base as _fs_base
+
+# Re-export edit_file from the editor subpackage for backward compatibility
 # Shared utilities from fs_base (single source of truth)
 from nexusagent.tools.fs_base import (
     _DEFAULT_DIR_EXCLUDES,
@@ -19,13 +22,7 @@ from nexusagent.tools.fs_base import (
     _resolve,
     get_read_files,
     reset_read_tracking,
-    set_workspace_root,  # noqa: F401 — re-exported for backward compatibility
 )
-from nexusagent.tools import fs_base as _fs_base
-
-
-# Re-export edit_file from the editor subpackage for backward compatibility
-from nexusagent.tools.editor import edit_file  # noqa: F401
 
 
 def __getattr__(name: str):
@@ -188,12 +185,3 @@ def write_multiple_files(files: dict[str, str]) -> str:
         write_file(path, content)
     return f"Successfully wrote {len(files)} files"
 
-
-def get_read_files() -> list[str]:
-    """Return list of files that have been read in this session. Useful for debugging."""
-    return sorted(_get_read_files())
-
-
-def reset_read_tracking() -> None:
-    """Reset the read-file tracking. Use when starting a new task/session."""
-    _get_read_files().clear()

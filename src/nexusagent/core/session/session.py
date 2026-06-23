@@ -11,6 +11,7 @@ Extends SessionBase (shared memory logic) with:
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 from pathlib import Path
 from typing import Any
@@ -22,11 +23,11 @@ from nexusagent.core.session.helpers import (
     _build_session_history_context,
 )
 from nexusagent.core.session.session_base import SessionBase
-from nexusagent.memory.dream import DreamCycle
 from nexusagent.hooks import HookEvent, get_hook_manager
 from nexusagent.infrastructure.config import settings
 from nexusagent.infrastructure.prompt_loader import inject_file_at_reference, load_nexus_prompt
 from nexusagent.llm.models import ErrorEvent, ResponseEvent, ThinkingEvent
+from nexusagent.memory.dream import DreamCycle
 
 logger = logging.getLogger(__name__)
 
@@ -222,7 +223,7 @@ class Session(SessionBase):
         if settings.agent.compaction_enabled and _compaction.should_compact(
             [{"role": "system" if isinstance(m, SystemMessage) else "user" if isinstance(m, HumanMessage) else "assistant", "content": m.content} for m in messages]
         ):
-            summary = f"Session {self.session_id} turn: {user_message[:100]}"
+            logger.debug("Session %s turn: %s", self.session_id, user_message[:100])
             try:
                 flush_ctx = await self.pre_compaction_flush()
                 messages.insert(1, SystemMessage(content=flush_ctx))
@@ -242,6 +243,22 @@ class Session(SessionBase):
         # Invoke the agent via astream for real-time token streaming
         self._cancel_flag = False
         accumulated: list[str] = []
+
+        # Start heartbeat task for long-running LLM calls
+        # Emits periodic "still thinking" events so the TUI knows we're alive
+        heartbeat_interval = 15.0  # seconds
+        last_heartbeat = asyncio.get_event_loop().time()
+        self._heartbeat_task = None
+
+        async def _heartbeat():
+            """Emit periodic thinking events during long LLM calls."""
+            while True:
+                await asyncio.sleep(heartbeat_interval)
+                elapsed = int(asyncio.get_event_loop().time() - last_heartbeat)
+                self._enqueue(ThinkingEvent(content=f"Still thinking... ({elapsed}s)").model_dump())
+
+        self._heartbeat_task = asyncio.create_task(_heartbeat())
+
         try:
             async for chunk in self.agent.astream(
                 {"messages": messages},
@@ -249,6 +266,8 @@ class Session(SessionBase):
             ):
                 if self._cancel_flag:
                     break
+                # Reset heartbeat timer on each chunk
+                last_heartbeat = asyncio.get_event_loop().time()
                 if isinstance(chunk, tuple):
                     token, metadata = chunk
                     await self._handle_message_token(token, metadata, accumulated)
@@ -398,10 +417,8 @@ class Session(SessionBase):
             self._event_queue.put_nowait(event)
         except asyncio.QueueFull:
             # Drop oldest event to make room (prevents deadlock on slow consumers)
-            try:
+            with contextlib.suppress(asyncio.QueueEmpty):
                 self._event_queue.get_nowait()
-            except asyncio.QueueEmpty:
-                pass
             try:
                 self._event_queue.put_nowait(event)
             except asyncio.QueueFull:
@@ -417,10 +434,8 @@ class Session(SessionBase):
         """
         # Drop oldest if at capacity
         if self._extraction_queue.full():
-            try:
+            with contextlib.suppress(asyncio.QueueEmpty):
                 self._extraction_queue.get_nowait()
-            except asyncio.QueueEmpty:
-                pass
 
         combined = f"User: {user_message}\nAssistant: {response}"
         task = asyncio.create_task(self._run_extraction(combined))
@@ -454,7 +469,7 @@ class Session(SessionBase):
             return
 
         # Fire-and-forget: create task without awaiting
-        asyncio.create_task(self._run_dream_cycle())
+        self._dream_task = asyncio.create_task(self._run_dream_cycle())
 
     async def _run_dream_cycle(self) -> None:
         """Run dream cycle in background."""

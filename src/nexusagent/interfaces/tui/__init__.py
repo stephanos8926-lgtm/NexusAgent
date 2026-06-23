@@ -9,17 +9,17 @@ This compat shim ensures all existing imports from tui.py continue to work:
 from __future__ import annotations
 
 # App class and entry point
-from nexusagent.interfaces.tui.app import NexusApp, main  # noqa: F401, I001
+from nexusagent.interfaces.tui.app import NexusApp, main
 
 # Formatters
-from nexusagent.interfaces.tui.formatters import (  # noqa: F401, I001
+from nexusagent.interfaces.tui.formatters import (
     format_arg_value,
     render_markdown,
     truncate,
 )
 
 # Widgets re-exported for backward compat (tests import from tui.py)
-from nexusagent.interfaces.tui_widgets import (  # noqa: F401, I001
+from nexusagent.interfaces.tui_widgets import (
     NO_COLOR,
     ApprovalModal,
     Breakpoint,
@@ -32,8 +32,8 @@ from nexusagent.interfaces.tui_widgets import (  # noqa: F401, I001
 )
 
 # Message widgets (tests import from tui.py)
-from nexusagent.widgets.chat_input import ChatInput  # noqa: F401, I001
-from nexusagent.widgets.messages import (  # noqa: F401, I001
+from nexusagent.widgets.chat_input import ChatInput
+from nexusagent.widgets.messages import (
     AppMessage,
     AssistantMessage,
     ErrorMessage,
@@ -43,4 +43,4 @@ from nexusagent.widgets.messages import (  # noqa: F401, I001
 )
 
 # Status bar
-from nexusagent.widgets.status import StatusBar  # noqa: F401
+from nexusagent.widgets.status import StatusBar

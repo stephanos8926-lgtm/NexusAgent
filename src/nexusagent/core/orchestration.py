@@ -127,9 +127,10 @@ class DeepResearchOrchestrator:
     async def _fetch(self, url: str) -> str | None:
         """Fetch content from a URL using the existing fetch_url tool."""
         try:
-            from nexusagent.tools.research import fetch_url
             # fetch_url is sync (uses httpx directly) — run in executor to avoid blocking
             import asyncio
+
+            from nexusagent.tools.research import fetch_url
             return await asyncio.get_event_loop().run_in_executor(None, fetch_url, url)
         except Exception:
             return None

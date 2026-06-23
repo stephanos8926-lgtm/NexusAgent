@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from textual.widgets import Markdown, Static
+from textual.widgets import Static
+
+if TYPE_CHECKING:
+    from textual.content import Content
 
 
 class AssistantMessage(Static):
@@ -67,10 +70,7 @@ class AssistantMessage(Static):
             self.update(content)
 
     def render(self) -> Content:
-        """Render the buffered content as plain text.
-
-        Returns:
-            Content wrapping the current buffer string.
-        """
+        """Render the buffered content as plain text."""
         from textual.content import Content
+
         return Content(self._buffer)

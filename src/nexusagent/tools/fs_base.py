@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 # Track files read in the current session (context-local for session isolation)
 import contextvars
+from pathlib import Path
 
 _read_files_var: contextvars.ContextVar[set[str]] = contextvars.ContextVar(
     "read_files", default=set()

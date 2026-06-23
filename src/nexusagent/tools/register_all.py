@@ -71,7 +71,7 @@ async def register_mcp_tools() -> list[str]:
         return registered
 
     try:
-        import httpx  # noqa: F401
+        import httpx
     except ImportError:
         logger.warning("httpx not installed — MCP tool loading skipped")
         return registered
@@ -315,19 +315,19 @@ async def spawn_subagent(
 )
 def ask_user(question: str, options: list[str] | None = None) -> str:
     """Ask the user a question. In TUI mode, pauses for user input.
-    
+
     Returns the user's response, or a fallback if non-interactive.
     """
     # Check if we're running in TUI mode (event loop available)
     try:
         import asyncio
-        loop = asyncio.get_running_loop()
+        asyncio.get_running_loop()
         # We're in an async context — this is the TUI
         # Return a signal that the TUI will handle via push_screen_wait
         return f"__ASK_USER__{question}__OPTIONS__{','.join(options or [])}__"
     except RuntimeError:
         pass
-    
+
     # Non-interactive fallback
     if options:
         return (
@@ -394,10 +394,7 @@ def _get_memory_workspace() -> str:
 
     # 2. Check config
     ws = settings.agent.memory_workspace
-    if ws:
-        path = os.path.expanduser(ws)
-    else:
-        path = os.path.expanduser(_DEFAULT_MEMORY_WORKSPACE)
+    path = os.path.expanduser(ws) if ws else os.path.expanduser(_DEFAULT_MEMORY_WORKSPACE)
     os.makedirs(path, exist_ok=True)
     return path
 

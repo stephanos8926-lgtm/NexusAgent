@@ -17,11 +17,10 @@ import logging
 from pathlib import Path
 
 from nexusagent.infrastructure.template_includes import (
-    resolve_path as _resolve_path,
-    load_prompt_content,
-    PromptLoadError,
-    CircularChainError,
     DEFAULT_MAX_CHAIN_DEPTH,
+    CircularChainError,
+    PromptLoadError,
+    load_prompt_content,
     set_allowed_include_paths,
 )
 

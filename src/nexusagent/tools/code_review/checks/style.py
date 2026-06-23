@@ -5,8 +5,8 @@ from __future__ import annotations
 import re
 
 from nexusagent.tools.code_review.models import (
-    SEVERITY_LOW,
     SEVERITY_INFO,
+    SEVERITY_LOW,
     ReviewResult,
 )
 

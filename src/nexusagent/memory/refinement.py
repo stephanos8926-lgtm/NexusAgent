@@ -311,7 +311,7 @@ If no contradiction, output: {"has_contradiction": false}
 Respond with ONLY the JSON, no other text."""
 
         user_prompt = f"Entity: {entity}\n\nMemories:\n"
-        for idx, (i, mem) in enumerate(memories):
+        for idx, (_i, mem) in enumerate(memories):
             content = mem.get("content", "")
             confidence = mem.get("confidence", 0.5)
             user_prompt += f"[{idx}] (confidence: {confidence}) {content}\n"

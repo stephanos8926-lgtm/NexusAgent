@@ -37,7 +37,7 @@ def _validate_workdir(workdir: str | None) -> str | None:
         raise PermissionError(
             f"SAFETY: workdir '{workdir}' resolves to '{resolved}' which is outside "
             f"the workspace root '{_SHELL_WORKSPACE_ROOT}'"
-        )
+        ) from None
     return str(resolved)
 
 

@@ -12,8 +12,8 @@ from nexusagent.widgets.theme.colors import (
     DARK_COLORS,
     ROSE_PINE_COLORS,
     SOLARIZED_DARK_COLORS,
-    TOKYO_NIGHT_COLORS,
     THEME_REGISTRY,
+    TOKYO_NIGHT_COLORS,
     ThemeColors,
 )
 from nexusagent.widgets.theme.registry import (

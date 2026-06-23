@@ -25,16 +25,16 @@ from typing import Any
 import sqlite_vec
 
 from .embeddings import (
-    EMBED_DIM,
-    CHUNK_SIZE,
-    CHUNK_OVERLAP,
-    VECTOR_WEIGHT,
-    KEYWORD_WEIGHT,
-    CANDIDATE_MULTIPLIER,
     _DB_POOL,
-    _vec_to_blob,
-    _blob_to_vec,
+    CANDIDATE_MULTIPLIER,
+    CHUNK_OVERLAP,
+    CHUNK_SIZE,
+    EMBED_DIM,
+    KEYWORD_WEIGHT,
+    VECTOR_WEIGHT,
     EmbeddingProvider,
+    _blob_to_vec,
+    _vec_to_blob,
 )
 
 logger = logging.getLogger(__name__)

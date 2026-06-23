@@ -35,7 +35,7 @@ RE_ENTITY_PROJECT_NAME = re.compile(
     r"\b([A-Z][a-zA-Z]*(?:[-_][A-Z][a-zA-Z]*)+)\b"  # CamelCase or kebab-case project names
 )
 RE_ENTITY_FILE_PATH = re.compile(
-    r"(?:[\w./-]+\.(?:py|js|ts|tsx|jsx|rs|go|java|c|cpp|h|hpp|yaml|yml|toml|json|md|txt|cfg|ini|sh|bash|zsh|sql|html|css|scss|less|vue|svelte|rb|php|ex|exs|erl|hs|ml|fs|ps1|psm1|psd1|dockerfile|makefile|cmake|gradle|sbt|xml|xsl|svg))"  # noqa: E501
+    r"(?:[\w./-]+\.(?:py|js|ts|tsx|jsx|rs|go|java|c|cpp|h|hpp|yaml|yml|toml|json|md|txt|cfg|ini|sh|bash|zsh|sql|html|css|scss|less|vue|svelte|rb|php|ex|exs|erl|hs|ml|fs|ps1|psm1|psd1|dockerfile|makefile|cmake|gradle|sbt|xml|xsl|svg))"
 )
 
 # Decision phrases

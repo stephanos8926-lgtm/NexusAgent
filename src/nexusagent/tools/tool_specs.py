@@ -32,11 +32,10 @@ from nexusagent.tools.git import (
     git_status,
 )
 from nexusagent.tools.patch import apply_patch
-from nexusagent.tools.registry import register_tool, tool_search, auto_correct
+from nexusagent.tools.registry import auto_correct, register_tool, tool_search
 from nexusagent.tools.research import fetch_url, search_local_docs, search_web
 from nexusagent.tools.shell import run_shell, run_shell_streaming
 from nexusagent.tools.test_runner import run_single_test, run_tests
-from nexusagent.tools.write_todos import read_todos, write_todos
 
 # ═══════════════════════════════════════════════════════════════════════
 # Tool Specifications

@@ -373,7 +373,7 @@ settings = load_config()
 
 def reload_settings() -> ConfigSchema:
     """Reload settings from config files and environment variables.
-    
+
     Use this after modifying config files to pick up changes without restarting.
     """
     global settings

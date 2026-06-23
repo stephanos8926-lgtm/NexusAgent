@@ -38,44 +38,34 @@ async def session_websocket(
     ?token= query parameter.
     """
     logger.info(f"session_websocket CALLED: session_id={session_id}")
-    # Debug: log all headers
-    print(f"DEBUG headers: {dict(websocket.headers)}", flush=True)
     # Verify API key — accept X-API-Key header or Authorization: Bearer ***
     header_key = websocket.headers.get("x-api-key")
-    # Also accept Bearer <REDACTED> (sent by TUI and browser clients)
+    # Also accept Bearer token (sent by TUI and browser clients)
     auth_header = websocket.headers.get("authorization", "")
     if auth_header.lower().startswith("bearer "):
         header_key = header_key or auth_header[7:]
     # Also accept short-lived connection token from query param
     token = websocket.query_params.get("token")
+    
+    # All WebSocket connections require API key or valid token
     effective_key = header_key or token
-    print(f"DEBUG effective_key: '{effective_key}'", flush=True)
-
-    # In local/dev mode, if no key is provided and auth keystore doesn't exist,
-    # allow connections without auth (the TUI connects locally without a key)
+    
+    # Skip token validation only for SELF-SIGNED JWT with explicit verification
+    # Ensure no unqualified localhost bypasses exist
     if not effective_key:
-        try:
-            from nexusagent.infrastructure.auth import get_auth_manager
-            get_auth_manager()
-            # Auth is initialized but no key provided — reject
-            await websocket.close(code=4001, reason="Missing API key")
-            return
-        except FileNotFoundError:
-            # Auth not initialized — allow local dev connections without key
-            logger.info("Auth keystore not found — allowing local connection without API key")
-            effective_key = "local-dev"  # Skip auth verification
-    if effective_key != "local-dev":
-        try:
-            await verify_api_key(effective_key)
-        except HTTPException as e:
-            logger.warning(f"WS auth failed for key={effective_key}: {e}")
-            await websocket.close(code=4001, reason="Invalid or missing API key")
-            return
+        await websocket.close(code=4001, reason="Missing API key")
+        return
+        
+    try:
+        await verify_api_key(effective_key)
+    except HTTPException as e:
+        logger.warning(f"WS auth failed for key={effective_key}: {e}")
+        await websocket.close(code=4001, reason="Invalid or missing API key")
+        return
 
     # Validate Origin header to prevent CSRF
     origin = websocket.headers.get("origin", "")
-    print(f"DEBUG WS origin: '{origin}', allowed={_WS_ALLOWED_ORIGINS}")
-    logger.info(f"WS origin: '{origin}', allowed={_WS_ALLOWED_ORIGINS}")
+    logger.info(f"WS origin: origin={'present' if origin else 'missing'}, allowed={len(_WS_ALLOWED_ORIGINS)} origins")
     if origin and origin not in _WS_ALLOWED_ORIGINS:
         logger.warning(f"Rejected WebSocket from unauthorized origin: {origin}")
         await websocket.close(code=4003, reason="Forbidden origin")
@@ -89,9 +79,10 @@ async def session_websocket(
     agent = Agent(role="full", policy="permissive")
 
     # Resolve workspace-scoped memory directory from query param or config
-    from nexusagent.infrastructure.config import settings as _settings
-    from pathlib import Path as _Path
     import os as _os
+    from pathlib import Path as _Path
+
+    from nexusagent.infrastructure.config import settings as _settings
 
     _memory_dir: str | None = None
     _working_dir = websocket.query_params.get("working_dir", ".")
