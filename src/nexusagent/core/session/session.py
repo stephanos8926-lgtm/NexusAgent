@@ -169,41 +169,27 @@ class Session(SessionBase):
 
         return HumanMessage(content=content_blocks)
 
-    async def send(self, user_message: str, images: list[str] | None = None) -> None:
-        """Process a user message: store in DB, recall memory, stream agent response."""
-        if self.status != "active":
-            # Cancel any zombie heartbeat task from previous run
-            if self._heartbeat_task is not None and not self._heartbeat_task.done():
-                self._heartbeat_task.cancel()
-            self._enqueue(ErrorEvent(message="Session is not active").model_dump())
-            return
+    # ── send() helper methods ────────────────────────────────────────────
 
-        if settings.hooks.hooks_enabled:
-            try:
-                await get_hook_manager().run_hooks(
-                    HookEvent.SESSION_INIT,
-                    {
-                        "session_id": self.session_id,
-                        "working_dir": self.working_dir,
-                        "config": settings,
-                    },
-                )
-            except Exception as exc:
-                logger.warning("session_init hook failed: %s", exc)
+    def _build_messages_list(
+        self,
+        system_prompt: str,
+        user_message: str,
+        images: list[str] | None = None,
+    ) -> list[Any]:
+        """Build the complete message list for agent invocation.
 
-        user_message = self._process_chat_input(user_message)
-        self._enqueue(ThinkingEvent(content="Processing...").model_dump())
+        Assembles system prompt, context injections, cross-session memories,
+        hybrid memory context, and conversation history.
 
-        try:
-            await self.db_repo.add_message(self.session_id, "user", user_message)
-        except Exception as exc:
-            logger.warning("Failed to store user message in DB: %s", exc)
+        Args:
+            system_prompt: Base system prompt from NEXUS.md.
+            user_message: User's input message.
+            images: Optional list of image paths to attach.
 
-        # Build messages list
-        system_prompt = self._load_system_prompt()
-        context_block = self._build_context_injection()
-        if context_block:
-            system_prompt = system_prompt + "\n\n" + context_block
+        Returns:
+            List of LangChain message objects ready for agent invocation.
+        """
         messages = [SystemMessage(content=system_prompt)]
 
         # Inject cross-session memories
@@ -215,68 +201,117 @@ class Session(SessionBase):
             )
             messages.append(SystemMessage(content=cross_session_ctx))
 
-        # Inject memory context from HybridMemoryManager
+        # Inject hybrid memory context
         try:
-            hybrid_context = await self.hybrid_memory.get_memory_context(
-                user_message, max_results=5
+            hybrid_context = asyncio.run(
+                self.hybrid_memory.get_memory_context(user_message, max_results=5)
             )
             if hybrid_context:
                 messages.append(SystemMessage(content=hybrid_context))
         except Exception as exc:
             logger.warning("Hybrid memory context retrieval failed: %s", exc)
 
-        messages.extend(self._conversation_history[-settings.agent.max_conversation_history :])
+        # Add conversation history
+        max_hist = settings.agent.max_conversation_history
+        messages.extend(self._conversation_history[-max_hist:])
+
+        # Add user message
         user_msg = self._build_user_message(user_message, images)
         messages.append(user_msg)
 
-        # Compaction
-        _compaction = self._compaction.__class__()  # Fresh instance
-        if settings.agent.compaction_enabled and _compaction.should_compact(
-            [
-                {
-                    "role": "system"
-                    if isinstance(m, SystemMessage)
-                    else "user"
-                    if isinstance(m, HumanMessage)
-                    else "assistant",
-                    "content": m.content,
-                }
-                for m in messages
-            ]
-        ):
-            logger.debug("Session %s turn: %s", self.session_id, user_message[:100])
-            try:
-                flush_ctx = await self.pre_compaction_flush()
-                messages.insert(1, SystemMessage(content=flush_ctx))
-            except Exception as exc:
-                logger.warning("Pre-compaction flush failed: %s", exc)
-            msg_dicts = [
-                {
-                    "role": "system"
-                    if isinstance(m, SystemMessage)
-                    else "user"
-                    if isinstance(m, HumanMessage)
-                    else "assistant",
-                    "content": m.content,
-                }
-                for m in messages
-            ]
-            compacted = _compaction.compact(msg_dicts)
-            messages = []
-            for md in compacted:
-                if md["role"] == "system":
-                    messages.append(SystemMessage(content=md["content"]))
-                elif md["role"] == "user":
-                    messages.append(HumanMessage(content=md["content"]))
-                else:
-                    messages.append(AIMessage(content=md["content"]))
+        return messages
 
-        # Invoke the agent via astream for real-time token streaming
+    def _apply_compaction(self, messages: list[Any]) -> list[Any]:
+        """Apply compaction to the message list if enabled.
+
+        Flushes memory context before compaction, then compacts
+        the message list using graduated strategies.
+
+        Args:
+            messages: List of messages to potentially compact.
+
+        Returns:
+            Compacted message list (or original if compaction skipped).
+        """
+        _compaction = self._compaction.__class__()
+        if not settings.agent.compaction_enabled:
+            return messages
+
+        # Check if compaction should be applied
+        msg_dicts = [
+            {
+                "role": "system"
+                if isinstance(m, SystemMessage)
+                else "user"
+                if isinstance(m, HumanMessage)
+                else "assistant",
+                "content": m.content,
+            }
+            for m in messages
+        ]
+
+        if not _compaction.should_compact(msg_dicts):
+            return messages
+
+        logger.debug("Session %s turn: compaction triggered", self.session_id)
+
+        # Try to flush memory context before compaction
+        try:
+            flush_ctx = asyncio.run(self.pre_compaction_flush())
+            messages.insert(1, SystemMessage(content=flush_ctx))
+        except Exception as exc:
+            logger.warning("Pre-compaction flush failed: %s", exc)
+
+        # Re-convert to dicts after flush insertion
+        msg_dicts = [
+            {
+                "role": "system"
+                if isinstance(m, SystemMessage)
+                else "user"
+                if isinstance(m, HumanMessage)
+                else "assistant",
+                "content": m.content,
+            }
+            for m in messages
+        ]
+
+        # Apply compaction
+        compacted = _compaction.compact(msg_dicts)
+
+        # Convert back to message objects
+        result = []
+        for md in compacted:
+            if md["role"] == "system":
+                result.append(SystemMessage(content=md["content"]))
+            elif md["role"] == "user":
+                result.append(HumanMessage(content=md["content"]))
+            else:
+                result.append(AIMessage(content=md["content"]))
+
+        return result
+
+    async def _stream_agent_response(
+        self,
+        messages: list[Any],
+        user_msg: Any,
+        accumulated: list[str],
+    ) -> bool:
+        """Stream agent response via astream() with heartbeat monitoring.
+
+        Emits periodic "still thinking" events during long LLM calls,
+        handles token streaming, tool calls, and tool results.
+
+        Args:
+            messages: Message list for agent invocation.
+            user_msg: The user message object (for history tracking).
+            accumulated: List to accumulate response tokens.
+
+        Returns:
+            True if response completed successfully, False if cancelled.
+        """
         self._cancel_flag = False
-        accumulated: list[str] = []
 
         # Start heartbeat task for long-running LLM calls
-        # Emits periodic "still thinking" events so the TUI knows we're alive
         heartbeat_interval = 15.0  # seconds
         last_heartbeat = asyncio.get_event_loop().time()
 
@@ -310,36 +345,53 @@ class Session(SessionBase):
 
             if self._cancel_flag:
                 self._enqueue(ErrorEvent(message="Session interrupted").model_dump())
-            else:
-                final_content = "".join(accumulated)
-                self._enqueue(ResponseEvent(content=final_content).model_dump())
+                return False
 
-                self._conversation_history.append(user_msg)
-                self._conversation_history.append(AIMessage(content=final_content))
-                max_hist = settings.agent.max_conversation_history
-                if len(self._conversation_history) > max_hist:
-                    self._conversation_history = self._conversation_history[-max_hist:]
+            # Response completed successfully
+            final_content = "".join(accumulated)
+            self._enqueue(ResponseEvent(content=final_content).model_dump())
 
-                try:
-                    await self.db_repo.add_message(self.session_id, "assistant", final_content)
-                except Exception as exc:
-                    logger.warning("Failed to store assistant message in DB: %s", exc)
+            # Update conversation history
+            self._conversation_history.append(user_msg)
+            self._conversation_history.append(AIMessage(content=final_content))
+            max_hist = settings.agent.max_conversation_history
+            if len(self._conversation_history) > max_hist:
+                self._conversation_history = self._conversation_history[-max_hist:]
 
-                # Fire-and-forget auto extraction (non-blocking)
-                self._schedule_extraction(user_msg, final_content)
+            # Store in DB
+            try:
+                await self.db_repo.add_message(self.session_id, "assistant", final_content)
+            except Exception as exc:
+                logger.warning("Failed to store assistant message in DB: %s", exc)
 
-                # Increment turn count and auto-trigger dream cycle
-                self._turn_count += 1
-                self._maybe_trigger_dream_cycle()
+            # Schedule auto-extraction (fire-and-forget)
+            self._schedule_extraction(user_msg, final_content)
+
+            # Increment turn count and trigger dream cycle
+            self._turn_count += 1
+            self._maybe_trigger_dream_cycle()
+
+            return True
 
         except Exception as exc:
             logger.error("Agent invocation failed: %s", exc, exc_info=True)
             # Cancel heartbeat task on error (prevents zombie tasks)
             if self._heartbeat_task is not None and not self._heartbeat_task.done():
                 self._heartbeat_task.cancel()
-            if settings.hooks.hooks_enabled:
-                try:
-                    await get_hook_manager().run_hooks(
+            raise
+
+    def _handle_send_error(self, exc: Exception) -> None:
+        """Handle errors during send() execution.
+
+        Runs error hooks if enabled and enqueues an ErrorEvent.
+
+        Args:
+            exc: The exception that occurred.
+        """
+        if settings.hooks.hooks_enabled:
+            try:
+                asyncio.run(
+                    get_hook_manager().run_hooks(
                         HookEvent.ERROR,
                         {
                             "session_id": self.session_id,
@@ -347,9 +399,70 @@ class Session(SessionBase):
                             "working_dir": self.working_dir,
                         },
                     )
-                except Exception as hook_exc:
-                    logger.warning("error hook failed: %s", hook_exc)
-            self._enqueue(ErrorEvent(message=str(exc)).model_dump())
+                )
+            except Exception as hook_exc:
+                logger.warning("error hook failed: %s", hook_exc)
+        self._enqueue(ErrorEvent(message=str(exc)).model_dump())
+
+    async def send(self, user_message: str, images: list[str] | None = None) -> None:
+        """Process a user message: store in DB, recall memory, stream agent response."""
+        if self.status != "active":
+            # Cancel any zombie heartbeat task from previous run
+            if self._heartbeat_task is not None and not self._heartbeat_task.done():
+                self._heartbeat_task.cancel()
+            self._enqueue(ErrorEvent(message="Session is not active").model_dump())
+            return
+
+        if settings.hooks.hooks_enabled:
+            try:
+                await get_hook_manager().run_hooks(
+                    HookEvent.SESSION_INIT,
+                    {
+                        "session_id": self.session_id,
+                        "working_dir": self.working_dir,
+                        "config": settings,
+                    },
+                )
+            except Exception as exc:
+                logger.warning("session_init hook failed: %s", exc)
+
+        user_message = self._process_chat_input(user_message)
+        self._enqueue(ThinkingEvent(content="Processing...").model_dump())
+
+        try:
+            await self.db_repo.add_message(self.session_id, "user", user_message)
+        except Exception as exc:
+            logger.warning("Failed to store user message in DB: %s", exc)
+
+        # Build system prompt with context
+        system_prompt = self._load_system_prompt()
+        context_block = self._build_context_injection()
+        if context_block:
+            system_prompt = system_prompt + "\n\n" + context_block
+
+        # Build messages list (system prompt, memories, history, user message)
+        messages = self._build_messages_list(system_prompt, user_message, images)
+
+        # Apply compaction if enabled
+        messages = self._apply_compaction(messages)
+
+        # Prepare for streaming
+        accumulated: list[str] = []
+        user_msg = self._build_user_message(user_message, images)
+
+        try:
+            # Stream agent response with heartbeat monitoring
+            success = await self._stream_agent_response(messages, user_msg, accumulated)
+
+            if success:
+                logger.debug("Session %s completed successfully", self.session_id)
+
+        except Exception as exc:
+            logger.error("Agent invocation failed: %s", exc, exc_info=True)
+            # Cancel heartbeat task on error (prevents zombie tasks)
+            if self._heartbeat_task is not None and not self._heartbeat_task.done():
+                self._heartbeat_task.cancel()
+            self._handle_send_error(exc)
 
     async def _handle_message_token(self, token, metadata: dict, accumulated: list[str]) -> None:
         """Process a single message token from the stream."""
