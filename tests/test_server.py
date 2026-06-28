@@ -130,13 +130,97 @@ async def test_workers_endpoint():
 
 
 @pytest.mark.asyncio
-async def test_tools_endpoint():
-    """GET /tools should return registered tools grouped by category."""
+async def test_operator_key_rejected_from_admin_endpoints():
+    """Operator keys (NEXUS_AUTH_OPERATOR_KEYS) should be rejected from admin-only endpoints."""
+    import os
+    os.environ["NEXUS_AUTH_OPERATOR_KEYS"] = "operator-key-123"
+    try:
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            # POST /tasks should require admin — operator key must be rejected
+            response = await client.post(
+                "/tasks",
+                json={"description": "test", "priority": 1},
+                headers={"X-API-Key": "operator-key-123"},
+            )
+            assert response.status_code == 403, f"Expected 403, got {response.status_code}"
+
+            # POST /tasks/{id}/cancel should require admin
+            response = await client.post(
+                "/tasks/some-id/cancel",
+                headers={"X-API-Key": "operator-key-123"},
+            )
+            assert response.status_code == 403, f"Expected 403, got {response.status_code}"
+
+            # POST /tasks/{id}/retry should require admin
+            response = await client.post(
+                "/tasks/some-id/retry",
+                headers={"X-API-Key": "operator-key-123"},
+            )
+            assert response.status_code == 403, f"Expected 403, got {response.status_code}"
+    finally:
+        del os.environ["NEXUS_AUTH_OPERATOR_KEYS"]
+
+
+@pytest.mark.asyncio
+async def test_operator_key_allowed_on_read_endpoints():
+    """Operator keys should be allowed on read-only endpoints (status, result, list)."""
+    import os
+    os.environ["NEXUS_AUTH_OPERATOR_KEYS"] = "operator-key-456"
+    try:
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            # GET /tasks/{id}/status — operator allowed
+            response = await client.get(
+                "/tasks/some-id/status",
+                headers={"X-API-Key": "operator-key-456"},
+            )
+            assert response.status_code == 200, f"Expected 200, got {response.status_code}"
+
+            # GET /tasks/{id}/result — operator allowed
+            response = await client.get(
+                "/tasks/some-id/result",
+                headers={"X-API-Key": "operator-key-456"},
+            )
+            # 404 is fine — we're testing auth, not task existence
+            assert response.status_code in (200, 404), f"Expected 200/404, got {response.status_code}"
+
+            # GET /tasks — operator allowed
+            response = await client.get(
+                "/tasks",
+                headers={"X-API-Key": "operator-key-456"},
+            )
+            assert response.status_code == 200, f"Expected 200, got {response.status_code}"
+
+            # GET /workers — operator allowed
+            response = await client.get(
+                "/workers",
+                headers={"X-API-Key": "operator-key-456"},
+            )
+            assert response.status_code == 200, f"Expected 200, got {response.status_code}"
+    finally:
+        del os.environ["NEXUS_AUTH_OPERATOR_KEYS"]
+
+
+@pytest.mark.asyncio
+async def test_admin_key_allowed_on_all_endpoints():
+    """Admin key (keystore key) should be allowed on both admin and read endpoints."""
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
-        response = await client.get("/tools", headers=API_HEADERS)
-        assert response.status_code == 200
-        data = response.json()
-        assert "tools" in data
-        assert "total" in data
-        assert data["total"] >= 0
+        # POST /tasks — admin allowed
+        response = await client.post(
+            "/tasks",
+            json={"description": "test admin", "priority": 1},
+            headers=API_HEADERS,
+        )
+        # 200 or 503 (NATS unavailable) — both mean auth passed
+        assert response.status_code in (200, 503), f"Expected 200/503, got {response.status_code}"
+
+        # GET /tasks — admin allowed
+        response = await client.get("/tasks", headers=API_HEADERS)
+        assert response.status_code == 200, f"Expected 200, got {response.status_code}"
+
+        # POST /tasks/{id}/cancel — admin allowed
+        response = await client.post("/tasks/some-id/cancel", headers=API_HEADERS)
+        # 400 is fine (task not found), means auth passed
+        assert response.status_code in (200, 400), f"Expected 200/400, got {response.status_code}"

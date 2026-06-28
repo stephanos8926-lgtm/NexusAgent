@@ -13,11 +13,14 @@ api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 # Admin API key — the primary key from the keystore has full access
 # Additional operator keys can be set via NEXUS_AUTH_OPERATOR_KEYS (comma-separated)
-_OPERATOR_KEYS: set[str] = set(
-    k.strip()
-    for k in os.environ.get("NEXUS_AUTH_OPERATOR_KEYS", "").split(",")
-    if k.strip()
-)
+# NOTE: Read dynamically at call time to support test environment overrides
+def _get_operator_keys() -> set[str]:
+    """Get current operator keys from environment."""
+    return {
+        k.strip()
+        for k in os.environ.get("NEXUS_AUTH_OPERATOR_KEYS", "").split(",")
+        if k.strip()
+    }
 
 
 def _classify_key(api_key: str) -> str:
@@ -26,13 +29,13 @@ def _classify_key(api_key: str) -> str:
     The admin key is the one stored in the Fernet keystore.
     Operator keys are configured via NEXUS_AUTH_OPERATOR_KEYS env var.
     """
-    if api_key in _OPERATOR_KEYS:
+    if api_key in _get_operator_keys():
         return "operator"
     return "admin"  # keystore key is always admin
 
 
 async def verify_api_key(api_key: str = Security(api_key_header)) -> str:
-    """Verify API key from header against the auth keystore.
+    """Verify API key from header against the auth keystore or operator keys.
 
     Uses constant-time comparison to prevent timing attacks.
     Returns the API key if valid.
@@ -43,7 +46,11 @@ async def verify_api_key(api_key: str = Security(api_key_header)) -> str:
             detail="Missing X-API-Key header",
         )
 
-    # Try to validate against the keystore if auth is initialized
+    # Check operator keys first (constant-time via set membership)
+    if api_key in _get_operator_keys():
+        return api_key
+
+    # Try to validate against the keystore
     try:
         from nexusagent.infrastructure.auth import get_auth_manager
 

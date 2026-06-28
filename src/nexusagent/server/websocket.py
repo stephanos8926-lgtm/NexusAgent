@@ -8,7 +8,7 @@ from fastapi import HTTPException, WebSocket, WebSocketDisconnect
 
 from nexusagent.core.agent import Agent
 from nexusagent.core.session import session_manager
-from nexusagent.infrastructure.api_auth import verify_api_key
+from nexusagent.infrastructure.api_auth import require_admin, verify_api_key
 from nexusagent.infrastructure.db import get_session_repo
 from nexusagent.tools.fs_base import set_workspace_root
 
@@ -141,8 +141,16 @@ async def session_websocket(
                 elif msg_type == "interrupt":
                     await session.interrupt()
                 elif msg_type == "list_sessions":
-                    # Return session list to the TUI
+                    # Return session list to the TUI — admin only
                     try:
+                        from nexusagent.infrastructure.api_auth import _classify_key
+                        _role = _classify_key(header_key)
+                        if _role != "admin":
+                            await websocket.send_json({
+                                "type": "error",
+                                "error": "Admin access required to list sessions",
+                            })
+                            continue
                         sessions = await session_repo.list_sessions(limit=20)
                         await websocket.send_json({
                             "type": "session_list",

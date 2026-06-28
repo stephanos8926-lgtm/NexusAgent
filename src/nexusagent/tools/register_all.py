@@ -234,10 +234,48 @@ def _extract_param_descriptions(schema: dict) -> dict[str, str]:
 # Regex to strip HTML/script tags from tool descriptions
 _HTML_TAG_RE = re.compile(r"<[^>]+>")
 
+# Maximum allowed length for MCP tool descriptions
+_MAX_DESCRIPTION_LENGTH = 1000
+
+# Valid tool name pattern: lowercase letters, digits, underscores; must start with letter or underscore
+_VALID_TOOL_NAME_RE = re.compile(r"^[a-z_][a-z0-9_]*$")
+
+# Denylist of reserved/suspicious tool name prefixes (beyond BUILTIN_TOOL_NAMES)
+_RESERVED_PREFIXES = ("system__", "internal__", "admin__", "root__")
+
 
 def _sanitize_description(desc: str) -> str:
-    """Strip HTML/script tags from tool descriptions to prevent injection."""
-    return _HTML_TAG_RE.sub("", desc).strip()
+    """Strip HTML/script tags from tool descriptions and limit length.
+
+    Prevents HTML/script injection attacks and overly long descriptions
+    that could be used for prompt injection.
+    """
+    cleaned = _HTML_TAG_RE.sub("", desc).strip()
+    if len(cleaned) > _MAX_DESCRIPTION_LENGTH:
+        cleaned = cleaned[:_MAX_DESCRIPTION_LENGTH] + "…[truncated]"
+    return cleaned
+
+
+def _validate_tool_name(tool_name: str) -> tuple[bool, str]:
+    """Validate an MCP tool name for safety.
+
+    Returns:
+        (is_valid, reason) — if is_valid is False, reason explains why.
+    """
+    if not tool_name:
+        return False, "empty tool name"
+
+    if not _VALID_TOOL_NAME_RE.match(tool_name):
+        return False, (
+            f"invalid tool name '{tool_name}': "
+            "must match [a-z_][a-z0-9_]* (lowercase, digits, underscores only)"
+        )
+
+    for prefix in _RESERVED_PREFIXES:
+        if tool_name.startswith(prefix):
+            return False, f"tool name '{tool_name}' uses reserved prefix '{prefix}'"
+
+    return True, ""
 
 
 # ═══════════════════════════════════════════════════════════════════════
