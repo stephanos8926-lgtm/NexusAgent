@@ -165,6 +165,13 @@ class NexusApp(App):
             oldest = children.pop(0)
             oldest.remove()
 
+    def _mount_with_limit(self, widget) -> None:
+        """Mount any widget with the global _MAX_MESSAGE_WIDGETS limit.
+
+        Alias for _mount_message — keeps all mount paths under the same limit.
+        """
+        self._mount_message(widget)
+
     def on_mount(self) -> None:
         """Set up the TUI on mount: initialize queues, widgets, and start WebSocket loop."""
         self._input_queue: asyncio.Queue[str | None] = asyncio.Queue(maxsize=100)

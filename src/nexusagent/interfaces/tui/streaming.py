@@ -31,11 +31,11 @@ _STREAMING_MAX_WIDGETS = 50
 def _mount_with_limit(app, widget) -> None:
     """Mount a message widget with a sliding window limit.
 
-    Delegates to app._mount_message if available (app.py >= Phase C),
-    otherwise falls back to direct mount with manual cleanup.
+    Always delegates to app._mount_with_limit() to enforce the global limit.
+    Fallback to direct mount if the method doesn't exist yet.
     """
-    if hasattr(app, "_mount_message"):
-        app._mount_message(widget)
+    if hasattr(app, "_mount_with_limit"):
+        app._mount_with_limit(widget)
     else:
         # Fallback: direct mount with manual sliding window cleanup
         app.messages_container.mount(widget)

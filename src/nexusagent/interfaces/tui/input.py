@@ -36,6 +36,7 @@ async def on_chat_input_submitted(app, event) -> None:
         return
 
     if app._busy:
+        # Enforce queue limit BEFORE boxing _busy
         if len(app._pending_inputs) >= app._pending_inputs_max:
             msg = AppMessage("Queue full — please wait for the agent to finish")
             _mount_with_limit(app, msg)
