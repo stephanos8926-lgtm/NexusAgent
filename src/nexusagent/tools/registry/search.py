@@ -38,15 +38,15 @@ def tool_search(
     from .policy import _get_ctx, get_manifest
 
     ctx = _get_ctx()
-    manifest = get_manifest(ctx.role)
+    manifest = get_manifest(ctx["role"])
 
     # In strict mode, also filter out anything not in the original manifest
-    if ctx.policy == "strict":
+    if ctx["policy"] == "strict":
         allowed_names = manifest
-    elif ctx.policy == "restricted":
-        allowed_names = manifest | ctx.unlocked
+    elif ctx["policy"] == "restricted":
+        allowed_names = manifest | ctx["unlocked"]
     else:  # permissive
-        allowed_names = manifest | ctx.unlocked
+        allowed_names = manifest | ctx["unlocked"]
 
     # Filter registry to only allowed tools
     available = {name: info for name, info in _REGISTRY.items() if name in allowed_names}
@@ -120,8 +120,8 @@ def _exact_search(query: str, available: dict[str, ToolInfo]) -> str:
     if query in _REGISTRY:
         ctx = _get_ctx()
         return (
-            f"Tool '{query}' exists but is not available for your role '{ctx.role}' "
-            f"(policy: {ctx.policy}). Use tool_search() to see your available tools."
+            f"Tool '{query}' exists but is not available for your role '{ctx['role']}' "
+            f"(policy: {ctx['policy']}). Use tool_search() to see your available tools."
         )
 
     return f"Tool '{query}' not found. Use tool_search() to list available tools."
