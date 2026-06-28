@@ -8,7 +8,7 @@ from fastapi import HTTPException, WebSocket, WebSocketDisconnect
 
 from nexusagent.core.agent import Agent
 from nexusagent.core.session import session_manager
-from nexusagent.infrastructure.api_auth import require_admin, verify_api_key
+from nexusagent.infrastructure.api_auth import verify_api_key
 from nexusagent.infrastructure.db import get_session_repo
 from nexusagent.tools.fs_base import set_workspace_root
 

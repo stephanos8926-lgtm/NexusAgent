@@ -195,7 +195,7 @@ async def ws_loop(app) -> None:
 
 def _mount_error(app, message: str) -> None:
     """Mount an error message in the TUI with sliding window enforcement."""
-    from nexusagent.widgets.messages import ErrorMessage
     from nexusagent.interfaces.tui.streaming import _mount_with_limit
+    from nexusagent.widgets.messages import ErrorMessage
     err = ErrorMessage(message=message)
     _mount_with_limit(app, err)
