@@ -187,7 +187,13 @@ async def session_websocket(
 
     except WebSocketDisconnect:
         logger.info("Session %s disconnected", session_id)
+        # Cancel heartbeat immediately on disconnect (prevents "Still thinking..." after client gone)
+        if session._heartbeat_task is not None and not session._heartbeat_task.done():
+            session._heartbeat_task.cancel()
         await session_manager.mark_idle(session_id)
     except Exception as e:
         logger.error("WebSocket error in session %s: %s", session_id, type(e).__name__)
+        # Cancel heartbeat on any error
+        if session._heartbeat_task is not None and not session._heartbeat_task.done():
+            session._heartbeat_task.cancel()
         await websocket.close(code=1011)
