@@ -12,12 +12,12 @@ Search flow:
 
 from __future__ import annotations
 
-import asyncio
 import hashlib
 import logging
 import math
 import sqlite3
 import uuid
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -25,7 +25,6 @@ from typing import Any
 import sqlite_vec
 
 from .embeddings import (
-    _DB_POOL,
     CANDIDATE_MULTIPLIER,
     CHUNK_OVERLAP,
     CHUNK_SIZE,
@@ -38,6 +37,15 @@ from .embeddings import (
 )
 
 logger = logging.getLogger(__name__)
+
+# Try to import aiosqlite for persistent connection support
+try:
+    import aiosqlite
+
+    AIOSQLITE_AVAILABLE = True
+except ImportError:
+    AIOSQLITE_AVAILABLE = False
+    logger.warning("aiosqlite not available — using thread pool fallback for async operations")
 
 
 class HybridMemoryIndex:
@@ -54,7 +62,32 @@ class HybridMemoryIndex:
         self.db_path = self.workspace / ".memory" / "index.sqlite"
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self.embedder = EmbeddingProvider()
+        self._db_pool = None
         self._init_db()
+
+    @asynccontextmanager
+    async def _get_connection(self):
+        """Get or create the persistent aiosqlite connection (if available)."""
+        if not AIOSQLITE_AVAILABLE:
+            # Fallback: signal that we should use sync methods via run_in_executor
+            yield None
+            return
+
+        if self._db_pool is None:
+            self._db_pool = await aiosqlite.connect(
+                str(self.db_path), detect_types=sqlite3.PARSE_DECLTYPES
+            )
+            self._db_pool.row_factory = aiosqlite.Row
+            await self._db_pool.enable_load_extension(True)
+            await sqlite_vec.load(self._db_pool)
+            await self._db_pool.enable_load_extension(False)
+        yield self._db_pool
+
+    async def close(self):
+        """Close the persistent database connection."""
+        if self._db_pool is not None:
+            await self._db_pool.close()
+            self._db_pool = None
 
     def _init_db(self):
         """Create the SQLite schema: chunks, chunks_fts, chunks_vec, file_meta."""
@@ -387,22 +420,30 @@ class HybridMemoryIndex:
 
     async def search(self, query: str, max_results: int = 6, min_score: float = 0.1) -> list[dict]:
         """Hybrid search: keyword + vector with union merge."""
-        loop = asyncio.get_running_loop()
-
         # Get query embedding
         query_vec = await self.embedder.embed(query)
 
         # Run both searches concurrently
         candidate_limit = max_results * CANDIDATE_MULTIPLIER
-        keyword_future = loop.run_in_executor(
-            _DB_POOL, self._search_keyword, query, candidate_limit
-        )
-        vector_future = loop.run_in_executor(
-            _DB_POOL, self._search_vector, query_vec, candidate_limit
-        )
 
-        keyword_results = await keyword_future
-        vector_results = await vector_future
+        # If aiosqlite not available, run sync methods in executor
+        if not AIOSQLITE_AVAILABLE:
+            import asyncio
+
+            loop = asyncio.get_running_loop()
+            keyword_future = loop.run_in_executor(
+                None, self._search_keyword_sync, query, candidate_limit
+            )
+            vector_future = loop.run_in_executor(
+                None, self._search_vector_sync, query_vec, candidate_limit
+            )
+            keyword_results = await keyword_future
+            vector_results = await vector_future
+        else:
+            keyword_results, vector_results = await asyncio.gather(
+                self._search_keyword(query, candidate_limit),
+                self._search_vector(query_vec, candidate_limit),
+            )
 
         # Merge
         merged = self._merge_results(keyword_results, vector_results, max_results, min_score)
@@ -412,12 +453,34 @@ class HybridMemoryIndex:
         """Synchronous search (uses hash embedding fallback)."""
         query_vec = self.embedder._embed_hash(query)
         candidate_limit = max_results * CANDIDATE_MULTIPLIER
-        keyword_results = self._search_keyword(query, candidate_limit)
-        vector_results = self._search_vector(query_vec, candidate_limit)
+        keyword_results = self._search_keyword_sync(query, candidate_limit)
+        vector_results = self._search_vector_sync(query_vec, candidate_limit)
         return self._merge_results(keyword_results, vector_results, max_results, 0.0)
 
-    def _search_keyword(self, query: str, limit: int) -> list[dict]:
-        """FTS5 keyword search."""
+    async def _search_keyword(self, query: str, limit: int) -> list[dict]:
+        """FTS5 keyword search (async)."""
+        async with self._get_connection() as conn:
+            try:
+                # Build FTS5 query (AND logic for tokens)
+                tokens = query.split()
+                fts_query = " AND ".join(f'"{t}"' for t in tokens if len(t) > 1)
+
+                rows = await conn.execute(
+                    """SELECT id, file_path, content, rank
+                       FROM chunks_fts
+                       WHERE chunks_fts MATCH ?
+                       ORDER BY rank
+                       LIMIT ?""",
+                    (fts_query, limit),
+                ).fetchall()
+
+                return [{"id": r[0], "file": r[1], "content": r[2], "rank": r[3]} for r in rows]
+            except Exception as e:
+                logger.warning("Keyword search failed: %s", e)
+                return []
+
+    def _search_keyword_sync(self, query: str, limit: int) -> list[dict]:
+        """FTS5 keyword search (sync fallback)."""
         conn = sqlite3.connect(str(self.db_path))
         try:
             # Build FTS5 query (AND logic for tokens)
@@ -440,8 +503,58 @@ class HybridMemoryIndex:
         finally:
             conn.close()
 
-    def _search_vector(self, query_vec: list[float], limit: int) -> list[dict]:
-        """sqlite-vec similarity search."""
+    async def _search_vector(self, query_vec: list[float], limit: int) -> list[dict]:
+        """sqlite-vec similarity search (async)."""
+        async with self._get_connection() as conn:
+            try:
+                conn.enable_load_extension(True)
+                await sqlite_vec.load(conn)
+
+                vec_blob = _vec_to_blob(query_vec)
+                # sqlite-vec KNN MATCH requires a simple query — no JOINs.
+                # Fetch matching chunk IDs first, then look up content.
+                vec_rows = await conn.execute(
+                    """SELECT id, distance
+                       FROM chunks_vec
+                       WHERE embedding MATCH ?
+                       ORDER BY distance
+                       LIMIT ?""",
+                    (vec_blob, limit),
+                ).fetchall()
+
+                if not vec_rows:
+                    return []
+
+                # Fetch chunk content for the matched IDs
+                ids = [r[0] for r in vec_rows]
+                placeholders = ",".join("?" for _ in ids)
+                chunk_rows = await conn.execute(
+                    f"SELECT id, file_path, content FROM chunks WHERE id IN ({placeholders})",
+                    ids,
+                ).fetchall()
+
+                chunk_map = {r[0]: (r[1], r[2]) for r in chunk_rows}
+
+                results = []
+                for chunk_id, distance in vec_rows:
+                    if chunk_id in chunk_map:
+                        file_path, content = chunk_map[chunk_id]
+                        similarity = 1.0 / (1.0 + distance)
+                        results.append(
+                            {
+                                "id": chunk_id,
+                                "file": file_path,
+                                "content": content,
+                                "similarity": similarity,
+                            }
+                        )
+                return results
+            except Exception as e:
+                logger.warning("Vector search failed: %s, falling back to brute force", e)
+                return await self._search_vector_brute(query_vec, limit)
+
+    def _search_vector_sync(self, query_vec: list[float], limit: int) -> list[dict]:
+        """sqlite-vec similarity search (sync fallback)."""
         conn = sqlite3.connect(str(self.db_path))
         try:
             conn.enable_load_extension(True)
@@ -491,8 +604,6 @@ class HybridMemoryIndex:
             return self._search_vector_brute(query_vec, limit)
         finally:
             conn.close()
-
-    def _search_vector_brute(self, query_vec: list[float], limit: int) -> list[dict]:
         """Brute-force cosine similarity fallback when sqlite-vec fails.
 
         Includes an OOM guard: estimates memory for all embeddings before loading.
@@ -700,11 +811,5 @@ class HybridMemoryIndex:
         for pattern in ["bank/**/*.md", "memory/**/*.md"]:
             for filepath in self.workspace.glob(pattern):
                 self.index_file(str(filepath.relative_to(self.workspace)))
-
-    def close(self):
-        """Close the index and clean up resources."""
-        # The SQLite connections are opened and closed per-method,
-        # but we can clear any cached embedder references.
-        self.embedder = None  # type: ignore[assignment]
 
         logger.info("Rebuilt index from workspace files")
