@@ -638,21 +638,15 @@ class HybridMemoryIndex:
                 ).fetchall()
             ]
 
-            cursor = conn.execute(
-                "DELETE FROM chunks WHERE file_path = ?", (relative_path,)
-            )
+            cursor = conn.execute("DELETE FROM chunks WHERE file_path = ?", (relative_path,))
             deleted = cursor.rowcount
 
-            conn.execute(
-                "DELETE FROM chunks_fts WHERE file_path = ?", (relative_path,)
-            )
+            conn.execute("DELETE FROM chunks_fts WHERE file_path = ?", (relative_path,))
 
             for oid in old_ids:
                 conn.execute("DELETE FROM chunks_vec WHERE id = ?", (oid,))
 
-            conn.execute(
-                "DELETE FROM file_meta WHERE file_path = ?", (relative_path,)
-            )
+            conn.execute("DELETE FROM file_meta WHERE file_path = ?", (relative_path,))
 
             conn.commit()
             logger.info("Deleted %d index entries for %s", deleted, relative_path)

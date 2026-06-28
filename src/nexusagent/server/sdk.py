@@ -20,7 +20,6 @@ logger = logging.getLogger(__name__)
 SERVER_VERSION = VERSION
 
 
-
 class NexusSDK:
     """High-level SDK for interacting with the NexusAgent system.
     This can be used by both the FastAPI server and external clients.
@@ -88,6 +87,7 @@ class NexusSDK:
     async def get_task_status(self, task_id: str) -> TaskStatus | None:
         """Query the current status of a task from the database."""
         from nexusagent.infrastructure.db import get_task_repo
+
         task_repo = get_task_repo()
         status_str = await task_repo.get_task_status(task_id)
         if status_str:
@@ -119,18 +119,21 @@ class NexusSDK:
     ) -> list[dict]:
         """List tasks with optional status filter and pagination."""
         from nexusagent.infrastructure.db import get_task_repo
+
         task_repo = get_task_repo()
         return await task_repo.list_tasks(status=status, limit=limit, offset=offset)
 
     async def cancel_task(self, task_id: str) -> bool:
         """Cancel a pending or processing task. Returns True if cancelled."""
         from nexusagent.infrastructure.db import get_task_repo
+
         task_repo = get_task_repo()
         return await task_repo.cancel_task(task_id)
 
     async def retry_task(self, task_id: str) -> str | None:
         """Retry a failed task. Returns task ID or None if not eligible."""
         from nexusagent.infrastructure.db import get_task_repo
+
         task_repo = get_task_repo()
         new_id = await task_repo.retry_task(task_id)
         if new_id:

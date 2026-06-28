@@ -39,6 +39,7 @@ class LLMProvider:
         import importlib
 
         import nexusagent.infrastructure.config as _cfg
+
         importlib.reload(_cfg)
         _settings = _cfg.settings
 
@@ -98,9 +99,13 @@ class LLMProvider:
         logger.info(f"Generating response using {provider} ({model_id})")
 
         if provider == "gemini":
-            return await self._call_gemini(prompt, system_prompt, model_id, timeout=timeout, **kwargs)
+            return await self._call_gemini(
+                prompt, system_prompt, model_id, timeout=timeout, **kwargs
+            )
         elif provider == "openrouter":
-            return await self._call_openrouter(prompt, system_prompt, model_id, timeout=timeout, **kwargs)
+            return await self._call_openrouter(
+                prompt, system_prompt, model_id, timeout=timeout, **kwargs
+            )
         else:
             raise ValueError(f"Unsupported provider: {provider}")
 
@@ -113,7 +118,12 @@ class LLMProvider:
         exceptions=(Exception,),
     )
     async def _call_gemini(
-        self, prompt: str, system_prompt: str | None, model_id: str, timeout: float = 120.0, **kwargs
+        self,
+        prompt: str,
+        system_prompt: str | None,
+        model_id: str,
+        timeout: float = 120.0,
+        **kwargs,
     ) -> LLMResponse:
         try:
             model = genai.GenerativeModel(model_name=model_id, system_instruction=system_prompt)
@@ -135,7 +145,12 @@ class LLMProvider:
         exceptions=(Exception,),
     )
     async def _call_openrouter(
-        self, prompt: str, system_prompt: str | None, model_id: str, timeout: float = 120.0, **kwargs
+        self,
+        prompt: str,
+        system_prompt: str | None,
+        model_id: str,
+        timeout: float = 120.0,
+        **kwargs,
     ) -> LLMResponse:
         try:
             messages = []

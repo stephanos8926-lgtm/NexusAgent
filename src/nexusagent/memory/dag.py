@@ -28,6 +28,7 @@ logger = logging.getLogger(__name__)
 # Node types
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class DAGNode:
     """A single node in the summary DAG."""
@@ -36,9 +37,7 @@ class DAGNode:
     depth: int = 0  # 0=leaf, 1=arc, 2=narrative
     content: str = ""
     source_ids: list[str] = field(default_factory=list)
-    created_at: str = field(
-        default_factory=lambda: datetime.now(UTC).isoformat()
-    )
+    created_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
@@ -183,12 +182,14 @@ class SummaryDAG:
             # Narrative summaries (depth-2)
             for nid in self._narratives:
                 node = self._nodes[nid]
-                messages.append({
-                    "role": "system",
-                    "content": f"[Narrative summary]\n{node.content}",
-                    "_dag_node_id": node.id,
-                    "_dag_depth": 2,
-                })
+                messages.append(
+                    {
+                        "role": "system",
+                        "content": f"[Narrative summary]\n{node.content}",
+                        "_dag_node_id": node.id,
+                        "_dag_depth": 2,
+                    }
+                )
 
             # Arc summaries (depth-1) not yet promoted to narrative
             promoted_arcs: set[str] = set()
@@ -200,12 +201,14 @@ class SummaryDAG:
                 if nid in promoted_arcs:
                     continue
                 node = self._nodes[nid]
-                messages.append({
-                    "role": "system",
-                    "content": f"[Conversation arc summary]\n{node.content}",
-                    "_dag_node_id": node.id,
-                    "_dag_depth": 1,
-                })
+                messages.append(
+                    {
+                        "role": "system",
+                        "content": f"[Conversation arc summary]\n{node.content}",
+                        "_dag_node_id": node.id,
+                        "_dag_depth": 1,
+                    }
+                )
 
             # Unprocessed leaves (depth-0) not promoted to arcs
             promoted_leaves: set[str] = set()
@@ -279,10 +282,7 @@ class SummaryDAG:
 
         # Gather compressible leaf IDs
         tail_ids = self._fresh_tail_ids()
-        candidates = [
-            nid for nid in self._leaves
-            if nid not in tail_ids and nid not in promoted
-        ]
+        candidates = [nid for nid in self._leaves if nid not in tail_ids and nid not in promoted]
 
         # Process in batches
         for batch_start in range(0, len(candidates), self.leaf_batch):
@@ -297,9 +297,7 @@ class SummaryDAG:
                 continue
 
             # Build summarization prompt from leaf contents
-            leaf_texts = [
-                self._nodes[nid].content for nid in batch if nid in self._nodes
-            ]
+            leaf_texts = [self._nodes[nid].content for nid in batch if nid in self._nodes]
             summary = await self._summarize(
                 llm_call,
                 system_prompt=(
@@ -347,9 +345,7 @@ class SummaryDAG:
             if len(batch) < self.arc_batch:
                 continue
 
-            arc_texts = [
-                self._nodes[nid].content for nid in batch if nid in self._nodes
-            ]
+            arc_texts = [self._nodes[nid].content for nid in batch if nid in self._nodes]
             summary = await self._summarize(
                 llm_call,
                 system_prompt=(
@@ -385,9 +381,8 @@ class SummaryDAG:
         # Heuristic fallback: truncate and prefix
         total_chars = len(user_prompt)
         truncated = user_prompt[:1000]
-        return (
-            f"[Heuristic summary of ~{total_chars} chars]\n{truncated}"
-            + ("..." if total_chars > 1000 else "")
+        return f"[Heuristic summary of ~{total_chars} chars]\n{truncated}" + (
+            "..." if total_chars > 1000 else ""
         )
 
 

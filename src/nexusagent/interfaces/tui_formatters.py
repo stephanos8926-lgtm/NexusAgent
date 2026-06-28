@@ -40,14 +40,14 @@ def render_markdown(text: str, *, code_blocks: bool = True) -> str:
             code_blocks_list.append((lang, code))
             return f"__CODE_BLOCK_{idx}__"
 
-        text = re.sub(r'```(\w*)\n(.*?)```', replace_code_block, text, flags=re.DOTALL)
+        text = re.sub(r"```(\w*)\n(.*?)```", replace_code_block, text, flags=re.DOTALL)
 
     # Inline code
-    text = re.sub(r'`([^`]+)`', r'[reverse]\1[/reverse]', text)
+    text = re.sub(r"`([^`]+)`", r"[reverse]\1[/reverse]", text)
 
     # Bold and italic
-    text = re.sub(r'\*\*(.+?)\*\*', r'[b]\1[/b]', text)
-    text = re.sub(r'(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)', r'[i]\1[/i]', text)
+    text = re.sub(r"\*\*(.+?)\*\*", r"[b]\1[/b]", text)
+    text = re.sub(r"(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)", r"[i]\1[/i]", text)
 
     if code_blocks:
         # Restore code blocks with dim/styled formatting
@@ -55,7 +55,10 @@ def render_markdown(text: str, *, code_blocks: bool = True) -> str:
             lang_label = f"[dim]({lang})[/dim] " if lang else ""
             code_lines = code.split("\n")
             if len(code_lines) > 20:
-                code = "\n".join(code_lines[:20]) + f"\n[dim]... +{len(code_lines) - 20} more lines[/dim]"
+                code = (
+                    "\n".join(code_lines[:20])
+                    + f"\n[dim]... +{len(code_lines) - 20} more lines[/dim]"
+                )
             styled = f"{lang_label}[dim]{code}[/dim]"
             text = text.replace(f"__CODE_BLOCK_{i}__", styled)
 
@@ -68,7 +71,9 @@ def render_markdown(text: str, *, code_blocks: bool = True) -> str:
 
 
 def format_tool_result_for_display(
-    tool_name: str, success: bool, output: str,
+    tool_name: str,
+    success: bool,
+    output: str,
     max_chars: int = 400,
 ) -> str:
     """Format a tool result for display using per-tool dispatch."""
@@ -135,7 +140,7 @@ def format_shell_output(output: str) -> str:
 def format_read_file_output(output: str) -> str:
     """Format read_file output: show line count + content preview."""
     lines = output.strip().split("\n")
-    content_lines = [line for line in lines if not re.match(r'^\d+\|', line)]
+    content_lines = [line for line in lines if not re.match(r"^\d+\|", line)]
     line_count = len(content_lines)
 
     preview_lines = content_lines[:12]
@@ -152,7 +157,8 @@ def format_write_file_output(output: str, tool_name: str) -> str:
     cleaned = output.strip()
     path_match = re.search(
         r'(?:written|saved|patched)\s+(?:to\s+)?["\']?([\w./~_-]+)["\']?',
-        cleaned, re.IGNORECASE,
+        cleaned,
+        re.IGNORECASE,
     )
     path = path_match.group(0) if path_match else cleaned[:80]
     return f"[green]✓ {tool_name}[/green] → {path}"
@@ -172,7 +178,7 @@ def format_git_output(output: str, tool_name: str) -> str:
 def format_search_output(output: str) -> str:
     """Format search_web output: show result count + top URLs."""
     result_count = output.count("Title:")
-    urls = re.findall(r'URL:\s*(\S+)', output)
+    urls = re.findall(r"URL:\s*(\S+)", output)
     url_preview = "\n".join(f"  🔗 {u}" for u in urls[:3])
     suffix = ""
     if len(urls) > 3:
@@ -183,8 +189,8 @@ def format_search_output(output: str) -> str:
 def format_subagent_output(output: str) -> str:
     """Format spawn_subagent output: show task + status."""
     cleaned = output.strip()
-    id_match = re.search(r'worker\s+(\S+)', cleaned)
-    status_match = re.search(r'status:\s*(\w+)', cleaned)
+    id_match = re.search(r"worker\s+(\S+)", cleaned)
+    status_match = re.search(r"status:\s*(\w+)", cleaned)
     worker_id = id_match.group(1) if id_match else "?"
     status = status_match.group(1) if status_match else "?"
     return f"[b purple]subagent {worker_id}[/b purple] status: [yellow]{status}[/yellow]"
@@ -238,7 +244,7 @@ def format_tool_output_generic(output: str, max_chars: int = 400) -> str:
         pass
 
     cleaned = output.strip()
-    cleaned = re.sub(r'\n{3,}', '\n\n', cleaned)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
     return _escape(cleaned)
 
 
@@ -251,8 +257,8 @@ def truncate_output(output: str, max_chars: int = 400) -> str:
     """Truncate long output with head/tail and char count indicator."""
     if len(output) <= max_chars:
         return output
-    head = output[:max_chars // 2]
-    tail = output[-(max_chars // 2):]
+    head = output[: max_chars // 2]
+    tail = output[-(max_chars // 2) :]
     return f"{head}\n[dim]... ({len(output):,} chars total) ...[/dim]\n{tail}"
 
 
@@ -260,7 +266,7 @@ def truncate(text: str, max_len: int) -> str:
     """Truncate text with ellipsis."""
     if len(text) <= max_len:
         return text
-    return text[:max_len - 3] + "..."
+    return text[: max_len - 3] + "..."
 
 
 def format_arg_value(value: Any) -> str:
@@ -280,6 +286,7 @@ def _escape(text: str) -> str:
 
 
 # ── Contextlib suppress helper (avoids import at module level) ─────────────
+
 
 class ContextlibSuppress:
     """Minimal context manager to suppress specific exceptions."""

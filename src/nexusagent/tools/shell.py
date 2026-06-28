@@ -17,11 +17,14 @@ _SHELL_WORKSPACE_ROOT: Path | None = None
 
 MAX_OUTPUT_BYTES = 1024 * 1024  # 1MB output cap to prevent memory exhaustion
 
+
 def set_shell_workspace_root(path: str) -> None:
     """Set the workspace root directory for shell command path jail."""
     global _SHELL_WORKSPACE_ROOT
     import pathlib
+
     _SHELL_WORKSPACE_ROOT = pathlib.Path(path).resolve()
+
 
 def _validate_workdir(workdir: str | None) -> str | None:
     """Validate workdir is within workspace root if set."""
@@ -30,6 +33,7 @@ def _validate_workdir(workdir: str | None) -> str | None:
     if _SHELL_WORKSPACE_ROOT is None:
         return workdir
     import pathlib
+
     resolved = pathlib.Path(workdir).resolve()
     try:
         resolved.relative_to(_SHELL_WORKSPACE_ROOT)

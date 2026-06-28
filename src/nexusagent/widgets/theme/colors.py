@@ -5,32 +5,32 @@ from dataclasses import dataclass
 # ── Brand Palette (Linear-inspired, indigo accent) ────────────────────────
 
 # Backgrounds — near-black with blue-cool undertone
-BG = "#11181C"              # Main background
-BG_PANEL = "#1A1D23"        # Panel/sidebar background
-BG_SURFACE = "#23252A"      # Elevated surface (cards, inputs)
-BG_HOVER = "#28282C"        # Hover state
+BG = "#11181C"  # Main background
+BG_PANEL = "#1A1D23"  # Panel/sidebar background
+BG_SURFACE = "#23252A"  # Elevated surface (cards, inputs)
+BG_HOVER = "#28282C"  # Hover state
 
 # Text — grayscale with cool undertone
-TEXT = "#F7F8F8"            # Primary text (not pure white)
+TEXT = "#F7F8F8"  # Primary text (not pure white)
 TEXT_SECONDARY = "#D0D6E0"  # Body text, descriptions
-TEXT_MUTED = "#8A8F98"      # Placeholders, metadata
-TEXT_DIM = "#62666D"        # Timestamps, disabled
+TEXT_MUTED = "#8A8F98"  # Placeholders, metadata
+TEXT_DIM = "#62666D"  # Timestamps, disabled
 
 # Accent — indigo-violet (the ONLY chromatic color)
-ACCENT = "#5E6AD2"          # Brand indigo — CTAs, active states
-ACCENT_HOVER = "#7170FF"    # Brighter violet — hover states
-ACCENT_LIGHT = "#828FFF"    # Lightest variant — subtle highlights
+ACCENT = "#5E6AD2"  # Brand indigo — CTAs, active states
+ACCENT_HOVER = "#7170FF"  # Brighter violet — hover states
+ACCENT_LIGHT = "#828FFF"  # Lightest variant — subtle highlights
 
 # Status — used sparingly
-SUCCESS = "#10B981"         # Emerald green
-WARNING = "#EB8B46"         # Amber
-ERROR = "#F7768E"           # Soft pink-red
-ERROR_BG = "#2A1F32"        # Subtle pink-tinted background
+SUCCESS = "#10B981"  # Emerald green
+WARNING = "#EB8B46"  # Amber
+ERROR = "#F7768E"  # Soft pink-red
+ERROR_BG = "#2A1F32"  # Subtle pink-tinted background
 
 # Borders — semi-transparent white (the Linear way)
-BORDER = "rgba(255,255,255,0.08)"       # Standard border
-BORDER_SUBTLE = "rgba(255,255,255,0.05)" # Subtle border
-BORDER_FOCUS = "#5E6AD2"                 # Focused border (accent color)
+BORDER = "rgba(255,255,255,0.08)"  # Standard border
+BORDER_SUBTLE = "rgba(255,255,255,0.05)"  # Subtle border
+BORDER_FOCUS = "#5E6AD2"  # Focused border (accent color)
 
 
 # ── Tokyo Night Palette ───────────────────────────────────────────────────
@@ -167,9 +167,11 @@ ND_BORDER_FOCUS = "#5E81AC"
 
 # ── ThemeColors Dataclass ─────────────────────────────────────────────────
 
+
 @dataclass(frozen=True)
 class ThemeColors:
     """Semantic color tokens for a single theme (dark or light)."""
+
     # Backgrounds
     bg: str
     bg_panel: str
@@ -202,59 +204,150 @@ class ThemeColors:
 # ── Theme Instances ───────────────────────────────────────────────────────
 
 DARK_COLORS = ThemeColors(
-    bg=BG, bg_panel=BG_PANEL, bg_surface=BG_SURFACE, bg_hover=BG_HOVER,
-    text=TEXT, text_secondary=TEXT_SECONDARY, text_muted=TEXT_MUTED, text_dim=TEXT_DIM,
-    accent=ACCENT, accent_hover=ACCENT_HOVER, accent_light=ACCENT_LIGHT,
-    success=SUCCESS, warning=WARNING, error=ERROR, error_bg=ERROR_BG,
-    border=BORDER, border_subtle=BORDER_SUBTLE, border_focus=BORDER_FOCUS,
+    bg=BG,
+    bg_panel=BG_PANEL,
+    bg_surface=BG_SURFACE,
+    bg_hover=BG_HOVER,
+    text=TEXT,
+    text_secondary=TEXT_SECONDARY,
+    text_muted=TEXT_MUTED,
+    text_dim=TEXT_DIM,
+    accent=ACCENT,
+    accent_hover=ACCENT_HOVER,
+    accent_light=ACCENT_LIGHT,
+    success=SUCCESS,
+    warning=WARNING,
+    error=ERROR,
+    error_bg=ERROR_BG,
+    border=BORDER,
+    border_subtle=BORDER_SUBTLE,
+    border_focus=BORDER_FOCUS,
 )
 
 TOKYO_NIGHT_COLORS = ThemeColors(
-    bg=TN_BG, bg_panel=TN_BG_PANEL, bg_surface=TN_BG_SURFACE, bg_hover=TN_BG_HOVER,
-    text=TN_TEXT, text_secondary=TN_TEXT_SECONDARY, text_muted=TN_TEXT_MUTED, text_dim=TN_TEXT_DIM,
-    accent=TN_ACCENT, accent_hover=TN_ACCENT_HOVER, accent_light=TN_ACCENT_LIGHT,
-    success=TN_SUCCESS, warning=TN_WARNING, error=TN_ERROR, error_bg=TN_ERROR_BG,
-    border=TN_BORDER, border_subtle=TN_BORDER_SUBTLE, border_focus=TN_BORDER_FOCUS,
+    bg=TN_BG,
+    bg_panel=TN_BG_PANEL,
+    bg_surface=TN_BG_SURFACE,
+    bg_hover=TN_BG_HOVER,
+    text=TN_TEXT,
+    text_secondary=TN_TEXT_SECONDARY,
+    text_muted=TN_TEXT_MUTED,
+    text_dim=TN_TEXT_DIM,
+    accent=TN_ACCENT,
+    accent_hover=TN_ACCENT_HOVER,
+    accent_light=TN_ACCENT_LIGHT,
+    success=TN_SUCCESS,
+    warning=TN_WARNING,
+    error=TN_ERROR,
+    error_bg=TN_ERROR_BG,
+    border=TN_BORDER,
+    border_subtle=TN_BORDER_SUBTLE,
+    border_focus=TN_BORDER_FOCUS,
 )
 
 ROSE_PINE_COLORS = ThemeColors(
-    bg=RP_BG, bg_panel=RP_BG_PANEL, bg_surface=RP_BG_SURFACE, bg_hover=RP_BG_HOVER,
-    text=RP_TEXT, text_secondary=RP_TEXT_SECONDARY, text_muted=RP_TEXT_MUTED, text_dim=RP_TEXT_DIM,
-    accent=RP_ACCENT, accent_hover=RP_ACCENT_HOVER, accent_light=RP_ACCENT_LIGHT,
-    success=RP_SUCCESS, warning=RP_WARNING, error=RP_ERROR, error_bg=RP_ERROR_BG,
-    border=RP_BORDER, border_subtle=RP_BORDER_SUBTLE, border_focus=RP_BORDER_FOCUS,
+    bg=RP_BG,
+    bg_panel=RP_BG_PANEL,
+    bg_surface=RP_BG_SURFACE,
+    bg_hover=RP_BG_HOVER,
+    text=RP_TEXT,
+    text_secondary=RP_TEXT_SECONDARY,
+    text_muted=RP_TEXT_MUTED,
+    text_dim=RP_TEXT_DIM,
+    accent=RP_ACCENT,
+    accent_hover=RP_ACCENT_HOVER,
+    accent_light=RP_ACCENT_LIGHT,
+    success=RP_SUCCESS,
+    warning=RP_WARNING,
+    error=RP_ERROR,
+    error_bg=RP_ERROR_BG,
+    border=RP_BORDER,
+    border_subtle=RP_BORDER_SUBTLE,
+    border_focus=RP_BORDER_FOCUS,
 )
 
 SOLARIZED_DARK_COLORS = ThemeColors(
-    bg=SD_BG, bg_panel=SD_BG_PANEL, bg_surface=SD_BG_SURFACE, bg_hover=SD_BG_HOVER,
-    text=SD_TEXT, text_secondary=SD_TEXT_SECONDARY, text_muted=SD_TEXT_MUTED, text_dim=SD_TEXT_DIM,
-    accent=SD_ACCENT, accent_hover=SD_ACCENT_HOVER, accent_light=SD_ACCENT_LIGHT,
-    success=SD_SUCCESS, warning=SD_WARNING, error=SD_ERROR, error_bg=SD_ERROR_BG,
-    border=SD_BORDER, border_subtle=SD_BORDER_SUBTLE, border_focus=SD_BORDER_FOCUS,
+    bg=SD_BG,
+    bg_panel=SD_BG_PANEL,
+    bg_surface=SD_BG_SURFACE,
+    bg_hover=SD_BG_HOVER,
+    text=SD_TEXT,
+    text_secondary=SD_TEXT_SECONDARY,
+    text_muted=SD_TEXT_MUTED,
+    text_dim=SD_TEXT_DIM,
+    accent=SD_ACCENT,
+    accent_hover=SD_ACCENT_HOVER,
+    accent_light=SD_ACCENT_LIGHT,
+    success=SD_SUCCESS,
+    warning=SD_WARNING,
+    error=SD_ERROR,
+    error_bg=SD_ERROR_BG,
+    border=SD_BORDER,
+    border_subtle=SD_BORDER_SUBTLE,
+    border_focus=SD_BORDER_FOCUS,
 )
 
 CATPPUCCIN_MOCHA_COLORS = ThemeColors(
-    bg=CP_BG, bg_panel=CP_BG_PANEL, bg_surface=CP_BG_SURFACE, bg_hover=CP_BG_HOVER,
-    text=CP_TEXT, text_secondary=CP_TEXT_SECONDARY, text_muted=CP_TEXT_MUTED, text_dim=CP_TEXT_DIM,
-    accent=CP_ACCENT, accent_hover=CP_ACCENT_HOVER, accent_light=CP_ACCENT_LIGHT,
-    success=CP_SUCCESS, warning=CP_WARNING, error=CP_ERROR, error_bg=CP_ERROR_BG,
-    border=CP_BORDER, border_subtle=CP_BORDER_SUBTLE, border_focus=CP_BORDER_FOCUS,
+    bg=CP_BG,
+    bg_panel=CP_BG_PANEL,
+    bg_surface=CP_BG_SURFACE,
+    bg_hover=CP_BG_HOVER,
+    text=CP_TEXT,
+    text_secondary=CP_TEXT_SECONDARY,
+    text_muted=CP_TEXT_MUTED,
+    text_dim=CP_TEXT_DIM,
+    accent=CP_ACCENT,
+    accent_hover=CP_ACCENT_HOVER,
+    accent_light=CP_ACCENT_LIGHT,
+    success=CP_SUCCESS,
+    warning=CP_WARNING,
+    error=CP_ERROR,
+    error_bg=CP_ERROR_BG,
+    border=CP_BORDER,
+    border_subtle=CP_BORDER_SUBTLE,
+    border_focus=CP_BORDER_FOCUS,
 )
 
 GRUVBOX_DARK_COLORS = ThemeColors(
-    bg=GB_BG, bg_panel=GB_BG_PANEL, bg_surface=GB_BG_SURFACE, bg_hover=GB_BG_HOVER,
-    text=GB_TEXT, text_secondary=GB_TEXT_SECONDARY, text_muted=GB_TEXT_MUTED, text_dim=GB_TEXT_DIM,
-    accent=GB_ACCENT, accent_hover=GB_ACCENT_HOVER, accent_light=GB_ACCENT_LIGHT,
-    success=GB_SUCCESS, warning=GB_WARNING, error=GB_ERROR, error_bg=GB_ERROR_BG,
-    border=GB_BORDER, border_subtle=GB_BORDER_SUBTLE, border_focus=GB_BORDER_FOCUS,
+    bg=GB_BG,
+    bg_panel=GB_BG_PANEL,
+    bg_surface=GB_BG_SURFACE,
+    bg_hover=GB_BG_HOVER,
+    text=GB_TEXT,
+    text_secondary=GB_TEXT_SECONDARY,
+    text_muted=GB_TEXT_MUTED,
+    text_dim=GB_TEXT_DIM,
+    accent=GB_ACCENT,
+    accent_hover=GB_ACCENT_HOVER,
+    accent_light=GB_ACCENT_LIGHT,
+    success=GB_SUCCESS,
+    warning=GB_WARNING,
+    error=GB_ERROR,
+    error_bg=GB_ERROR_BG,
+    border=GB_BORDER,
+    border_subtle=GB_BORDER_SUBTLE,
+    border_focus=GB_BORDER_FOCUS,
 )
 
 NORD_COLORS = ThemeColors(
-    bg=ND_BG, bg_panel=ND_BG_PANEL, bg_surface=ND_BG_SURFACE, bg_hover=ND_BG_HOVER,
-    text=ND_TEXT, text_secondary=ND_TEXT_SECONDARY, text_muted=ND_TEXT_MUTED, text_dim=ND_TEXT_DIM,
-    accent=ND_ACCENT, accent_hover=ND_ACCENT_HOVER, accent_light=ND_ACCENT_LIGHT,
-    success=ND_SUCCESS, warning=ND_WARNING, error=ND_ERROR, error_bg=ND_ERROR_BG,
-    border=ND_BORDER, border_subtle=ND_BORDER_SUBTLE, border_focus=ND_BORDER_FOCUS,
+    bg=ND_BG,
+    bg_panel=ND_BG_PANEL,
+    bg_surface=ND_BG_SURFACE,
+    bg_hover=ND_BG_HOVER,
+    text=ND_TEXT,
+    text_secondary=ND_TEXT_SECONDARY,
+    text_muted=ND_TEXT_MUTED,
+    text_dim=ND_TEXT_DIM,
+    accent=ND_ACCENT,
+    accent_hover=ND_ACCENT_HOVER,
+    accent_light=ND_ACCENT_LIGHT,
+    success=ND_SUCCESS,
+    warning=ND_WARNING,
+    error=ND_ERROR,
+    error_bg=ND_ERROR_BG,
+    border=ND_BORDER,
+    border_subtle=ND_BORDER_SUBTLE,
+    border_focus=ND_BORDER_FOCUS,
 )
 
 # ── Theme Registry ────────────────────────────────────────────────────────

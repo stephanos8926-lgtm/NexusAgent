@@ -75,7 +75,9 @@ def load_nexus_prompt(
             parts.append(f"[ERROR loading base prompt: {e}]")
     else:
         logger.warning("Base NEXUS.md not found at %s", base_prompt_file)
-        parts.append("You are NexusAgent, a helpful AI assistant that operates on the user's machine.")
+        parts.append(
+            "You are NexusAgent, a helpful AI assistant that operates on the user's machine."
+        )
 
     # 2. Project-specific prompt from CWD
     cwd_prompt_file = cwd / "NEXUS.md"

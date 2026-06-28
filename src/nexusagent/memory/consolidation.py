@@ -51,10 +51,12 @@ class ConsolidationEngine:
                 content = f.read_text()
                 content_hash = self._hash_content(content)
                 if content_hash in seen_hashes:
-                    report["duplicates"].append({
-                        "original": seen_hashes[content_hash],
-                        "duplicate": str(f.name),
-                    })
+                    report["duplicates"].append(
+                        {
+                            "original": seen_hashes[content_hash],
+                            "duplicate": str(f.name),
+                        }
+                    )
                 else:
                     seen_hashes[content_hash] = str(f.name)
             except Exception:
@@ -67,10 +69,12 @@ class ConsolidationEngine:
                 stat = f.stat()
                 mtime = datetime.fromtimestamp(stat.st_mtime, UTC)
                 if mtime < cutoff:
-                    report["stale"].append({
-                        "file": str(f.name),
-                        "age_days": (datetime.now(UTC) - mtime).days,
-                    })
+                    report["stale"].append(
+                        {
+                            "file": str(f.name),
+                            "age_days": (datetime.now(UTC) - mtime).days,
+                        }
+                    )
             except Exception:
                 continue
 
@@ -116,6 +120,7 @@ class ConsolidationEngine:
         # Rebuild index
         try:
             from nexusagent.memory.index.index import HybridMemoryIndex
+
             idx = HybridMemoryIndex(str(self.workspace_dir))
             idx.rebuild()
             actions["index_rebuilt"] = True
@@ -152,5 +157,6 @@ class ConsolidationEngine:
     def _hash_content(content: str) -> str:
         """Hash content for deduplication comparison."""
         import hashlib
+
         normalized = " ".join(content.lower().split())
         return hashlib.sha256(normalized.encode()).hexdigest()[:16]

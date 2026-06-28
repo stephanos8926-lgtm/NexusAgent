@@ -125,9 +125,7 @@ class FileMemory:
         # Write .gitignore in memory dir to exclude binary/cache files
         mem_gitignore = self.memory_dir / ".gitignore"
         if not mem_gitignore.exists():
-            mem_gitignore.write_text(
-                "*.sqlite\n*.db\n__pycache__/\n"
-            )
+            mem_gitignore.write_text("*.sqlite\n*.db\n__pycache__/\n")
 
         # Initialize git repo if enabled
         if self._git is not None:
@@ -233,6 +231,7 @@ class FileMemory:
         """
         # Base score from content length (logarithmic, caps at 1.0 for ~1000 chars)
         import math
+
         length_score = min(math.log(max(len(content), 1)) / math.log(1000), 1.0)
 
         # Confidence bonus
@@ -452,9 +451,35 @@ class FileMemory:
 
         # Build set of significant words from content
         content_words = set(content.lower().split()) - {
-            "the", "a", "an", "is", "are", "was", "were", "in", "on", "at",
-            "to", "for", "of", "and", "or", "but", "with", "by", "from", "as",
-            "it", "this", "that", "i", "we", "you", "he", "she", "they",
+            "the",
+            "a",
+            "an",
+            "is",
+            "are",
+            "was",
+            "were",
+            "in",
+            "on",
+            "at",
+            "to",
+            "for",
+            "of",
+            "and",
+            "or",
+            "but",
+            "with",
+            "by",
+            "from",
+            "as",
+            "it",
+            "this",
+            "that",
+            "i",
+            "we",
+            "you",
+            "he",
+            "she",
+            "they",
         }
 
         # Score each memory file
@@ -475,9 +500,29 @@ class FileMemory:
                 body = self._strip_frontmatter(file_content)
                 if body:
                     file_words = set(body.lower().split()) - {
-                        "the", "a", "an", "is", "are", "was", "were", "in", "on", "at",
-                        "to", "for", "of", "and", "or", "but", "with", "by", "from", "as",
-                        "it", "this", "that",
+                        "the",
+                        "a",
+                        "an",
+                        "is",
+                        "are",
+                        "was",
+                        "were",
+                        "in",
+                        "on",
+                        "at",
+                        "to",
+                        "for",
+                        "of",
+                        "and",
+                        "or",
+                        "but",
+                        "with",
+                        "by",
+                        "from",
+                        "as",
+                        "it",
+                        "this",
+                        "that",
                     }
                     overlap = len(content_words & file_words)
                     score += overlap * 0.5
@@ -519,7 +564,9 @@ class FileMemory:
                 frontmatter["related"] = related
                 # Rebuild the file content
                 body = self._strip_frontmatter(content)
-                new_content = f"---\n{yaml.dump(frontmatter, default_flow_style=False)}---\n\n{body}"
+                new_content = (
+                    f"---\n{yaml.dump(frontmatter, default_flow_style=False)}---\n\n{body}"
+                )
                 filepath.write_text(new_content)
             return True
         except Exception:
@@ -606,9 +653,7 @@ class FileMemory:
                 self._remove_index_entry(rel_path)
                 report["index_entries_removed"] += 1
             except Exception as e:
-                logger.warning(
-                    "Failed to remove index entry for %s: %s", rel_path, e
-                )
+                logger.warning("Failed to remove index entry for %s: %s", rel_path, e)
 
         # Auto-commit if enabled
         if (

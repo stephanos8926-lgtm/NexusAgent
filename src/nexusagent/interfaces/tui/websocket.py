@@ -64,7 +64,8 @@ async def check_server_version(app) -> bool:
     if not is_compatible(server_ver, CLIENT_VERSION):
         logger.warning(
             "Version mismatch: server=%s client=%s",
-            server_ver, CLIENT_VERSION,
+            server_ver,
+            CLIENT_VERSION,
         )
     return True
 
@@ -78,11 +79,15 @@ async def send_approval(app, call_id: str, approved: bool) -> None:
         approved: Whether the call was approved.
     """
     if app._ws:
-        await app._ws.send(json.dumps({
-            "type": "approval",
-            "call_id": call_id,
-            "approved": approved,
-        }))
+        await app._ws.send(
+            json.dumps(
+                {
+                    "type": "approval",
+                    "call_id": call_id,
+                    "approved": approved,
+                }
+            )
+        )
 
 
 async def ws_loop(app) -> None:
@@ -100,6 +105,7 @@ async def ws_loop(app) -> None:
     working_dir = getattr(app, "working_dir", None) or str(pathlib.Path.cwd())
     if working_dir != ".":
         from urllib.parse import quote as _quote
+
         ws_url += f"?working_dir={_quote(working_dir, safe='')}"
     extra_headers: dict[str, str] = {}
     if api_key:
@@ -135,6 +141,7 @@ async def ws_loop(app) -> None:
 
                 async def receive_events():
                     from nexusagent.interfaces.tui.streaming import handle_event
+
                     async for raw in ws:
                         try:
                             event = json.loads(raw)
@@ -150,7 +157,7 @@ async def ws_loop(app) -> None:
                 return
 
         except ConnectionRefusedError:
-            delay = base_delay * (2 ** attempt)
+            delay = base_delay * (2**attempt)
             remaining = max_retries - attempt - 1
             if remaining == 0:
                 app.status_bar.set_status("Connection refused")
@@ -168,7 +175,7 @@ async def ws_loop(app) -> None:
             return
 
         except websockets.exceptions.ConnectionClosedError as e:
-            delay = base_delay * (2 ** attempt)
+            delay = base_delay * (2**attempt)
             remaining = max_retries - attempt - 1
             app._busy = False
             app._current_assistant = None
@@ -197,5 +204,6 @@ def _mount_error(app, message: str) -> None:
     """Mount an error message in the TUI with sliding window enforcement."""
     from nexusagent.interfaces.tui.streaming import _mount_with_limit
     from nexusagent.widgets.messages import ErrorMessage
+
     err = ErrorMessage(message=message)
     _mount_with_limit(app, err)

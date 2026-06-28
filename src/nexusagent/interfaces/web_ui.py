@@ -91,6 +91,7 @@ def create_ui():
 def run_ui() -> None:
     """Entry point for the nexus-web command."""
     import os
+
     demo = create_ui()
     # SECURITY: bind to localhost by default, require token auth
     demo.launch(
@@ -104,6 +105,7 @@ def run_ui() -> None:
 def _check_web_auth(username: str, password: str) -> bool:
     """Check web UI auth against the configured API key."""
     import os
+
     # Use the API key from environment or config as the password
     # Username is ignored — only the password (API key) is checked
     api_key = os.getenv("NEXUS_API_KEY", "")
@@ -111,6 +113,7 @@ def _check_web_auth(username: str, password: str) -> bool:
         # If no API key configured, check against auth manager
         try:
             from nexusagent.infrastructure.auth import get_auth_manager
+
             stored = get_auth_manager().get_key("api")
             if stored is None:
                 return False  # No key configured, deny
@@ -118,6 +121,7 @@ def _check_web_auth(username: str, password: str) -> bool:
         except Exception:
             return False
     import hmac
+
     return hmac.compare_digest(password, api_key)
 
 

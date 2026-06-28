@@ -150,6 +150,7 @@ class CompactionPipeline:
 
         # DAG compression is async — run synchronously if no event loop
         import asyncio
+
         try:
             loop = asyncio.get_running_loop()
         except RuntimeError:
@@ -158,10 +159,9 @@ class CompactionPipeline:
         if loop and loop.is_running():
             # We're inside an async context — create a task
             import concurrent.futures
+
             with concurrent.futures.ThreadPoolExecutor() as pool:
-                future = pool.submit(
-                    asyncio.run, dag.compress(llm_call=llm_call)
-                )
+                future = pool.submit(asyncio.run, dag.compress(llm_call=llm_call))
                 future.result()
         else:
             asyncio.run(dag.compress(llm_call=llm_call))

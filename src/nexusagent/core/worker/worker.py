@@ -91,6 +91,7 @@ class NexusWorker:
         if self._health_task:
             self._health_task.cancel()
             import contextlib
+
             with contextlib.suppress(asyncio.CancelledError):
                 await self._health_task
         logger.info("NexusWorker stopped")
@@ -135,17 +136,13 @@ class NexusWorker:
                 else:
                     consecutive_failures += 1
                     logger.warning(
-                        "NATS health check failed "
-                        "(probe %d/%d, reconnect_count=%d/%d)",
+                        "NATS health check failed (probe %d/%d, reconnect_count=%d/%d)",
                         consecutive_failures,
                         max_failures_before_degraded,
                         health.get("reconnect_count", 0),
                         health.get("max_reconnects", 0),
                     )
-                    if (
-                        consecutive_failures >= max_failures_before_degraded
-                        and not self._degraded
-                    ):
+                    if consecutive_failures >= max_failures_before_degraded and not self._degraded:
                         self._degraded = True
                         self._healthy = False
                         logger.warning(
@@ -158,9 +155,7 @@ class NexusWorker:
                     rc = health.get("reconnect_count", 0)
                     mr = health.get("max_reconnects", _NATS_HARD_RECONNECT_CAP)
                     if rc < mr and not is_connected:
-                        logger.info(
-                            "Attempting NATS reconnect (%d/%d)...", rc + 1, mr
-                        )
+                        logger.info("Attempting NATS reconnect (%d/%d)...", rc + 1, mr)
                         try:
                             await self.bus.connect()
                         except Exception as exc:
@@ -188,9 +183,9 @@ class NexusWorker:
                     await self.bus.put_result(task_id, result)
                 except Exception as e:
                     logger.warning(
-                        "Failed to push result to NATS KV for task %s: %s. "
-                        "Result is safe in DB.",
-                        task_id, e,
+                        "Failed to push result to NATS KV for task %s: %s. Result is safe in DB.",
+                        task_id,
+                        e,
                     )
             else:
                 logger.info(
@@ -199,9 +194,7 @@ class NexusWorker:
                     task_id,
                 )
         except Exception as e:
-            logger.error(
-                "Failed to persist result for task %s: %s", task_id, e
-            )
+            logger.error("Failed to persist result for task %s: %s", task_id, e)
 
     @retry_with_backoff(max_attempts=2, base_delay=0.5, max_delay=5.0)
     async def _execute_agent_logic(self, task: TaskSchema) -> Any:
@@ -217,9 +210,7 @@ class NexusWorker:
             await asyncio.sleep(30)
             try:
                 async with task_repo.db_manager.get_session() as session:
-                    result = await session.execute(
-                        select(TaskModel).where(TaskModel.id == task_id)
-                    )
+                    result = await session.execute(select(TaskModel).where(TaskModel.id == task_id))
                     task_obj = result.scalar_one_or_none()
                     if task_obj and task_obj.status == "processing":
                         task_obj.updated_at = datetime.now(UTC)
@@ -262,9 +253,7 @@ class NexusWorker:
 
             # Start heartbeat to keep updated_at fresh during execution
             heartbeat_stop = asyncio.Event()
-            heartbeat_task = asyncio.create_task(
-                self._heartbeat(task.id, heartbeat_stop)
-            )
+            heartbeat_task = asyncio.create_task(self._heartbeat(task.id, heartbeat_stop))
             try:
                 # 2. Execute the agent task (with retry + circuit breaker)
                 result_data = await self._execute_agent_logic(task)
@@ -311,9 +300,7 @@ class NexusWorker:
                         error=str(e),
                         duration=None,
                     )
-                    await self._publish_result_degraded(
-                        task_id, failure_result.model_dump()
-                    )
+                    await self._publish_result_degraded(task_id, failure_result.model_dump())
             except Exception as inner_e:
                 logger.error(f"Critical failure reporting task error: {inner_e}")
 

@@ -119,7 +119,9 @@ class MemoryGitOps:
         try:
             result = subprocess.run(
                 [
-                    "git", "log", f"--max-count={limit}",
+                    "git",
+                    "log",
+                    f"--max-count={limit}",
                     "--format=%H|%s|%ai",
                 ],
                 cwd=str(self.workspace),
@@ -135,11 +137,13 @@ class MemoryGitOps:
                     continue
                 parts = line.split("|", 2)
                 if len(parts) == 3:
-                    commits.append({
-                        "hash": parts[0],
-                        "message": parts[1],
-                        "date": parts[2],
-                    })
+                    commits.append(
+                        {
+                            "hash": parts[0],
+                            "message": parts[1],
+                            "date": parts[2],
+                        }
+                    )
             return commits
         except Exception as e:
             logger.warning("Git log failed: %s", e)

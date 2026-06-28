@@ -237,6 +237,7 @@ async def create_research_graph(db_path: str | None = None) -> Any:
     # Set up async checkpointing for durable research workflows
     try:
         from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
+
         async with AsyncSqliteSaver.from_conn_string(db_path or ":memory:") as memory:
             await memory.setup()
             graph = workflow.compile(checkpointer=memory)

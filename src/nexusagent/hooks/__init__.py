@@ -145,7 +145,8 @@ class HookManager:
             except Exception:
                 logger.warning(
                     "Hook '%s' for event '%s' raised an exception",
-                    reg.name, event.value,
+                    reg.name,
+                    event.value,
                     exc_info=True,
                 )
 

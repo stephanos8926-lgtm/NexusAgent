@@ -189,6 +189,7 @@ class NexusApp(App):
 
         if not self._gc_frozen:
             import gc
+
             gc.freeze()
             self._gc_frozen = True
 
@@ -197,10 +198,13 @@ class NexusApp(App):
     def _refresh_git_branch(self) -> None:
         """Detect git branch and update the status bar."""
         import subprocess
+
         try:
             result = subprocess.run(
                 ["git", "branch", "--show-current"],
-                capture_output=True, text=True, timeout=3,
+                capture_output=True,
+                text=True,
+                timeout=3,
                 cwd=str(pathlib.Path.cwd()),
             )
             branch = result.stdout.strip() if result.returncode == 0 else ""
@@ -218,6 +222,7 @@ class NexusApp(App):
         # Show connection error as a hint (not as a message widget)
         if getattr(self, "_connection_error", None):
             from nexusagent.widgets.messages import AppMessage
+
             hint = AppMessage(
                 f"⚠ {self._connection_error} Start the server with: nexusagent.server"
             )
@@ -266,7 +271,7 @@ class NexusApp(App):
     def action_quit(self) -> None:
         """Quit the TUI application, canceling background tasks."""
         _ = asyncio.create_task(self._input_queue.put(None))  # noqa: RUF006
-        if hasattr(self, '_ws_task'):
+        if hasattr(self, "_ws_task"):
             self._ws_task.cancel()
         self.exit()
 

@@ -52,7 +52,9 @@ class Issue:
         icon = _SEVERITY_ICON.get(self.severity, "•")
         line_info = f" (line {self.line})" if self.line else ""
         suggestion = f"\n    → Suggestion: {self.suggestion}" if self.suggestion else ""
-        return f"  {icon} [{self.severity}] [{self.category}]{line_info}: {self.message}{suggestion}"
+        return (
+            f"  {icon} [{self.severity}] [{self.category}]{line_info}: {self.message}{suggestion}"
+        )
 
 
 @dataclass

@@ -82,7 +82,7 @@ def edit_file(
             )
 
         # Perform the replacement
-        new_content = content[:pos] + new_text + content[pos + len(old_text):]
+        new_content = content[:pos] + new_text + content[pos + len(old_text) :]
     else:
         # Search entire file
         if old_text not in content:

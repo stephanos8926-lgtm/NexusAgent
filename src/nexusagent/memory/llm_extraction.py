@@ -138,7 +138,9 @@ class LLMExtractor:
                     type=item.get("type", "observation"),
                     description=item.get("description", "")[:100],
                     confidence=min(max(confidence, 0.0), 1.0),
-                    entities=item.get("entities", []) if isinstance(item.get("entities"), list) else [],
+                    entities=item.get("entities", [])
+                    if isinstance(item.get("entities"), list)
+                    else [],
                 )
             )
         return results

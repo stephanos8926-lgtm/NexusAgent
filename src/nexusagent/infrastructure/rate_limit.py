@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class _Bucket:
     """Token bucket for a single client."""
+
     tokens: float
     last_refill: float
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)
@@ -24,12 +25,12 @@ class _Bucket:
 
 # Global rate limit config
 _RATE_LIMIT_ENABLED = True
-_RATE_LIMIT_TOKENS = 60      # max tokens per bucket
-_RATE_LIMIT_REFILL = 60      # refill period in seconds
-_RATE_LIMIT_PER_CLIENT: dict[str, _Bucket] = {}   # client_id -> _Bucket
-_RATE_LIMIT_CLEANUP = 300     # cleanup interval for stale buckets (seconds)
-_RATE_LIMIT_MAX_IDLE = 600    # remove buckets idle longer than this (seconds)
-_last_cleanup: float = 0.0   # timestamp of last cleanup run
+_RATE_LIMIT_TOKENS = 60  # max tokens per bucket
+_RATE_LIMIT_REFILL = 60  # refill period in seconds
+_RATE_LIMIT_PER_CLIENT: dict[str, _Bucket] = {}  # client_id -> _Bucket
+_RATE_LIMIT_CLEANUP = 300  # cleanup interval for stale buckets (seconds)
+_RATE_LIMIT_MAX_IDLE = 600  # remove buckets idle longer than this (seconds)
+_last_cleanup: float = 0.0  # timestamp of last cleanup run
 
 
 def _get_bucket(client_id: str) -> _Bucket:

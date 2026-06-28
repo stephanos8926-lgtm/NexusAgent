@@ -34,6 +34,7 @@ def _extract_agent_response(result) -> str:
     if isinstance(result, dict):
         if "messages" in result:
             from langchain_core.messages import BaseMessage
+
             messages = result["messages"]
             for msg in reversed(messages):
                 if isinstance(msg, BaseMessage) and not isinstance(msg, SystemMessage):
@@ -63,14 +64,18 @@ def _get_git_info(working_dir: str) -> str:
     try:
         branch = subprocess.run(
             ["git", "branch", "--show-current"],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True,
+            text=True,
+            timeout=5,
             cwd=working_dir,
         ).stdout.strip()
         if not branch:
             return ""
         status = subprocess.run(
             ["git", "status", "--short"],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True,
+            text=True,
+            timeout=5,
             cwd=working_dir,
         ).stdout.strip()
         info = f"Branch: {branch}"
@@ -115,6 +120,7 @@ def _build_environment_context(working_dir: str) -> str:
     # List available tools
     try:
         from nexusagent.tools.registry import list_all_tools
+
         tools = list_all_tools()
         if tools:
             by_cat: dict[str, list[str]] = {}

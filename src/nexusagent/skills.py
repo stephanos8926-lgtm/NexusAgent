@@ -73,7 +73,7 @@ def load_skill(skill_dir: Path) -> Skill | None:
                 description = desc_val.strip('"').strip("'")
 
     # Remove frontmatter from content for injection
-    body = content[match.end():] if match else content
+    body = content[match.end() :] if match else content
 
     return Skill(name=name, description=description, content=body.strip(), path=skill_md)
 

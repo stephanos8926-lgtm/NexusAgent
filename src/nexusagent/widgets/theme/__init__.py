@@ -40,8 +40,10 @@ __all__ = [
     "register_themes",
 ]
 
+
 # Import register_themes lazily to avoid circular imports
 def register_themes(app):
     """Register NexusAgent themes with the Textual app."""
     from nexusagent.widgets.theme.registry import register_themes as _register
+
     return _register(app)

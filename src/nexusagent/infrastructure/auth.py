@@ -4,6 +4,7 @@ Provides ``AuthManager`` for Fernet-encrypted API key storage with PBKDF2
 key derivation, plus module-level ``get_auth_manager`` / ``set_auth_manager``
 singleton accessors.
 """
+
 import base64
 import json
 import logging
@@ -35,8 +36,7 @@ class AuthManager:
         self.salt_path = Path(settings.auth.salt_path)
 
     def _get_salt(self) -> bytes:
-        """Retrieves or creates a random salt for KDF.
-        """
+        """Retrieves or creates a random salt for KDF."""
         if not self.salt_path.exists():
             salt = secrets.token_bytes(16)
             with open(self.salt_path, "wb") as f:
@@ -106,8 +106,7 @@ class AuthManager:
         return f"Master secret initialized successfully. Path: {self.master_secret_path}"
 
     def save_key(self, service: str, key: str):
-        """Encrypts and saves a service API key to the keystore.
-        """
+        """Encrypts and saves a service API key to the keystore."""
         fernet = self._get_fernet()
         encrypted_key = fernet.encrypt(key.encode()).decode()
 
@@ -116,8 +115,7 @@ class AuthManager:
         self._save_keystore(keystore)
 
     def get_key(self, service: str) -> str | None:
-        """Retrieves and decrypts a service API key.
-        """
+        """Retrieves and decrypts a service API key."""
         try:
             fernet = self._get_fernet()
             keystore = self._load_keystore()

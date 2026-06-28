@@ -61,7 +61,9 @@ async def session_websocket(
 
     # Validate Origin header to prevent CSRF
     origin = websocket.headers.get("origin", "")
-    logger.info(f"WS origin: origin={'present' if origin else 'missing'}, allowed={len(_WS_ALLOWED_ORIGINS)} origins")
+    logger.info(
+        f"WS origin: origin={'present' if origin else 'missing'}, allowed={len(_WS_ALLOWED_ORIGINS)} origins"
+    )
     if origin and origin not in _WS_ALLOWED_ORIGINS:
         logger.warning(f"Rejected WebSocket from unauthorized origin: {origin}")
         await websocket.close(code=4003, reason="Forbidden origin")
@@ -117,10 +119,12 @@ async def session_websocket(
                 # Validate message size (prevent DoS via large payloads)
                 msg_size = len(str(msg))
                 if msg_size > _WS_MAX_MESSAGE_SIZE:
-                    await websocket.send_json({
-                        "type": "error",
-                        "error": f"Message too large ({msg_size} bytes, max {_WS_MAX_MESSAGE_SIZE})",
-                    })
+                    await websocket.send_json(
+                        {
+                            "type": "error",
+                            "error": f"Message too large ({msg_size} bytes, max {_WS_MAX_MESSAGE_SIZE})",
+                        }
+                    )
                     continue
                 # Validate message has required fields
                 msg_type = msg.get("type")
@@ -144,41 +148,52 @@ async def session_websocket(
                     # Return session list to the TUI — admin only
                     try:
                         from nexusagent.infrastructure.api_auth import _classify_key
+
                         _role = _classify_key(header_key)
                         if _role != "admin":
-                            await websocket.send_json({
-                                "type": "error",
-                                "error": "Admin access required to list sessions",
-                            })
+                            await websocket.send_json(
+                                {
+                                    "type": "error",
+                                    "error": "Admin access required to list sessions",
+                                }
+                            )
                             continue
                         sessions = await session_repo.list_sessions(limit=20)
-                        await websocket.send_json({
-                            "type": "session_list",
-                            "sessions": sessions,
-                        })
+                        await websocket.send_json(
+                            {
+                                "type": "session_list",
+                                "sessions": sessions,
+                            }
+                        )
                     except Exception as e:
                         logger.warning("Failed to list sessions: %s", e)
-                        await websocket.send_json({
-                            "type": "session_list",
-                            "sessions": [],
-                            "error": str(e),
-                        })
+                        await websocket.send_json(
+                            {
+                                "type": "session_list",
+                                "sessions": [],
+                                "error": str(e),
+                            }
+                        )
                 elif msg_type == "compact":
                     # Trigger context compaction for this session
                     try:
                         ctx = await session.pre_compaction_flush()
-                        await websocket.send_json({
-                            "type": "compact_result",
-                            "status": "ok",
-                            "summary": ctx[:200] if ctx else "",
-                        })
+                        await websocket.send_json(
+                            {
+                                "type": "compact_result",
+                                "status": "ok",
+                                "summary": ctx[:200] if ctx else "",
+                            }
+                        )
                     except Exception as e:
                         logger.warning("Compaction failed: %s", e)
-                        await websocket.send_json({
-                            "type": "compact_result",
-                            "status": "error",
-                            "error": str(e),
-                        })
+                        await websocket.send_json(
+                            {
+                                "type": "compact_result",
+                                "status": "error",
+                                "error": str(e),
+                            }
+                        )
                 elif msg_type == "close":
                     await session.close()
                     break

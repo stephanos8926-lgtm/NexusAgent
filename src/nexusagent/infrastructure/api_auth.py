@@ -11,15 +11,14 @@ logger = logging.getLogger(__name__)
 
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
+
 # Admin API key — the primary key from the keystore has full access
 # Additional operator keys can be set via NEXUS_AUTH_OPERATOR_KEYS (comma-separated)
 # NOTE: Read dynamically at call time to support test environment overrides
 def _get_operator_keys() -> set[str]:
     """Get current operator keys from environment."""
     return {
-        k.strip()
-        for k in os.environ.get("NEXUS_AUTH_OPERATOR_KEYS", "").split(",")
-        if k.strip()
+        k.strip() for k in os.environ.get("NEXUS_AUTH_OPERATOR_KEYS", "").split(",") if k.strip()
     }
 
 

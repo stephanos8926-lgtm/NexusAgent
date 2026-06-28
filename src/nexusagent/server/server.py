@@ -31,6 +31,7 @@ async def lifespan(app: FastAPI):
     try:
         # 1. Initialize DB
         from nexusagent.infrastructure.db import get_db_manager
+
         db_manager = get_db_manager()
         await db_manager.init_db()
         logger.info("Database initialized.")
@@ -41,6 +42,7 @@ async def lifespan(app: FastAPI):
 
         # 3. Start the Worker as a background task within the same process
         from nexusagent.core.worker import NexusWorker
+
         worker = NexusWorker()
         worker_task = asyncio.create_task(worker.start())
         logger.info("Worker background task started.")

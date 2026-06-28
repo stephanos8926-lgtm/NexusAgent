@@ -94,40 +94,36 @@ class DatabaseManager:
         tracked in a ``_migrations`` table.
         """
         # Ensure the migrations tracking table exists
-        await conn.execute(text(
-            "CREATE TABLE IF NOT EXISTS _migrations ("
-            "  name TEXT PRIMARY KEY,"
-            "  applied_at TEXT NOT NULL DEFAULT (datetime('now'))"
-            ")"))
+        await conn.execute(
+            text(
+                "CREATE TABLE IF NOT EXISTS _migrations ("
+                "  name TEXT PRIMARY KEY,"
+                "  applied_at TEXT NOT NULL DEFAULT (datetime('now'))"
+                ")"
+            )
+        )
 
         # Migration: add memory_dir column to sessions table
-        row = await conn.execute(text(
-            "SELECT name FROM _migrations WHERE name = 'add_memory_dir'"
-        ))
+        row = await conn.execute(text("SELECT name FROM _migrations WHERE name = 'add_memory_dir'"))
         if row.scalar_one_or_none() is None:
             # Check if the column already exists (in case of pre-existing DB)
             pragma = await conn.execute(text("PRAGMA table_info(sessions)"))
             columns = [r[1] for r in pragma.fetchall()]
             if "memory_dir" not in columns:
-                await conn.execute(text(
-                    "ALTER TABLE sessions ADD COLUMN memory_dir TEXT"
-                ))
-            await conn.execute(text(
-                "INSERT INTO _migrations (name) VALUES ('add_memory_dir')"
-            ))
+                await conn.execute(text("ALTER TABLE sessions ADD COLUMN memory_dir TEXT"))
+            await conn.execute(text("INSERT INTO _migrations (name) VALUES ('add_memory_dir')"))
 
         # Migration: add index on working_dir for find_sessions_by_working_dir
-        row = await conn.execute(text(
-            "SELECT name FROM _migrations WHERE name = 'add_working_dir_index'"
-        ))
+        row = await conn.execute(
+            text("SELECT name FROM _migrations WHERE name = 'add_working_dir_index'")
+        )
         if row.scalar_one_or_none() is None:
-            await conn.execute(text(
-                "CREATE INDEX IF NOT EXISTS ix_sessions_working_dir "
-                "ON sessions (working_dir)"
-            ))
-            await conn.execute(text(
-                "INSERT INTO _migrations (name) VALUES ('add_working_dir_index')"
-            ))
+            await conn.execute(
+                text("CREATE INDEX IF NOT EXISTS ix_sessions_working_dir ON sessions (working_dir)")
+            )
+            await conn.execute(
+                text("INSERT INTO _migrations (name) VALUES ('add_working_dir_index')")
+            )
 
     async def close(self) -> None:
         """Dispose the engine (call on shutdown)."""

@@ -5,6 +5,7 @@ tool access roles, prompt injection defence, and multi-resolution model/provider
 selection. Also exposes ``run_agent_task`` as the shared execution entry point
 used by the worker pool and sub-agent system.
 """
+
 import logging
 import os
 import re
@@ -63,7 +64,9 @@ def sanitize_tool_output(text: str) -> str:
         f"{text}"
     )
 
+
 # ─── MCP + Memory Index Tool Wiring ────────────────────────────────────
+
 
 async def _ensure_mcp_tools_loaded():
     """Lazily load MCP tools on first agent use.
@@ -260,7 +263,8 @@ class Agent:
             # run without the safety net than fail agent construction.
             logging.getLogger(__name__).warning(
                 "init_chat_model rejected timeout/max_retries for %r; "
-                "falling back to unbounded model string", model_name,
+                "falling back to unbounded model string",
+                model_name,
                 exc_info=True,
             )
             model = model_name
@@ -310,9 +314,12 @@ def run_agent_task(state: dict) -> dict:
     _setup_workspace_context(working_dir)
 
     try:
-        agent = Agent(role=role, policy=policy,
-                      model_override=model_override,
-                      provider_override=provider_override)
+        agent = Agent(
+            role=role,
+            policy=policy,
+            model_override=model_override,
+            provider_override=provider_override,
+        )
 
         # Inject workspace context into state for the agent
         if working_dir and working_dir != ".":
@@ -320,6 +327,7 @@ def run_agent_task(state: dict) -> dict:
             from pathlib import Path
 
             from nexusagent.infrastructure.prompt_loader import load_nexus_prompt
+
             try:
                 nexus_prompt = load_nexus_prompt(
                     package_root=Path(__file__).parent.parent,
@@ -333,6 +341,7 @@ def run_agent_task(state: dict) -> dict:
             # Build environment context
             try:
                 from nexusagent.core.session.helpers import _build_environment_context
+
                 env_ctx = _build_environment_context(working_dir)
                 state["_environment_context"] = env_ctx
             except Exception:
@@ -392,6 +401,7 @@ def _setup_workspace_context(working_dir: str) -> None:
 
     # 1. Set path jail
     from nexusagent.tools.fs_base import set_workspace_root
+
     set_workspace_root(working_dir)
 
     # 2. Set workspace-scoped memory directory

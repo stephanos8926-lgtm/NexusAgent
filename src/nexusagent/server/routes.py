@@ -44,6 +44,7 @@ def register_routes(app: FastAPI) -> None:
         allowed, headers = await check_rate_limit(client_id)
         if not allowed:
             from fastapi.responses import JSONResponse
+
             return JSONResponse(
                 status_code=429,
                 content={"detail": "Rate limit exceeded. Try again later."},
@@ -78,12 +79,14 @@ def register_routes(app: FastAPI) -> None:
             nats_error = None
             for attempt in range(3):
                 try:
-                    await sdk.submit_task({
-                        "id": task_id,
-                        "description": request.description,
-                        "priority": request.priority,
-                        "metadata": request.metadata,
-                    })
+                    await sdk.submit_task(
+                        {
+                            "id": task_id,
+                            "description": request.description,
+                            "priority": request.priority,
+                            "metadata": request.metadata,
+                        }
+                    )
                     nats_error = None
                     break
                 except Exception as nats_exc:
@@ -91,6 +94,7 @@ def register_routes(app: FastAPI) -> None:
                     logger.warning("NATS publish attempt %d failed: %s", attempt + 1, nats_exc)
                     if attempt < 2:
                         import asyncio
+
                         await asyncio.sleep(0.5 * (attempt + 1))
 
             if nats_error:
@@ -183,7 +187,9 @@ def register_routes(app: FastAPI) -> None:
         task_repo = get_task_repo()
         cancelled = await task_repo.cancel_task(task_id)
         if not cancelled:
-            raise HTTPException(status_code=400, detail="Task not found or already completed/failed")
+            raise HTTPException(
+                status_code=400, detail="Task not found or already completed/failed"
+            )
 
         try:
             bus = get_bus()
@@ -223,20 +229,22 @@ def register_routes(app: FastAPI) -> None:
         from nexusagent.core.worker import _agent_breaker, _nats_breaker
 
         return {
-            "workers": [{
-                "name": "default",
-                "status": "running",
-                "circuit_breakers": {
-                    "agent": {
-                        "state": _agent_breaker.state,
-                        "failure_count": _agent_breaker.failure_count,
+            "workers": [
+                {
+                    "name": "default",
+                    "status": "running",
+                    "circuit_breakers": {
+                        "agent": {
+                            "state": _agent_breaker.state,
+                            "failure_count": _agent_breaker.failure_count,
+                        },
+                        "nats": {
+                            "state": _nats_breaker.state,
+                            "failure_count": _nats_breaker.failure_count,
+                        },
                     },
-                    "nats": {
-                        "state": _nats_breaker.state,
-                        "failure_count": _nats_breaker.failure_count,
-                    },
-                },
-            }]
+                }
+            ]
         }
 
     @app.get("/tools", dependencies=[Depends(verify_api_key)])
@@ -245,21 +253,25 @@ def register_routes(app: FastAPI) -> None:
         tools = list_all_tools()
         by_cat: dict[str, list[dict]] = {}
         for t in tools:
-            by_cat.setdefault(t.category, []).append({
-                "name": t.name,
-                "description": t.description,
-                "parameters": t.parameters,
-            })
+            by_cat.setdefault(t.category, []).append(
+                {
+                    "name": t.name,
+                    "description": t.description,
+                    "parameters": t.parameters,
+                }
+            )
         return {"tools": by_cat, "total": len(tools)}
 
     # ─── Auth Token Exchange (for browser WebSocket clients) ─────────────
 
     class TokenExchangeRequest(BaseModel):
         """Request body for token exchange."""
+
         api_key: str = Field(..., description="API key to exchange for a connection token")
 
     class TokenExchangeResponse(BaseModel):
         """Response with short-lived connection token."""
+
         token: str = Field(..., description="Short-lived connection token for WebSocket")
         expires_in: int = Field(default=300, description="Token expiry in seconds")
 

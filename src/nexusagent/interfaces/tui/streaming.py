@@ -44,6 +44,7 @@ def _mount_with_limit(app, widget) -> None:
             oldest = children.pop(0)
             oldest.remove()
 
+
 logger = logging.getLogger(__name__)
 
 
@@ -85,6 +86,7 @@ async def handle_event(app, event: dict) -> None:
         if app._auto_approve:
             # Auto-approve: skip the modal, send approval directly
             from nexusagent.interfaces.tui.websocket import send_approval
+
             await send_approval(app, call_id, True)
             app.status_bar.set_status("Ready")
         else:
@@ -92,10 +94,10 @@ async def handle_event(app, event: dict) -> None:
             args = event.get("args", {})
             app.status_bar.set_status("Awaiting approval...")
             from nexusagent.interfaces.tui_widgets import ApprovalModal
-            approved = await app.push_screen_wait(
-                ApprovalModal(tool, args, call_id)
-            )
+
+            approved = await app.push_screen_wait(ApprovalModal(tool, args, call_id))
             from nexusagent.interfaces.tui.websocket import send_approval
+
             await send_approval(app, call_id, approved)
             app.status_bar.set_status("Ready")
 
@@ -103,6 +105,7 @@ async def handle_event(app, event: dict) -> None:
         content = event.get("content", "")
         if app._current_assistant is None:
             from nexusagent.widgets.messages import AssistantMessage
+
             app._current_assistant = AssistantMessage()
             _mount_with_limit(app, app._current_assistant)
         await app._current_assistant.append_token(content)
@@ -118,6 +121,7 @@ async def handle_event(app, event: dict) -> None:
             app._current_assistant = None
         elif content:
             from nexusagent.widgets.messages import AssistantMessage
+
             msg = AssistantMessage()
             msg.finalize(content)
             _mount_with_limit(app, msg)
@@ -212,9 +216,10 @@ def _handle_tool_call_event(app, event: dict) -> None:
 
     if app._auto_approve and tool != "tool_search":
         from nexusagent.interfaces.tui.websocket import send_approval
+
         call_id = event.get("call_id", "")
-        app._auto_approve_task = __import__("asyncio").get_event_loop().create_task(
-            send_approval(app, call_id, True)
+        app._auto_approve_task = (
+            __import__("asyncio").get_event_loop().create_task(send_approval(app, call_id, True))
         )
 
     app.status_bar.set_status(f"Running: {tool}")
@@ -403,6 +408,7 @@ async def handle_slash_command(app, cmd: str) -> bool:
         return True
     if command == "/skills":
         from nexusagent.skills import get_skills_summary, load_all_skills
+
         skills = load_all_skills()
         if skills:
             get_skills_summary(skills)
@@ -420,6 +426,7 @@ async def handle_slash_command(app, cmd: str) -> bool:
             _mount_with_limit(app, msg)
             return True
         from nexusagent.skills import get_skill_content, load_all_skills
+
         skills = load_all_skills()
         skill_content = get_skill_content(skills, skill_name)
         if skill_content:
@@ -525,6 +532,7 @@ def process_next_in_queue(app) -> None:
     app.status_bar.set_status("Thinking...")
     app.status_bar.set_spinner(True)
     import asyncio
+
     asyncio.create_task(app._input_queue.put(next_msg))  # noqa: RUF006
     update_queue_status(app)
 

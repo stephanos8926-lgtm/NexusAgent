@@ -226,16 +226,21 @@ class ToolCallMessage(Static):
 
         # Handle collapsed state — show hint so user knows it's clickable
         if self._collapsed:
-            output_parts.append((
-                f"  ▸ {line_count} line{'s' if line_count != 1 else ''}"
-                f" · click to expand",
-                "text-muted",
-            ))
+            output_parts.append(
+                (
+                    f"  ▸ {line_count} line{'s' if line_count != 1 else ''} · click to expand",
+                    "text-muted",
+                )
+            )
             return Content.assemble(*output_parts)
 
         # Expanded: truncate only very large outputs (10k chars)
-        output = self._output if len(self._output) <= 10000 else (
-            self._output[:10000] + f"\n[truncated — {len(self._output)-10000:,} more chars]"
+        output = (
+            self._output
+            if len(self._output) <= 10000
+            else (
+                self._output[:10000] + f"\n[truncated — {len(self._output) - 10000:,} more chars]"
+            )
         )
 
         output_parts.append(("\n", ""))

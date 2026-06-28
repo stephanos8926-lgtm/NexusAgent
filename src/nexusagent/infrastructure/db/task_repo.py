@@ -36,9 +36,7 @@ class TaskRepository:
         """
         async with self.db_manager.get_session() as session:
             # Check if task already exists (idempotent)
-            existing = await session.execute(
-                select(TaskModel).where(TaskModel.id == task_id)
-            )
+            existing = await session.execute(select(TaskModel).where(TaskModel.id == task_id))
             if existing.scalar_one_or_none():
                 return  # Already exists, skip
             task = TaskModel(
@@ -57,9 +55,7 @@ class TaskRepository:
             status: The new status string (e.g. ``"pending"``, ``"processing"``, ``"completed"``).
         """
         async with self.db_manager.get_session() as session:
-            stmt = (
-                update(TaskModel).where(TaskModel.id == task_id).values(status=status)
-            )
+            stmt = update(TaskModel).where(TaskModel.id == task_id).values(status=status)
             await session.execute(stmt)
 
     async def get_task_status(self, task_id: str) -> str | None:
@@ -72,18 +68,14 @@ class TaskRepository:
             The status string, or None if the task doesn't exist.
         """
         async with self.db_manager.get_session() as session:
-            result = await session.execute(
-                select(TaskModel).where(TaskModel.id == task_id)
-            )
+            result = await session.execute(select(TaskModel).where(TaskModel.id == task_id))
             task = result.scalar_one_or_none()
             return task.status if task else None
 
     async def get_task(self, task_id: str) -> dict | None:
         """Get a full task record by ID."""
         async with self.db_manager.get_session() as session:
-            result = await session.execute(
-                select(TaskModel).where(TaskModel.id == task_id)
-            )
+            result = await session.execute(select(TaskModel).where(TaskModel.id == task_id))
             task = result.scalar_one_or_none()
             if not task:
                 return None
@@ -159,9 +151,7 @@ class TaskRepository:
         from nexusagent.llm.models import TaskStatus
 
         async with self.db_manager.get_session() as session:
-            result = await session.execute(
-                select(TaskModel).where(TaskModel.id == task_id)
-            )
+            result = await session.execute(select(TaskModel).where(TaskModel.id == task_id))
             task = result.scalar_one_or_none()
             if not task:
                 return False
@@ -175,9 +165,7 @@ class TaskRepository:
         from nexusagent.llm.models import TaskStatus
 
         async with self.db_manager.get_session() as session:
-            result = await session.execute(
-                select(TaskModel).where(TaskModel.id == task_id)
-            )
+            result = await session.execute(select(TaskModel).where(TaskModel.id == task_id))
             task = result.scalar_one_or_none()
             if not task or task.status != TaskStatus.FAILED:
                 return None

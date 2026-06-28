@@ -89,6 +89,7 @@ class HybridMemoryManager:
         Returns the file path of the written entry.
         """
         from nexusagent.memory.memory_files import MemoryEntryType
+
         entry_type = MemoryEntryType(type) if isinstance(type, str) else type
 
         # Auto-link to related memories if not explicitly provided
@@ -159,9 +160,7 @@ class HybridMemoryManager:
         parent_results: list[dict] = []
         if self._parent_index is not None:
             try:
-                parent_results = await self._parent_index.search(
-                    query, max_results=fetch_count
-                )
+                parent_results = await self._parent_index.search(query, max_results=fetch_count)
                 for r in parent_results:
                     r["origin"] = "parent"
             except Exception as exc:
@@ -260,22 +259,17 @@ class HybridMemoryManager:
 
         # Validate path exists
         if not resolved_path.exists():
-            raise FileNotFoundError(
-                f"Parent memory directory does not exist: {resolved_path}"
-            )
+            raise FileNotFoundError(f"Parent memory directory does not exist: {resolved_path}")
 
         # Validate it contains a memory index
         index_path = resolved_path / ".memory" / "index.sqlite"
         if not index_path.exists():
-            raise FileNotFoundError(
-                f"Parent memory directory missing index: {index_path}"
-            )
+            raise FileNotFoundError(f"Parent memory directory missing index: {index_path}")
 
         # Prevent self-inheritance
         if resolved_path == self.workspace_dir.resolve():
             raise ValueError(
-                "Cannot inherit from own workspace: "
-                f"{resolved_path} == {self.workspace_dir}"
+                f"Cannot inherit from own workspace: {resolved_path} == {self.workspace_dir}"
             )
 
         # Close previous parent index if replacing
@@ -286,9 +280,7 @@ class HybridMemoryManager:
         self._parent_index = HybridMemoryIndex(str(resolved_path))
         logger.info("Configured parent memory inheritance from %s", resolved_path)
 
-    def promote_to_parent(
-        self, filter_fn=None
-    ) -> int:
+    def promote_to_parent(self, filter_fn=None) -> int:
         """Copy selected markdown memories from own bank/ to parent's bank/.
 
         Uses file-based locking for concurrency safety. After copying,
@@ -339,7 +331,11 @@ class HybridMemoryManager:
                     count += 1
 
                 # Re-index parent for new files
-                if count > 0 and self._parent_index is not None and self.parent_memory_dir is not None:
+                if (
+                    count > 0
+                    and self._parent_index is not None
+                    and self.parent_memory_dir is not None
+                ):
                     for md_file in parent_bank.glob("*.md"):
                         rel = md_file.relative_to(self.parent_memory_dir)
                         self._parent_index.index_file(str(rel))

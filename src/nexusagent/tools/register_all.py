@@ -90,7 +90,8 @@ async def register_mcp_tools() -> list[str]:
         except Exception as exc:
             logger.warning(
                 "Failed to discover tools from MCP server '%s': %s",
-                server_name, exc,
+                server_name,
+                exc,
             )
             continue
 
@@ -101,11 +102,13 @@ async def register_mcp_tools() -> list[str]:
 
             # SECURITY: Deny MCP tools that shadow built-in tool names
             from nexusagent.tools.tool_specs import BUILTIN_TOOL_NAMES
+
             if tool_name in BUILTIN_TOOL_NAMES:
                 logger.warning(
                     "MCP server '%s' attempted to register tool '%s' "
                     "which shadows a built-in tool — BLOCKED",
-                    server_name, tool_name,
+                    server_name,
+                    tool_name,
                 )
                 continue
 
@@ -204,11 +207,7 @@ def _wrap_mcp_tool(
                 response.raise_for_status()
                 result = response.json()
                 content = result.get("result", {}).get("content", [])
-                texts = [
-                    c.get("text", "")
-                    for c in content
-                    if c.get("type") == "text"
-                ]
+                texts = [c.get("text", "") for c in content if c.get("type") == "text"]
                 return "\n".join(texts) if texts else str(result)
         except Exception as exc:
             return f"[MCP:{server_name}] Error calling '{tool_name}': {exc}"
@@ -359,6 +358,7 @@ def ask_user(question: str, options: list[str] | None = None) -> str:
     # Check if we're running in TUI mode (event loop available)
     try:
         import asyncio
+
         asyncio.get_running_loop()
         # We're in an async context — this is the TUI
         # Return a signal that the TUI will handle via push_screen_wait
@@ -425,6 +425,7 @@ def _get_memory_workspace() -> str:
     # 1. Check thread-local worker override
     from nexusagent.core.agent import _ws_memory_dir
     from nexusagent.infrastructure.config import settings
+
     ws = _ws_memory_dir.get()
     if ws:
         os.makedirs(ws, exist_ok=True)
@@ -611,10 +612,7 @@ async def memory_write(
                 top_score = existing[0].get("score", 0)
                 if top_score >= dedup_threshold:
                     top_file = existing[0].get("file", "unknown")
-                    return (
-                        f"Duplicate memory (score: {top_score:.2f}). "
-                        f"Existing entry: {top_file}"
-                    )
+                    return f"Duplicate memory (score: {top_score:.2f}). Existing entry: {top_file}"
         except Exception:
             pass  # If dedup check fails, proceed with write
 
@@ -849,6 +847,7 @@ def memory_update(
         fm_lines.append(f"created: {existing_created}")
     else:
         from datetime import UTC, datetime
+
         fm_lines.append(f"created: {datetime.now(UTC).isoformat()}")
     if existing_confidence:
         fm_lines.append(f"confidence: {existing_confidence}")
@@ -949,12 +948,14 @@ def memory_list(
         if type and entry_type != type:
             continue
 
-        entries.append({
-            "file": f"bank/{md_file}",
-            "type": entry_type,
-            "description": desc,
-            "created": created,
-        })
+        entries.append(
+            {
+                "file": f"bank/{md_file}",
+                "type": entry_type,
+                "description": desc,
+                "created": created,
+            }
+        )
 
     if not entries:
         return "No memories found matching the criteria"
@@ -1059,12 +1060,14 @@ def memory_prune(
         if not cutoff and not type:
             continue
 
-        to_delete.append({
-            "file": rel_path,
-            "type": entry_type,
-            "created": created_str,
-            "full_path": filepath,
-        })
+        to_delete.append(
+            {
+                "file": rel_path,
+                "type": entry_type,
+                "created": created_str,
+                "full_path": filepath,
+            }
+        )
 
     if not to_delete:
         return "No memories match the prune criteria"
@@ -1078,6 +1081,7 @@ def memory_prune(
     if not dry_run:
         # Actually delete
         from nexusagent.memory.index.index import HybridMemoryIndex
+
         idx = HybridMemoryIndex(ws)
         for entry in to_delete:
             try:
@@ -1109,7 +1113,7 @@ def memory_prune(
         "workspace": "Override workspace path (optional)",
         "dry_run": "If True, preview what would be deleted (default: True)",
     },
-    example='memory_consolidate(dry_run=True)',
+    example="memory_consolidate(dry_run=True)",
     category="memory",
     returns="Consolidation report with actions taken.",
 )

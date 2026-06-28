@@ -43,11 +43,13 @@ def _is_path_allowed(resolved: Path) -> bool:
 
 class PromptLoadError(Exception):
     """Raised when a prompt file cannot be loaded."""
+
     pass
 
 
 class CircularChainError(PromptLoadError):
     """Raised when a circular @file chain is detected."""
+
     pass
 
 
@@ -100,19 +102,13 @@ def load_prompt_content(
 
             # SECURITY: Path allowlist check — only allow files within permitted dirs
             if _ALLOWED_INCLUDE_PATHS and not _is_path_allowed(file_path.resolve()):
-                logger.warning(
-                    "Prompt chain path blocked by allowlist: %s", file_path
-                )
-                output_parts.append(
-                    f"[prompt: {file_str} — BLOCKED by path allowlist]"
-                )
+                logger.warning("Prompt chain path blocked by allowlist: %s", file_path)
+                output_parts.append(f"[prompt: {file_str} — BLOCKED by path allowlist]")
                 continue
 
             # Circular detection
             if abs_path in visited:
-                raise CircularChainError(
-                    f"Circular prompt chain detected: {file_path}"
-                )
+                raise CircularChainError(f"Circular prompt chain detected: {file_path}")
 
             if not file_path.exists():
                 logger.warning("Prompt chain file not found: %s", file_path)
@@ -127,9 +123,7 @@ def load_prompt_content(
             file_size = file_path.stat().st_size
             if file_size > MAX_FILE_SIZE:
                 logger.warning("Prompt chain file too large (%d bytes): %s", file_size, file_path)
-                output_parts.append(
-                    f"[prompt: {file_str} — TOO LARGE ({file_size} bytes)]"
-                )
+                output_parts.append(f"[prompt: {file_str} — TOO LARGE ({file_size} bytes)]")
                 continue
 
             try:

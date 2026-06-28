@@ -41,8 +41,7 @@ async def _run_agent_task(task: TaskSchema) -> str:
 
     # Route: research tasks → LangGraph workflow, everything else → Agent
     is_research = metadata.get("mode") == "research" or any(
-        kw in task_desc
-        for kw in ["research", "investigate", "analyze", "deep dive", "report on"]
+        kw in task_desc for kw in ["research", "investigate", "analyze", "deep dive", "report on"]
     )
 
     async with _agent_breaker:
@@ -69,9 +68,7 @@ async def _run_agent_task(task: TaskSchema) -> str:
                         parent_memory_dir=parent_memory_dir,
                     )
                     # Inject memory context into the task description
-                    memory_ctx = await base.get_memory_context(
-                        task.description, max_results=5
-                    )
+                    memory_ctx = await base.get_memory_context(task.description, max_results=5)
                     if memory_ctx:
                         # Prepend memory context to task description
                         state["task"] = f"{memory_ctx}\n\n---\n\nTask: {task.description}"
@@ -88,9 +85,7 @@ async def _run_agent_task(task: TaskSchema) -> str:
                 try:
                     agent_result = result.get("result", "")
                     if agent_result:
-                        await session_base.extract_and_store(
-                            task.description, str(agent_result)
-                        )
+                        await session_base.extract_and_store(task.description, str(agent_result))
                     await session_base.maybe_dream()
                     await session_base.close()
                 except Exception as exc:
@@ -105,6 +100,7 @@ async def _run_research_workflow(task: TaskSchema, working_dir: str = ".") -> st
 
     # Set up workspace path jail for research agents too
     from nexusagent.tools.fs_base import set_workspace_root
+
     if working_dir and working_dir != ".":
         set_workspace_root(working_dir)
 

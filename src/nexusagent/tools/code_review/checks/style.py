@@ -17,13 +17,21 @@ def check(code: str, lines: list[str], result: ReviewResult):
     # Lines too long
     for i, line in enumerate(lines, 1):
         if len(line) > 120:
-            result.add(SEVERITY_LOW, "style",
-                       f"Line too long ({len(line)} chars, recommend ≤120)", i,
-                       "Break the line into multiple lines")
+            result.add(
+                SEVERITY_LOW,
+                "style",
+                f"Line too long ({len(line)} chars, recommend ≤120)",
+                i,
+                "Break the line into multiple lines",
+            )
         elif len(line) > 99:
-            result.add(SEVERITY_INFO, "style",
-                       f"Line is {len(line)} chars (PEP 8 recommends ≤79, pragmatic limit ≤99)", i,
-                       "Consider breaking the line")
+            result.add(
+                SEVERITY_INFO,
+                "style",
+                f"Line is {len(line)} chars (PEP 8 recommends ≤79, pragmatic limit ≤99)",
+                i,
+                "Consider breaking the line",
+            )
 
     # Trailing whitespace
     for i, line in enumerate(lines, 1):
@@ -37,15 +45,28 @@ def check(code: str, lines: list[str], result: ReviewResult):
             for j in range(i, min(i + 3, len(lines))):
                 next_line = lines[j].strip()
                 if next_line and not next_line.startswith("#"):
-                    if '"""' in next_line or "'''" in next_line or next_line.startswith("def ") or next_line.startswith("class "):
+                    if (
+                        '"""' in next_line
+                        or "'''" in next_line
+                        or next_line.startswith("def ")
+                        or next_line.startswith("class ")
+                    ):
                         break
                     elif next_line.startswith("pass") or next_line.startswith("..."):
-                        result.add(SEVERITY_LOW, "style",
-                                   "Function/class has only pass/ellipsis — needs implementation", i)
+                        result.add(
+                            SEVERITY_LOW,
+                            "style",
+                            "Function/class has only pass/ellipsis — needs implementation",
+                            i,
+                        )
                         break
                     elif not (next_line.startswith("def ") or next_line.startswith("class ")):
                         if j == i or (j == i + 1 and not lines[i].strip()):
-                            result.add(SEVERITY_INFO, "style",
-                                       "Public function/class missing docstring", i,
-                                       "Add a docstring describing the purpose and parameters")
+                            result.add(
+                                SEVERITY_INFO,
+                                "style",
+                                "Public function/class missing docstring",
+                                i,
+                                "Add a docstring describing the purpose and parameters",
+                            )
                         break

@@ -100,6 +100,7 @@ class EmbeddingProvider:
             env_path = Path.home() / ".nexusagent" / ".env"
             if not env_path.exists():
                 from nexusagent.infrastructure.config import get_project_root
+
                 env_path = get_project_root() / ".env"
             if env_path.exists():
                 for line in env_path.read_text().splitlines():

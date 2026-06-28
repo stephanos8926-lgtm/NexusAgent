@@ -3,6 +3,7 @@
 Provides Click-based CLI commands for interacting with the NexusAgent service,
 including task submission, worker execution, session management, and hook control.
 """
+
 # src/nexusagent/cli.py
 import asyncio
 import logging
@@ -19,6 +20,7 @@ CLIENT_VERSION = "0.1.0"
 def _validate_working_dir(working_dir: str) -> None:
     """Validate working_dir doesn't escape via path traversal."""
     from pathlib import Path
+
     resolved = Path(working_dir).resolve()
     # Ensure the path exists and is a directory
     if not resolved.is_dir():
@@ -63,8 +65,7 @@ async def preflight() -> bool:
         health = await sdk.health_check()
     except Exception:
         click.echo(
-            "Warning: Unable to reach server. "
-            "Use --skip-version-check to bypass.",
+            "Warning: Unable to reach server. Use --skip-version-check to bypass.",
             err=True,
         )
         return False
@@ -106,7 +107,9 @@ def main(ctx, check_server) -> None:
 
 @main.command()
 @click.argument("task")
-@click.option("--skip-version-check", is_flag=True, default=False, help="Skip preflight version check.")
+@click.option(
+    "--skip-version-check", is_flag=True, default=False, help="Skip preflight version check."
+)
 def submit(task, skip_version_check):
     """Submit a coding task to the agent service.
 
@@ -158,9 +161,24 @@ def submit(task, skip_version_check):
 @click.option("--acceptance", "-a", multiple=True, help="Acceptance criteria")
 @click.option("--model", "-M", default=None, help="Model override for this agent")
 @click.option("--max-depth", default=3, help="Max sub-agent nesting depth")
-@click.option("--summary-only", is_flag=True, default=False, help="Return only summary (not full output)")
-@click.option("--skip-version-check", is_flag=True, default=False, help="Skip preflight version check.")
-def run(task, working_dir, max_turns, wall_time, memory_mode, acceptance, model, max_depth, summary_only, skip_version_check):
+@click.option(
+    "--summary-only", is_flag=True, default=False, help="Return only summary (not full output)"
+)
+@click.option(
+    "--skip-version-check", is_flag=True, default=False, help="Skip preflight version check."
+)
+def run(
+    task,
+    working_dir,
+    max_turns,
+    wall_time,
+    memory_mode,
+    acceptance,
+    model,
+    max_depth,
+    summary_only,
+    skip_version_check,
+):
     """Spawn an isolated worker to complete a task.
 
     Example:
@@ -217,7 +235,13 @@ def run(task, working_dir, max_turns, wall_time, memory_mode, acceptance, model,
 @click.argument("session_id", required=False)
 @click.option("--new-id", "-n", default=None, help="New session ID (for rename/fork)")
 @click.option("--working-dir", "-d", default=None, help="Working directory (for fork)")
-@click.option("--status", "-s", default=None, type=click.Choice(["active", "idle", "closed"]), help="Filter by status")
+@click.option(
+    "--status",
+    "-s",
+    default=None,
+    type=click.Choice(["active", "idle", "closed"]),
+    help="Filter by status",
+)
 @click.option("--limit", "-l", default=20, help="Max results")
 def session_cmd(action, session_id, new_id, working_dir, status, limit):
     """Manage interactive sessions.
@@ -238,6 +262,7 @@ def session_cmd(action, session_id, new_id, working_dir, status, limit):
         nexus session delete abc123
     """
     from nexusagent.infrastructure.db import get_session_repo
+
     session_repo = get_session_repo()
 
     async def _run():
@@ -284,7 +309,9 @@ def session_cmd(action, session_id, new_id, working_dir, status, limit):
             if ok:
                 click.echo(f"Renamed {session_id} → {new_id}")
             else:
-                click.echo(f"Failed. Session {session_id} not found or {new_id} already exists.", err=True)
+                click.echo(
+                    f"Failed. Session {session_id} not found or {new_id} already exists.", err=True
+                )
 
         elif action == "delete":
             if not session_id:
@@ -437,9 +464,7 @@ def memory_health(workspace):
     if type_dist:
         click.echo("")
         click.echo("── Type Distribution ──────────────────────────────")
-        for entry_type, count in sorted(
-            type_dist.items(), key=lambda x: x[1], reverse=True
-        ):
+        for entry_type, count in sorted(type_dist.items(), key=lambda x: x[1], reverse=True):
             bar = "█" * min(count * 2, 30)
             click.echo(f"  {entry_type:<20} {count:>4}  {bar}")
 
@@ -448,9 +473,7 @@ def memory_health(workspace):
     if entity_freq:
         click.echo("")
         click.echo("── Top Entities by Frequency ─────────────────────")
-        top_entities = sorted(
-            entity_freq.items(), key=lambda x: x[1], reverse=True
-        )[:10]
+        top_entities = sorted(entity_freq.items(), key=lambda x: x[1], reverse=True)[:10]
         for entity, count in top_entities:
             click.echo(f"  {entity:<25} mentioned {count} time(s)")
 
@@ -502,9 +525,7 @@ def memory_stats(workspace):
         click.echo("")
         click.echo("── Memory Count by Type ──────────────────────────")
         total = sum(type_dist.values())
-        for entry_type, count in sorted(
-            type_dist.items(), key=lambda x: x[1], reverse=True
-        ):
+        for entry_type, count in sorted(type_dist.items(), key=lambda x: x[1], reverse=True):
             pct = (count / total * 100) if total > 0 else 0
             click.echo(f"  {entry_type:<20} {count:>4}  ({pct:.1f}%)")
         click.echo(f"  {'─' * 46}")

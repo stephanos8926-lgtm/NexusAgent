@@ -85,7 +85,7 @@ class ModelLabel(Static):
             return Content(self._model)
         # Left-truncate model
         if width > 1:
-            return Content("…" + self._model[-(width - 1):])
+            return Content("…" + self._model[-(width - 1) :])
         return Content("…")
 
 
@@ -200,6 +200,7 @@ class StatusBar(Horizontal):
             if self._cwd and term_width > 60:
                 # Abbreviate long paths: show only last 2 components
                 from pathlib import Path
+
                 parts = Path(self._cwd).parts
                 short = str(Path(*parts[-2:])) if len(parts) > 2 else self._cwd
                 cwd.update(short)
@@ -330,6 +331,7 @@ NO_COLOR: bool = bool(os.environ.get("NO_COLOR"))
 def _run_git(*args: str) -> str | None:
     """Run a git command and return stdout, or None on failure."""
     import subprocess
+
     try:
         result = subprocess.run(
             ["git", *args],

@@ -85,11 +85,7 @@ class SessionRepository:
             status: The new status string (e.g. ``"active"``, ``"idle"``, ``"closed"``).
         """
         async with self.db_manager.get_session() as session:
-            stmt = (
-                update(SessionModel)
-                .where(SessionModel.id == session_id)
-                .values(status=status)
-            )
+            stmt = update(SessionModel).where(SessionModel.id == session_id).values(status=status)
             await session.execute(stmt)
 
     async def add_message(
@@ -125,9 +121,7 @@ class SessionRepository:
             session.add(msg)
         return msg_id
 
-    async def get_messages(
-        self, session_id: str, limit: int = 100
-    ) -> list[dict]:
+    async def get_messages(self, session_id: str, limit: int = 100) -> list[dict]:
         """Retrieve messages for a session, ordered oldest-first.
 
         Args:
@@ -233,16 +227,10 @@ class SessionRepository:
     async def rename_session(self, session_id: str, new_id: str) -> bool:
         """Rename a session. Returns True if renamed, False if not found or new_id taken."""
         async with self.db_manager.get_session() as session:
-            existing = await session.execute(
-                select(SessionModel).where(SessionModel.id == new_id)
-            )
+            existing = await session.execute(select(SessionModel).where(SessionModel.id == new_id))
             if existing.scalar_one_or_none():
                 return False
-            stmt = (
-                update(SessionModel)
-                .where(SessionModel.id == session_id)
-                .values(id=new_id)
-            )
+            stmt = update(SessionModel).where(SessionModel.id == session_id).values(id=new_id)
             result = await session.execute(stmt)
             return result.rowcount > 0
 
@@ -259,9 +247,7 @@ class SessionRepository:
             )
             return result.rowcount > 0
 
-    async def fork_session(
-        self, source_id: str, new_working_dir: str | None = None
-    ) -> str | None:
+    async def fork_session(self, source_id: str, new_working_dir: str | None = None) -> str | None:
         """Fork a session: copy messages to a new session ID.
 
         All operations (create new session record, copy messages) happen
@@ -272,9 +258,7 @@ class SessionRepository:
             The new session UUID, or ``None`` if the source session was not found.
         """
         async with self.db_manager.get_session() as session:
-            src = await session.execute(
-                select(SessionModel).where(SessionModel.id == source_id)
-            )
+            src = await session.execute(select(SessionModel).where(SessionModel.id == source_id))
             src_sess = src.scalar_one_or_none()
             if not src_sess:
                 return None

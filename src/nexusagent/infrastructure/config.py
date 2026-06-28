@@ -6,6 +6,7 @@ Provides ``ConfigSchema`` and its sub-models (``ServerConfig``, ``ClientConfig``
 (file → env vars → Pydantic defaults) and ``get_project_root`` /
 ``get_nexus_home`` path helpers.
 """
+
 import logging
 import os
 from pathlib import Path
@@ -98,11 +99,15 @@ class AgentConfig(BaseModel):
     """Agent runtime configuration (model, provider, tools, compaction, images)."""
 
     default_model: str = Field(default="gemini-2.5-flash")
-    primary_provider: str = Field(default="gemini", description="LLM provider: 'gemini' or 'openrouter'")
+    primary_provider: str = Field(
+        default="gemini", description="LLM provider: 'gemini' or 'openrouter'"
+    )
     # Primary model for Gemini provider (used when provider is "gemini")
     gemini_model: str = Field(default="gemini-2.5-flash")
     # Gemini API key (optional, defaults to GEMINI_API_KEY env var if not set)
-    gemini_api_key: str | None = Field(default=None, description="Gemini API key (overrides GEMINI_API_KEY env var)")
+    gemini_api_key: str | None = Field(
+        default=None, description="Gemini API key (overrides GEMINI_API_KEY env var)"
+    )
     openrouter_default_model: str = Field(default="google/gemini-2.5-flash-preview")
     openrouter_override_model: str | None = None
     enabled_tools: list[str] = Field(
@@ -112,26 +117,66 @@ class AgentConfig(BaseModel):
     max_conversation_history: int = Field(default=40, ge=4)
     compaction_enabled: bool = Field(default=True)
     yolo: bool = Field(default=False)
-    memory_workspace: str | None = Field(default=None, description="Path to the workspace-scoped memory directory, overrides default memory location when set")
+    memory_workspace: str | None = Field(
+        default=None,
+        description="Path to the workspace-scoped memory directory, overrides default memory location when set",
+    )
     # Memory extraction
-    memory_model: str = Field(default="", description="Model for memory extraction; empty string uses the current agent model")
+    memory_model: str = Field(
+        default="",
+        description="Model for memory extraction; empty string uses the current agent model",
+    )
     # Git-backed memory
-    memory_git_enabled: bool = Field(default=True, description="Enable git-backed memory persistence")
-    memory_git_auto_commit: bool = Field(default=True, description="Auto-commit memory changes after each write")
+    memory_git_enabled: bool = Field(
+        default=True, description="Enable git-backed memory persistence"
+    )
+    memory_git_auto_commit: bool = Field(
+        default=True, description="Auto-commit memory changes after each write"
+    )
     # Two-tier compaction
-    compaction_tier2_threshold: float = Field(default=0.75, ge=0.0, le=1.0, description="Fraction of context window to trigger tier-2 compaction (summarization)")
-    compaction_tier2_fresh_tail: int = Field(default=32, ge=1, description="Number of recent messages to preserve untouched during tier-2 compaction")
-    compaction_tier2_model: str = Field(default="", description="Model for tier-2 LLM summarization; empty string uses the current agent model")
+    compaction_tier2_threshold: float = Field(
+        default=0.75,
+        ge=0.0,
+        le=1.0,
+        description="Fraction of context window to trigger tier-2 compaction (summarization)",
+    )
+    compaction_tier2_fresh_tail: int = Field(
+        default=32,
+        ge=1,
+        description="Number of recent messages to preserve untouched during tier-2 compaction",
+    )
+    compaction_tier2_model: str = Field(
+        default="",
+        description="Model for tier-2 LLM summarization; empty string uses the current agent model",
+    )
     # Dream cycle
-    dream_cycle_interval: int = Field(default=20, ge=1, description="Number of turns between automatic dream cycle consolidations")
+    dream_cycle_interval: int = Field(
+        default=20, ge=1, description="Number of turns between automatic dream cycle consolidations"
+    )
     # NATS distributed memory
-    nats_memory_enabled: bool = Field(default=True, description="Enable NATS-based distributed memory sharing across workers")
-    nats_memory_subject_prefix: str = Field(default="nexus.memory", description="NATS subject prefix for memory events")
-    nats_memory_filter_own_events: bool = Field(default=True, description="Filter out own session's memory events when receiving from NATS")
+    nats_memory_enabled: bool = Field(
+        default=True, description="Enable NATS-based distributed memory sharing across workers"
+    )
+    nats_memory_subject_prefix: str = Field(
+        default="nexus.memory", description="NATS subject prefix for memory events"
+    )
+    nats_memory_filter_own_events: bool = Field(
+        default=True, description="Filter out own session's memory events when receiving from NATS"
+    )
     # LLM memory extraction
-    llm_extraction_enabled: bool = Field(default=True, description="Enable LLM-powered memory extraction (replaces regex-based)")
-    llm_extraction_model: str = Field(default="gemini-2.5-flash", description="Model for LLM extraction; empty string uses the current agent model")
-    llm_extraction_min_confidence: float = Field(default=0.5, ge=0.0, le=1.0, description="Minimum confidence threshold for LLM-extracted facts")
+    llm_extraction_enabled: bool = Field(
+        default=True, description="Enable LLM-powered memory extraction (replaces regex-based)"
+    )
+    llm_extraction_model: str = Field(
+        default="gemini-2.5-flash",
+        description="Model for LLM extraction; empty string uses the current agent model",
+    )
+    llm_extraction_min_confidence: float = Field(
+        default=0.5,
+        ge=0.0,
+        le=1.0,
+        description="Minimum confidence threshold for LLM-extracted facts",
+    )
     # Image input settings
     max_image_size_mb: int = Field(default=10, ge=1, le=50)
     supported_image_types: list[str] = Field(
@@ -144,17 +189,20 @@ class AgentConfig(BaseModel):
     # entire turn indefinitely with no exception ever raised, leaving the
     # session stalled with nothing surfaced to the user.
     llm_request_timeout: float = Field(
-        default=90.0, gt=0,
+        default=90.0,
+        gt=0,
         description="Max seconds to wait for an agent LLM response before raising TimeoutError",
     )
     llm_max_retries: int = Field(
-        default=2, ge=0,
+        default=2,
+        ge=0,
         description="Number of automatic retries on transient LLM request failures",
     )
 
 
 class PromptConfig(BaseModel):
     """Configuration for the NEXUS.md prompt system."""
+
     # Path to the base prompt file (defaults to ~/.nexusagent/NEXUS.md)
     base_prompt_file: str = Field(default="NEXUS.md")
     # Whether to look for a project-specific NEXUS.md in CWD
@@ -175,9 +223,7 @@ class LoggingConfig(BaseModel):
     """Logging configuration for level and format string."""
 
     level: str = Field(default="INFO")
-    format: str = Field(
-        default="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
-    )
+    format: str = Field(default="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 
 
 class HooksConfig(BaseModel):
@@ -292,7 +338,7 @@ def load_config(config_file: str | None = None) -> ConfigSchema:
     def override_from_env(prefix: str, data: dict, current_level: dict):
         for key, value in os.environ.items():
             if key.startswith(prefix):
-                stripped = key[len(prefix):]
+                stripped = key[len(prefix) :]
                 if "__" in stripped:
                     parts = stripped.split("__")
                     target = current_level
@@ -336,7 +382,12 @@ def load_config(config_file: str | None = None) -> ConfigSchema:
     # Coerce tui_responsive_enabled from string env var
     _resp = raw_data.get("client", {}).get("tui_responsive_enabled")
     if isinstance(_resp, str):
-        raw_data.setdefault("client", {})["tui_responsive_enabled"] = _resp.lower() in ("true", "1", "yes", "on")
+        raw_data.setdefault("client", {})["tui_responsive_enabled"] = _resp.lower() in (
+            "true",
+            "1",
+            "yes",
+            "on",
+        )
 
     try:
         config = ConfigSchema(**raw_data)
@@ -357,8 +408,12 @@ def load_config(config_file: str | None = None) -> ConfigSchema:
             setattr(config.auth, attr, val)
 
         # Ensure data subdirectories exist
-        for path_str in (config.server.db_path, config.auth.master_secret_path,
-                         config.auth.keystore_path, config.auth.salt_path):
+        for path_str in (
+            config.server.db_path,
+            config.auth.master_secret_path,
+            config.auth.keystore_path,
+            config.auth.salt_path,
+        ):
             Path(path_str).parent.mkdir(parents=True, exist_ok=True)
 
         return config

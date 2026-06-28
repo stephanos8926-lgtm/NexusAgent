@@ -202,12 +202,84 @@ Respond with ONLY the JSON array, no other text."""
                 continue
             group = [obs]
             used.add(i)
-            words_i = set(obs.lower().split()) - {"the", "a", "an", "is", "are", "was", "were", "in", "on", "at", "to", "for", "of", "and", "or", "but", "with", "by", "from", "as", "it", "this", "that", "i", "we", "you", "he", "she", "they", "my", "our", "your", "his", "her", "their"}
+            words_i = set(obs.lower().split()) - {
+                "the",
+                "a",
+                "an",
+                "is",
+                "are",
+                "was",
+                "were",
+                "in",
+                "on",
+                "at",
+                "to",
+                "for",
+                "of",
+                "and",
+                "or",
+                "but",
+                "with",
+                "by",
+                "from",
+                "as",
+                "it",
+                "this",
+                "that",
+                "i",
+                "we",
+                "you",
+                "he",
+                "she",
+                "they",
+                "my",
+                "our",
+                "your",
+                "his",
+                "her",
+                "their",
+            }
 
             for j, other in enumerate(observations):
                 if j in used or i == j:
                     continue
-                words_j = set(other.lower().split()) - {"the", "a", "an", "is", "are", "was", "were", "in", "on", "at", "to", "for", "of", "and", "or", "but", "with", "by", "from", "as", "it", "this", "that", "i", "we", "you", "he", "she", "they", "my", "our", "your", "his", "her", "their"}
+                words_j = set(other.lower().split()) - {
+                    "the",
+                    "a",
+                    "an",
+                    "is",
+                    "are",
+                    "was",
+                    "were",
+                    "in",
+                    "on",
+                    "at",
+                    "to",
+                    "for",
+                    "of",
+                    "and",
+                    "or",
+                    "but",
+                    "with",
+                    "by",
+                    "from",
+                    "as",
+                    "it",
+                    "this",
+                    "that",
+                    "i",
+                    "we",
+                    "you",
+                    "he",
+                    "she",
+                    "they",
+                    "my",
+                    "our",
+                    "your",
+                    "his",
+                    "her",
+                    "their",
+                }
                 if len(words_i & words_j) >= 3:
                     group.append(other)
                     used.add(j)

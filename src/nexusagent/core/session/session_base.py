@@ -78,6 +78,7 @@ class SessionBase:
         self._llm_extractor = None
         if llm_call is not None:
             from nexusagent.memory.llm_extraction import LLMExtractor
+
             self._llm_extractor = LLMExtractor(llm_call=llm_call)
 
         # Compaction
@@ -101,9 +102,7 @@ class SessionBase:
     async def get_memory_context(self, query: str, max_results: int = 5) -> str:
         """Get relevant memory context for injection into agent prompts."""
         try:
-            return await self.hybrid_memory.get_memory_context(
-                query, max_results=max_results
-            )
+            return await self.hybrid_memory.get_memory_context(query, max_results=max_results)
         except Exception as exc:
             logger.warning("Memory context retrieval failed: %s", exc)
             return ""

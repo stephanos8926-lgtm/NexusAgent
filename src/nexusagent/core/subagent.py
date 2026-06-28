@@ -90,11 +90,8 @@ class SubAgentHandle:
         the active configuration so subagents match the main agent provider.
         """
         from nexusagent.infrastructure.config import settings
-        return (
-            self.contract.model
-            or os.getenv("AGENT_MODEL")
-            or settings.agent.default_model
-        )
+
+        return self.contract.model or os.getenv("AGENT_MODEL") or settings.agent.default_model
 
     @property
     def provider(self) -> str:
@@ -108,6 +105,7 @@ class SubAgentHandle:
         explicitly overridden.
         """
         from nexusagent.infrastructure.config import settings
+
         return self.contract.provider or settings.agent.primary_provider
 
     # -- public query methods ------------------------------------------------

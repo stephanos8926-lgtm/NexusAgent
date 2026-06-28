@@ -42,8 +42,12 @@ class _HTMLToText(HTMLParser):
             self._current_tags.pop()
         if tag in self._skip_tags:
             self._skip = False
-        elif tag in ("p", "div", "h1", "h2", "h3", "h4", "h5", "h6", "li", "tr", "blockquote") and self._result and not self._result[-1].endswith("\n"):
-                self._result.append("\n")
+        elif (
+            tag in ("p", "div", "h1", "h2", "h3", "h4", "h5", "h6", "li", "tr", "blockquote")
+            and self._result
+            and not self._result[-1].endswith("\n")
+        ):
+            self._result.append("\n")
 
     def handle_data(self, data):
         if not self._skip:
@@ -53,6 +57,7 @@ class _HTMLToText(HTMLParser):
         text = "".join(self._result)
         # Collapse excessive whitespace
         import re
+
         text = re.sub(r"\n{3,}", "\n\n", text)
         return text.strip()
 
@@ -65,6 +70,7 @@ def _html_to_markdown(html: str) -> str:
     except Exception:
         # Fallback: strip tags with regex
         import re
+
         text = re.sub(r"<[^>]+>", "", html)
         return text.strip()
     return parser.get_text()
@@ -83,7 +89,9 @@ def _search_exa(query: str) -> str | None:
         client = Exa(api_key=api_key)
         # Use search() API — text parameter depends on exa_py version
         try:
-            response = client.search(query, num_results=5, text=True, contents={"text": {"max_characters": 600}})
+            response = client.search(
+                query, num_results=5, text=True, contents={"text": {"max_characters": 600}}
+            )
         except TypeError:
             # Older exa_py — text and contents not supported
             response = client.search(query, num_results=5)
@@ -94,7 +102,11 @@ def _search_exa(query: str) -> str | None:
         for r in results:
             title = getattr(r, "title", "Untitled")
             url = getattr(r, "url", "")
-            text = getattr(r, "text", "")[:600] or getattr(r, "highlights", [""])[0][:600] if hasattr(r, "highlights") else ""
+            text = (
+                getattr(r, "text", "")[:600] or getattr(r, "highlights", [""])[0][:600]
+                if hasattr(r, "highlights")
+                else ""
+            )
             parts.append(f"Title: {title}\nURL: {url}\n{text}")
         return "\n\n".join(parts)
     except ImportError:
@@ -160,8 +172,7 @@ def search_web(query: str) -> str:
 
 
 def search_local_docs(query: str) -> str:
-    """Search local documentation using ctx7 via subprocess.
-    """
+    """Search local documentation using ctx7 via subprocess."""
     try:
         result = subprocess.run(
             ["npx", "ctx7@latest", "docs", "query", query],
@@ -194,6 +205,7 @@ def fetch_url(url: str) -> str:
     content_type = response.headers.get("content-type", "")
     if "application/json" in content_type:
         import json
+
         try:
             data = response.json()
             text = json.dumps(data, indent=2, default=str)

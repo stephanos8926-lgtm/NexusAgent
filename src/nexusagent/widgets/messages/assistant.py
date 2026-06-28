@@ -63,6 +63,7 @@ class AssistantMessage(Static):
         self.update("")
         try:
             from textual.widgets import Markdown as TextualMarkdown
+
             md = TextualMarkdown(content)
             self.mount(md)
         except Exception:

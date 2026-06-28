@@ -6,14 +6,19 @@ from __future__ import annotations
 import contextvars
 from pathlib import Path
 
-_read_files_var: contextvars.ContextVar[set[str]] = contextvars.ContextVar(
-    "read_files", default=set()
+_read_files_var: contextvars.ContextVar[set[str] | None] = contextvars.ContextVar(
+    "read_files", default=None
 )
 
 
 def _get_read_files() -> set[str]:
     """Get the read-files set for the current context."""
-    return _read_files_var.get()
+    val = _read_files_var.get()
+    if val is None:
+        val = set()
+        _read_files_var.set(val)
+    return val
+
 
 # Default directory excludes for list_directory
 _DEFAULT_DIR_EXCLUDES = frozenset(

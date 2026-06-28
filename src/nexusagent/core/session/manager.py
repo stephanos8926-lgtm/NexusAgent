@@ -89,9 +89,7 @@ async def _discover_cross_session_memories(
             return []
 
     # Run searches in parallel across all previous sessions
-    all_results_nested = await asyncio.gather(
-        *[_search_session(s) for s in prev_sessions]
-    )
+    all_results_nested = await asyncio.gather(*[_search_session(s) for s in prev_sessions])
 
     # Flatten and deduplicate by content
     seen_contents: set[str] = set()

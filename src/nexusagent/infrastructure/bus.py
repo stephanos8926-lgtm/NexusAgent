@@ -5,6 +5,7 @@ reconnection, health monitoring, and JSON encoding for complex types) and
 ``NATSJSONEncoder`` (a custom JSON encoder that handles datetime, bytes,
 sets, and Path objects).
 """
+
 import asyncio
 import base64
 import json
@@ -104,9 +105,7 @@ class AgentBus:
         self._last_connect_time: float | None = None
         self._last_disconnect_time: float | None = None
         self._reconnect_count: int = 0
-        self._max_reconnects: int = _effective_max_reconnects(
-            settings.server.nats_max_reconnects
-        )
+        self._max_reconnects: int = _effective_max_reconnects(settings.server.nats_max_reconnects)
 
     @property
     def is_connected(self) -> bool:
@@ -151,10 +150,7 @@ class AgentBus:
             return
         try:
             max_reconnects = self._max_reconnects
-            logger.info(
-                f"Connecting to NATS at {self.url} "
-                f"(max_reconnects={max_reconnects})"
-            )
+            logger.info(f"Connecting to NATS at {self.url} (max_reconnects={max_reconnects})")
             self.nc = await nats.connect(
                 self.url,
                 reconnect_time_wait=settings.server.nats_reconnect_wait,
@@ -196,9 +192,7 @@ class AgentBus:
         self._last_connect_time = time.time()
         self._connected_event.set()
         self._disconnected_event.clear()
-        logger.info(
-            f"NATS reconnected (attempt #{self._reconnect_count})"
-        )
+        logger.info(f"NATS reconnected (attempt #{self._reconnect_count})")
 
     async def _on_closed(self) -> None:
         self._last_disconnect_time = time.time()
@@ -239,7 +233,7 @@ class AgentBus:
 
         # Deduplicate: don't re-subscribe to the same subject with the same callback
         for existing_sub in self._subscriptions:
-            if getattr(existing_sub, 'subject', None) == subject:
+            if getattr(existing_sub, "subject", None) == subject:
                 logger.debug("Already subscribed to '%s' — skipping", subject)
                 return
 
@@ -314,13 +308,9 @@ class AgentBus:
                 max_deliver=-1,
                 ack_wait=30,
             )
-            logger.info(
-                f"JetStream durable consumer '{durable}' created on '{stream}'"
-            )
+            logger.info(f"JetStream durable consumer '{durable}' created on '{stream}'")
         except nats.errors.Error:
-            logger.debug(
-                f"JetStream durable consumer '{durable}' already exists on '{stream}'"
-            )
+            logger.debug(f"JetStream durable consumer '{durable}' already exists on '{stream}'")
 
         # ── 3. Pull-subscribe and batch-fetch loop ───────────────────────
         psub = await self.js.pull_subscribe(subject, durable=durable, stream=stream)
@@ -363,14 +353,10 @@ class AgentBus:
                     # No messages available — loop and retry
                     pass
                 except asyncio.CancelledError:
-                    logger.info(
-                        f"JetStream durable consumer '{durable}' cancelled"
-                    )
+                    logger.info(f"JetStream durable consumer '{durable}' cancelled")
                     break
                 except Exception as exc:
-                    logger.error(
-                        f"JetStream durable fetch error: {exc}", exc_info=True
-                    )
+                    logger.error(f"JetStream durable fetch error: {exc}", exc_info=True)
                     await asyncio.sleep(1.0)
 
         # Fire-and-forget: return immediately; loop runs as background task
@@ -416,7 +402,7 @@ class AgentBus:
                 if isinstance(result, dict) and "data" in result:
                     truncated = {
                         **result,
-                        "data": str(result["data"])[:NATS_MAX_MESSAGE_SIZE // 2]
+                        "data": str(result["data"])[: NATS_MAX_MESSAGE_SIZE // 2]
                         + "\n... [TRUNCATED: exceeded NATS 1MB limit]",
                     }
                     payload = json.dumps(truncated, cls=NATSJSONEncoder).encode()

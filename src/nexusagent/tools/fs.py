@@ -182,4 +182,3 @@ def write_multiple_files(files: dict[str, str]) -> str:
     for path, content in files.items():
         write_file(path, content)
     return f"Successfully wrote {len(files)} files"
-

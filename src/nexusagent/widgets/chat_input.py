@@ -24,31 +24,33 @@ from textual.widgets import TextArea
 logger = logging.getLogger(__name__)
 
 # Known slash commands for autocomplete
-SLASH_COMMANDS: list[str] = sorted([
-    "/help",
-    "/new",
-    "/clear",
-    "/resume",
-    "/status",
-    "/version",
-    "/tokens",
-    "/model",
-    "/theme",
-    "/theme-preview",
-    "/auto",
-    "/compact",
-    "/context",
-    "/logs",
-    "/skills",
-    "/skill",
-    "/sessions",
-    "/threads",
-    "/interrupt",
-    "/undo",
-    "/redo",
-    "/copy",
-    "/quit",
-])
+SLASH_COMMANDS: list[str] = sorted(
+    [
+        "/help",
+        "/new",
+        "/clear",
+        "/resume",
+        "/status",
+        "/version",
+        "/tokens",
+        "/model",
+        "/theme",
+        "/theme-preview",
+        "/auto",
+        "/compact",
+        "/context",
+        "/logs",
+        "/skills",
+        "/skill",
+        "/sessions",
+        "/threads",
+        "/interrupt",
+        "/undo",
+        "/redo",
+        "/copy",
+        "/quit",
+    ]
+)
 # History file path
 _HISTORY_DIR = Path.home() / ".nexusagent"
 _HISTORY_FILE = _HISTORY_DIR / "history.json"
@@ -278,12 +280,13 @@ class ChatInput(TextArea):
         - https://example.com/image.png
         """
         import re
+
         images = []
         # Match URLs
-        for m in re.finditer(r'https?://\S+\.(?:png|jpg|jpeg|webp|gif|bmp)\b', text, re.IGNORECASE):
+        for m in re.finditer(r"https?://\S+\.(?:png|jpg|jpeg|webp|gif|bmp)\b", text, re.IGNORECASE):
             images.append(m.group())
         # Match local paths (simple heuristic)
-        for m in re.finditer(r'(?:[/~]\S+\.(?:png|jpg|jpeg|webp|gif|bmp))\b', text, re.IGNORECASE):
+        for m in re.finditer(r"(?:[/~]\S+\.(?:png|jpg|jpeg|webp|gif|bmp))\b", text, re.IGNORECASE):
             images.append(m.group())
         return images
 
@@ -312,6 +315,7 @@ class ChatInput(TextArea):
                 input_widget: Reference to the ChatInput widget (for clearing).
             """
             from textual.message import Message
+
             Message.__init__(self)
             self.text = text
             self.images = images

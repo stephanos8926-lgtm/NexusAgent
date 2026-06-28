@@ -105,10 +105,11 @@ class SpinnerLabel(Horizontal):
 
 class Breakpoint(enum.Enum):
     """Terminal width breakpoints for responsive layout."""
-    WIDE = "wide"           # > 120 cols
-    STANDARD = "standard"   # 80-120 cols
-    NARROW = "narrow"         # 60-79 cols
-    TOO_SMALL = "too_small" # < 60 cols
+
+    WIDE = "wide"  # > 120 cols
+    STANDARD = "standard"  # 80-120 cols
+    NARROW = "narrow"  # 60-79 cols
+    TOO_SMALL = "too_small"  # < 60 cols
 
 
 # Width thresholds

@@ -89,6 +89,7 @@ class DreamLock:
             await asyncio.sleep(LOCK_POLL_INTERVAL)
         return False
 
+
 class DreamCycle:
     """4-phase memory consolidation daemon.
 
@@ -121,12 +122,14 @@ class DreamCycle:
         for f in self.bank_dir.glob("*.md"):
             try:
                 content = f.read_text()
-                if ("type: insight" in content or "type: synthesis" in content) and content.startswith("---"):
-                        parts = content.split("---", 2)
-                        if len(parts) >= 3:
-                            body = parts[2].strip()
-                            if body:
-                                insights.append(body[:200])
+                if (
+                    "type: insight" in content or "type: synthesis" in content
+                ) and content.startswith("---"):
+                    parts = content.split("---", 2)
+                    if len(parts) >= 3:
+                        body = parts[2].strip()
+                        if body:
+                            insights.append(body[:200])
             except Exception:
                 continue
         return insights
@@ -143,7 +146,9 @@ class DreamCycle:
                 entities=r.entities,
             )
 
-    async def _write_insight(self, content: str, description: str, confidence: float, entities: list[str]):
+    async def _write_insight(
+        self, content: str, description: str, confidence: float, entities: list[str]
+    ):
         """Write a synthesized insight as a new memory file."""
         from nexusagent.memory.memory_files import FileMemory, MemoryEntryType
 
@@ -157,7 +162,7 @@ class DreamCycle:
             entities=entities or None,
         )
 
-    # ── Phase 1: Scan ───────────────────────────────────────────────────
+        # ── Phase 1: Scan ───────────────────────────────────────────────────
         """Load existing insight memories to avoid duplication."""
         if not self.bank_dir.exists():
             return []
@@ -165,12 +170,14 @@ class DreamCycle:
         for f in self.bank_dir.glob("*.md"):
             try:
                 content = f.read_text()
-                if ("type: insight" in content or "type: synthesis" in content) and content.startswith("---"):
-                        parts = content.split("---", 2)
-                        if len(parts) >= 3:
-                            body = parts[2].strip()
-                            if body:
-                                insights.append(body[:200])
+                if (
+                    "type: insight" in content or "type: synthesis" in content
+                ) and content.startswith("---"):
+                    parts = content.split("---", 2)
+                    if len(parts) >= 3:
+                        body = parts[2].strip()
+                        if body:
+                            insights.append(body[:200])
             except Exception:
                 continue
         return insights
@@ -187,7 +194,9 @@ class DreamCycle:
                 entities=r.entities,
             )
 
-    async def _write_insight(self, content: str, description: str, confidence: float, entities: list[str]):
+    async def _write_insight(
+        self, content: str, description: str, confidence: float, entities: list[str]
+    ):
         """Write a synthesized insight as a new memory file."""
         from nexusagent.memory.memory_files import FileMemory
 
@@ -222,11 +231,7 @@ class DreamCycle:
 
         files = list(self.bank_dir.glob("*.md"))
         # Also scan entity files
-        entity_files = (
-            list(self.entities_dir.glob("*.md"))
-            if self.entities_dir.exists()
-            else []
-        )
+        entity_files = list(self.entities_dir.glob("*.md")) if self.entities_dir.exists() else []
 
         report: dict[str, Any] = {
             "total": len(files),
@@ -246,10 +251,12 @@ class DreamCycle:
                 content = f.read_text()
                 content_hash = self._hash_content(content)
                 if content_hash in seen_hashes:
-                    report["duplicates"].append({
-                        "original": seen_hashes[content_hash],
-                        "duplicate": str(f.name),
-                    })
+                    report["duplicates"].append(
+                        {
+                            "original": seen_hashes[content_hash],
+                            "duplicate": str(f.name),
+                        }
+                    )
                 else:
                     seen_hashes[content_hash] = str(f.name)
             except Exception:
@@ -265,18 +272,22 @@ class DreamCycle:
                 stat = f.stat()
                 mtime = datetime.fromtimestamp(stat.st_mtime, UTC)
                 if mtime < cutoff:
-                    report["stale"].append({
-                        "file": str(f.name),
-                        "age_days": (datetime.now(UTC) - mtime).days,
-                    })
+                    report["stale"].append(
+                        {
+                            "file": str(f.name),
+                            "age_days": (datetime.now(UTC) - mtime).days,
+                        }
+                    )
 
                 # Quality check
                 score = self._read_quality_score(content)
                 if score is not None and score < LOW_QUALITY_THRESHOLD:
-                    report["low_quality"].append({
-                        "file": str(f.name),
-                        "score": score,
-                    })
+                    report["low_quality"].append(
+                        {
+                            "file": str(f.name),
+                            "score": score,
+                        }
+                    )
             except Exception:
                 continue
 
@@ -348,6 +359,7 @@ class DreamCycle:
     def consolidate(self, scan_report, patterns=None):
         """Synchronous wrapper for consolidate_async."""
         import asyncio
+
         try:
             loop = asyncio.get_running_loop()
         except RuntimeError:
@@ -355,6 +367,7 @@ class DreamCycle:
         if loop and loop.is_running():
             # We're inside an async context — create a task
             import concurrent.futures
+
             with concurrent.futures.ThreadPoolExecutor() as pool:
                 future = pool.submit(asyncio.run, self._consolidate_async(scan_report, patterns))
                 return future.result()
@@ -400,9 +413,7 @@ class DreamCycle:
                     self._remove_index_entry(f"bank/{dup['duplicate']}")
                     logger.info("Removed duplicate: %s", dup["duplicate"])
                 except Exception as e:
-                    logger.warning(
-                        "Failed to remove duplicate %s: %s", dup["duplicate"], e
-                    )
+                    logger.warning("Failed to remove duplicate %s: %s", dup["duplicate"], e)
 
         # Resolve contradictions
         if self._llm_refinement and self._refinement:
@@ -414,12 +425,14 @@ class DreamCycle:
                         content = f.read_text()
                         frontmatter = self._parse_frontmatter(content)
                         body = self._strip_frontmatter(content)
-                        memories.append({
-                            "file": str(f.name),
-                            "content": body.strip() if body else "",
-                            "entities": frontmatter.get("entities", []),
-                            "confidence": frontmatter.get("confidence", 0.5),
-                        })
+                        memories.append(
+                            {
+                                "file": str(f.name),
+                                "content": body.strip() if body else "",
+                                "entities": frontmatter.get("entities", []),
+                                "confidence": frontmatter.get("confidence", 0.5),
+                            }
+                        )
                     except Exception:
                         continue
 
@@ -445,7 +458,7 @@ class DreamCycle:
                                     logger.warning(
                                         "Failed to remove contradicted memory %s: %s",
                                         mem["file"],
-                                    e,
+                                        e,
                                     )
             except Exception as e:
                 logger.warning("Contradiction detection failed: %s", e)
@@ -461,9 +474,7 @@ class DreamCycle:
                     self._remove_index_entry(f"bank/{stale['file']}")
                     logger.info("Pruned stale entry: %s", stale["file"])
                 except Exception as e:
-                    logger.warning(
-                        "Failed to prune stale %s: %s", stale["file"], e
-                    )
+                    logger.warning("Failed to prune stale %s: %s", stale["file"], e)
 
         # Remove low-quality entries
         for lq in scan_report.get("low_quality", []):
@@ -476,9 +487,7 @@ class DreamCycle:
                     self._remove_index_entry(f"bank/{lq['file']}")
                     logger.info("Removed low-quality entry: %s", lq["file"])
                 except Exception as e:
-                    logger.warning(
-                        "Failed to remove low-quality %s: %s", lq["file"], e
-                    )
+                    logger.warning("Failed to remove low-quality %s: %s", lq["file"], e)
 
         # Resolve contradictions (same entity, conflicting facts)
         contradictions = self._find_contradictions(patterns)
@@ -530,9 +539,7 @@ class DreamCycle:
             sweep_report = fm.sweep_expired()
             report["expired_swept"] = sweep_report
             if sweep_report["files_removed"] > 0:
-                logger.info(
-                    "Trim swept %d expired entries", sweep_report["files_removed"]
-                )
+                logger.info("Trim swept %d expired entries", sweep_report["files_removed"])
         except Exception as e:
             logger.warning("Expired sweep failed during trim: %s", e)
 
@@ -573,9 +580,7 @@ class DreamCycle:
         else:
             # Create a fresh index
             self.index_file.write_text(
-                "# Memory Index\n\n"
-                "This file is an index of memory entries.\n\n"
-                "## Entries\n"
+                "# Memory Index\n\nThis file is an index of memory entries.\n\n## Entries\n"
             )
             report["memory_lines_after"] = 4
 
@@ -687,9 +692,7 @@ class DreamCycle:
                 "memory_trimmed": False,
             }
             if self.index_file.exists():
-                trim_report["memory_lines_before"] = len(
-                    self.index_file.read_text().split("\n")
-                )
+                trim_report["memory_lines_before"] = len(self.index_file.read_text().split("\n"))
         else:
             trim_report = self.trim_index()
 
@@ -737,11 +740,7 @@ class DreamCycle:
         if total == 0:
             return 1.0
 
-        issues = (
-            len(report["duplicates"])
-            + len(report["stale"])
-            + len(report["low_quality"])
-        )
+        issues = len(report["duplicates"]) + len(report["stale"]) + len(report["low_quality"])
         if issues == 0:
             return 1.0
 
@@ -788,9 +787,7 @@ class DreamCycle:
         if len(filtered) != len(lines):
             self.index_file.write_text("\n".join(filtered))
 
-    def _find_contradictions(
-        self, patterns: dict[str, Any] | None
-    ) -> list[dict[str, Any]]:
+    def _find_contradictions(self, patterns: dict[str, Any] | None) -> list[dict[str, Any]]:
         """Find contradictions: same entity with conflicting facts.
 
         Returns a list of contradiction dicts with entity and conflicting files.
@@ -820,11 +817,13 @@ class DreamCycle:
         # Flag entities mentioned in many files as potential contradictions
         for entity, files in entity_files.items():
             if len(files) > 3:
-                contradictions.append({
-                    "entity": entity,
-                    "files": files,
-                    "reason": "high_entity_density",
-                })
+                contradictions.append(
+                    {
+                        "entity": entity,
+                        "files": files,
+                        "reason": "high_entity_density",
+                    }
+                )
 
         return contradictions
 

@@ -131,6 +131,7 @@ class DeepResearchOrchestrator:
             import asyncio
 
             from nexusagent.tools.research import fetch_url
+
             return await asyncio.get_event_loop().run_in_executor(None, fetch_url, url)
         except Exception:
             return None

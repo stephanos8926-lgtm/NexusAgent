@@ -160,10 +160,12 @@ class Session(SessionBase):
                 content_blocks.append(image_content)
             except Exception as exc:
                 logger.warning("Failed to encode image '%s': %s", img_path, exc)
-                content_blocks.append({
-                    "type": "text",
-                    "text": f"[Image could not be loaded: {img_path}]",
-                })
+                content_blocks.append(
+                    {
+                        "type": "text",
+                        "text": f"[Image could not be loaded: {img_path}]",
+                    }
+                )
 
         return HumanMessage(content=content_blocks)
 
@@ -178,11 +180,14 @@ class Session(SessionBase):
 
         if settings.hooks.hooks_enabled:
             try:
-                await get_hook_manager().run_hooks(HookEvent.SESSION_INIT, {
-                    "session_id": self.session_id,
-                    "working_dir": self.working_dir,
-                    "config": settings,
-                })
+                await get_hook_manager().run_hooks(
+                    HookEvent.SESSION_INIT,
+                    {
+                        "session_id": self.session_id,
+                        "working_dir": self.working_dir,
+                        "config": settings,
+                    },
+                )
             except Exception as exc:
                 logger.warning("session_init hook failed: %s", exc)
 
@@ -212,20 +217,32 @@ class Session(SessionBase):
 
         # Inject memory context from HybridMemoryManager
         try:
-            hybrid_context = await self.hybrid_memory.get_memory_context(user_message, max_results=5)
+            hybrid_context = await self.hybrid_memory.get_memory_context(
+                user_message, max_results=5
+            )
             if hybrid_context:
                 messages.append(SystemMessage(content=hybrid_context))
         except Exception as exc:
             logger.warning("Hybrid memory context retrieval failed: %s", exc)
 
-        messages.extend(self._conversation_history[-settings.agent.max_conversation_history:])
+        messages.extend(self._conversation_history[-settings.agent.max_conversation_history :])
         user_msg = self._build_user_message(user_message, images)
         messages.append(user_msg)
 
         # Compaction
         _compaction = self._compaction.__class__()  # Fresh instance
         if settings.agent.compaction_enabled and _compaction.should_compact(
-            [{"role": "system" if isinstance(m, SystemMessage) else "user" if isinstance(m, HumanMessage) else "assistant", "content": m.content} for m in messages]
+            [
+                {
+                    "role": "system"
+                    if isinstance(m, SystemMessage)
+                    else "user"
+                    if isinstance(m, HumanMessage)
+                    else "assistant",
+                    "content": m.content,
+                }
+                for m in messages
+            ]
         ):
             logger.debug("Session %s turn: %s", self.session_id, user_message[:100])
             try:
@@ -233,7 +250,17 @@ class Session(SessionBase):
                 messages.insert(1, SystemMessage(content=flush_ctx))
             except Exception as exc:
                 logger.warning("Pre-compaction flush failed: %s", exc)
-            msg_dicts = [{"role": "system" if isinstance(m, SystemMessage) else "user" if isinstance(m, HumanMessage) else "assistant", "content": m.content} for m in messages]
+            msg_dicts = [
+                {
+                    "role": "system"
+                    if isinstance(m, SystemMessage)
+                    else "user"
+                    if isinstance(m, HumanMessage)
+                    else "assistant",
+                    "content": m.content,
+                }
+                for m in messages
+            ]
             compacted = _compaction.compact(msg_dicts)
             messages = []
             for md in compacted:
@@ -260,7 +287,9 @@ class Session(SessionBase):
                 elapsed = int(asyncio.get_event_loop().time() - last_heartbeat)
                 # Only send "still thinking" if we've been waiting > 30s
                 if elapsed >= 30:
-                    self._enqueue(ThinkingEvent(content=f"Still thinking... ({elapsed}s)").model_dump())
+                    self._enqueue(
+                        ThinkingEvent(content=f"Still thinking... ({elapsed}s)").model_dump()
+                    )
 
         self._heartbeat_task = asyncio.create_task(_heartbeat())
 
@@ -310,11 +339,14 @@ class Session(SessionBase):
                 self._heartbeat_task.cancel()
             if settings.hooks.hooks_enabled:
                 try:
-                    await get_hook_manager().run_hooks(HookEvent.ERROR, {
-                        "session_id": self.session_id,
-                        "error_message": str(exc),
-                        "working_dir": self.working_dir,
-                    })
+                    await get_hook_manager().run_hooks(
+                        HookEvent.ERROR,
+                        {
+                            "session_id": self.session_id,
+                            "error_message": str(exc),
+                            "working_dir": self.working_dir,
+                        },
+                    )
                 except Exception as hook_exc:
                     logger.warning("error hook failed: %s", hook_exc)
             self._enqueue(ErrorEvent(message=str(exc)).model_dump())
@@ -328,32 +360,39 @@ class Session(SessionBase):
                 call_id = tc.get("id", "")
                 if tc.get("name") and call_id and call_id not in self._seen_tool_calls:
                     self._seen_tool_calls.add(call_id)
-                    self._enqueue({
-                        "type": "tool_call",
-                        "tool": tc["name"],
-                        "args": tc.get("args", {}),
-                        "call_id": call_id,
-                    })
+                    self._enqueue(
+                        {
+                            "type": "tool_call",
+                            "tool": tc["name"],
+                            "args": tc.get("args", {}),
+                            "call_id": call_id,
+                        }
+                    )
 
         if isinstance(token, ToolMessage):
             call_id = getattr(token, "tool_call_id", "")
             if call_id and call_id not in self._seen_tool_results:
                 self._seen_tool_results.add(call_id)
-                self._enqueue({
-                    "type": "tool_result",
-                    "call_id": call_id,
-                    "output": str(token.content) if token.content else "",
-                    "success": True,
-                })
+                self._enqueue(
+                    {
+                        "type": "tool_result",
+                        "call_id": call_id,
+                        "output": str(token.content) if token.content else "",
+                        "success": True,
+                    }
+                )
                 if settings.hooks.hooks_enabled:
                     try:
-                        await get_hook_manager().run_hooks(HookEvent.POST_TOOL_USE, {
-                            "session_id": self.session_id,
-                            "tool_name": getattr(token, "name", "unknown"),
-                            "tool_args": {},
-                            "tool_result": str(token.content)[:400] if token.content else "",
-                            "call_id": call_id,
-                        })
+                        await get_hook_manager().run_hooks(
+                            HookEvent.POST_TOOL_USE,
+                            {
+                                "session_id": self.session_id,
+                                "tool_name": getattr(token, "name", "unknown"),
+                                "tool_args": {},
+                                "tool_result": str(token.content)[:400] if token.content else "",
+                                "call_id": call_id,
+                            },
+                        )
                     except Exception as exc:
                         logger.warning("post_tool_use hook failed: %s", exc)
 
@@ -369,10 +408,12 @@ class Session(SessionBase):
                         chunk_text += text
                         accumulated.append(text)
             if chunk_text:
-                self._enqueue({
-                    "type": "response_chunk",
-                    "content": chunk_text,
-                })
+                self._enqueue(
+                    {
+                        "type": "response_chunk",
+                        "content": chunk_text,
+                    }
+                )
 
     # ── Approval gate ──────────────────────────────────────────────────
 
@@ -404,13 +445,11 @@ class Session(SessionBase):
             await self.db_repo.update_status(self.session_id, "closed")
         except Exception as exc:
             logger.warning("Failed to update session status in DB: %s", exc)
-        # Cancel heartbeat task if running (prevents zombie "Still thinking..." spam)
+        # Cancel heartbeat task if running
         if self._heartbeat_task is not None and not self._heartbeat_task.done():
             self._heartbeat_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._heartbeat_task
-            except asyncio.CancelledError:
-                pass  # Expected
         await super().close()
         self._enqueue({"type": "session_closed"})
 
