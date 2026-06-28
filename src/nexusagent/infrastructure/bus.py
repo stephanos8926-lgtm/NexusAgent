@@ -98,7 +98,8 @@ class AgentBus:
         self.nc: NATSClient | None = None
         self.js: Any = None
         self.kv: Any = None
-        self._subscriptions: list[Subscription] = []
+        self._subscriptions: set[Any] = set()  # Changed to set for thread-safety
+        self._subscriptions_lock = asyncio.Lock()  # Lock for concurrent access
         # Health tracking
         self._connected_event = asyncio.Event()
         self._disconnected_event = asyncio.Event()
@@ -232,14 +233,16 @@ class AgentBus:
             raise RuntimeError("NATSBus not connected. Call connect() first.")
 
         # Deduplicate: don't re-subscribe to the same subject with the same callback
-        for existing_sub in self._subscriptions:
-            if getattr(existing_sub, "subject", None) == subject:
-                logger.debug("Already subscribed to '%s' — skipping", subject)
-                return
+        async with self._subscriptions_lock:
+            for existing_sub in self._subscriptions:
+                if getattr(existing_sub, "subject", None) == subject:
+                    logger.debug("Already subscribed to '%s' — skipping", subject)
+                    return
 
         async def _do_subscribe() -> Subscription:
             sub = await self.nc.subscribe(subject, cb=callback)
-            self._subscriptions.append(sub)
+            async with self._subscriptions_lock:
+                self._subscriptions.add(sub)
             logger.info(f"Subscribed to NATS subject '{subject}'")
             return sub
 
@@ -314,7 +317,8 @@ class AgentBus:
 
         # ── 3. Pull-subscribe and batch-fetch loop ───────────────────────
         psub = await self.js.pull_subscribe(subject, durable=durable, stream=stream)
-        self._subscriptions.append(psub)  # type: ignore[arg-type]
+        async with self._subscriptions_lock:
+            self._subscriptions.add(psub)
         logger.info(
             f"JetStream pull consumer active: stream='{stream}', "
             f"durable='{durable}', subject='{subject}'"
@@ -456,15 +460,16 @@ class AgentBus:
         """Unsubscribe from all subjects and close the NATS connection."""
         import contextlib
 
-        for sub in self._subscriptions:
-            with contextlib.suppress(Exception):
-                await sub.unsubscribe()
+        async with self._subscriptions_lock:
+            for sub in list(self._subscriptions):
+                with contextlib.suppress(Exception):
+                    await sub.unsubscribe()
+            self._subscriptions.clear()
         if self.nc:
             await self.nc.close()
             self.nc = None
             self.js = None
             self.kv = None
-            self._subscriptions.clear()
             logger.info("NATS connection closed.")
 
 

@@ -70,7 +70,14 @@ class ServerConfig(BaseModel):
     # TLS settings (set via env: NEXUS_SERVER__TLS_CERTFILE, NEXUS_SERVER__TLS_KEYFILE)
     tls_certfile: str | None = Field(default=None, description="Path to TLS certificate file (PEM)")
     tls_keyfile: str | None = Field(default=None, description="Path to TLS private key file (PEM)")
-    tls_enabled: bool = Field(default=False, description="Enable TLS for the API server")
+    tls_enabled: bool = Field(
+        default=True,
+        description="Enable TLS for the API server (default: True for production security)",
+    )
+
+    shell_tool_approval_required: bool = Field(
+        default=True, description="Require approval even in YOLO mode for shell tools"
+    )
 
 
 class ClientConfig(BaseModel):
@@ -111,7 +118,17 @@ class AgentConfig(BaseModel):
     openrouter_default_model: str = Field(default="google/gemini-2.5-flash-preview")
     openrouter_override_model: str | None = None
     enabled_tools: list[str] = Field(
-        default_factory=lambda: ["read_file", "write_file", "run_shell"]
+        default_factory=lambda: [
+            "read_file",
+            "write_file",
+            "list_directory",
+            "search_files",
+            "grep_files",
+            "execute_python",
+            "execute_bash",
+            "terminal_command",
+        ],
+        description="Tools enabled by default for agent sessions (run_shell excluded - requires explicit opt-in)",
     )
     max_tool_output_chars: int = Field(default=400, ge=100)
     max_conversation_history: int = Field(default=40, ge=4)

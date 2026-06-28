@@ -67,8 +67,6 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    # NO CORS MIDDLEWARE FOR TESTING
-
     # Register REST routes (includes rate limiting middleware)
     register_routes(app)
 
