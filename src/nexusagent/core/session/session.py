@@ -90,6 +90,7 @@ class Session(SessionBase):
         self._seen_tool_calls: set[str] = set()
         self._conversation_history: list[Any] = []
         self._extraction_queue: asyncio.Queue = asyncio.Queue(maxsize=_MAX_EXTRACTION_QUEUE)
+        self._heartbeat_task: asyncio.Task | None = None
 
     # ── Prompt & Context ─────────────────────────────────────────────────
 
@@ -169,6 +170,9 @@ class Session(SessionBase):
     async def send(self, user_message: str, images: list[str] | None = None) -> None:
         """Process a user message: store in DB, recall memory, stream agent response."""
         if self.status != "active":
+            # Cancel any zombie heartbeat task from previous run
+            if self._heartbeat_task is not None and not self._heartbeat_task.done():
+                self._heartbeat_task.cancel()
             self._enqueue(ErrorEvent(message="Session is not active").model_dump())
             return
 
@@ -248,14 +252,15 @@ class Session(SessionBase):
         # Emits periodic "still thinking" events so the TUI knows we're alive
         heartbeat_interval = 15.0  # seconds
         last_heartbeat = asyncio.get_event_loop().time()
-        self._heartbeat_task = None
 
         async def _heartbeat():
             """Emit periodic thinking events during long LLM calls."""
             while True:
                 await asyncio.sleep(heartbeat_interval)
                 elapsed = int(asyncio.get_event_loop().time() - last_heartbeat)
-                self._enqueue(ThinkingEvent(content=f"Still thinking... ({elapsed}s)").model_dump())
+                # Only send "still thinking" if we've been waiting > 30s
+                if elapsed >= 30:
+                    self._enqueue(ThinkingEvent(content=f"Still thinking... ({elapsed}s)").model_dump())
 
         self._heartbeat_task = asyncio.create_task(_heartbeat())
 
@@ -300,6 +305,9 @@ class Session(SessionBase):
 
         except Exception as exc:
             logger.error("Agent invocation failed: %s", exc, exc_info=True)
+            # Cancel heartbeat task on error (prevents zombie tasks)
+            if self._heartbeat_task is not None and not self._heartbeat_task.done():
+                self._heartbeat_task.cancel()
             if settings.hooks.hooks_enabled:
                 try:
                     await get_hook_manager().run_hooks(HookEvent.ERROR, {
@@ -396,6 +404,13 @@ class Session(SessionBase):
             await self.db_repo.update_status(self.session_id, "closed")
         except Exception as exc:
             logger.warning("Failed to update session status in DB: %s", exc)
+        # Cancel heartbeat task if running (prevents zombie "Still thinking..." spam)
+        if self._heartbeat_task is not None and not self._heartbeat_task.done():
+            self._heartbeat_task.cancel()
+            try:
+                await self._heartbeat_task
+            except asyncio.CancelledError:
+                pass  # Expected
         await super().close()
         self._enqueue({"type": "session_closed"})
 
