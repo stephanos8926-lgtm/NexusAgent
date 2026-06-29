@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-print("🔥 MODULE LOADED - Starting execution", flush=True)
 """
 NexusAgent TUI End-to-End Test Suite
 
@@ -33,8 +32,15 @@ class colors:
 
 def log(msg, level="INFO", end="\n"):
     """Pretty log with color."""
-    print(f"[{level}] {msg}", flush=True)
-    return  # Skip colors for now
+    colors_map = {
+        "PASS": colors.GREEN,
+        "FAIL": colors.RED,
+        "WARN": colors.YELLOW,
+        "INFO": colors.BLUE,
+        "TEST": colors.BOLD,
+    }
+    color = colors_map.get(level, "")
+    print(f"{color}[{level}] {msg}{colors.END}", end=end, flush=True)
 
 
 class E2ETester:
@@ -438,7 +444,6 @@ class E2ETester:
 
 
 async def main():
-    print("🔥 MAIN() STARTED", flush=True)
     log("🚀 Starting E2E test suite...", "TEST")
     tester = E2ETester()
     log("Created tester instance", "INFO")
