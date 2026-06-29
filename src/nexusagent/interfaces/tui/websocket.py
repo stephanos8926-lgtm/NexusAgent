@@ -52,9 +52,12 @@ async def check_server_version(app) -> bool:
         app: The NexusApp instance.
 
     Returns:
-        True if server is reachable (version mismatch is non-blocking).
+        True if server is reachable (version mismatch is non-blocking by default).
         False if server is unreachable.
+        Raises SystemExit if NEXUS_STRICT_VERSION=1 and versions mismatch.
     """
+    import os
+    
     data = await app._fetch_server_version()
     if data is None:
         logger.warning("Version check failed: server unreachable (will retry via WebSocket)")
@@ -62,11 +65,20 @@ async def check_server_version(app) -> bool:
 
     server_ver = data.get("version", "unknown")
     if not is_compatible(server_ver, CLIENT_VERSION):
-        logger.warning(
-            "Version mismatch: server=%s client=%s",
-            server_ver,
-            CLIENT_VERSION,
-        )
+        mismatch_msg = f"⚠️  VERSION MISMATCH: Server={server_ver} | Client={CLIENT_VERSION}"
+        logger.warning(f"Version mismatch: server={server_ver} client={CLIENT_VERSION}")
+        
+        # Check strict mode
+        if os.environ.get("NEXUS_STRICT_VERSION") == "1":
+            logger.error(f"{mismatch_msg} — NEXUS_STRICT_VERSION=1, refusing to connect")
+            print(f"\n{mismatch_msg}")
+            print("Environment variable NEXUS_STRICT_VERSION=1 is set — aborting connection.")
+            print("Run the server with: cd ~/Workspaces/NexusAgent && .venv/bin/python -m nexusagent.server")
+            raise SystemExit(1)
+        
+        # Show warning in TUI status bar
+        app.notify(mismatch_msg, timeout=10)
+        
     return True
 
 

@@ -84,7 +84,7 @@ class E2ETester:
         
             try:
                 # Send message
-                await self.ws.send(json.dumps({"type": "user_message", "content": message}))
+                await self.ws.send(json.dumps({"type": "user_input", "content": message}))
             
                 # Collect events with timeout
                 import time
