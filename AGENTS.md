@@ -211,6 +211,11 @@ See CODEBASE_MAP.md for details. Established pattern: extract to subpackage → 
 - **CLI**: Use `--check-server` to verify compatibility; `--skip-version-check` to bypass
 - **TUI**: Performs async version preflight via httpx before WebSocket connect (non-blocking on mismatch)
 - **Version changes**: Always update `pyproject.toml` first, run version-sync test
+- **Dev mode strict checking**: Set `NEXUS_STRICT_VERSION=1` to FAIL on version mismatch
+  - Default: Shows warning notification but continues (production-safe)
+  - Strict mode: Aborts TUI with clear error message and server restart instructions
+  - Added to `~/.zshrc` for development: `export NEXUS_STRICT_VERSION=1`
+  - Prevents running with stale server code (common dev pitfall)
 
 ### TUI
 - **Textual framework**: Uses Textual (not Rich directly). Widgets extend `Static`, `Horizontal`, etc.
