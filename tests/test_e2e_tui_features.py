@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+print("🔥 MODULE LOADED - Starting execution", flush=True)
 """
 NexusAgent TUI End-to-End Test Suite
 
@@ -14,24 +15,11 @@ import sys
 import websockets
 from pathlib import Path
 
-# Add src to path
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-
-from nexusagent.infrastructure.config import settings
-from nexusagent.llm.models import (
-    ThinkingEvent,
-    ToolCallEvent,
-    ToolResultEvent,
-    ApprovalRequestEvent,
-    ResponseEvent,
-    ErrorEvent,
-)
-
-# Test configuration - get API key from config (keystore is encrypted)
-# The server accepts the plain API key from config for WebSocket auth
+# Test configuration - NO HEAVY IMPORTS
 API_KEY = "nexus-2638f25daba9af9c"  # From ~/.nexusagent/config/nexusagent.yaml
-SERVER_URL = f"ws://localhost:{settings.server.api_port}/sessions/{{session_id}}/ws"
-TIMEOUT = 60  # seconds
+SERVER_PORT = 8000
+SERVER_URL = f"ws://localhost:{SERVER_PORT}/sessions/{{session_id}}/ws"
+TIMEOUT = 30  # Reduced timeout for faster feedback
 
 
 class colors:
@@ -45,15 +33,8 @@ class colors:
 
 def log(msg, level="INFO", end="\n"):
     """Pretty log with color."""
-    colors_map = {
-        "PASS": colors.GREEN,
-        "FAIL": colors.RED,
-        "WARN": colors.YELLOW,
-        "INFO": colors.BLUE,
-        "TEST": colors.BOLD,
-    }
-    color = colors_map.get(level, "")
-    print(f"{color}[{level}] {msg}{colors.END}", end=end)
+    print(f"[{level}] {msg}", flush=True)
+    return  # Skip colors for now
 
 
 class E2ETester:
@@ -91,44 +72,47 @@ class E2ETester:
             log("Disconnected", "INFO")
 
     async def send_message(self, message: str, timeout: float = TIMEOUT):
-        """Send a message and collect all events."""
-        self.events = []
-        log(f"Sending: '{message[:50]}...' ", "TEST", end="")
-
-        try:
-            # Send message
-            await self.ws.send(json.dumps({"type": "user_message", "content": message}))
-
-            # Collect events with timeout
-            start = asyncio.get_event_loop().time()
-            while True:
-                try:
-                    remaining = timeout - (asyncio.get_event_loop().time() - start)
-                    if remaining <= 0:
-                        log(f"⏱️ Timeout after {timeout}s", "WARN")
+            """Send a message and collect all events."""
+            self.events = []
+            log(f"Sending: '{message[:50]}...'", "TEST")
+        
+            try:
+                # Send message
+                await self.ws.send(json.dumps({"type": "user_message", "content": message}))
+            
+                # Collect events with timeout
+                import time
+                start = time.time()
+                while True:
+                    try:
+                        remaining = timeout - (time.time() - start)
+                        if remaining <= 0:
+                            log(f"⏱️ Timeout after {timeout}s", "WARN")
+                            break
+                    
+                        event_raw = await asyncio.wait_for(self.ws.recv(), timeout=remaining)
+                        event = json.loads(event_raw)
+                        self.events.append(event)
+                    
+                        # Stop on response or error
+                        if event.get("type") in ("response", "error"):
+                            break
+                        # Stop on tool approval request (we'll handle it)
+                        if event.get("type") == "approval_request":
+                            break
+                    
+                    except asyncio.TimeoutError:
+                        log("⏱️ No more events", "INFO")
                         break
-
-                    event_raw = await asyncio.wait_for(self.ws.recv(), timeout=remaining)
-                    event = json.loads(event_raw)
-                    self.events.append(event)
-
-                    # Stop on response or error
-                    if event.get("type") in ("response", "error"):
-                        break
-                    # Stop on tool approval request (we'll handle it)
-                    if event.get("type") == "approval_request":
-                        break
-
-                except asyncio.TimeoutError:
-                    log("⏱️ No more events", "INFO")
-                    break
-
-            log(f"Received {len(self.events)} events", "INFO")
-            return self.events
-
-        except Exception as e:
-            log(f"❌ Send failed: {e}", "FAIL")
-            return []
+            
+                log(f"Received {len(self.events)} events", "INFO")
+                if self.events:
+                    log(f"Event types: {[e.get('type') for e in self.events]}", "INFO")
+                return self.events
+        
+            except Exception as e:
+                log(f"❌ Send failed: {e}", "FAIL")
+                return []
 
     async def approve_tool(self, call_id: str, approved: bool = True):
         """Send approval for a tool call."""
@@ -454,8 +438,12 @@ class E2ETester:
 
 
 async def main():
+    print("🔥 MAIN() STARTED", flush=True)
+    log("🚀 Starting E2E test suite...", "TEST")
     tester = E2ETester()
+    log("Created tester instance", "INFO")
     success = await tester.run_all_tests()
+    log(f"Tests completed: {'PASS' if success else 'FAIL'}", "TEST")
     sys.exit(0 if success else 1)
 
 
