@@ -8,6 +8,7 @@ Handles:
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 
@@ -69,7 +70,7 @@ async def handle_event(app, event: dict) -> None:
         app._thinking_visible = True
 
     elif etype == "tool_call":
-        _handle_tool_call_event(app, event)
+        await _handle_tool_call_event(app, event)
 
     elif etype == "tool_result":
         _handle_tool_result_event(app, event)
@@ -83,23 +84,25 @@ async def handle_event(app, event: dict) -> None:
 
     elif etype == "approval_request":
         call_id = event.get("call_id", "")
-        if app._auto_approve:
-            # Auto-approve: skip the modal, send approval directly
-            from nexusagent.interfaces.tui.websocket import send_approval
+        # TOCTOU FIX: Atomic check + send with lock to prevent race condition
+        async with app._auto_approve_lock:
+            if app._auto_approve:
+                # Auto-approve: skip the modal, send approval directly
+                from nexusagent.interfaces.tui.websocket import send_approval
 
-            await send_approval(app, call_id, True)
-            app.status_bar.set_status("Ready")
-        else:
-            tool = event.get("tool", "?")
-            args = event.get("args", {})
-            app.status_bar.set_status("Awaiting approval...")
-            from nexusagent.interfaces.tui_widgets import ApprovalModal
+                await send_approval(app, call_id, True)
+                app.status_bar.set_status("Ready")
+            else:
+                tool = event.get("tool", "?")
+                args = event.get("args", {})
+                app.status_bar.set_status("Awaiting approval...")
+                from nexusagent.interfaces.tui_widgets import ApprovalModal
 
-            approved = await app.push_screen_wait(ApprovalModal(tool, args, call_id))
-            from nexusagent.interfaces.tui.websocket import send_approval
+                approved = await app.push_screen_wait(ApprovalModal(tool, args, call_id))
+                from nexusagent.interfaces.tui.websocket import send_approval
 
-            await send_approval(app, call_id, approved)
-            app.status_bar.set_status("Ready")
+                await send_approval(app, call_id, approved)
+                app.status_bar.set_status("Ready")
 
     elif etype == "response_chunk":
         content = event.get("content", "")
@@ -195,7 +198,7 @@ async def handle_event(app, event: dict) -> None:
         app._busy = False
 
 
-def _handle_tool_call_event(app, event: dict) -> None:
+async def _handle_tool_call_event(app, event: dict) -> None:
     """Handle a tool_call event.
 
     Args:
@@ -214,13 +217,15 @@ def _handle_tool_call_event(app, event: dict) -> None:
     app._current_tool = msg
     _mount_with_limit(app, msg)
 
-    if app._auto_approve and tool != "tool_search":
-        from nexusagent.interfaces.tui.websocket import send_approval
+    # TOCTOU FIX: Atomic check + task creation with lock
+    async with app._auto_approve_lock:
+        if app._auto_approve and tool != "tool_search":
+            from nexusagent.interfaces.tui.websocket import send_approval
 
-        call_id = event.get("call_id", "")
-        app._auto_approve_task = (
-            __import__("asyncio").get_event_loop().create_task(send_approval(app, call_id, True))
-        )
+            call_id = event.get("call_id", "")
+            app._auto_approve_task = (
+                __import__("asyncio").get_event_loop().create_task(send_approval(app, call_id, True))
+            )
 
     app.status_bar.set_status(f"Running: {tool}")
 

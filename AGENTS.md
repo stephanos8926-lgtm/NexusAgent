@@ -429,3 +429,54 @@ Design and implement a full authorization and key management system:
 - Randomized test order via pytest-randomly
 
 *This file is the living knowledge base for the NexusAgent project. Update it after every significant discovery, refactoring, or architectural decision. When in doubt, point to the reference documents rather than duplicating information.*
+
+---
+
+## [2026-06-28] GEMINI NATIVE TOOLS IMPLEMENTED
+
+**Problem:** Users with only Gemini API keys lacked native tool calling (Google Search, Code Execution, URL Context). OpenRouter had these features but required separate API key.
+
+**Solution:** Migrated from old `google-generativeai` SDK to new **Interactions API** (`google-genai>=2.3.0`):
+
+### Changes
+
+File | Change | Impact
+-----|--------|--------
+`pyproject.toml` | `google-genai>=2.3.0` | Interactions API support
+`src/nexusagent/llm/llm.py` | Rewrite to `client.interactions.create()` | Native tools work automatically
+`docs/GEMINI_NATIVE_TOOLS.md` | New documentation | Usage guide + troubleshooting
+
+### Enabled Tools
+
+- **google_search**: Real-time web grounding (e.g., "current Bitcoin price")
+- **code_execution**: Python sandbox for math/data tasks
+- **url_context**: Fetch + summarize webpages
+- **Multi-turn**: `previous_interaction_id` preserves context
+
+### Test Results
+
+```python
+# Google Search (real-time data beyond training cutoff)
+response = await llm.generate(prompt="What's the current price of Bitcoin?")
+# → "$59,200-$59,600 USD (June 29, 2026)" ✅
+
+# Code Execution (Python calculation)
+response = await llm.generate(prompt="Sum of first 50 primes")
+# → "5117 (calculated via Python)" ✅
+
+# Multi-turn (context preservation)
+response2 = await llm.generate(
+    prompt="Now calculate the average",
+    previous_interaction_id=response1.interaction_id
+)
+# → Correct calculation using previous context ✅
+```
+
+### Commit
+
+- **SHA:** `f4bb7e3`
+- **Message:** "feat: Gemini native tool calling via Interactions API"
+- **Breaking:** Requires `google-genai>=2.3.0`
+- **Benefit:** Users with only Gemini key now have full tool calling
+
+**Reference:** `docs/GEMINI_NATIVE_TOOLS.md`

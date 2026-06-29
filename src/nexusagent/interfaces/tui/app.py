@@ -143,6 +143,7 @@ class NexusApp(App):
         self._breakpoint: Breakpoint = Breakpoint.STANDARD
         self._resize_state: dict[str, float] = {}
         self._auto_approve = self._yolo_default or settings.agent.yolo
+        self._auto_approve_lock = asyncio.Lock()  # Prevent TOCTOU race in approval
         self._total_tokens_used = 0
         self._request_count = 0
         self._last_tool_name = ""
