@@ -598,3 +598,61 @@ f4bb7e3 feat: Gemini native tool calling via Interactions API
 ---
 
 **Session Status:** ✅ **COMPLETE** — Security fix + major feature + perfect lint score = **TRIFECTA** 🏆
+
+---
+
+## [2026-06-28] MEDIUM-IMPACT ITEMS AUDIT
+
+**Finding:** The "remaining refactoring" from plans is **ALREADY COMPLETE**!
+
+### What We Discovered
+
+#### 1. ✅ TUI App Split — DONE
+**Plan said:** "Extract screens + commands from app.py (366L)"  
+**Reality:** Already split across 5 clean modules:
+- `app.py` (366L) — App lifecycle, bindings, state ✅
+- `streaming.py` (550L) — Event dispatch + slash commands ✅
+- `input.py` — User input handling ✅
+- `websocket.py` — WebSocket comms ✅
+- `tui_widgets.py` — Screens/modals ✅
+
+**Verification:** Zero complexity issues, no functions >50 lines
+
+#### 2. ✅ Session.send() Refinement — DONE
+**Plan said:** "Extract approval + prompt building from send() (652L total)"  
+**Reality:** Wave 5 already did this! Current `send()` is 60L orchestrator:
+- `_build_messages_list()` — Context assembly ✅
+- `_apply_compaction()` — Compaction logic ✅
+- `_stream_agent_response()` — Agent streaming ✅
+- `_handle_send_error()` — Error handling ✅
+
+**Verification:** Complexity 28→5 (82% reduction), already committed as `dd7f48b`
+
+#### 3. ✅ Session-Memory Integration — DONE
+**Plan said:** "Wire HybridMemoryManager into session loop (Phase 1)"  
+**Reality:** Already wired in `session_base.py` lines 70-74:
+```python
+self.hybrid_memory = HybridMemoryManager(
+    str(self._memory_dir),
+    parent_memory_dir=parent_memory_dir,
+)
+self.hybrid_memory.initialize()
+```
+
+**Usage:** `session.py:207` calls `self.hybrid_memory.get_memory_context()` every turn ✅
+
+**Test:** SessionBase instantiates correctly, memory_dir created, HybridMemoryManager initialized
+
+---
+
+### Conclusion
+
+**The refactoring plan (`docs/REFACTORING_PLAN.md`) is OUTDATED.**
+
+Phases 1-7 + 16-17 marked as "complete" ✅, but Phases 8-14 (TUI split, session refinement, memory integration) were **also completed** in Waves 1-5, just not documented in the plan.
+
+**Action:** Archive old refactoring plan, create new "Next Opportunities" doc with actual remaining work.
+
+---
+
+**Lesson:** Run `git log --oneline` and read actual code BEFORE trusting old plans. The codebase evolved faster than the documentation.
