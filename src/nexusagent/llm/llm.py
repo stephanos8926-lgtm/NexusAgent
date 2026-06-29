@@ -1,16 +1,24 @@
 # src/nexusagent/llm.py
 """Multi-provider LLM bridge with retry and circuit-breaker support.
 
-Routes generation requests between Gemini (google-genai) and OpenRouter
-(openai-compatible) providers based on the active configuration.  All
-public calls are wrapped with :func:`retry_with_backoff` so transient
+Routes generation requests between Gemini (google-genai Interactions API) and 
+OpenRouter (openai-compatible) providers based on the active configuration. 
+All public calls are wrapped with :func:`retry_with_backoff` so transient 
 failures are handled gracefully.
+
+Gemini path uses the 2026 Interactions API with native tool support:
+- Google Search (grounding)
+- Code Execution (Python sandbox)
+- URL Context (fetch + summarize)
+- Function Calling (custom tools)
 """
 
 import logging
 import os
+from typing import Any
 
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from openai import AsyncOpenAI
 from pydantic import BaseModel
 
@@ -26,11 +34,15 @@ class LLMResponse(BaseModel):
     content: str
     model_used: str
     provider: str
+    tool_calls: list[dict[str, Any]] | None = None
+    interaction_id: str | None = None  # For multi-turn with tools
 
 
 class LLMProvider:
     """Bridge for multiple LLM providers.
-    Handles routing between Gemini and OpenRouter using official SDKs.
+    
+    Handles routing between Gemini (Interactions API) and OpenRouter 
+    (OpenAI-compatible) providers.
     """
 
     def __init__(self) -> None:
@@ -43,18 +55,20 @@ class LLMProvider:
         importlib.reload(_cfg)
         _settings = _cfg.settings
 
-        # Prefer project settings over environment variables (Hermes loads
-        # its own .env which may contain a different GEMINI_API_KEY for Gemma)
+        # Gemini Setup (Interactions API - requires google-genai>=2.3.0)
         self.gemini_key = _settings.agent.gemini_api_key or os.environ.get("GEMINI_API_KEY")
         if self.gemini_key:
-            genai.configure(api_key=self.gemini_key)
+            self.gemini_client = genai.Client(api_key=self.gemini_key)
+        else:
+            self.gemini_client = None
+            logger.warning("GEMINI_API_KEY not configured - Gemini provider disabled")
 
         # OpenRouter Setup (OpenAI compatible)
         self.openrouter_key = os.environ.get("OPENROUTER_API_KEY")
         self.openrouter_client = AsyncOpenAI(
             api_key=self.openrouter_key,
             base_url=os.environ.get("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"),
-        )
+        ) if self.openrouter_key else None
 
     def get_active_model(self) -> tuple[str, str]:
         """Returns (provider, model_id) based on current settings."""
@@ -70,6 +84,27 @@ class LLMProvider:
             return "openrouter", model
         return "gemini", settings.agent.default_model
 
+    def _get_gemini_tools(self) -> list[dict[str, Any]]:
+        """Get native Gemini tools configuration.
+        
+        Returns a list of built-in tools to enable:
+        - google_search: Ground responses in real-time web data
+        - code_execution: Execute Python code in sandbox
+        - url_context: Fetch and summarize URLs
+        """
+        tools = []
+        
+        # Enable Google Search for grounding
+        tools.append({"type": "google_search"})
+        
+        # Enable Code Execution for math/data tasks
+        tools.append({"type": "code_execution"})
+        
+        # Enable URL Context for webpage summarization
+        tools.append({"type": "url_context"})
+        
+        return tools
+
     @retry_with_backoff(
         max_attempts=3,
         base_delay=1.0,
@@ -79,7 +114,12 @@ class LLMProvider:
         exceptions=(Exception,),
     )
     async def generate(
-        self, prompt: str, system_prompt: str | None = None, timeout: float = 120.0, **kwargs
+        self, 
+        prompt: str, 
+        system_prompt: str | None = None, 
+        timeout: float = 120.0,
+        previous_interaction_id: str | None = None,
+        **kwargs
     ) -> LLMResponse:
         """Generate a response from the active LLM provider.
 
@@ -87,6 +127,7 @@ class LLMProvider:
             prompt: The user prompt to send.
             system_prompt: Optional system-level instructions.
             timeout: Maximum seconds to wait for a response.
+            previous_interaction_id: For multi-turn conversations with tool context.
             **kwargs: Additional provider-specific parameters.
 
         Returns:
@@ -100,11 +141,16 @@ class LLMProvider:
 
         if provider == "gemini":
             return await self._call_gemini(
-                prompt, system_prompt, model_id, timeout=timeout, **kwargs
+                prompt, system_prompt, model_id, 
+                timeout=timeout,
+                previous_interaction_id=previous_interaction_id,
+                **kwargs
             )
         elif provider == "openrouter":
             return await self._call_openrouter(
-                prompt, system_prompt, model_id, timeout=timeout, **kwargs
+                prompt, system_prompt, model_id, 
+                timeout=timeout,
+                **kwargs
             )
         else:
             raise ValueError(f"Unsupported provider: {provider}")
@@ -123,17 +169,78 @@ class LLMProvider:
         system_prompt: str | None,
         model_id: str,
         timeout: float = 120.0,
+        previous_interaction_id: str | None = None,
         **kwargs,
     ) -> LLMResponse:
+        """Call Gemini using the Interactions API with native tool support.
+        
+        The Interactions API automatically handles:
+        - Tool selection and execution (server-side tools)
+        - Multi-turn conversation state
+        - Tool context circulation
+        
+        Args:
+            prompt: User input
+            system_prompt: System instructions (prepended to prompt)
+            model_id: Gemini model name (e.g., "gemini-2.5-flash")
+            timeout: Request timeout in seconds
+            previous_interaction_id: Continue from previous interaction
+            **kwargs: Additional parameters
+            
+        Returns:
+            LLMResponse with content and interaction metadata
+        """
+        if not self.gemini_client:
+            raise ValueError("Gemini client not initialized (missing API key)")
+        
         try:
-            model = genai.GenerativeModel(model_name=model_id, system_instruction=system_prompt)
-            # google-genai's generate_content_async does not accept timeout kwarg
-            response = await model.generate_content_async(prompt)
-            return LLMResponse(content=response.text, model_used=model_id, provider="gemini")
+            # Build input with system prompt
+            if system_prompt:
+                full_input = f"{system_prompt}\n\n{prompt}"
+            else:
+                full_input = prompt
+            
+            # Configure native tools
+            tools_config = self._get_gemini_tools()
+            
+            logger.info(f"Calling Gemini with native tools: {[t['type'] for t in tools_config]}")
+            
+            # Create interaction with native tool support
+            interaction = self.gemini_client.interactions.create(
+                model=model_id,
+                input=full_input,
+                tools=tools_config,
+                previous_interaction_id=previous_interaction_id,
+            )
+            
+            # Extract final output
+            content = interaction.output_text or ""
+            
+            # Collect tool call metadata for logging/debugging
+            tool_calls = []
+            if hasattr(interaction, 'steps') and interaction.steps:
+                for step in interaction.steps:
+                    if hasattr(step, 'type') and step.type == 'function_call':
+                        tool_calls.append({
+                            'name': step.name,
+                            'arguments': step.arguments if hasattr(step, 'arguments') else {},
+                            'id': step.id if hasattr(step, 'id') else '',
+                        })
+            
+            logger.info(f"Gemini response: {len(content)} chars, {len(tool_calls)} tool calls")
+            
+            return LLMResponse(
+                content=content,
+                model_used=model_id,
+                provider="gemini",
+                tool_calls=tool_calls if tool_calls else None,
+                interaction_id=interaction.id if hasattr(interaction, 'id') else None,
+            )
+            
         except TimeoutError:
             raise TimeoutError(f"LLM request timed out after {timeout}s") from None
         except Exception as e:
-            logger.error(f"Gemini API error: {e}")
+            logger.error(f"Gemini Interactions API error: {e}")
             raise
 
     @retry_with_backoff(
@@ -152,6 +259,10 @@ class LLMProvider:
         timeout: float = 120.0,
         **kwargs,
     ) -> LLMResponse:
+        """Call OpenRouter using OpenAI-compatible API."""
+        if not self.openrouter_client:
+            raise ValueError("OpenRouter client not initialized (missing API key)")
+        
         try:
             messages = []
             if system_prompt:
@@ -159,10 +270,13 @@ class LLMProvider:
             messages.append({"role": "user", "content": prompt})
 
             response = await self.openrouter_client.chat.completions.create(
-                model=model_id, messages=messages, timeout=timeout, **kwargs
+                model=model_id, 
+                messages=messages, 
+                timeout=timeout, 
+                **kwargs
             )
             return LLMResponse(
-                content=response.choices[0].message.content,
+                content=response.choices[0].message.content or "",
                 model_used=model_id,
                 provider="openrouter",
             )
