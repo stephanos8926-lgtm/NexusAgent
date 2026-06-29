@@ -480,3 +480,121 @@ response2 = await llm.generate(
 - **Benefit:** Users with only Gemini key now have full tool calling
 
 **Reference:** `docs/GEMINI_NATIVE_TOOLS.md`
+
+---
+
+## [2026-06-28] SESSION TRIFECTA — Security + Features + Quality
+
+**Session Goal:** Rapid improvements across security, features, and code quality.
+
+### What We Accomplished
+
+#### 1. ✅ Gemini Native Tool Calling (f4bb7e3)
+
+**Problem:** Users with only Gemini API keys lacked native tool calling capabilities.
+
+**Solution:** Migrated to Google's **Interactions API** (`google-genai>=2.3.0`):
+- Upgraded SDK from `google-genai<2.3.0` to `>=2.3.0`
+- Rewrote `src/nexusagent/llm/llm.py` to use `client.interactions.create()`
+- Enabled native tools automatically:
+  - **Google Search**: Real-time web grounding (beyond training cutoff)
+  - **Code Execution**: Python sandbox for math/data tasks
+  - **URL Context**: Fetch + summarize webpages
+- Added multi-turn support via `previous_interaction_id`
+
+**Test Results:**
+```python
+# Google Search (real-time)
+>>> response = await llm.generate(prompt="What's the current price of Bitcoin?")
+>>> response.content
+"$59,200-$59,600 USD (June 29, 2026)"  # ✅ Real-time data!
+
+# Code Execution (Python calculation)
+>>> response = await llm.generate(prompt="Sum of first 50 primes")
+>>> response.content
+"5117"  # ✅ Calculated via Python sandbox!
+```
+
+**Impact:** Users with Gemini key now have full tool calling without needing OpenRouter.
+
+**Documentation:** `docs/GEMINI_NATIVE_TOOLS.md`
+
+---
+
+#### 2. ✅ TOCTOU Approval Race Fix (bc6d7f5) — CRITICAL SECURITY
+
+**Problem:** Time-of-check-time-of-use race in TUI auto-approve flow:
+```python
+# BEFORE (vulnerable)
+if app._auto_approve:  # Check
+    await send_approval(...)  # Race: user could toggle between check and send
+```
+
+**Solution:** Atomic lock for check+send:
+```python
+# AFTER (safe)
+async with app._auto_approve_lock:
+    if app._auto_approve:
+        await send_approval(...)
+```
+
+**Files Changed:**
+- `src/nexusagent/interfaces/tui/app.py`: Added `_auto_approve_lock = asyncio.Lock()`
+- `src/nexusagent/interfaces/tui/streaming.py`: 
+  - Made `_handle_tool_call_event()` async
+  - Wrapped approval logic in lock (2 locations)
+
+**Security Impact:** Eliminates race condition where rapid toggle of auto-approve could bypass approval modal or send duplicate approvals.
+
+**Reference:** `security-hardening-sprint` skill — TOCTOU Race Condition Fix pattern
+
+---
+
+#### 3. ✅ Lint Cleanup (7981a76) — 36 → 0 Errors
+
+**Problem:** 36 lint errors (trailing whitespace, unused imports, style violations)
+
+**Solution:** Applied `ruff check --fix --unsafe-fixes`:
+- Removed duplicate `asyncio` imports (streaming.py lines 293, 539)
+- Removed unused `google.genai.types` import (llm.py)
+- Used ternary operator for input building (SIM108)
+- Removed all trailing whitespace (W291, W293)
+- Fixed missing newline at EOF (W292)
+
+**Result:** **0 lint errors** — 100% clean codebase! ✅
+
+---
+
+### Session Statistics
+
+| Metric | Before | After | Delta |
+|--------|--------|-------|-------|
+| Lint Errors | 36 | 0 | -100% ✅ |
+| Security Issues | 1 critical | 0 | -100% ✅ |
+| Native Tool Support | ❌ (OpenRouter only) | ✅ (Gemini native) | +Feature 🚀 |
+| Commits | 10 | 13 | +3 |
+| Documentation Files | 37 | 38 | +1 (GEMINI_NATIVE_TOOLS.md) |
+
+### Commits
+
+```
+7981a76 fix: Lint cleanup (36 → 0 errors)
+bc6d7f5 fix: TOCTOU approval race in TUI (critical security)
+f4bb7e3 feat: Gemini native tool calling via Interactions API
+```
+
+### Lessons Learned
+
+1. **Security first:** TOCTOU races are subtle — always use locks for check+act patterns
+2. **Native tools > wrappers:** Google's Interactions API provides better Gemini integration than OpenRouter proxy
+3. **Lint debt compounds:** 36 errors seemed small, but fixing them now prevents future mistakes
+4. **Test before claiming done:** Actually ran Gemini tool calls (Bitcoin price, prime calculation) before committing
+
+### Next Steps (Deferred)
+
+- `docs/MEMORY_ARCHITECTURE.md` — Document v2 memory system (low priority, system works fine)
+- TUI Gemini e2e test — Native tools already tested via `llm.py` directly
+
+---
+
+**Session Status:** ✅ **COMPLETE** — Security fix + major feature + perfect lint score = **TRIFECTA** 🏆
