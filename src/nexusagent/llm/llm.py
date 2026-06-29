@@ -1,9 +1,9 @@
 # src/nexusagent/llm.py
 """Multi-provider LLM bridge with retry and circuit-breaker support.
 
-Routes generation requests between Gemini (google-genai Interactions API) and 
-OpenRouter (openai-compatible) providers based on the active configuration. 
-All public calls are wrapped with :func:`retry_with_backoff` so transient 
+Routes generation requests between Gemini (google-genai Interactions API) and
+OpenRouter (openai-compatible) providers based on the active configuration.
+All public calls are wrapped with :func:`retry_with_backoff` so transient
 failures are handled gracefully.
 
 Gemini path uses the 2026 Interactions API with native tool support:
@@ -18,7 +18,6 @@ import os
 from typing import Any
 
 from google import genai
-from google.genai import types
 from openai import AsyncOpenAI
 from pydantic import BaseModel
 
@@ -40,8 +39,8 @@ class LLMResponse(BaseModel):
 
 class LLMProvider:
     """Bridge for multiple LLM providers.
-    
-    Handles routing between Gemini (Interactions API) and OpenRouter 
+
+    Handles routing between Gemini (Interactions API) and OpenRouter
     (OpenAI-compatible) providers.
     """
 
@@ -86,23 +85,23 @@ class LLMProvider:
 
     def _get_gemini_tools(self) -> list[dict[str, Any]]:
         """Get native Gemini tools configuration.
-        
+
         Returns a list of built-in tools to enable:
         - google_search: Ground responses in real-time web data
         - code_execution: Execute Python code in sandbox
         - url_context: Fetch and summarize URLs
         """
         tools = []
-        
+
         # Enable Google Search for grounding
         tools.append({"type": "google_search"})
-        
+
         # Enable Code Execution for math/data tasks
         tools.append({"type": "code_execution"})
-        
+
         # Enable URL Context for webpage summarization
         tools.append({"type": "url_context"})
-        
+
         return tools
 
     @retry_with_backoff(
@@ -114,9 +113,9 @@ class LLMProvider:
         exceptions=(Exception,),
     )
     async def generate(
-        self, 
-        prompt: str, 
-        system_prompt: str | None = None, 
+        self,
+        prompt: str,
+        system_prompt: str | None = None,
         timeout: float = 120.0,
         previous_interaction_id: str | None = None,
         **kwargs
@@ -141,14 +140,14 @@ class LLMProvider:
 
         if provider == "gemini":
             return await self._call_gemini(
-                prompt, system_prompt, model_id, 
+                prompt, system_prompt, model_id,
                 timeout=timeout,
                 previous_interaction_id=previous_interaction_id,
                 **kwargs
             )
         elif provider == "openrouter":
             return await self._call_openrouter(
-                prompt, system_prompt, model_id, 
+                prompt, system_prompt, model_id,
                 timeout=timeout,
                 **kwargs
             )
@@ -173,12 +172,12 @@ class LLMProvider:
         **kwargs,
     ) -> LLMResponse:
         """Call Gemini using the Interactions API with native tool support.
-        
+
         The Interactions API automatically handles:
         - Tool selection and execution (server-side tools)
         - Multi-turn conversation state
         - Tool context circulation
-        
+
         Args:
             prompt: User input
             system_prompt: System instructions (prepended to prompt)
@@ -186,25 +185,22 @@ class LLMProvider:
             timeout: Request timeout in seconds
             previous_interaction_id: Continue from previous interaction
             **kwargs: Additional parameters
-            
+
         Returns:
             LLMResponse with content and interaction metadata
         """
         if not self.gemini_client:
             raise ValueError("Gemini client not initialized (missing API key)")
-        
+
         try:
             # Build input with system prompt
-            if system_prompt:
-                full_input = f"{system_prompt}\n\n{prompt}"
-            else:
-                full_input = prompt
-            
+            full_input = f"{system_prompt}\n\n{prompt}" if system_prompt else prompt
+
             # Configure native tools
             tools_config = self._get_gemini_tools()
-            
+
             logger.info(f"Calling Gemini with native tools: {[t['type'] for t in tools_config]}")
-            
+
             # Create interaction with native tool support
             interaction = self.gemini_client.interactions.create(
                 model=model_id,
@@ -212,10 +208,10 @@ class LLMProvider:
                 tools=tools_config,
                 previous_interaction_id=previous_interaction_id,
             )
-            
+
             # Extract final output
             content = interaction.output_text or ""
-            
+
             # Collect tool call metadata for logging/debugging
             tool_calls = []
             if hasattr(interaction, 'steps') and interaction.steps:
@@ -226,9 +222,9 @@ class LLMProvider:
                             'arguments': step.arguments if hasattr(step, 'arguments') else {},
                             'id': step.id if hasattr(step, 'id') else '',
                         })
-            
+
             logger.info(f"Gemini response: {len(content)} chars, {len(tool_calls)} tool calls")
-            
+
             return LLMResponse(
                 content=content,
                 model_used=model_id,
@@ -236,7 +232,7 @@ class LLMProvider:
                 tool_calls=tool_calls if tool_calls else None,
                 interaction_id=interaction.id if hasattr(interaction, 'id') else None,
             )
-            
+
         except TimeoutError:
             raise TimeoutError(f"LLM request timed out after {timeout}s") from None
         except Exception as e:
@@ -262,7 +258,7 @@ class LLMProvider:
         """Call OpenRouter using OpenAI-compatible API."""
         if not self.openrouter_client:
             raise ValueError("OpenRouter client not initialized (missing API key)")
-        
+
         try:
             messages = []
             if system_prompt:
@@ -270,9 +266,9 @@ class LLMProvider:
             messages.append({"role": "user", "content": prompt})
 
             response = await self.openrouter_client.chat.completions.create(
-                model=model_id, 
-                messages=messages, 
-                timeout=timeout, 
+                model=model_id,
+                messages=messages,
+                timeout=timeout,
                 **kwargs
             )
             return LLMResponse(

@@ -290,8 +290,6 @@ async def handle_slash_command(app, cmd: str) -> bool:
             _mount_with_limit(app, msg)
             return True
         # Run search_web in background
-        import asyncio
-
         from nexusagent.tools.research import search_web
 
         async def _do_search():
@@ -536,7 +534,6 @@ def process_next_in_queue(app) -> None:
     _mount_with_limit(app, user_msg)
     app.status_bar.set_status("Thinking...")
     app.status_bar.set_spinner(True)
-    import asyncio
 
     asyncio.create_task(app._input_queue.put(next_msg))  # noqa: RUF006
     update_queue_status(app)
