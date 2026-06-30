@@ -230,15 +230,15 @@ class HybridMemoryManager:
         rel_path = f"memory/{today}.md"
         await self.index.async_index_file(rel_path)
 
-    def close(self):
+    async def close(self):
         """Close the memory manager and clean up resources.
 
         Closes the database connections in the underlying index
         and the parent index if one is configured.
         """
-        self.index.close()
+        await self.index.close()
         if self._parent_index is not None:
-            self._parent_index.close()
+            await self._parent_index.close()
             self._parent_index = None
 
     def inherit_from(self, parent_dir: str | Path) -> None:

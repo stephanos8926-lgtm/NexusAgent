@@ -204,6 +204,6 @@ class SessionBase:
     async def close(self) -> None:
         """Close the session and clean up resources."""
         try:
-            self.hybrid_memory.close()
+            await self.hybrid_memory.close()
         except Exception as exc:
             logger.debug("Error closing hybrid memory: %s", exc)
