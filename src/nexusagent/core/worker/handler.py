@@ -11,6 +11,7 @@ import logging
 
 from nexusagent.core.agent import run_agent_task
 from nexusagent.infrastructure.db import get_task_repo
+from nexusagent.infrastructure.utils.budget import get_budget_guard
 from nexusagent.infrastructure.utils.circuit import CircuitBreaker
 from nexusagent.llm.models import TaskSchema
 
@@ -18,9 +19,15 @@ task_repo = get_task_repo()  # singleton instance for module-level use
 
 logger = logging.getLogger(__name__)
 
-# Circuit breakers for external dependencies
+# Circle breakers for external dependencies
 _nats_breaker = CircuitBreaker("nats", failure_threshold=3, recovery_timeout=15.0)
-_agent_breaker = CircuitBreaker("agent", failure_threshold=5, recovery_timeout=30.0)
+# Agent breaker with quota error detection ( RESOURCE_EXHAUSTED from Gemini/Google)
+_agent_breaker = CircuitBreaker(
+    "agent",
+    failure_threshold=5,
+    recovery_timeout=30.0,
+    quota_error_classes=(Exception,),  # Will check for RESOURCE_EXHAUSTED in error message
+)
 
 
 async def _run_agent_task(task: TaskSchema) -> str:

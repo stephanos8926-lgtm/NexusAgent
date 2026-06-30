@@ -35,7 +35,11 @@ class NexusWorker:
     persists results to both SQLite and NATS JetStream KV.
 
     Includes background health monitoring with automatic degraded-mode
-    transition when NATS becomes unreachable.
+    transition when NATS is unreachable.
+
+    Budget guard integration:
+    - Checks budget before accepting tasks
+    - Rejects tasks when budget exceeded or quota exhausted
     """
 
     # Health-check interval (seconds) — how often we probe NATS liveness
@@ -235,6 +239,24 @@ class NexusWorker:
             data = json.loads(msg.data.decode())
             task = TaskSchema(**data)
             task_id = task.id
+
+            # Check budget guard before accepting task
+            from nexusagent.infrastructure.utils.budget import get_budget_guard
+
+            guard = get_budget_guard()
+            allowed, reason = await guard.can_submit_task()
+            if not allowed:
+                logger.critical(f"Task {task.id} rejected: {reason}")
+                # Mark task as failed immediately
+                await task_repo.update_task_status(task.id, TaskStatus.FAILED)
+                await task_repo.save_result(
+                    task_id=task.id,
+                    success=False,
+                    data=None,
+                    error=f"Budget exceeded: {reason}",
+                    duration=0.0,
+                )
+                return
 
             logger.info(f"Worker received task {task.id}: {task.description}")
 

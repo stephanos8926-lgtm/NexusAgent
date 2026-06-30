@@ -65,6 +65,26 @@ def sanitize_tool_output(text: str) -> str:
     )
 
 
+# ─── NEXUS_TEST_MODE — blocks real API calls ─────────────────────────────
+
+_NEXUS_TEST_MODE = os.getenv("NEXUS_TEST_MODE", "").lower() in ("1", "true", "yes", "on")
+
+
+def _check_test_mode() -> None:
+    """Raise error if running in test mode without mocks."""
+    if _NEXUS_TEST_MODE:
+        from nexusagent.infrastructure.utils.budget import get_budget_guard
+
+        guard = get_budget_guard()
+        if guard.state.value in ("exceeded", "quota_exhausted"):
+            raise BudgetExceededError(
+                message="NEXUS_TEST_MODE: Budget exceeded or quota exhausted - refusing to call LLM",
+                budget_type="daily",
+                spent=0.0,
+                budget=0.0,
+            )
+
+
 # ─── MCP + Memory Index Tool Wiring ────────────────────────────────────
 
 

@@ -17,6 +17,10 @@ Usage::
     # Or as a context manager:
     async with breaker:
         await nats_call()
+
+Special handling for LLM quota errors (RESOURCE_EXHAUSTED):
+- Trips immediately on first quota error (doesn't wait for threshold)
+- Signals budget guard to enforce cooldown period
 """
 
 import asyncio
@@ -38,18 +42,30 @@ class CircuitState:
 class CircuitBreakerError(Exception):
     """Raised when the circuit breaker is open and calls are rejected."""
 
-    def __init__(self, name: str, state: str):
+    def __init__(
+        self, name: str, state: str, is_quota_error: bool = False, original_error: str | None = None
+    ):
         """Initialize the error with circuit breaker details.
 
         Args:
             name: Name of the circuit breaker that rejected the call.
             state: Current state of the circuit breaker (e.g. ``"open"``).
+            is_quota_error: True if this was triggered by a quota/spend cap error.
+            original_error: Original error message from the LLM provider.
         """
         self.name = name
         self.state = state
-        super().__init__(
-            f"Circuit breaker '{name}' is {state}. Call rejected to prevent cascading failures."
-        )
+        self.is_quota_error = is_quota_error
+        self.original_error = original_error
+        if is_quota_error:
+            super().__init__(
+                f"Circuit breaker '{name}' OPEN due to quota exhaustion. "
+                f"Original error: {original_error}"
+            )
+        else:
+            super().__init__(
+                f"Circuit breaker '{name}' is {state}. Call rejected to prevent cascading failures."
+            )
 
 
 class CircuitBreaker:
@@ -60,6 +76,10 @@ class CircuitBreaker:
       - OPEN: Threshold exceeded. Calls are rejected immediately.
                 After recovery_timeout, transitions to HALF_OPEN.
       - HALF_OPEN: Allows a single test call. Success -> CLOSED, Failure -> OPEN.
+
+    Special behavior for quota errors:
+      - Quota errors (RESOURCE_EXHAUSTED) trip the breaker immediately, regardless of threshold
+      - Budget guard is notified to enforce cooldown period
     """
 
     def __init__(
@@ -68,6 +88,7 @@ class CircuitBreaker:
         failure_threshold: int = 5,
         recovery_timeout: float = 30.0,
         expected_exceptions: tuple[type[BaseException], ...] = (Exception,),
+        quota_error_classes: tuple[type[BaseException], ...] | None = None,
     ):
         """Initialize the circuit breaker.
 
@@ -80,11 +101,14 @@ class CircuitBreaker:
                 transitioning to HALF_OPEN for a test call.
             expected_exceptions: Tuple of exception types that count as
                 failures. Other exceptions pass through uncounted.
+            quota_error_classes: Tuple of exception types that indicate quota/spend
+                cap exhaustion. These trip the breaker immediately (ignores threshold).
         """
         self.name = name
         self.failure_threshold = failure_threshold
         self.recovery_timeout = recovery_timeout
         self.expected_exceptions = expected_exceptions
+        self.quota_error_classes = quota_error_classes or ()
 
         self._state = CircuitState.CLOSED
         self._failure_count = 0
@@ -116,15 +140,20 @@ class CircuitBreaker:
         self._state = CircuitState.CLOSED
         logger.info(f"Circuit breaker '{self.name}' reset to CLOSED")
 
-    def _trip(self) -> None:
-        """Record a failure and trip the circuit open if threshold is reached."""
+    def _trip(self, is_quota_error: bool = False) -> None:
+        """Record a failure and trip the circuit open if threshold is reached.
+
+        Args:
+            is_quota_error: If True, trip immediately regardless of failure count.
+        """
         self._failure_count += 1
         self._last_failure_time = time.time()
-        if self._failure_count >= self.failure_threshold:
+
+        if is_quota_error or self._failure_count >= self.failure_threshold:
             self._state = CircuitState.OPEN
-            logger.warning(
+            logger.critical(
                 f"Circuit breaker '{self.name}' tripped to OPEN "
-                f"after {self._failure_count} failures. "
+                f"{'(quota exhaustion)' if is_quota_error else f'after {self._failure_count} failures'}. "
                 f"Recovery in {self.recovery_timeout}s"
             )
 
@@ -163,6 +192,10 @@ class CircuitBreaker:
 
         Returns:
             False — exceptions are never suppressed.
+
+        Special handling:
+            - Quota errors (RESOURCE_EXHAUSTED) trip breaker immediately
+            - Budget guard is notified for cooldown enforcement
         """
         async with self._lock:
             if exc_type is None:
@@ -173,9 +206,23 @@ class CircuitBreaker:
                     self._failure_count = max(0, self._failure_count - 1)
                 return False
             else:
-                # Failure
+                # Failure - check if it's a quota error (trips immediately)
+                is_quota_error = bool(
+                    self.quota_error_classes and issubclass(exc_type, self.quota_error_classes)
+                )
                 if issubclass(exc_type, self.expected_exceptions):
-                    self._trip()
+                    self._trip(is_quota_error=is_quota_error)
+
+                    # Notify budget guard if quota exhausted
+                    if is_quota_error:
+                        try:
+                            from nexusagent.infrastructure.utils.budget import get_budget_guard
+
+                            guard = get_budget_guard()
+                            asyncio.create_task(guard.record_quota_exhausted())
+                        except Exception as e:
+                            logger.warning(f"Failed to notify budget guard of quota exhaustion: {e}")
+
                 return False
 
     def __call__(self, func):
