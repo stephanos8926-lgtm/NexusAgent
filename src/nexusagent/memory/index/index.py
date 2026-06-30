@@ -429,7 +429,6 @@ class HybridMemoryIndex:
 
         # If aiosqlite not available, run sync methods in executor
         if not AIOSQLITE_AVAILABLE:
-            import asyncio
             logger.debug("AIOSQLITE not available, using run_in_executor fallback.")
             loop = asyncio.get_running_loop()
             keyword_future = loop.run_in_executor(

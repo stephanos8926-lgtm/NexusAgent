@@ -25,7 +25,7 @@ from nexusagent.memory.hybrid_memory import HybridMemoryManager
 
 @pytest.fixture
 def tmp_parent_dir():
-    """Create a temporary parent workspace with memory index."""
+    """Create a temporary parent workspace with some memories."""
     d = tempfile.mkdtemp()
     # Initialize with HybridMemoryManager so .memory/index.sqlite exists
     parent_mgr = HybridMemoryManager(d)
@@ -36,7 +36,7 @@ def tmp_parent_dir():
         type="world",
         description="Deployment target",
     ))
-    parent_mgr.close()
+    asyncio.run(parent_mgr.close())
     yield d
     shutil.rmtree(d, ignore_errors=True)
 
@@ -76,7 +76,7 @@ async def test_inherit_from_loads_parent_memories(tmp_parent_dir, tmp_child_dir)
     # Create child workspace and inherit from parent
     child_mgr = HybridMemoryManager(tmp_child_dir)
     child_mgr.initialize()
-    child_mgr.inherit_from(tmp_parent_dir)
+    await child_mgr.inherit_from(tmp_parent_dir)
 
     # Recall should find parent memory
     results = await child_mgr.recall("deployment target", max_results=5)
@@ -85,7 +85,7 @@ async def test_inherit_from_loads_parent_memories(tmp_parent_dir, tmp_child_dir)
     assert any("us-east-1" in c for c in contents), (
         f"Parent memory not found in results: {contents}"
     )
-    child_mgr.close()
+    await child_mgr.close()
 
 
 # ---------------------------------------------------------------------------
@@ -99,14 +99,14 @@ async def test_write_isolation(tmp_parent_dir, tmp_child_dir):
     # Create child and inherit
     child_mgr = HybridMemoryManager(tmp_child_dir)
     child_mgr.initialize()
-    child_mgr.inherit_from(tmp_parent_dir)
+    await child_mgr.inherit_from(tmp_parent_dir)
 
     # Write a memory in child
     await child_mgr.remember(
         content="Child memory about UI design",
         type="observation",
     )
-    child_mgr.close()
+    await child_mgr.close()
 
     # Verify child bank/ has the child memory
     child_bank = Path(tmp_child_dir) / "bank"
@@ -134,7 +134,7 @@ async def test_promote_to_parent(tmp_parent_dir, tmp_child_dir):
     # Create child with memories
     child_mgr = HybridMemoryManager(tmp_child_dir)
     child_mgr.initialize()
-    child_mgr.inherit_from(tmp_parent_dir)
+    await child_mgr.inherit_from(tmp_parent_dir)
     await child_mgr.remember(
         content="Important finding from child session",
         type="opinion",
@@ -143,7 +143,7 @@ async def test_promote_to_parent(tmp_parent_dir, tmp_child_dir):
     # Promote
     count = child_mgr.promote_to_parent()
     assert count >= 1, f"Expected at least 1 file promoted, got {count}"
-    child_mgr.close()
+    await child_mgr.close()
 
     # Verify the memory is now in parent's bank/
     parent_bank = Path(tmp_parent_dir) / "bank"
@@ -164,7 +164,7 @@ async def test_promote_concurrent_locking(tmp_parent_dir, tmp_child_dir):
     # Create child with multiple memories
     child_mgr = HybridMemoryManager(tmp_child_dir)
     child_mgr.initialize()
-    child_mgr.inherit_from(tmp_parent_dir)
+    await child_mgr.inherit_from(tmp_parent_dir)
     for i in range(5):
         await child_mgr.remember(
             content=f"Concurrent memory #{i}",
@@ -191,7 +191,7 @@ async def test_promote_concurrent_locking(tmp_parent_dir, tmp_child_dir):
     assert len(contents) <= 5, (
         f"Concurrent promotion created duplicates: {len(contents)} files"
     )
-    child_mgr.close()
+    await child_mgr.close()
 
 
 # ---------------------------------------------------------------------------
@@ -205,7 +205,7 @@ async def test_parent_dir_deleted_mid_session(tmp_parent_dir, tmp_child_dir):
     # Create child and inherit
     child_mgr = HybridMemoryManager(tmp_child_dir)
     child_mgr.initialize()
-    child_mgr.inherit_from(tmp_parent_dir)
+    await child_mgr.inherit_from(tmp_parent_dir)
 
     # Delete parent directory
     shutil.rmtree(tmp_parent_dir)
@@ -220,7 +220,7 @@ async def test_parent_dir_deleted_mid_session(tmp_parent_dir, tmp_child_dir):
         content="Child still works after parent deletion",
         type="observation",
     )
-    child_mgr.close()
+    await child_mgr.close()
 
 
 # ---------------------------------------------------------------------------
@@ -236,21 +236,21 @@ async def test_path_traversal_prevention(tmp_child_dir):
 
     # Try a path that doesn't exist
     with pytest.raises(FileNotFoundError):
-        child_mgr.inherit_from("/tmp/nonexistent_path_12345")
+        await child_mgr.inherit_from("/tmp/nonexistent_path_12345")
 
     # Try a path that exists but has no memory index
     tmp_bad = tempfile.mkdtemp()
     try:
         with pytest.raises(FileNotFoundError):
-            child_mgr.inherit_from(tmp_bad)
+            await child_mgr.inherit_from(tmp_bad)
     finally:
         shutil.rmtree(tmp_bad, ignore_errors=True)
 
     # Try a path traversal that resolves outside workspace
     with pytest.raises((FileNotFoundError, ValueError)):
-        child_mgr.inherit_from("../../../etc/passwd")
+        await child_mgr.inherit_from("../../../etc/passwd")
 
-    child_mgr.close()
+    await child_mgr.close()
 
 
 # ---------------------------------------------------------------------------
@@ -265,9 +265,9 @@ async def test_self_inheritance_prevention(tmp_child_dir):
     child_mgr.initialize()
 
     with pytest.raises(ValueError, match="Cannot inherit from own workspace"):
-        child_mgr.inherit_from(tmp_child_dir)
+        await child_mgr.inherit_from(tmp_child_dir)
 
-    child_mgr.close()
+    await child_mgr.close()
 
 
 # ---------------------------------------------------------------------------
@@ -288,12 +288,12 @@ async def test_duplicate_inherit_from(tmp_parent_dir, tmp_child_dir):
             content="Memory from parent workspace TWO",
             type="world",
         )
-        parent2_mgr.close()
+        asyncio.run(parent2_mgr.close())
 
         # Create child and inherit from parent1 (already has memory from fixture)
         child_mgr = HybridMemoryManager(tmp_child_dir)
         child_mgr.initialize()
-        child_mgr.inherit_from(tmp_parent_dir)
+        await child_mgr.inherit_from(tmp_parent_dir)
 
         # Verify parent1 memory is found
         results = await child_mgr.recall("deployment target", max_results=5)
@@ -303,7 +303,7 @@ async def test_duplicate_inherit_from(tmp_parent_dir, tmp_child_dir):
         )
 
         # Now switch to parent2
-        child_mgr.inherit_from(parent2_dir)
+        await child_mgr.inherit_from(parent2_dir)
 
         # Verify parent2 memory is found
         results = await child_mgr.recall("workspace TWO", max_results=5)
@@ -315,7 +315,7 @@ async def test_duplicate_inherit_from(tmp_parent_dir, tmp_child_dir):
         assert not any("us-east-1" in c for c in contents), (
             f"Parent1 memory still present after replacement: {contents}"
         )
-        child_mgr.close()
+        await child_mgr.close()
     finally:
         shutil.rmtree(parent2_dir, ignore_errors=True)
 
@@ -331,7 +331,7 @@ async def test_recall_merges_results(tmp_parent_dir, tmp_child_dir):
     # Create child with inherit and own memory
     child_mgr = HybridMemoryManager(tmp_child_dir)
     child_mgr.initialize()
-    child_mgr.inherit_from(tmp_parent_dir)
+    await child_mgr.inherit_from(tmp_parent_dir)
     await child_mgr.remember(
         content="Child memory about API endpoints",
         type="observation",
@@ -346,7 +346,7 @@ async def test_recall_merges_results(tmp_parent_dir, tmp_child_dir):
     assert any("API endpoints" in c for c in contents), (
         f"Child memory missing from recall: {contents}"
     )
-    child_mgr.close()
+    await child_mgr.close()
 
 
 # ---------------------------------------------------------------------------
@@ -360,7 +360,7 @@ async def test_context_prefix(tmp_parent_dir, tmp_child_dir):
     # Create child with inherit
     child_mgr = HybridMemoryManager(tmp_child_dir)
     child_mgr.initialize()
-    child_mgr.inherit_from(tmp_parent_dir)
+    await child_mgr.inherit_from(tmp_parent_dir)
 
     # Get context
     context = await child_mgr.get_memory_context("deployment", max_results=5)
@@ -368,7 +368,7 @@ async def test_context_prefix(tmp_parent_dir, tmp_child_dir):
         f"Parent memory prefix missing from context:\n{context}"
     )
     assert "us-east-1" in context
-    child_mgr.close()
+    await child_mgr.close()
 
 
 # ---------------------------------------------------------------------------
