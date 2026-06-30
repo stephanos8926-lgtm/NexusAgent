@@ -67,12 +67,15 @@ def sanitize_tool_output(text: str) -> str:
 
 # ─── NEXUS_TEST_MODE — blocks real API calls ─────────────────────────────
 
-_NEXUS_TEST_MODE = os.getenv("NEXUS_TEST_MODE", "").lower() in ("1", "true", "yes", "on")
-
-
 def _check_test_mode() -> None:
     """Raise error if running in test mode without mocks."""
-    if _NEXUS_TEST_MODE:
+    from nexusagent.infrastructure.config import settings
+
+    # Check both env var and config
+    test_mode_env = os.getenv("NEXUS_TEST_MODE", "").lower() in ("1", "true", "yes", "on")
+    test_mode_config = settings.test_mode.block_real_api
+
+    if test_mode_env or test_mode_config:
         from nexusagent.infrastructure.utils.budget import get_budget_guard
 
         guard = get_budget_guard()

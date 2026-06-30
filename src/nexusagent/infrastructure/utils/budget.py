@@ -122,10 +122,11 @@ class LLMBudgetGuard:
 
     def __init__(
         self,
-        daily_budget_usd: float = 10.0,
-        monthly_budget_usd: float = 100.0,
+        daily_budget_usd: float | None = None,
+        monthly_budget_usd: float | None = None,
         alert_thresholds: list[float] | None = None,
         quota_cooldown_seconds: float = 3600.0,  # 1 hour cooldown after quota hit
+        enabled: bool = True,
     ):
         """Initialize budget guard.
 
@@ -136,11 +137,15 @@ class LLMBudgetGuard:
                 Default: [0.5, 0.8, 0.95] for 50%/80%/95% warnings.
             quota_cooldown_seconds: Seconds to wait after quota exhaustion before
                 allowing calls again. Default: 1 hour.
+            enabled: Whether budget guard is enabled. If False, all checks pass.
         """
-        self.daily_budget_usd = daily_budget_usd
-        self.monthly_budget_usd = monthly_budget_usd
+        # Use config values, fallback to sensible defaults for new users
+        # Defaults are conservative (1M daily / 10M monthly tokens ≈ $10/$100 for gemini-2.5-flash)
+        self.daily_budget_usd = daily_budget_usd if daily_budget_usd is not None else 10.0
+        self.monthly_budget_usd = monthly_budget_usd if monthly_budget_usd is not None else 100.0
         self.alert_thresholds = sorted(alert_thresholds or [0.5, 0.8, 0.95])
         self.quota_cooldown_seconds = quota_cooldown_seconds
+        self.enabled = enabled
 
         self._state = LLMBudgetGuardState()
         self._lock = asyncio.Lock()
@@ -150,10 +155,10 @@ class LLMBudgetGuard:
         self._load_state()
 
         # Initialize windows if budgets set
-        if daily_budget_usd > 0:
-            self._state.daily.budget_usd = daily_budget_usd
-        if monthly_budget_usd > 0:
-            self._state.monthly.budget_usd = monthly_budget_usd
+        if self.daily_budget_usd > 0:
+            self._state.daily.budget_usd = self.daily_budget_usd
+        if self.monthly_budget_usd > 0:
+            self._state.monthly.budget_usd = self.monthly_budget_usd
 
         # Check/reset windows on startup
         self._check_window_reset()
@@ -283,6 +288,9 @@ class LLMBudgetGuard:
         Returns:
             Tuple of (allowed, reason). If allowed is False, reason explains why.
         """
+        if not self.enabled:
+            return True, None
+
         async with self._lock:
             self._check_window_reset()
 
@@ -485,11 +493,26 @@ class LLMBudgetGuard:
 _guard_instance: LLMBudgetGuard | None = None
 
 
+def create_budget_guard_from_config(config: "ConfigSchema") -> LLMBudgetGuard:
+    """Create LLMBudgetGuard from config schema."""
+    global _guard_instance
+    _guard_instance = LLMBudgetGuard(
+        daily_budget_usd=config.budget.daily_budget_usd,
+        monthly_budget_usd=config.budget.monthly_budget_usd,
+        alert_thresholds=config.budget.alert_thresholds,
+        quota_cooldown_seconds=config.budget.quota_cooldown_seconds,
+        enabled=config.budget.enabled,
+    )
+    return _guard_instance
+
+
 def get_budget_guard() -> LLMBudgetGuard:
     """Get or create the module-level LLMBudgetGuard singleton."""
     global _guard_instance
     if _guard_instance is None:
-        _guard_instance = LLMBudgetGuard()
+        from nexusagent.infrastructure.config import settings
+
+        _guard_instance = create_budget_guard_from_config(settings)
     return _guard_instance
 
 

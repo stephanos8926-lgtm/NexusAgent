@@ -243,11 +243,84 @@ class LoggingConfig(BaseModel):
     format: str = Field(default="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 
 
+class BudgetConfig(BaseModel):
+    """LLM token budget configuration.
+
+    Controls spend limits, alert thresholds, and quota cooldown behavior.
+    All values are in USD unless noted.
+    """
+
+    enabled: bool = Field(
+        default=True,
+        description="Enable budget guard. If False, all budget checks pass.",
+    )
+    daily_budget_usd: float = Field(
+        default=10.0,
+        ge=0.0,
+        description="Daily spend limit in USD. 0 = disabled. "
+                    "Sensible default for new users (~1M tokens/day on gemini-2.5-flash).",
+    )
+    monthly_budget_usd: float = Field(
+        default=100.0,
+        ge=0.0,
+        description="Monthly spend limit in USD. 0 = disabled. "
+                    "Sensible default for new users (~10M tokens/month on gemini-2.5-flash).",
+    )
+    alert_thresholds: list[float] = Field(
+        default_factory=lambda: [0.5, 0.8, 0.95],
+        description="Alert thresholds as fraction of budget (0.0-1.0). "
+                    "Default: 50%, 80%, 95%. Alerts logged at WARNING level.",
+    )
+    quota_cooldown_seconds: float = Field(
+        default=3600.0,
+        gt=0,
+        description="Cooldown period after quota exhaustion (seconds). "
+                    "Default: 1 hour (3600s).",
+    )
+
+
 class HooksConfig(BaseModel):
     """Configuration for the hooks system."""
 
     hooks_enabled: bool = Field(default=True)
     hooks_dir: str = Field(default="~/.nexusagent/hooks")
+
+
+class BudgetConfig(BaseModel):
+    """Budget guard configuration for LLM spend tracking."""
+
+    daily_budget_usd: float = Field(
+        default=10.0,
+        ge=0.0,
+        description="Daily spend limit in USD. Set to 0 to disable daily limit."
+    )
+    monthly_budget_usd: float = Field(
+        default=100.0,
+        ge=0.0,
+        description="Monthly spend limit in USD. Set to 0 to disable monthly limit."
+    )
+    alert_thresholds: list[float] = Field(
+        default_factory=lambda: [0.5, 0.8, 0.95],
+        description="Thresholds (0.0-1.0) to trigger budget alerts. Default: 50%/80%/95%"
+    )
+    quota_cooldown_seconds: float = Field(
+        default=3600.0,
+        ge=0.0,
+        description="Seconds to wait after quota exhaustion before allowing calls again"
+    )
+    enabled: bool = Field(
+        default=True,
+        description="Enable budget guard. Set false to disable entirely (not recommended)"
+    )
+
+
+class TestModeConfig(BaseModel):
+    """Test mode configuration to prevent accidental real API calls."""
+
+    block_real_api: bool = Field(
+        default=True,
+        description="When true and NEXUS_TEST_MODE=1, blocks real LLM API calls"
+    )
 
 
 class ConfigSchema(BaseModel):
@@ -259,7 +332,9 @@ class ConfigSchema(BaseModel):
     agent: AgentConfig = Field(default_factory=AgentConfig)
     prompt: PromptConfig = Field(default_factory=PromptConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
+    budget: BudgetConfig = Field(default_factory=BudgetConfig)
     hooks: HooksConfig = Field(default_factory=HooksConfig)
+    test_mode: TestModeConfig = Field(default_factory=TestModeConfig)
     # MCP server configuration
     mcp_servers: list[dict[str, str]] = Field(
         default_factory=list,
@@ -365,8 +440,17 @@ def load_config(config_file: str | None = None) -> ConfigSchema:
                 else:
                     current_level[stripped.lower()] = value
 
-    # Systematic overrides for each section
-    for section in ["server", "client", "auth", "agent", "prompt", "logging", "hooks"]:
+    # Systematic overrides for each section (EXCLUDE test_mode - handled after deep merge)
+    for section in [
+        "server",
+        "client",
+        "auth",
+        "agent",
+        "prompt",
+        "logging",
+        "hooks",
+        "budget",
+    ]:
         section_data = raw_data.get(section, {})
         override_from_env(f"NEXUS_{section.upper()}__", section_data, section_data)
         raw_data[section] = section_data
@@ -390,11 +474,26 @@ def load_config(config_file: str | None = None) -> ConfigSchema:
             # These fields belong to the agent section
             env_overrides.setdefault("agent", {})[config_field] = val
 
+    # Special handling for simple boolean env vars (NEXUS_TEST_MODE=1, etc.) BEFORE general NEXUS_ override
+    test_mode_env = os.environ.get("NEXUS_TEST_MODE", "").lower() in ("1", "true", "yes", "on")
+
+    # Also load NEXUS_* env vars (existing pattern) - but filter out test_mode to handle separately
+    # We need to temporarily remove NEXUS_TEST_MODE from environ to prevent it from being processed
+    test_mode_value = os.environ.pop("NEXUS_TEST_MODE", None)
+
     # Also load NEXUS_* env vars (existing pattern)
     override_from_env("NEXUS_", raw_data, raw_data)
 
+    # Restore NEXUS_TEST_MODE
+    if test_mode_value is not None:
+        os.environ["NEXUS_TEST_MODE"] = test_mode_value
+
     # Apply env overrides on top (deep merge)
     raw_data = _deep_merge(raw_data, env_overrides)
+
+    # Special handling for simple boolean env vars (NEXUS_TEST_MODE=1, etc.) AFTER deep merge
+    if test_mode_env:
+        raw_data.setdefault("test_mode", {})["block_real_api"] = True
 
     # Coerce tui_responsive_enabled from string env var
     _resp = raw_data.get("client", {}).get("tui_responsive_enabled")

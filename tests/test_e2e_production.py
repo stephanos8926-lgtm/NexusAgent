@@ -8,10 +8,14 @@ import pytest_asyncio
 from httpx import AsyncClient
 
 from nexusagent.infrastructure.bus import get_bus
+from nexusagent.infrastructure.config import settings
 from nexusagent.infrastructure.db import db_manager
 from nexusagent.llm.models import ResultSchema, TaskStatus
 from nexusagent.server.sdk import sdk
 from nexusagent.server.server import app
+
+# Enable test mode to block real API calls
+os.environ["NEXUS_TEST_MODE"] = "1"
 
 # Test configuration
 TEST_DB_PATH = "/tmp/nexus_e2e_test.db"

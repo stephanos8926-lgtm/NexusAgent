@@ -20,7 +20,9 @@ from nexusagent.core.worker.handler import (
     task_repo,
 )
 from nexusagent.infrastructure.bus import _NATS_HARD_RECONNECT_CAP, AgentBus, get_bus
+from nexusagent.infrastructure.config import settings
 from nexusagent.infrastructure.db import TaskModel
+from nexusagent.infrastructure.utils.budget import create_budget_guard_from_config
 from nexusagent.infrastructure.utils.retry import retry_with_backoff
 from nexusagent.llm.models import ResultSchema, TaskSchema, TaskStatus
 
@@ -55,6 +57,7 @@ class NexusWorker:
                 default bus from ``get_bus()``.
         """
         self.bus = bus or get_bus()
+        self._budget_guard = create_budget_guard_from_config(settings)
         self._health_task: asyncio.Task | None = None
         self._healthy: bool = True
         self._degraded: bool = False
@@ -241,10 +244,7 @@ class NexusWorker:
             task_id = task.id
 
             # Check budget guard before accepting task
-            from nexusagent.infrastructure.utils.budget import get_budget_guard
-
-            guard = get_budget_guard()
-            allowed, reason = await guard.can_submit_task()
+            allowed, reason = await self._budget_guard.can_submit_task()
             if not allowed:
                 logger.critical(f"Task {task.id} rejected: {reason}")
                 # Mark task as failed immediately
