@@ -246,7 +246,101 @@ See CODEBASE_MAP.md for details. Established pattern: extract to subpackage → 
 - **New tests**: `test_version.py` (8), `test_server_version.py` (5), `test_memory_extraction.py` (8) — version system + memory extraction coverage
 - **Memory system tests**: All new memory tests pass (extraction, git ops, cross-session, compaction, dream cycle)
 
-### Critical Lessons Learned (2026-07-22)
+---
+
+## Configuration System Philosophy
+
+**Purpose**: Make NexusAgent easy to configure, easy to understand what's configured, and how it's configured. Clean separation of interests.
+
+### Configuration Loading Order (later overrides earlier)
+
+1. **Pydantic Model Defaults** — Baseline minimums to get the application RUNNING. Conservative defaults suitable for NEW USERS (e.g., daily_budget_usd=10.0 ≈ 1M tokens on gemini-2.5-flash). These are NOT production recommendations — they're safety floors.
+
+2. **Project Config** (`config/nexusagent.yaml`) — **Deployment defaults ONLY**. Committed to repo. Used as TEMPLATE to build user's home config on first run. This is what gets deployed. DO NOT put user preferences here.
+
+3. **User Config** (`~/.nexusagent/config/nexusagent.yaml`) — User overrides. NOT committed. This is where users customize behavior for their environment.
+
+4. **Environment Variables** (`NEXUS_*`) — Highest priority. **Best used ONLY for**: secrets (API keys, encryption keys), machine-specific paths, CI/CD injected values. AVOID for user preferences — easily forgotten, hard to audit, cause "works on my machine" bugs.
+
+### Configuration File Structure
+
+**Single unified config file** (`config/nexusagent.yaml` / `~/.nexusagent/config/nexusagent.yaml`) with **logical sections** (NOT separate files):
+
+| Section | Domain | Examples |
+|---------|--------|----------|
+| `server` | Server runtime | nats_url, db_path, api_port, tls, worker_threads |
+| `client` | TUI/CLI/Web-UI | tui_theme, timeout, retry_limit, responsive_enabled |
+| `agent` | LLM agent behavior | default_model, primary_provider, enabled_tools, compaction |
+| `budget` | LLM spend guard | daily_budget_usd, monthly_budget_usd, alert_thresholds, quota_cooldown_seconds, enabled |
+| `test_mode` | Test safety | block_real_api |
+| `prompt` | NEXUS.md system | base_prompt_file, load_cwd_prompt, max_chain_depth |
+| `logging` | Log config | level, format |
+| `hooks` | Hook system | hooks_enabled, hooks_dir |
+| `auth` | Auth/security | master_secret_path, keystore_path, kdf_iterations |
+
+**Ordering within files**: Most commonly configured options at TOP. Obscure/rare options at BOTTOM. Comments explain WHY, not just WHAT.
+
+### What MUST Be Configurable
+
+**Rule**: If a variable answers YES to ANY of these → it belongs in config:
+- "Should the user be allowed to configure this?"
+- "Is this something the user should already have access to configuring?"
+- "Without access to this variable in the configuration pipeline, what will this negatively impact?"
+- Is this a magic number? (timeout, threshold, limit, retry count, batch size)
+- Is this security-related? (key paths, iterations, encryption settings)
+- Is this UI/UX related? (theme, colors, streaming, notifications)
+- Is this a feature flag? (enable/disable budget guard, test mode, dream cycle)
+- Is this a limit? (max tokens, max history, max file size, max retries)
+
+**Examples of extracted magic numbers now in config:**
+- `budget.daily_budget_usd`, `budget.monthly_budget_usd`, `budget.alert_thresholds`, `budget.quota_cooldown_seconds`
+- `agent.llm_request_timeout`, `agent.llm_max_retries`
+- `agent.compaction_tier2_threshold`, `agent.compaction_tier2_fresh_tail`
+- `agent.dream_cycle_interval`
+- `client.timeout`, `client.retry_limit`
+- `server.nats_max_reconnects`, `server.nats_reconnect_wait`
+
+### Env Var Naming Convention
+
+```
+NEXUS_<SECTION>__<NESTED_KEY> = value
+# Examples:
+NEXUS_BUDGET__DAILY_BUDGET_USD=50.0
+NEXUS_AGENT__DEFAULT_MODEL=gemini-2.5-pro
+NEXUS_SERVER__API_PORT=8080
+```
+
+**NOT for**: user preferences (theme, timeout, retry_limit) — those go in user config file.
+
+### Implementation Pattern
+
+```python
+# In config.py - add to ConfigSchema
+class MyFeatureConfig(BaseModel):
+    my_setting: int = Field(default=100, ge=0, description="...")
+    my_flag: bool = Field(default=True, description="...")
+
+class ConfigSchema(BaseModel):
+    my_feature: MyFeatureConfig = Field(default_factory=MyFeatureConfig)
+
+# In code - access via settings
+from nexusagent.infrastructure.config import settings
+value = settings.my_feature.my_setting
+```
+
+**NEVER** hardcode values that should be configurable. ALWAYS add to config schema first, then reference via `settings`.
+
+### Documentation Requirements
+
+Every config addition MUST include:
+1. Field in appropriate Pydantic config class with `Field(description="...")`
+2. Entry in `config/nexusagent.yaml` (project defaults)
+3. Documentation in AGENTS.md "Configuration" section
+4. If env var needed → add to `override_from_env` section list
+
+---
+
+## Critical Lessons Learned (2026-07-22)
 
 1. **Never trust session summaries over `git log`** — The prior session (June 18-19) claimed 80% of the memory system was committed, but `git log` showed zero commits for those files. The subagent work was lost during context compaction. Always verify with `git log --oneline -- <file>` before claiming completion.
 
