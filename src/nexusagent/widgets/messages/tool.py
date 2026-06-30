@@ -86,9 +86,9 @@ class ToolCallMessage(Static):
     }
 
     _BORDER_COLORS: ClassVar[dict[str, str]] = {
-        STATUS_RUNNING: "warning",
-        STATUS_SUCCESS: "success",
-        STATUS_FAILED: "error",
+        STATUS_RUNNING: "yellow",
+        STATUS_SUCCESS: "green",
+        STATUS_FAILED: "red",
     }
 
     def __init__(
@@ -106,7 +106,7 @@ class ToolCallMessage(Static):
         self._output = output
         self._status = status
         self._collapsed = self._should_collapse(output)
-        self.styles.border_left = ("wide", _BORDER_COLORS.get(status, "warning"))
+        self.styles.border_left = ("wide", self._BORDER_COLORS.get(status, "yellow"))
 
     def _should_collapse(self, output: str) -> bool:
         """Determine if output should be collapsed by default."""
@@ -187,7 +187,7 @@ class ToolCallMessage(Static):
     def update_status(self, status: str) -> None:
         """Update the status and refresh the display."""
         self._status = status
-        self.styles.border_left = ("wide", _BORDER_COLORS.get(status, "warning"))
+        self.styles.border_left = ("wide", self._BORDER_COLORS.get(status, "yellow"))
         self.refresh()
 
     def update_output(self, output: str) -> None:
