@@ -2,7 +2,9 @@
 """FastAPI WebSocket server for the NexusAgent platform."""
 
 import asyncio
+import fcntl
 import logging
+import os
 import time
 from contextlib import asynccontextmanager
 
@@ -13,6 +15,11 @@ from nexusagent.infrastructure.config import settings
 from nexusagent.server.routes import register_routes
 from nexusagent.server.websocket import session_websocket
 from nexusagent.version import VERSION
+
+# Singleton lock — prevents multiple server instances on the same host
+_PID_FILE = os.path.join(
+    os.path.expanduser("~"), ".nexusagent", "server.pid"
+)
 
 # Track server start time for uptime reporting
 _SERVER_START_TIME = time.monotonic()
@@ -82,9 +89,39 @@ def create_app() -> FastAPI:
 app = create_app()
 
 
+def _acquire_singleton_lock() -> int | None:
+    """Acquire a file-based singleton lock. Returns the file descriptor or None if another instance is running."""
+    os.makedirs(os.path.dirname(_PID_FILE), exist_ok=True)
+    try:
+        fd = os.open(_PID_FILE, os.O_CREAT | os.O_RDWR)
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        # Another instance holds the lock
+        try:
+            os.lseek(fd, 0, os.SEEK_SET)
+            existing_pid = os.read(fd, 32).decode().strip()
+        except Exception:
+            existing_pid = "unknown"
+        os.close(fd)
+        print(f"❌ NexusAgent server already running (PID {existing_pid}). Refusing to start.")
+        print(f"   If this is stale, remove: {_PID_FILE}")
+        return None
+
+    # Write our PID and keep the fd open (lock released on process exit)
+    os.ftruncate(fd, 0)
+    os.lseek(fd, 0, os.SEEK_SET)
+    os.write(fd, str(os.getpid()).encode())
+    os.fsync(fd)
+    return fd
+
+
 def run(reload: bool = False) -> None:
     """Entry point for the nexus-server command."""
     import uvicorn
+
+    lock_fd = _acquire_singleton_lock()
+    if lock_fd is None:
+        return  # Another instance is already running
 
     uvicorn.run(
         "nexusagent.server.server:app",
