@@ -35,7 +35,7 @@ def git_status(workdir: str | None = None) -> str:
 
     Returns: Short-format status showing modified, added, deleted, untracked files.
     """
-    return _run_git("status --short", workdir=workdir)
+    return _run_git(["git", "status", "--short"], workdir=workdir)
 
 
 def git_diff(

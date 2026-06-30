@@ -241,7 +241,7 @@ class HybridMemoryManager:
             await self._parent_index.close()
             self._parent_index = None
 
-    def inherit_from(self, parent_dir: str | Path) -> None:
+    async def inherit_from(self, parent_dir: str | Path) -> None:
         """Configure this manager to inherit memories from a parent workspace.
 
         Validates the parent directory, checks it contains a valid memory index,
