@@ -79,7 +79,7 @@ async def _discover_cross_session_memories(
                 )
                 return results
             finally:
-                index.close()
+                await index.close()
         except Exception as exc:
             logger.debug(
                 "Failed to search memory for session %s: %s",

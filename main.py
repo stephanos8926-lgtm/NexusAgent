@@ -1,14 +1,28 @@
-"""NexusAgent — production entrypoint.
 
-Delegates to the Click CLI in ``nexusagent.cli``.  Supports::
+import threading
+import time
 
-    python -m nexusagent          # interactive client
-    python -m nexusagent server   # start API server
-    python -m nexusagent run "task"
-"""
-
-
-from nexusagent.interfaces.cli import main
+def task(name, duration):
+    print(f"Task {name}: Starting (duration={duration}s)")
+    time.sleep(duration)
+    print(f"Task {name}: Finished")
 
 if __name__ == "__main__":
-    main()
+    print("Main: Starting concurrent tasks")
+
+    t1 = threading.Thread(target=task, args=("One", 2))
+    t2 = threading.Thread(target=task, args=("Two", 3))
+    t3 = threading.Thread(target=task, args=("Three", 1))
+    t4 = threading.Thread(target=task, args=("Four", 4))
+
+    t1.start()
+    t2.start()
+    t3.start()
+    t4.start()
+
+    t1.join()
+    t2.join()
+    t3.join()
+    t4.join()
+
+    print("Main: All tasks finished")

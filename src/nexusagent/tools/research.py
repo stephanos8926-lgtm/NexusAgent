@@ -179,8 +179,11 @@ def search_local_docs(query: str) -> str:
             capture_output=True,
             text=True,
             check=True,
+            timeout=30.0,
         )
         return result.stdout
+    except subprocess.TimeoutExpired:
+        return "Error: Documentation search timed out (30s)"
     except subprocess.CalledProcessError as e:
         return f"Error searching docs: {e.stderr}"
 

@@ -88,7 +88,7 @@ class ClientConfig(BaseModel):
     retry_limit: int = Field(default=3, ge=0)
     result_timeout: int = Field(default=300, ge=1)
     # API key for TUI WebSocket connection (read from env NEXUS_CLIENT__API_KEY)
-    api_key: str = Field(default="nexus-tui-key-2026")
+    api_key: str = Field(default="")
     # Enable/disable responsive TUI behavior
     tui_responsive_enabled: bool = Field(default=True)
 

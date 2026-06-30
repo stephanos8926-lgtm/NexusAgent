@@ -149,6 +149,9 @@ class NexusApp(App):
         self._last_tool_name = ""
         self._context_used = 0
         self._context_limit = 0
+        # Track seen tool calls/results to prevent duplicate rendering (for /new command)
+        self._seen_tool_calls = set()
+        self._seen_tool_results = set()
         # Collapse repeated identical failures (tool name + error text)
         self._last_failure_key: tuple[str, str] | None = None
         self._failure_repeat_count: int = 0

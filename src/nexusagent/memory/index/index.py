@@ -80,7 +80,7 @@ class HybridMemoryIndex:
             )
             self._db_pool.row_factory = aiosqlite.Row
             await self._db_pool.enable_load_extension(True)
-            await sqlite_vec.load(self._db_pool)
+            sqlite_vec.load(self._db_pool)
             await self._db_pool.enable_load_extension(False)
         yield self._db_pool
 
@@ -430,7 +430,7 @@ class HybridMemoryIndex:
         # If aiosqlite not available, run sync methods in executor
         if not AIOSQLITE_AVAILABLE:
             import asyncio
-
+            logger.debug("AIOSQLITE not available, using run_in_executor fallback.")
             loop = asyncio.get_running_loop()
             keyword_future = loop.run_in_executor(
                 None, self._search_keyword_sync, query, candidate_limit
@@ -552,7 +552,7 @@ class HybridMemoryIndex:
                 return results
             except Exception as e:
                 logger.warning("Vector search failed: %s, falling back to brute force", e)
-                return await self._search_vector_brute(query_vec, limit)
+                return self._search_vector_brute(query_vec, limit)
 
     def _search_vector_sync(self, query_vec: list[float], limit: int) -> list[dict]:
         """sqlite-vec similarity search (sync fallback)."""
@@ -605,6 +605,8 @@ class HybridMemoryIndex:
             return self._search_vector_brute(query_vec, limit)
         finally:
             conn.close()
+
+    def _search_vector_brute(self, query_vec: list[float], limit: int) -> list[dict]:
         """Brute-force cosine similarity fallback when sqlite-vec fails.
 
         Includes an OOM guard: estimates memory for all embeddings before loading.

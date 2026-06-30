@@ -1,5 +1,6 @@
 import asyncio
 import os
+import logging
 
 import httpx
 import pytest
@@ -39,6 +40,23 @@ async def setup_system():
 
     # Initialize DB
     await db_manager.init_db()
+
+    # Set logging level to DEBUG for detailed output
+    logging.basicConfig(level=logging.DEBUG)
+
+    # Debugging: Verify database file permissions
+    if os.path.exists(TEST_DB_PATH):
+        import stat
+        file_stat = os.stat(TEST_DB_PATH)
+        print(f"DEBUG: DB file {TEST_DB_PATH} exists. Permissions: {stat.filemode(file_stat.st_mode)}")
+        # Ensure it's writable by the current user
+        if not (file_stat.st_mode & stat.S_IWUSR):
+            print(f"ERROR: DB file {TEST_DB_PATH} is not writable by owner. Attempting to change permissions.")
+            os.chmod(TEST_DB_PATH, file_stat.st_mode | stat.S_IWUSR)
+            file_stat = os.stat(TEST_DB_PATH)
+            print(f"DEBUG: New permissions: {stat.filemode(file_stat.st_mode)}")
+    else:
+        print(f"ERROR: DB file {TEST_DB_PATH} does not exist after init_db.")
 
     # Connect to NATS
     _bus = get_bus()

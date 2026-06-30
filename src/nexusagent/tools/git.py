@@ -4,17 +4,15 @@ Provides git status, diff, log, branch, commit, and stash operations.
 All operations are read-only by default; write operations require explicit flags.
 """
 
-import shlex
 import subprocess
 
 
-def _run_git(args: str, workdir: str | None = None, timeout: int = 30) -> str:
+def _run_git(cmd: list[str], workdir: str | None = None, timeout: int = 30) -> str:
     """Run a git command and return output.
 
     Uses list-based args with shell=False to prevent shell injection.
     """
     try:
-        cmd = ["git", *shlex.split(args)]
         result = subprocess.run(
             cmd,
             shell=False,
@@ -54,12 +52,12 @@ def git_diff(
 
     Returns: Unified diff output
     """
-    args = "diff"
+    cmd = ["git", "diff"]
     if cached:
-        args += " --cached"
+        cmd.append("--cached")
     if file_path:
-        args += f" -- {file_path}"
-    return _run_git(args, workdir=workdir)
+        cmd.extend(["--", file_path])
+    return _run_git(cmd, workdir=workdir)
 
 
 def git_log(
@@ -78,12 +76,12 @@ def git_log(
 
     Returns: Commit log output
     """
-    args = f"log -n {count}"
+    cmd = ["git", "log", f"-n{count}"]
     if oneline:
-        args += " --oneline"
+        cmd.append("--oneline")
     if file_path:
-        args += f" -- {file_path}"
-    return _run_git(args, workdir=workdir)
+        cmd.extend(["--", file_path])
+    return _run_git(cmd, workdir=workdir)
 
 
 def git_branch(workdir: str | None = None) -> str:
@@ -91,11 +89,11 @@ def git_branch(workdir: str | None = None) -> str:
 
     Returns: Branch list output
     """
-    return _run_git("branch -v", workdir=workdir)
+    return _run_git(["git", "branch", "-v"], workdir=workdir)
 
 
 def git_show(commit: str = "HEAD", workdir: str | None = None) -> str:
-    """Show a commit's details and diff.
+    """Show a specific commit.
 
     Args:
         commit: Commit hash, branch name, or ref (default: HEAD)
@@ -103,12 +101,12 @@ def git_show(commit: str = "HEAD", workdir: str | None = None) -> str:
 
     Returns: Commit details + diff
     """
-    return _run_git(f"show {commit} --stat", workdir=workdir)
+    return _run_git(["git", "show", commit, "--stat"], workdir=workdir)
 
 
 def git_stash_list(workdir: str | None = None) -> str:
     """List stashed changes."""
-    return _run_git("stash list", workdir=workdir)
+    return _run_git(["git", "stash", "list"], workdir=workdir)
 
 
 def git_stash_push(message: str | None = None, workdir: str | None = None) -> str:
@@ -120,15 +118,15 @@ def git_stash_push(message: str | None = None, workdir: str | None = None) -> st
 
     Returns: Stash result
     """
-    args = "stash push"
+    cmd = ["git", "stash", "push"]
     if message:
-        args += f" -m {message}"
-    return _run_git(args, workdir=workdir)
+        cmd.extend(["-m", message])
+    return _run_git(cmd, workdir=workdir)
 
 
 def git_stash_pop(workdir: str | None = None) -> str:
     """Pop the most recent stash. Write operation."""
-    return _run_git("stash pop", workdir=workdir)
+    return _run_git(["git", "stash", "pop"], workdir=workdir)
 
 
 def git_commit(message: str, files: list[str] | None = None, workdir: str | None = None) -> str:
@@ -143,11 +141,11 @@ def git_commit(message: str, files: list[str] | None = None, workdir: str | None
     """
     if files:
         for f in files:
-            _run_git(f"add {f}", workdir=workdir)
+            _run_git(["git", "add", f], workdir=workdir)
     else:
-        _run_git("add -A", workdir=workdir)
+        _run_git(["git", "add", "-A"], workdir=workdir)
 
-    return _run_git(f"commit -m {message}", workdir=workdir)
+    return _run_git(["git", "commit", "-m", message], workdir=workdir)
 
 
 def git_checkout_branch(branch: str, create: bool = False, workdir: str | None = None) -> str:
@@ -160,5 +158,8 @@ def git_checkout_branch(branch: str, create: bool = False, workdir: str | None =
 
     Returns: Checkout result
     """
-    args = f"checkout {'-b ' if create else ''}{branch}"
-    return _run_git(args, workdir=workdir)
+    cmd = ["git", "checkout"]
+    if create:
+        cmd.append("-b")
+    cmd.append(branch)
+    return _run_git(cmd, workdir=workdir)

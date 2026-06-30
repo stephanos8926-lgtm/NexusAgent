@@ -274,7 +274,7 @@ class HybridMemoryManager:
 
         # Close previous parent index if replacing
         if self._parent_index is not None:
-            self._parent_index.close()
+            await self._parent_index.close()
 
         self.parent_memory_dir = resolved_path
         self._parent_index = HybridMemoryIndex(str(resolved_path))
