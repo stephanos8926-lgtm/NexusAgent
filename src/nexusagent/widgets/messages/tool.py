@@ -6,6 +6,9 @@ import json
 import re
 from typing import Any, ClassVar
 
+from rich.console import Group
+from rich.syntax import Syntax
+from rich.text import Text
 from textual.content import Content
 from textual.widgets import Static
 
@@ -70,6 +73,24 @@ class ToolCallMessage(Static):
         STATUS_FAILED: "bold error",
     }
 
+    # Plain Rich color names (not Textual $theme-variables). Required when a
+    # Content object is nested inside a rich.console.Group alongside a
+    # Syntax renderable — Content's CSS-variable style names ("text-muted",
+    # "bold warning", etc.) only resolve when Content is itself the
+    # top-level value returned from a widget's render(); nested inside a
+    # plain Rich renderable they raise AttributeError at paint time.
+    _STATUS_RICH_STYLES: ClassVar[dict[str, str]] = {
+        STATUS_RUNNING: "bold yellow",
+        STATUS_SUCCESS: "bold green",
+        STATUS_FAILED: "bold red",
+    }
+
+    _BORDER_COLORS: ClassVar[dict[str, str]] = {
+        STATUS_RUNNING: "warning",
+        STATUS_SUCCESS: "success",
+        STATUS_FAILED: "error",
+    }
+
     def __init__(
         self,
         tool: str,
@@ -78,23 +99,14 @@ class ToolCallMessage(Static):
         status: str = "running",
         **kwargs: Any,
     ) -> None:
-        """Initialize the tool call message widget.
-
-        Args:
-            tool: Name of the tool that was called.
-            args: Arguments passed to the tool (dict or string).
-            output: Initial output text (may be empty for streaming).
-            status: One of STATUS_RUNNING, STATUS_SUCCESS, STATUS_FAILED.
-            **kwargs: Additional keyword arguments passed to Static.
-        """
+        """Initialize the tool call message widget."""
         super().__init__(**kwargs)
         self._tool = tool
-        # Store raw args for formatting
         self._args_raw = args
         self._output = output
         self._status = status
-        # Determine if output should be collapsed by default
         self._collapsed = self._should_collapse(output)
+        self.styles.border_left = ("wide", _BORDER_COLORS.get(status, "warning"))
 
     def _should_collapse(self, output: str) -> bool:
         """Determine if output should be collapsed by default."""
@@ -175,6 +187,7 @@ class ToolCallMessage(Static):
     def update_status(self, status: str) -> None:
         """Update the status and refresh the display."""
         self._status = status
+        self.styles.border_left = ("wide", _BORDER_COLORS.get(status, "warning"))
         self.refresh()
 
     def update_output(self, output: str) -> None:
@@ -198,11 +211,43 @@ class ToolCallMessage(Static):
         if self._output:
             self.toggle_collapse()
 
-    def render(self) -> Content:
+    def _build_output_renderable(self, output: str):
+        """Build a real renderable for tool output instead of a raw text dump.
+
+        Tries, in order: pretty-printed + highlighted JSON, the first fenced
+        code block syntax-highlighted (with any surrounding text kept plain),
+        then falls back to plain text.
+        """
+        stripped = output.strip()
+
+        # JSON output: pretty-print and syntax-highlight rather than dumping
+        # the raw (often single-line, escaped) string.
+        if stripped.startswith(("{", "[")):
+            try:
+                parsed = json.loads(stripped)
+            except (json.JSONDecodeError, ValueError):
+                parsed = None
+            if parsed is not None:
+                pretty = json.dumps(parsed, indent=2, ensure_ascii=False)
+                return Syntax(pretty, "json", theme="ansi_dark", word_wrap=True, background_color="default")
+
+        # Fenced code block: highlight just the code, keep surrounding text plain.
+        match = _CODE_BLOCK_LANG_RE.search(output)
+        if match:
+            lang = match.group(1) or "text"
+            code_match = re.search(r"```\w*\n([\s\S]*?)```", output)
+            code = code_match.group(1) if code_match else output
+            return Syntax(
+                code.rstrip("\n"), lang, theme="ansi_dark", word_wrap=True, background_color="default"
+            )
+
+        return Text(output)
+
+    def render(self):
         """Render the tool call with status icon, args, and collapsible output.
 
         Returns:
-            Content with header line and optional output body.
+            Rich renderable (Group for expanded, Content for collapsed/header-only).
         """
         icon = self._STATUS_ICONS.get(self._status, "⚙")
         style = self._STATUS_STYLES.get(self._status, "bold warning")
@@ -214,25 +259,24 @@ class ToolCallMessage(Static):
             return Content.assemble((header, style))
 
         # Build output display
-        self._detect_code(self._output)
         syntax_hint = self._detect_syntax_hint()
         line_count = self._count_lines(self._output)
 
-        output_parts = [(header, style)]
+        header_parts = [(header, style)]
 
         # Add syntax hint if detected
         if syntax_hint:
-            output_parts.append((f"  [{syntax_hint}]", "text-muted"))
+            header_parts.append((f"  [{syntax_hint}]", "text-muted"))
 
         # Handle collapsed state — show hint so user knows it's clickable
         if self._collapsed:
-            output_parts.append(
+            header_parts.append(
                 (
                     f"  ▸ {line_count} line{'s' if line_count != 1 else ''} · click to expand",
                     "text-muted",
                 )
             )
-            return Content.assemble(*output_parts)
+            return Content.assemble(*header_parts)
 
         # Expanded: truncate only very large outputs (10k chars)
         output = (
@@ -243,8 +287,11 @@ class ToolCallMessage(Static):
             )
         )
 
-        output_parts.append(("\n", ""))
-        output_parts.append((output, "text-muted"))
-        output_parts.append(("\n  ▾ click to collapse", "text-dim"))
+        header_text = Text()
+        header_text.append(f"{icon} {self._tool}({formatted_args})", style=self._STATUS_RICH_STYLES.get(self._status, "bold yellow"))
+        if syntax_hint:
+            header_text.append(f"  [{syntax_hint}]", style="dim")
 
-        return Content.assemble(*output_parts)
+        body = self._build_output_renderable(output)
+        footer = Text("  ▾ click to collapse", style="dim italic")
+        return Group(header_text, body, footer)

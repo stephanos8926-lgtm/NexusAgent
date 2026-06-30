@@ -73,7 +73,7 @@ async def handle_event(app, event: dict) -> None:
         await _handle_tool_call_event(app, event)
 
     elif etype == "tool_result":
-        _handle_tool_result_event(app, event)
+        await _handle_tool_result_event(app, event)
 
     elif etype == "tool_error":
         tool = event.get("tool", "?")
@@ -230,7 +230,7 @@ async def _handle_tool_call_event(app, event: dict) -> None:
     app.status_bar.set_status(f"Running: {tool}")
 
 
-def _handle_tool_result_event(app, event: dict) -> None:
+async def _handle_tool_result_event(app, event: dict) -> None:
     """Handle a tool_result event.
 
     Args:
@@ -239,10 +239,30 @@ def _handle_tool_result_event(app, event: dict) -> None:
     """
     output = event.get("output", "")
     success = event.get("success", True)
+    tool_name = app._current_tool._tool if app._current_tool else app._last_tool_name
 
     if app._current_tool:
         app._current_tool.update_output(output)
         app._current_tool.update_status("success" if success else "failed")
+
+        # Collapse repeated identical failures: if this failure matches the
+        # immediately preceding one, keep it collapsed and show a repeat counter.
+        if not success:
+            failure_key = (tool_name, output)
+            if app._last_failure_key == failure_key:
+                # Same failure as before — collapse to keep scrollback readable
+                app._failure_repeat_count += 1
+                app._current_tool._collapsed = True
+                app._current_tool.update_output(
+                    f"(same error ×{app._failure_repeat_count})"
+                )
+                app._current_tool.refresh()
+            else:
+                app._last_failure_key = failure_key
+                app._failure_repeat_count = 1
+        else:
+            app._last_failure_key = None
+            app._failure_repeat_count = 0
     else:
         msg = ToolCallMessage(
             tool=app._last_tool_name,

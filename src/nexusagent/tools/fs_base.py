@@ -2,22 +2,26 @@
 
 from __future__ import annotations
 
-# Track files read in the current session (context-local for session isolation)
 import contextvars
 from pathlib import Path
 
-_read_files_var: contextvars.ContextVar[set[str] | None] = contextvars.ContextVar(
-    "read_files", default=None
-)
+# Track files read in the current session.
+#
+# IMPORTANT: This is a plain set, NOT a ContextVar. ContextVar is inherited at
+# asyncio task-creation boundaries, and LangGraph's ToolNode runs each tool in
+# its own create_task() — meaning reads registered in one tool's task context
+# are invisible to the next tool's task context. A plain set shared across the
+# process works because:
+#   1. The main interactive session runs tools sequentially in one logical flow
+#   2. reset_read_tracking() is called at session start (in websocket.py)
+#   3. Worker pool subagents each get their own process (not just task)
+_reset_lock: object = object()
+_read_files: set[str] = set()
 
 
 def _get_read_files() -> set[str]:
-    """Get the read-files set for the current context."""
-    val = _read_files_var.get()
-    if val is None:
-        val = set()
-        _read_files_var.set(val)
-    return val
+    """Get the read-files set for the current session."""
+    return _read_files
 
 
 # Default directory excludes for list_directory
@@ -103,8 +107,8 @@ def get_read_files() -> list[str]:
 
 
 def reset_read_tracking() -> None:
-    """Reset the read-file tracking. Use when starting a new task/session."""
-    _get_read_files().clear()
+    """Reset the read-file tracking. Use when starting a new session."""
+    _read_files.clear()
 
 
 def __getattr__(name: str):

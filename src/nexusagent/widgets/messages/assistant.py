@@ -2,20 +2,21 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
+from textual.containers import Vertical
 from textual.widgets import Static
 
-if TYPE_CHECKING:
-    from textual.content import Content
 
-
-class AssistantMessage(Static):
+class AssistantMessage(Vertical):
     """Widget displaying an assistant message with streaming support.
 
     Streams token-by-token into a plain Static buffer, then swaps to a
     Textual Markdown widget on finalize() for full rich rendering:
     headings, lists, fenced code blocks, bold, italic, inline code.
+
+    Uses Vertical container as base so that the Markdown child widget
+    lays out correctly (Static does not support child layout).
     """
 
     DEFAULT_CSS = """
@@ -30,6 +31,9 @@ class AssistantMessage(Static):
     AssistantMessage .assistant-ts {
         color: $text-dim;
     }
+    AssistantMessage Static {
+        padding: 0;
+    }
     AssistantMessage Markdown {
         background: transparent;
         padding: 0;
@@ -39,19 +43,27 @@ class AssistantMessage(Static):
 
     def __init__(self, **kwargs: Any) -> None:
         """Initialize the assistant message widget with an empty buffer."""
-        super().__init__("", **kwargs)
+        super().__init__(**kwargs)
         self._buffer = ""
         self._finalized = False
+        # Streaming buffer — plain Static that shows tokens as they arrive
+        self._streaming_text = Static("", classes="assistant-stream")
+
+    def _ensure_streaming_widget(self) -> None:
+        """Mount the streaming buffer on first use (must be called after self is mounted)."""
+        from textual.widget import MountError
+        try:
+            if self._streaming_text not in self.children:
+                self.mount(self._streaming_text)
+        except MountError:
+            return  # Not mounted yet — skip, will retry on next token
 
     async def append_token(self, token: str) -> None:
         """Append a streaming token — renders as plain text during stream."""
         self._buffer += token
-        # Direct update without call_next — call_next schedules for the next
-        # Textual message pump which may not run if we're in a tight async loop.
-        # update() with plain string is thread-safe and triggers immediate render.
-        # Using string instead of Content() ensures CSS text-wrap: wrap is respected.
         if not self._finalized:
-            self.update(self._buffer)
+            self._ensure_streaming_widget()
+            self._streaming_text.update(self._buffer)
 
     def finalize(self, content: str) -> None:
         """Swap to a Markdown widget for full rich rendering."""
@@ -59,19 +71,14 @@ class AssistantMessage(Static):
             return  # Guard against double-finalize
         self._buffer = content
         self._finalized = True
-        # Clear the Static content before mounting Markdown
-        self.update("")
         try:
             from textual.widgets import Markdown as TextualMarkdown
 
+            # Remove the streaming buffer, mount Markdown in its place
+            self._ensure_streaming_widget()
+            self._streaming_text.remove()
             md = TextualMarkdown(content)
             self.mount(md)
         except Exception:
             # Fallback: plain text if Markdown widget fails
-            self.update(content)
-
-    def render(self) -> Content:
-        """Render the buffered content as plain text."""
-        from textual.content import Content
-
-        return Content(self._buffer)
+            self._streaming_text.update(content)

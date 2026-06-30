@@ -149,6 +149,10 @@ class NexusApp(App):
         self._last_tool_name = ""
         self._context_used = 0
         self._context_limit = 0
+        # Collapse repeated identical failures (tool name + error text)
+        self._last_failure_key: tuple[str, str] | None = None
+        self._failure_repeat_count: int = 0
+        self._failure_summary_widget: ToolCallMessage | None = None
 
     # ── Message widget sliding window ────────────────────────────────────
 

@@ -16,7 +16,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 
 from nexusagent.core.session.helpers import (
     _build_environment_context,
@@ -89,6 +89,8 @@ class Session(SessionBase):
         self._seen_tool_results: set[str] = set()
         self._seen_tool_calls: set[str] = set()
         self._conversation_history: list[Any] = []
+        self._pending_tool_calls: list[dict[str, Any]] = []
+        self._pending_tool_messages: list[ToolMessage] = []
         self._extraction_queue: asyncio.Queue = asyncio.Queue(maxsize=_MAX_EXTRACTION_QUEUE)
         self._heartbeat_task: asyncio.Task | None = None
 
@@ -171,7 +173,7 @@ class Session(SessionBase):
 
     # ── send() helper methods ────────────────────────────────────────────
 
-    def _build_messages_list(
+    async def _build_messages_list(
         self,
         system_prompt: str,
         user_message: str,
@@ -203,9 +205,7 @@ class Session(SessionBase):
 
         # Inject hybrid memory context
         try:
-            hybrid_context = asyncio.run(
-                self.hybrid_memory.get_memory_context(user_message, max_results=5)
-            )
+            hybrid_context = await self.hybrid_memory.get_memory_context(user_message, max_results=5)
             if hybrid_context:
                 messages.append(SystemMessage(content=hybrid_context))
         except Exception as exc:
@@ -221,7 +221,7 @@ class Session(SessionBase):
 
         return messages
 
-    def _apply_compaction(self, messages: list[Any]) -> list[Any]:
+    async def _apply_compaction(self, messages: list[Any]) -> list[Any]:
         """Apply compaction to the message list if enabled.
 
         Flushes memory context before compaction, then compacts
@@ -257,7 +257,7 @@ class Session(SessionBase):
 
         # Try to flush memory context before compaction
         try:
-            flush_ctx = asyncio.run(self.pre_compaction_flush())
+            flush_ctx = await self.pre_compaction_flush()
             messages.insert(1, SystemMessage(content=flush_ctx))
         except Exception as exc:
             logger.warning("Pre-compaction flush failed: %s", exc)
@@ -310,6 +310,8 @@ class Session(SessionBase):
             True if response completed successfully, False if cancelled.
         """
         self._cancel_flag = False
+        self._pending_tool_calls = []
+        self._pending_tool_messages = []
 
         # Start heartbeat task for long-running LLM calls
         heartbeat_interval = 15.0  # seconds
@@ -348,12 +350,28 @@ class Session(SessionBase):
                 return False
 
             # Response completed successfully
+            # Cancel heartbeat before anything else, otherwise it keeps firing
+            # "Still thinking..." forever after we're done.
+            if self._heartbeat_task is not None and not self._heartbeat_task.done():
+                self._heartbeat_task.cancel()
+
             final_content = "".join(accumulated)
             self._enqueue(ResponseEvent(content=final_content).model_dump())
 
             # Update conversation history
             self._conversation_history.append(user_msg)
-            self._conversation_history.append(AIMessage(content=final_content))
+            if self._pending_tool_calls:
+                # AIMessage carries the tool_calls so the model can see, on the
+                # next turn, that it actually invoked these tools — followed by
+                # the matching ToolMessage results (provider APIs require the
+                # ToolMessage(s) to immediately follow the AIMessage that made
+                # the call, with matching tool_call_id).
+                self._conversation_history.append(
+                    AIMessage(content=final_content, tool_calls=self._pending_tool_calls)
+                )
+                self._conversation_history.extend(self._pending_tool_messages)
+            else:
+                self._conversation_history.append(AIMessage(content=final_content))
             max_hist = settings.agent.max_conversation_history
             if len(self._conversation_history) > max_hist:
                 self._conversation_history = self._conversation_history[-max_hist:]
@@ -378,9 +396,17 @@ class Session(SessionBase):
             # Cancel heartbeat task on error (prevents zombie tasks)
             if self._heartbeat_task is not None and not self._heartbeat_task.done():
                 self._heartbeat_task.cancel()
+            # Preserve a record of this turn in history even on failure —
+            # otherwise the user's message AND the fact that something
+            # failed disappear entirely, and the agent has no memory of
+            # the exchange at all on the next turn.
+            self._conversation_history.append(user_msg)
+            self._conversation_history.append(
+                AIMessage(content=f"[Turn failed with an internal error: {exc}]")
+            )
             raise
 
-    def _handle_send_error(self, exc: Exception) -> None:
+    async def _handle_send_error(self, exc: Exception) -> None:
         """Handle errors during send() execution.
 
         Runs error hooks if enabled and enqueues an ErrorEvent.
@@ -390,15 +416,13 @@ class Session(SessionBase):
         """
         if settings.hooks.hooks_enabled:
             try:
-                asyncio.run(
-                    get_hook_manager().run_hooks(
-                        HookEvent.ERROR,
-                        {
-                            "session_id": self.session_id,
-                            "error_message": str(exc),
-                            "working_dir": self.working_dir,
-                        },
-                    )
+                await get_hook_manager().run_hooks(
+                    HookEvent.ERROR,
+                    {
+                        "session_id": self.session_id,
+                        "error_message": str(exc),
+                        "working_dir": self.working_dir,
+                    },
                 )
             except Exception as hook_exc:
                 logger.warning("error hook failed: %s", hook_exc)
@@ -441,10 +465,10 @@ class Session(SessionBase):
             system_prompt = system_prompt + "\n\n" + context_block
 
         # Build messages list (system prompt, memories, history, user message)
-        messages = self._build_messages_list(system_prompt, user_message, images)
+        messages = await self._build_messages_list(system_prompt, user_message, images)
 
         # Apply compaction if enabled
-        messages = self._apply_compaction(messages)
+        messages = await self._apply_compaction(messages)
 
         # Prepare for streaming
         accumulated: list[str] = []
@@ -462,7 +486,7 @@ class Session(SessionBase):
             # Cancel heartbeat task on error (prevents zombie tasks)
             if self._heartbeat_task is not None and not self._heartbeat_task.done():
                 self._heartbeat_task.cancel()
-            self._handle_send_error(exc)
+            await self._handle_send_error(exc)
 
     async def _handle_message_token(self, token, metadata: dict, accumulated: list[str]) -> None:
         """Process a single message token from the stream."""
@@ -473,11 +497,22 @@ class Session(SessionBase):
                 call_id = tc.get("id", "")
                 if tc.get("name") and call_id and call_id not in self._seen_tool_calls:
                     self._seen_tool_calls.add(call_id)
+                    args = tc.get("args", {})
+                    # Preserve the real tool call so it can be replayed into
+                    # conversation history — without this, the model loses
+                    # all memory of tool calls it made earlier in the session.
+                    self._pending_tool_calls.append(
+                        {
+                            "id": call_id,
+                            "name": tc["name"],
+                            "args": args if isinstance(args, dict) else {},
+                        }
+                    )
                     self._enqueue(
                         {
                             "type": "tool_call",
                             "tool": tc["name"],
-                            "args": tc.get("args", {}),
+                            "args": args,
                             "call_id": call_id,
                         }
                     )
@@ -486,12 +521,15 @@ class Session(SessionBase):
             call_id = getattr(token, "tool_call_id", "")
             if call_id and call_id not in self._seen_tool_results:
                 self._seen_tool_results.add(call_id)
+                self._pending_tool_messages.append(token)
+                output_text = str(token.content) if token.content else ""
+                is_error = output_text.startswith("Error:") or getattr(token, "status", None) == "error"
                 self._enqueue(
                     {
                         "type": "tool_result",
                         "call_id": call_id,
-                        "output": str(token.content) if token.content else "",
-                        "success": True,
+                        "output": output_text,
+                        "success": not is_error,
                     }
                 )
                 if settings.hooks.hooks_enabled:

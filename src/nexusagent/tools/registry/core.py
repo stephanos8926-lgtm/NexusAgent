@@ -33,10 +33,20 @@ def register_tool(
     def decorator(func: Callable) -> Callable:
         if asyncio.iscoroutinefunction(func):
             # Wrap async functions to ensure the agent framework gets
-            # the actual result, not the coroutine object.
+            # the actual result, not the coroutine object. Also catch
+            # exceptions and convert to an error string — LangGraph's
+            # ToolNode default error handler only catches its own
+            # ToolInvocationError; anything else (PermissionError from
+            # our own safety checks, OSError, etc.) propagates raw,
+            # breaks the astream() loop mid-turn, and silently drops the
+            # entire turn (including the user's message) from session
+            # history since the history-append only runs on success.
             @functools.wraps(func)
             async def async_wrapper(*args, **kwargs):
-                return await func(*args, **kwargs)
+                try:
+                    return await func(*args, **kwargs)
+                except Exception as exc:
+                    return f"Error: {exc}"
 
             _REGISTRY[name] = ToolInfo(
                 name=name,
@@ -49,9 +59,17 @@ def register_tool(
                 requires=requires,
             )
         else:
+            # Same rationale as async_wrapper above — applies to sync tools.
+            @functools.wraps(func)
+            def sync_wrapper(*args, **kwargs):
+                try:
+                    return func(*args, **kwargs)
+                except Exception as exc:
+                    return f"Error: {exc}"
+
             _REGISTRY[name] = ToolInfo(
                 name=name,
-                func=func,
+                func=sync_wrapper,
                 description=description,
                 parameters=parameters,
                 example=example,
