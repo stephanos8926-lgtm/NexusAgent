@@ -1,58 +1,85 @@
 # SESSION_STATE.md — NexusAgent
 
-> Last updated: 2026-06-21
-> Maintained by: OWL (Lucien)
+> Last updated: 2026-07-09
+> Maintained by: Lucien (Dagoth)
 
 ---
 
-## Memory System v2 — COMPLETE ✅
+## Current Status
 
-All 9 Kanban tasks complete. 208 memory tests passing.
-
-### What Was Done
-
-**Session 2026-06-15**: Memory system analysis + qwen extensions research → `4a4fc0c`
-
-**Session 2026-06-18**: Reconstructed after compaction → ADRs 0006-0008, SPECs 0003-0006, v2 plan, audit synthesis → `162602c`
-
-**Session 2026-06-18 (subagent)**: Phase 0 foundation fixes → `d0d319c`, `e69e1bc`, `b0a4940`, `f490d59`, `cfe9a30`
-
-**Session 2026-06-19**: LCM fix, TTL, E2E tests, rate limiter, dream cycle, provenance, dashboard, bi-temporal, LLM refinement, contradiction detection
-
-**Session 2026-06-21**: 
-- LLM extraction (`llm_extraction.py`) → `27c8806`
-- NATS distributed memory bus (`nats_bus.py`) → `9acffba`
-- Cross-agent memory (parent inheritance + promotion) → `6c91cf1`
-- Dead code cleanup (removed `memory_bank.py`, `memory_manager.py`) → `a48be57`
-- Architecture assessment → `docs/assessment/2026-06-21-memory-system-honest-assessment.md`
-- SessionLite for worker memory → `0e9f965`
-- Worker handler integration (memory recall + auto-extraction for workers)
-
-### Test Results: 208 passing (zero regressions)
+**Last active git commit:** 2026-06-29 — Version mismatch detection + E2E tests
+**Branch:** `master`
+**Test baseline:** 680 pass / 11 pre-existing fail (as of memory system v2)
+**Python:** 3.13+ | **Package:** `nexusagent` (src layout)
 
 ---
 
-## Remaining Work (Post-Memory-v2)
+## Completed Work (since Memory System v2 on 2026-06-21)
 
-### High Priority
-1. **Consolidate memory systems** — Remove dead `Memory` bank code, update compat shim
-2. **SessionLite unification** — Workers should use SessionLite (or lightweight Session) instead of bypassing Session entirely
-3. **Config simplification** — Reduce config file sprawl
+### Phase: Security Hardening — Waves 0–5 (2026-06-22 → 2026-06-29)
 
-### Medium Priority
-4. **Write `docs/MEMORY_ARCHITECTURE.md`** — Document the 4-layer model, data flow, and config
-5. **Update AGENTS.md** — Remove references to dead Memory bank system
-6. **Performance benchmarking** — Measure recall latency, dream cycle time, NATS throughput
+| Wave | Focus | Key Outcomes |
+|------|-------|-------------|
+| **Wave 0** | Lint & dead code | Ruff cleanup, circular import fixes, API key URL removal, import ordering |
+| **Wave 1** | Critical security | 8 vulnerabilities fixed — TOCTOU approval race, workspace root, heartbeat cancellation |
+| **Wave 2** | Core infrastructure | Persistent SQLite connection pool, async search, dict access fixes |
+| **Wave 3** | TUI + medium bugs | Sliding window fix, `_busy` state, queue management, stale reference cleanup |
+| **Wave 4** | Modified GO complete | All medium-impact audit items verified complete |
+| **Wave 5** | Session refactoring | `Session.send()` complexity reduced from 28 to 5 |
 
-### Low Priority
-7. **Product extraction plan** — Document how to extract `nexus-memory` as standalone package
-8. **Memory Linking tests** — Add tests for the `related` field auto-linking feature
+### Feature Work
+
+| Feature | Commits | Date |
+|---------|---------|------|
+| Gemini native tool calling (Interactions API) | `f4bb7e3` | 2026-06-28 |
+| Version mismatch detection + NEXUS_STRICT_VERSION | `c723d44`, `b8871b5` | 2026-06-29 |
+
+### Testing
+
+| Suite | Commits | Date |
+|-------|---------|------|
+| Comprehensive TUI E2E test suite | `c31a327` | 2026-06-29 |
+| WebSocket E2E test suite + minimal connection test | `95be381` | 2026-06-29 |
+| Debug print cleanup, color restoration | `d1ba409` | 2026-06-29 |
+
+### Documentation
+
+| Doc | Commits | Date |
+|-----|---------|------|
+| Memory Architecture v2 documentation | `aa386ed` | 2026-06-28 |
+| Wave 4 execution report | `5b122f7` | 2026-06-28 |
+| HIGH mode audit summary | `251320a` | 2026-06-28 |
+| AGENTS.md — NEXUS_STRICT_VERSION | `c723d44` | 2026-06-29 |
 
 ---
 
-## Key Documents
-- `docs/MEMORY_SYSTEM_COMPREHENSIVE_ANALYSIS.md` — Original analysis (463 lines)
-- `docs/plans/2026-07-22-memory-system-v2.md` — Implementation plan
-- `docs/specs/SPEC-003` through `SPEC-006` — Detailed specs
-- `docs/adrs/0006` through `0008` — Architecture decision records
-- `docs/assessment/2026-06-21-memory-system-honest-assessment.md` — Honest architecture review
+## Documentation Health
+
+| Document | Last Updated | Status | Action Needed |
+|----------|-------------|--------|---------------|
+| AGENTS.md | 2026-07-22 | 🟢 Good | N/A (most current) |
+| SESSION_STATE.md | **2026-06-21** | 🔴 Stale | ✅ Updated this session |
+| STATE.md | **2026-06-20** | 🔴 Stale | ⚠️ Header claims 2026-07-22 but git disagrees |
+| CODEBASE_MAP.md | **2026-06-20** | 🔴 Stale | ⚠️ Same discrepancy |
+| SEMANTIC_INDEX.md | ~2026-06-20 | 🟡 Verify | May need refresh |
+| REFACTORING_PLAN.md | ~2026-06-20 | 🟡 Verify | May need refresh |
+| DOC_COMPLIANCE.md | ~2026-06-20 | 🟡 Verify | May need refresh |
+
+---
+
+## Known Issues
+
+1. **No .venv on server** — Cannot run tests without setting up venv
+2. **11 pre-existing test failures** — Baseline noted in AGENTS.md
+3. **Feature branch divergence** — rw_exfil has feature/phase-14.5 ahead of master
+4. **Documentation half-life** — STATE.md and CODEBASE_MAP.md headers claim dates that don't match git history
+
+---
+
+## Next Steps (Prioritized)
+
+1. 🔴 Resolve STATE.md / CODEBASE_MAP.md date discrepancies
+2. 🟡 Re-establish test baseline (setup .venv, run full suite)
+3. 🟡 Audit remaining stale docs (SEMANTIC_INDEX, REFACTORING_PLAN, DOC_COMPLIANCE)
+4. 🟢 Add OSS community health files (CONTRIBUTING, SECURITY, CODE_OF_CONDUCT)
+5. 🟢 Update pyproject.toml description from placeholder "Add your description here"

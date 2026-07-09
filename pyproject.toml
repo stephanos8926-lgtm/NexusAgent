@@ -1,7 +1,7 @@
 [project]
 name = "nexusagent"
 version = "0.1.0"
-description = "Add your description here"
+description = "Production-grade AI coding agent platform — terminal-native, privacy-first, with hybrid memory and multi-agent orchestration"
 requires-python = ">=3.13"
 dependencies = [
     "langgraph",
