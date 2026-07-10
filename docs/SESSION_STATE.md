@@ -1,10 +1,14 @@
-# SESSION_STATE.md — NexusAgent
+# SESSION STATE — NexusAgent
+# Last updated: 2026-07-09
+# Maintained by: Lucien (Dagoth)
+## Active Work Summary
 
-> Last updated: 2026-07-09
-> Maintained by: Lucien (Dagoth)
+**CRITICAL INCIDENT RESPONDED TO:**
+- 30,000+ LLM API calls in 4 hours exhausted monthly spend cap
+- Root cause: e2e tests ran against production with real API keys
+- No budget guards, circuit breaker didn't trip on quota errors
 
----
-
+<<<<<<< HEAD
 ## Current Status
 
 **Last active git commit:** 2026-06-29 — Version mismatch detection + E2E tests
@@ -83,3 +87,45 @@
 3. 🟡 Audit remaining stale docs (SEMANTIC_INDEX, REFACTORING_PLAN, DOC_COMPLIANCE)
 4. 🟢 Add OSS community health files (CONTRIBUTING, SECURITY, CODE_OF_CONDUCT)
 5. 🟢 Update pyproject.toml description from placeholder "Add your description here"
+=======
+**IMPLEMENTED FIXES (commit 4a5cde7):**
+1. LLMBudgetGuard — hard spend caps, daily/monthly, persisted state
+2. CircuitBreaker enhancement — quota_error_classes, immediate trip on RESOURCE_EXHAUSTED
+3. Worker integration — budget check before task acceptance
+4. NEXUS_TEST_MODE=1 — blocks real API calls in tests
+5. Cost estimation utility — token-to-USD conversion
+6. SOUL.md updated with incident mandates
+
+## Completed (this session)
+- ✅ Created `src/nexusagent/infrastructure/utils/budget.py` — LLMBudgetGuard
+- ✅ Created `src/nexusagent/infrastructure/utils/cost.py` — cost estimation
+- ✅ Enhanced `src/nexusagent/infrastructure/utils/circuit.py` — quota error handling
+- ✅ Updated `src/nexusagent/core/worker/worker.py` — budget check in handle_task()
+- ✅ Updated `src/nexusagent/core/worker/handler.py` — agent breaker with quota detection
+- ✅ Updated `src/nexusagent/core/agent.py` — NEXUS_TEST_MODE guard
+- ✅ Updated `~/.hermes/SOUL.md` — incident mandates + validation protocol
+- ✅ Committed as `4a5cde7`
+
+## Pending (next session)
+- [ ] Fix `test_e2e_production.py` — add mocks, use NEXUS_TEST_MODE
+- [ ] Add startup check in server.py lifespan — refuse start if quota exhausted
+- [ ] Add alerting webhook integration for budget thresholds
+- [ ] Test full worker pipeline with budget guard active
+
+## Key Files Modified
+```
+src/nexusagent/infrastructure/utils/budget.py       (new)
+src/nexusagent/infrastructure/utils/cost.py         (new)
+src/nexusagent/infrastructure/utils/circuit.py      (enhanced)
+src/nexusagent/core/worker/worker.py                (budget check)
+src/nexusagent/core/worker/handler.py               (quota breaker)
+src/nexusagent/core/agent.py                        (NEXUS_TEST_MODE)
+~/.hermes/SOUL.md                                   (incident mandates)
+```
+
+## Current Machine State
+- Server processes: KILLED (was PID 1910744, running since 04:49)
+- TUI: Still running (PID 1902551)
+- Gemini API: Monthly spend cap exceeded — check https://ai.studio/spend
+- Budget guard state: `~/.nexusagent/budget_state.json` (will be created on first run)
+>>>>>>> 55d33bc (feat(config): Overhaul configuration system with three-tier loading philosophy)

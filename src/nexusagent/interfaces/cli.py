@@ -116,7 +116,11 @@ def submit(task, skip_version_check):
     Example:
         nexus-client submit "Fix the auth bug in server.py"
     """
-    from nexusagent.infrastructure.config import settings
+    from nexusagent.infrastructure.config import (
+        settings,
+        create_user_config_from_template,
+        ensure_user_config_exists,
+    )
 
     # Handle --check-server
     # (check_server is accessed via the parent context in click)
@@ -609,6 +613,59 @@ def server(host, port, reload):
     if reload:
         click.echo("Auto-reload enabled (dev mode)")
     uvicorn.run(app, host=host, port=port, reload=reload)
+
+
+@main.command()
+def config_init():
+    """Create user config file from project template.
+    
+    Copies config/nexusagent.yaml to ~/.nexusagent/config/nexusagent.yaml
+    if it doesn't already exist. This is the first thing to run after
+    installing NexusAgent.
+    
+    Example:
+        nexus config init
+    """
+    from nexusagent.infrastructure.config import create_user_config_from_template
+    try:
+        config_path = create_user_config_from_template()
+        click.echo(f"User config created at: {config_path}")
+        click.echo("Edit this file to customize your NexusAgent settings.")
+    except FileNotFoundError as e:
+        click.echo(f"Error: {e}", err=True)
+        raise SystemExit(1)
+    except Exception as e:
+        click.echo(f"Error creating user config: {e}", err=True)
+        raise SystemExit(1)
+
+
+@main.command()
+@click.option("--force", is_flag=True, default=False, help="Overwrite existing user config")
+def config_reset(force):
+    """Reset user config to project template defaults.
+    
+    WARNING: This overwrites your existing ~/.nexusagent/config/nexusagent.yaml
+    Use --force to confirm.
+    
+    Example:
+        nexus config reset --force
+    """
+    from nexusagent.infrastructure.config import get_project_root
+    if not force:
+        click.echo("Error: Use --force to confirm overwrite", err=True)
+        raise SystemExit(1)
+    
+    user_config = Path.home() / ".nexusagent" / "config" / "nexusagent.yaml"
+    project_root = get_project_root()
+    project_config = project_root / "config" / "nexusagent.yaml"
+    
+    if not project_config.exists():
+        click.echo(f"Error: Project config not found at {project_config}", err=True)
+        raise SystemExit(1)
+    
+    import shutil
+    shutil.copy2(project_config, user_config)
+    click.echo(f"User config reset to template: {user_config}")
 
 
 if __name__ == "__main__":

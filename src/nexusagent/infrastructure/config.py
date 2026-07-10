@@ -103,7 +103,11 @@ class AuthConfig(BaseModel):
 
 
 class AgentConfig(BaseModel):
-    """Agent runtime configuration (model, provider, tools, compaction, images)."""
+    """Agent runtime configuration (model, provider, compaction, images).
+
+    Tool access is controlled via Agent role/policy (see nexusagent.tools.registry.policy),
+    not via config. Default agent uses role="full", policy="permissive" (all tools available).
+    """
 
     default_model: str = Field(default="gemini-2.5-flash")
     primary_provider: str = Field(
@@ -117,19 +121,6 @@ class AgentConfig(BaseModel):
     )
     openrouter_default_model: str = Field(default="google/gemini-2.5-flash-preview")
     openrouter_override_model: str | None = None
-    enabled_tools: list[str] = Field(
-        default_factory=lambda: [
-            "read_file",
-            "write_file",
-            "list_directory",
-            "search_files",
-            "grep_files",
-            "execute_python",
-            "execute_bash",
-            "terminal_command",
-        ],
-        description="Tools enabled by default for agent sessions (run_shell excluded - requires explicit opt-in)",
-    )
     max_tool_output_chars: int = Field(default=400, ge=100)
     max_conversation_history: int = Field(default=40, ge=4)
     compaction_enabled: bool = Field(default=True)
@@ -348,6 +339,8 @@ def get_nexus_home() -> Path:
     """Return the NexusAgent home directory (~/.nexusagent/), creating it if needed."""
     home = Path.home() / ".nexusagent"
     home.mkdir(parents=True, exist_ok=True)
+    # Ensure data subdirectory exists for database
+    (home / "data").mkdir(parents=True, exist_ok=True)
     return home
 
 
@@ -550,3 +543,45 @@ def reload_settings() -> ConfigSchema:
     global settings
     settings = load_config()
     return settings
+
+
+def create_user_config_from_template() -> Path:
+    """Create user config file (~/.nexusagent/config/nexusagent.yaml) from project template.
+
+    Copies config/nexusagent.yaml to ~/.nexusagent/config/nexusagent.yaml if it doesn't exist.
+    Returns the path to the created file.
+
+    This is called automatically on first run if user config doesn't exist,
+    or can be called explicitly via CLI/TUI command.
+    """
+    project_root = get_project_root()
+    project_config = project_root / "config" / "nexusagent.yaml"
+    user_config_dir = Path.home() / ".nexusagent" / "config"
+    user_config = user_config_dir / "nexusagent.yaml"
+
+    user_config_dir.mkdir(parents=True, exist_ok=True)
+
+    if user_config.exists():
+        logger.info(f"User config already exists at {user_config}")
+        return user_config
+
+    if not project_config.exists():
+        raise FileNotFoundError(f"Project config template not found at {project_config}")
+
+    # Copy template to user config location
+    import shutil
+    shutil.copy2(project_config, user_config)
+    logger.info(f"Created user config from template: {user_config}")
+
+    return user_config
+
+
+def ensure_user_config_exists() -> Path:
+    """Ensure user config exists, creating from template if needed.
+    
+    Returns the path to the user config file.
+    """
+    user_config = Path.home() / ".nexusagent" / "config" / "nexusagent.yaml"
+    if not user_config.exists():
+        return create_user_config_from_template()
+    return user_config

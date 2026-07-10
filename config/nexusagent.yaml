@@ -1,28 +1,96 @@
+# NexusAgent Project Configuration Template
+# =========================================
+# This is the DEPLOYMENT DEFAULTS file — committed to repo.
+# Used as TEMPLATE to generate user config on first run.
+# 
+# DO NOT EDIT for local preferences — use ~/.nexusagent/config/nexusagent.yaml instead
+# This file should only be updated when DEPLOYMENT DEFAULTS change for new users.
+#
+# Loading order (later overrides earlier):
+#   1. Pydantic model defaults (baseline minimums)
+#   2. config/nexusagent.yaml (THIS FILE - project defaults, committed)
+#   3. ~/.nexusagent/config/nexusagent.yaml (user overrides, NOT committed)
+#   4. NEXUS_* environment variables (highest priority, for secrets only)
+
+# ─── Server Runtime ──────────────────────────────────────────────────────
 server:
   nats_url: "nats://localhost:4222"
   db_path: "data/nexus.db"
   api_port: 8000
+  worker_threads: 4
+  nats_reconnect_wait: 2
+  nats_max_reconnects: 60
+  reload: false
+  # TLS settings (set via env: NEXUS_SERVER__TLS_CERTFILE, NEXUS_SERVER__TLS_KEYFILE)
+  # tls_certfile: "/path/to/cert.pem"
+  # tls_keyfile: "/path/to/key.pem"
+  tls_enabled: true
+  shell_tool_approval_required: true
 
+# ─── Client (TUI / CLI / Web-UI) ──────────────────────────────────────────
 client:
   tui_theme: "textual-dark"
   timeout: 30
   retry_limit: 3
+  result_timeout: 300
+  # API key for TUI WebSocket connection (set via env: NEXUS_CLIENT__API_KEY)
+  # api_key: ""
+  tui_responsive_enabled: true
 
+# ─── Agent Behavior ───────────────────────────────────────────────────────
 agent:
   default_model: "gemini-2.5-flash"
   primary_provider: "gemini"
+  gemini_model: "gemini-2.5-flash"
+  # gemini_api_key: null  # Set via GEMINI_API_KEY env var
+  openrouter_default_model: "google/gemini-2.5-flash-preview"
+  # openrouter_override_model: null
   max_tool_output_chars: 400
   max_conversation_history: 40
   compaction_enabled: true
-  # Memory extraction
+  yolo: false
+  # memory_workspace: null
   memory_model: ""
-  # Git-backed memory
   memory_git_enabled: true
   memory_git_auto_commit: true
-  # Two-tier compaction
   compaction_tier2_threshold: 0.75
   compaction_tier2_fresh_tail: 32
+  compaction_tier2_model: ""
+  dream_cycle_interval: 20
+  nats_memory_enabled: true
+  nats_memory_subject_prefix: "nexus.memory"
+  nats_memory_filter_own_events: true
+  llm_extraction_enabled: true
+  llm_extraction_model: "gemini-2.5-flash"
+  llm_extraction_min_confidence: 0.5
+  max_image_size_mb: 10
+  supported_image_types:
+    - ".png"
+    - ".jpg"
+    - ".jpeg"
+    - ".webp"
+    - ".gif"
+    - ".bmp"
+  llm_request_timeout: 90.0
+  llm_max_retries: 2
 
+# ─── LLM Budget Guard ─────────────────────────────────────────────────────
+# CRITICAL: Adjust these for your usage. Defaults are SAFETY FLOORS (~1M tokens/day).
+budget:
+  enabled: true
+  daily_budget_usd: 10.0
+  monthly_budget_usd: 100.0
+  alert_thresholds:
+    - 0.5
+    - 0.8
+    - 0.95
+  quota_cooldown_seconds: 3600
+
+# ─── Test Mode Safety ──────────────────────────────────────────────────────
+test_mode:
+  block_real_api: true
+
+# ─── Prompt System (NEXUS.md) ──────────────────────────────────────────────
 prompt:
   base_prompt_file: "NEXUS.md"
   load_cwd_prompt: true
@@ -32,18 +100,23 @@ prompt:
   session_history_count: 5
   session_summary_max_chars: 2000
 
+# ─── Logging ───────────────────────────────────────────────────────────────
 logging:
   level: "INFO"
+  format: "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 
-budget:
-  daily_budget_usd: 10.0
-  monthly_budget_usd: 100.0
-  alert_thresholds:
-    - 0.5
-    - 0.8
-    - 0.95
-  quota_cooldown_seconds: 3600
-  enabled: true
+# ─── Hooks System ──────────────────────────────────────────────────────────
+hooks:
+  hooks_enabled: true
+  hooks_dir: "~/.nexusagent/hooks"
 
-test_mode:
-  block_real_api: true
+# ─── Authentication ────────────────────────────────────────────────────────
+auth:
+  master_secret_path: "auth/.master.secret"
+  keystore_path: "auth/keystore.json"
+  salt_path: "auth/.master.salt"
+  kdf_iterations: 100000
+
+# ─── MCP Servers ───────────────────────────────────────────────────────────
+# List of MCP servers: [{'name': ..., 'url': ..., 'transport': ...}]
+# mcp_servers: []
