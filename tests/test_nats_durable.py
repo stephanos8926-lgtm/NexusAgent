@@ -32,7 +32,8 @@ def _make_mock_js() -> tuple[AgentBus, AsyncMock]:
     bus.nc = AsyncMock()
     bus.js = AsyncMock()
     bus.kv = None
-    bus._subscriptions = []
+    bus._subscriptions = set()
+    bus._subscriptions_lock = asyncio.Lock()
     return bus, bus.js
 
 
@@ -79,6 +80,8 @@ class TestSubscribeDurablePreconditions:
         bus = AgentBus.__new__(AgentBus)
         bus.nc = None
         bus.js = None
+        bus._subscriptions = set()
+        bus._subscriptions_lock = asyncio.Lock()
         with pytest.raises(RuntimeError, match="not connected"):
             await bus.subscribe_durable("nexus.task.>", AsyncMock())
 

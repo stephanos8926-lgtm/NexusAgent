@@ -366,7 +366,7 @@ class AgentBus:
         # Fire-and-forget: return immediately; loop runs as background task
         loop_task = asyncio.create_task(_consume_loop())
         # Keep a strong reference so the GC doesn't reap it
-        self._subscriptions.append(loop_task)  # type: ignore[arg-type]
+        self._subscriptions.add(loop_task)
 
     async def publish(self, subject: str, message: Any) -> None:
         """Publish a JSON-serialized message to a NATS subject.
