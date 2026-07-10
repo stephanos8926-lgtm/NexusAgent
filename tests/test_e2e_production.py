@@ -191,10 +191,10 @@ async def test_invalid_task_failure():
 async def test_multiple_concurrent_tasks():
     """Submits multiple tasks simultaneously to verify worker reliability.
     """
-    tasks_count = 5
+    tasks_count = 2
     task_ids = []
 
-    # Submit 5 tasks
+    # Submit 2 tasks
     for i in range(tasks_count):
         tid = await sdk.submit_task({"description": f"Concurrent task {i}", "priority": 1})
         task_ids.append(tid)

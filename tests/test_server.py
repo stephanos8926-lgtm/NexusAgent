@@ -6,9 +6,32 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 
 from nexusagent.server.server import app
+from nexusagent.infrastructure.db import get_db_manager
 
 # Use a unique test key per test to avoid auth state leakage
 _TEST_API_KEY = "test-server-key-2026"
+
+
+@pytest.fixture(autouse=True)
+async def _setup_test_db():
+    """Initialize test database before each test."""
+    import tempfile
+    from pathlib import Path
+
+    # Use a temporary database for tests
+    test_db = tempfile.mktemp(suffix=".db")
+    db_manager = get_db_manager()
+    db_manager.reinit(test_db)
+    await db_manager.init_db()
+    
+    yield
+    
+    # Cleanup
+    import os
+    for suffix in ["", "-shm", "-wal"]:
+        p = test_db + suffix
+        if os.path.exists(p):
+            os.remove(p)
 
 
 @pytest.fixture(autouse=True)

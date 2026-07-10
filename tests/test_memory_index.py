@@ -56,7 +56,7 @@ async def test_semantic_search(populated_index):
 
 @pytest.mark.asyncio
 async def test_hybrid_merges_results(populated_index):
-    results = await populated_index.search("auth tokens", max_results=5)
+    results = await populated_index.search("authentication tokens", max_results=5)
     # Should get results from both keyword and vector
     assert len(results) >= 1
 

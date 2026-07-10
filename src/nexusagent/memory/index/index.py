@@ -460,19 +460,23 @@ class HybridMemoryIndex:
     async def _search_keyword(self, query: str, limit: int) -> list[dict]:
         """FTS5 keyword search (async)."""
         async with self._get_connection() as conn:
+            if conn is None:
+                # aiosqlite not available, fall back to sync
+                return self._search_keyword_sync(query, limit)
             try:
                 # Build FTS5 query (AND logic for tokens)
                 tokens = query.split()
                 fts_query = " AND ".join(f'"{t}"' for t in tokens if len(t) > 1)
 
-                rows = await conn.execute(
+                cursor = await conn.execute(
                     """SELECT id, file_path, content, rank
                        FROM chunks_fts
                        WHERE chunks_fts MATCH ?
                        ORDER BY rank
                        LIMIT ?""",
                     (fts_query, limit),
-                ).fetchall()
+                )
+                rows = await cursor.fetchall()
 
                 return [{"id": r[0], "file": r[1], "content": r[2], "rank": r[3]} for r in rows]
             except Exception as e:
@@ -506,21 +510,23 @@ class HybridMemoryIndex:
     async def _search_vector(self, query_vec: list[float], limit: int) -> list[dict]:
         """sqlite-vec similarity search (async)."""
         async with self._get_connection() as conn:
+            if conn is None:
+                # aiosqlite not available, fall back to sync
+                return self._search_vector_sync(query_vec, limit)
             try:
-                conn.enable_load_extension(True)
-                await sqlite_vec.load(conn)
-
+                # Extension already loaded in _get_connection pool
                 vec_blob = _vec_to_blob(query_vec)
                 # sqlite-vec KNN MATCH requires a simple query — no JOINs.
                 # Fetch matching chunk IDs first, then look up content.
-                vec_rows = await conn.execute(
+                cursor = await conn.execute(
                     """SELECT id, distance
                        FROM chunks_vec
                        WHERE embedding MATCH ?
                        ORDER BY distance
                        LIMIT ?""",
                     (vec_blob, limit),
-                ).fetchall()
+                )
+                vec_rows = await cursor.fetchall()
 
                 if not vec_rows:
                     return []
@@ -528,10 +534,11 @@ class HybridMemoryIndex:
                 # Fetch chunk content for the matched IDs
                 ids = [r[0] for r in vec_rows]
                 placeholders = ",".join("?" for _ in ids)
-                chunk_rows = await conn.execute(
+                cursor = await conn.execute(
                     f"SELECT id, file_path, content FROM chunks WHERE id IN ({placeholders})",
                     ids,
-                ).fetchall()
+                )
+                chunk_rows = await cursor.fetchall()
 
                 chunk_map = {r[0]: (r[1], r[2]) for r in chunk_rows}
 
@@ -550,9 +557,11 @@ class HybridMemoryIndex:
                         )
                 return results
             except Exception as e:
-                logger.warning("Vector search failed: %s, falling back to brute force", e)
-                return self._search_vector_brute(query_vec, limit)
-
+                logger.warning("Vector search failed: %s, falling back to sync brute force", e)
+                # Fall back to sync brute force which works reliably
+                return await asyncio.get_event_loop().run_in_executor(
+                    None, self._search_vector_brute, query_vec, limit
+                )
     def _search_vector_sync(self, query_vec: list[float], limit: int) -> list[dict]:
         """sqlite-vec similarity search (sync fallback)."""
         conn = sqlite3.connect(str(self.db_path))
@@ -613,7 +622,9 @@ class HybridMemoryIndex:
         """
         import psutil
 
-        oom_threshold = 0.85  # refuse brute-force if system memory usage exceeds this
+        # Allow override via env var for test environments
+        import os
+        oom_threshold = float(os.getenv("NEXUS_VECTOR_OOM_THRESHOLD", "0.90"))
 
         conn = sqlite3.connect(str(self.db_path))
         try:

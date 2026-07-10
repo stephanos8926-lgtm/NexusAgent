@@ -288,7 +288,7 @@ async def test_duplicate_inherit_from(tmp_parent_dir, tmp_child_dir):
             content="Memory from parent workspace TWO",
             type="world",
         )
-        asyncio.run(parent2_mgr.close())
+        await parent2_mgr.close()
 
         # Create child and inherit from parent1 (already has memory from fixture)
         child_mgr = HybridMemoryManager(tmp_child_dir)
