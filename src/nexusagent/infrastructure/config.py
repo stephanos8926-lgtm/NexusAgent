@@ -277,6 +277,19 @@ class HooksConfig(BaseModel):
     hooks_dir: str = Field(default="~/.nexusagent/hooks")
 
 
+class TrustConfig(BaseModel):
+    """Configuration for the trust subsystem (anomaly scoring, trust levels)."""
+    enabled: bool = True
+    anomaly_threshold: float = 0.60
+    min_score: float = 0.0
+    single_signal_boost_threshold: float = 0.70
+    single_signal_boost_multiplier: float = 1.5
+    pattern_weight: float = 0.40
+    entropy_weight: float = 0.25
+    length_weight: float = 0.20
+    density_weight: float = 0.15
+
+
 class BudgetConfig(BaseModel):
     """Budget guard configuration for LLM spend tracking."""
 
@@ -326,6 +339,8 @@ class ConfigSchema(BaseModel):
     budget: BudgetConfig = Field(default_factory=BudgetConfig)
     hooks: HooksConfig = Field(default_factory=HooksConfig)
     test_mode: TestModeConfig = Field(default_factory=TestModeConfig)
+    # Trust subsystem configuration
+    trust: TrustConfig = Field(default_factory=TrustConfig)
     # MCP server configuration
     mcp_servers: list[dict[str, str]] = Field(
         default_factory=list,
