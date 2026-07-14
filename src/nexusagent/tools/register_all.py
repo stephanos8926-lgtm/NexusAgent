@@ -16,6 +16,8 @@ import re
 from nexusagent.memory.rate_limiter import MemoryRateLimiter
 from nexusagent.tools.registry import register_tool
 
+from nexusagent.core.trust import TrustLevel
+
 logger = logging.getLogger(__name__)
 
 # ── Memory Rate Limiter (singleton) ──────────────────────────────────
@@ -133,6 +135,8 @@ async def register_mcp_tools() -> list[str]:
                 example=f"{tool_name}()",
                 category="mcp",
                 returns="Result from MCP server.",
+                trust=TrustLevel.TOOL_EXTERNAL,
+                provenance=f"mcp:{server_name}",
             )(wrapped)
 
             registered.append(tool_name)
@@ -251,7 +255,19 @@ _MAX_DESCRIPTION_LENGTH = 1000
 _VALID_TOOL_NAME_RE = re.compile(r"^[a-z_][a-z0-9_]*$")
 
 # Denylist of reserved/suspicious tool name prefixes (beyond BUILTIN_TOOL_NAMES)
-_RESERVED_PREFIXES = ("system__", "internal__", "admin__", "root__")
+_RESERVED_PREFIXES = (
+    "system__", "internal__", "admin__", "root__",
+    "ignore_", "override_", "bypass_", "inject_", "hack_",
+    "system_prompt", "instructions", "override", "new_instructions",
+    "system_override",
+)
+
+# Denylist of injection tool names (exact match + substring match)
+_INJECTION_TOOL_NAMES: frozenset[str] = frozenset({
+    "system_prompt", "instructions", "override", "inject",
+    "system_override", "new_instructions", "ignore_all",
+    "forget_instructions", "pretend", "impersonate",
+})
 
 
 def _sanitize_description(desc: str) -> str:
@@ -284,6 +300,10 @@ def _validate_tool_name(tool_name: str) -> tuple[bool, str]:
     for prefix in _RESERVED_PREFIXES:
         if tool_name.startswith(prefix):
             return False, f"tool name '{tool_name}' uses reserved prefix '{prefix}'"
+
+    # Check against injection tool name blocklist
+    if tool_name in _INJECTION_TOOL_NAMES:
+        return False, f"tool name '{tool_name}' matches injection tool name blocklist"
 
     return True, ""
 

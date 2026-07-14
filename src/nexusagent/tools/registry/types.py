@@ -5,6 +5,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from nexusagent.core.trust import TrustLevel
+
 
 @dataclass(frozen=True)
 class ToolInfo:
@@ -18,6 +20,8 @@ class ToolInfo:
     category: str
     returns: str = ""
     requires: str = ""  # Optional: tools this tool depends on
+    trust: TrustLevel = TrustLevel.TOOL_INTERNAL  # Provenance trust level
+    provenance: str = ""  # Origin description (e.g. "mcp:weather-server")
 
     def to_prompt_format(self) -> str:
         """Format the tool metadata as a full prompt-ready string.

@@ -22,6 +22,8 @@ from typing import Any
 
 from .types import ToolInfo
 
+from nexusagent.core.trust import TrustLevel
+
 
 # ─── ToolRegistry ────────────────────────────────────────────────────────
 
@@ -142,6 +144,8 @@ def register_tool(
     category: str = "general",
     returns: str = "",
     requires: str = "",
+    trust: TrustLevel = TrustLevel.TOOL_INTERNAL,
+    provenance: str = "",
 ) -> Callable:
     """Decorator to register a tool in the global registry.
 
@@ -178,6 +182,8 @@ def register_tool(
                     category=category,
                     returns=returns,
                     requires=requires,
+                    trust=trust,
+                    provenance=provenance,
                 ),
             )
         else:
@@ -200,6 +206,8 @@ def register_tool(
                     category=category,
                     returns=returns,
                     requires=requires,
+                    trust=trust,
+                    provenance=provenance,
                 ),
             )
         return func
