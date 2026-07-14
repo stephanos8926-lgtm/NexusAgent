@@ -35,6 +35,8 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     """FastAPI Lifespan: Handles startup and shutdown."""
     logger.info("NexusAgent Server v%s starting on port %d...", VERSION, settings.server.api_port)
+    worker_task = None
+    _bus = None
     try:
         # 1. Initialize DB
         from nexusagent.infrastructure.db import get_db_manager
@@ -56,14 +58,16 @@ async def lifespan(app: FastAPI):
 
         yield
 
-        # Shutdown
-        logger.info("Shutting down NexusAgent Backend...")
-        worker_task.cancel()
-        await _bus.close()
-
     except Exception as e:
         logger.error("Critical error during startup: %s", e, exc_info=True)
         raise
+    finally:
+        # Guaranteed shutdown — runs even if an exception occurs during app runtime
+        logger.info("Shutting down NexusAgent Backend...")
+        if worker_task is not None:
+            worker_task.cancel()
+        if _bus is not None:
+            await _bus.close()
 
 
 def create_app() -> FastAPI:
@@ -92,17 +96,20 @@ app = create_app()
 def _acquire_singleton_lock() -> int | None:
     """Acquire a file-based singleton lock. Returns the file descriptor or None if another instance is running."""
     os.makedirs(os.path.dirname(_PID_FILE), exist_ok=True)
+    fd = None
     try:
         fd = os.open(_PID_FILE, os.O_CREAT | os.O_RDWR)
         fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
     except OSError:
         # Another instance holds the lock
-        try:
-            os.lseek(fd, 0, os.SEEK_SET)
-            existing_pid = os.read(fd, 32).decode().strip()
-        except Exception:
-            existing_pid = "unknown"
-        os.close(fd)
+        existing_pid = "unknown"
+        if fd is not None:
+            try:
+                os.lseek(fd, 0, os.SEEK_SET)
+                existing_pid = os.read(fd, 32).decode().strip()
+            except Exception:
+                pass
+            os.close(fd)
         print(f"❌ NexusAgent server already running (PID {existing_pid}). Refusing to start.")
         print(f"   If this is stale, remove: {_PID_FILE}")
         return None

@@ -19,6 +19,16 @@ def _setup_test_auth():
     import shutil
 
     from nexusagent.infrastructure.auth import AuthManager, set_auth_manager
+    from nexusagent.infrastructure.db import DatabaseManager, set_db_manager
+
+    _test_dir = tempfile.mkdtemp()
+    _db_path = _Path(_test_dir) / "test.db"
+
+    # Initialize a temporary database for the tests
+    _db_manager = DatabaseManager(db_url=f"sqlite+aiosqlite:///{_db_path}")
+    set_db_manager(_db_manager)
+    # Use asyncio.run to call the async init_db within the sync fixture
+    asyncio.run(_db_manager.init_db())
 
     _test_dir = tempfile.mkdtemp()
     _master = _Path(_test_dir) / ".master.secret"
@@ -40,6 +50,7 @@ def _setup_test_auth():
 
     # Cleanup
     shutil.rmtree(_test_dir, ignore_errors=True)
+    _db_path.unlink(missing_ok=True)
 
 API_HEADERS = {"X-API-Key": _TEST_API_KEY}
 WS_HEADERS = {"Authorization": f"Bearer {_TEST_API_KEY}"}
