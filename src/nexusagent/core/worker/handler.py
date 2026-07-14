@@ -84,7 +84,7 @@ async def _run_agent_task(task: TaskSchema) -> str:
                 except Exception as exc:
                     logger.debug("SessionBase setup failed (non-fatal): %s", exc)
 
-            result = await loop.run_in_executor(None, run_agent_task, state)
+            result = await run_agent_task(state)
 
             # Post-turn: run auto-extraction if SessionBase was set up
             session_base = state.get("_session_base")
