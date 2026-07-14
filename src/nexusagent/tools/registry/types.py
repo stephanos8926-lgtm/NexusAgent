@@ -6,7 +6,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 
-@dataclass
+@dataclass(frozen=True)
 class ToolInfo:
     """Metadata for a registered tool."""
 
