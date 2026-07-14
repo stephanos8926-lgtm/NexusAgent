@@ -1,12 +1,12 @@
-"""Compat shim — imports from memory/index/ subpackage.
+"""Compat shim  imports from memory/index/ subpackage.
 
 All existing ``from nexusagent.memory.memory_index import ...`` usage
 continues to work. New code should import from ``nexusagent.memory.index``
 (the subpackage) directly.
 """
 
-from nexusagent.memory.index import *  # noqa: F403
 from nexusagent.memory.index import (
+    _DB_POOL,
     CANDIDATE_MULTIPLIER,
     CHUNK_OVERLAP,
     CHUNK_SIZE,
@@ -26,7 +26,7 @@ __all__ = [
     "EMBED_DIM",
     "KEYWORD_WEIGHT",
     "VECTOR_WEIGHT",
-    "_DB_POOL",  # noqa: F405 — defined in memory.index subpackage
+    "_DB_POOL",  # defined in memory.index subpackage
     "EmbeddingProvider",
     "HybridMemoryIndex",
     "_blob_to_vec",

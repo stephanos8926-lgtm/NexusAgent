@@ -1,11 +1,10 @@
-"""Compat shim — imports from messages/ subpackage.
+"""Compat shim  imports from messages/ subpackage.
 
 All existing ``from nexusagent.widgets.messages import ...`` usage continues
 to work. New code should import from ``nexusagent.widgets.messages`` (the
 subpackage) directly.
 """
 
-from nexusagent.widgets.messages import *  # noqa: F403
 from nexusagent.widgets.messages import (
     AppMessage,
     AssistantMessage,

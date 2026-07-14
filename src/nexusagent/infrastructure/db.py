@@ -1,11 +1,10 @@
-"""Compat shim — imports from db/ subpackage.
+"""Compat shim  imports from db/ subpackage.
 
 All existing ``from nexusagent.infrastructure.db import ...`` usage continues
 to work. New code should import from ``nexusagent.infrastructure.db`` (the
 subpackage) directly.
 """
 
-from nexusagent.infrastructure.db import *  # noqa: F403
 from nexusagent.infrastructure.db import (
     Base,
     DatabaseManager,
@@ -16,7 +15,13 @@ from nexusagent.infrastructure.db import (
     TaskModel,
     TaskRepository,
     db_manager,
+    get_db_manager,
+    get_session_repo,
+    get_task_repo,
     session_repo,
+    set_db_manager,
+    set_session_repo,
+    set_task_repo,
     task_repo,
 )
 
@@ -30,6 +35,12 @@ __all__ = [
     "TaskModel",
     "TaskRepository",
     "db_manager",
+    "get_db_manager",
+    "get_session_repo",
+    "get_task_repo",
     "session_repo",
+    "set_db_manager",
+    "set_session_repo",
+    "set_task_repo",
     "task_repo",
 ]
