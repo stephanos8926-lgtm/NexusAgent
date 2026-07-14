@@ -2,6 +2,7 @@
 """REST API routes for the NexusAgent platform."""
 
 import logging
+import time
 
 from fastapi import Depends, FastAPI, HTTPException
 from pydantic import BaseModel, Field
@@ -16,6 +17,9 @@ from nexusagent.tools.registry import list_all_tools
 from nexusagent.version import MIN_CLIENT_VERSION, VERSION
 
 logger = logging.getLogger(__name__)
+
+# Module-level start time for uptime calculation (independent of server.py to avoid circular imports)
+_VERSION_START_TIME = time.monotonic()
 
 
 class SubmitTaskRequest(BaseModel):
@@ -38,8 +42,11 @@ def register_routes(app: FastAPI) -> None:
         if request.url.path in ("/health", "/version") or request.url.path.startswith("/sessions/"):
             return await call_next(request)
 
-        # Identify client by API key header or fallback to IP
-        client_id = request.headers.get("x-api-key") or request.client.host
+        # Identify client by API key header or fallback to client IP
+        # Use X-Forwarded-For when behind a reverse proxy (nginx, Cloudflare, k8s ingress)
+        xff = request.headers.get("x-forwarded-for", "")
+        client_ip = xff.split(",")[0].strip() if xff else request.client.host
+        client_id = request.headers.get("x-api-key") or client_ip
 
         allowed, headers = await check_rate_limit(client_id)
         if not allowed:
@@ -154,8 +161,6 @@ def register_routes(app: FastAPI) -> None:
 
     # ─── Version ────────────────────────────────────────────────────────
 
-    server_start_time = None  # noqa: F841 — set at module level, read by health check
-
     @app.get("/version")
     def version_endpoint():
         """Return server version and minimum supported client version."""
@@ -164,7 +169,7 @@ def register_routes(app: FastAPI) -> None:
             "version": VERSION,
             "minClient": MIN_CLIENT_VERSION,
             "server": "nexus-server",
-            "uptime": 0,
+            "uptime": round(time.monotonic() - _VERSION_START_TIME, 2),
             "nats": "connected" if _bus.nc else "disconnected",
         }
 
