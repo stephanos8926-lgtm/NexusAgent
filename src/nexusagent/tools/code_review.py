@@ -1,7 +1,16 @@
-"""Code review tool — compat shim.
+"""Code review tool  compat shim.
 
 This file re-exports from the code_review/ subpackage for backward compatibility.
 New code should import directly from nexusagent.tools.code_review.
 """
 
-from nexusagent.tools.code_review import *  # noqa: F403
+from nexusagent.tools.code_review import (  # noqa: F401
+    SEVERITY_CRITICAL,
+    SEVERITY_HIGH,
+    SEVERITY_INFO,
+    SEVERITY_LOW,
+    SEVERITY_MEDIUM,
+    Issue,
+    ReviewResult,
+    review_code,
+)

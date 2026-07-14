@@ -1,11 +1,11 @@
-"""Compat shim — imports from registry/ subpackage.
+"""Compat shim  imports from registry/ subpackage.
 
 All existing ``from nexusagent.tools.registry import ...`` usage continues
 to work. New code should import from the subpackage directly.
 """
 
-from nexusagent.tools.registry import *  # noqa: F403
 from nexusagent.tools.registry import (
+    _REGISTRY,
     ROLE_MANIFESTS,
     ToolInfo,
     auto_correct,
@@ -23,6 +23,7 @@ from nexusagent.tools.registry import (
 
 __all__ = [
     "ROLE_MANIFESTS",
+    "_REGISTRY",
     "ToolInfo",
     "auto_correct",
     "check_tool_access",
