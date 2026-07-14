@@ -32,10 +32,15 @@ async def session_websocket(
 ):
     """Real-time interactive session via WebSocket.
 
-    Requires API key via X-API-Key header.
-    For browser clients, first call POST /auth/token to exchange an API key
-    for a short-lived connection token, then pass that token via the
-    ?token= query parameter.
+    Accepts API key via:
+      - X-API-Key header (primary)
+      - Authorization: Bearer <key> header (TUI clients)
+
+    For browser clients (which cannot set custom WebSocket headers),
+    call POST /auth/token first to obtain a short-lived token, then
+    pass it via the ?token= query parameter. Note: query-param tokens
+    are less secure — they may appear in server logs, proxy logs, and
+    Referer headers.
     """
     logger.info(f"session_websocket CALLED: session_id={session_id}")
     # Verify API key — accept X-API-Key header or Authorization: Bearer ***
@@ -44,10 +49,10 @@ async def session_websocket(
     auth_header = websocket.headers.get("authorization", "")
     if auth_header.lower().startswith("bearer "):
         header_key = header_key or auth_header[7:]
-    # DEPRECATED: Query-param token support is removed.
-    # Only Bearer token in Authorization header is accepted.
-    # This prevents API keys from appearing in server logs, browser history,
-    # proxy/CDN logs, and Referer headers.
+    # Query-param token fallback for browser clients (less secure but necessary)
+    token_param = websocket.query_params.get("token")
+    if token_param and not header_key:
+        header_key = token_param
     if not header_key:
         await websocket.close(code=4001, reason="Missing API key — use Authorization: Bearer <key>")
         return
@@ -113,18 +118,23 @@ async def session_websocket(
         async def receive_messages():
             while True:
                 try:
-                    msg = await websocket.receive_json()
+                    raw_text = await websocket.receive_text()
                 except Exception:
                     break
-                # Validate message size (prevent DoS via large payloads)
-                msg_size = len(str(msg))
-                if msg_size > _WS_MAX_MESSAGE_SIZE:
+                # Validate message size BEFORE parsing JSON (prevents OOM from crafted payloads)
+                if len(raw_text) > _WS_MAX_MESSAGE_SIZE:
                     await websocket.send_json(
                         {
                             "type": "error",
-                            "error": f"Message too large ({msg_size} bytes, max {_WS_MAX_MESSAGE_SIZE})",
+                            "error": f"Message too large ({len(raw_text)} bytes, max {_WS_MAX_MESSAGE_SIZE})",
                         }
                     )
+                    continue
+                try:
+                    import json
+
+                    msg = json.loads(raw_text)
+                except Exception:
                     continue
                 # Validate message has required fields
                 msg_type = msg.get("type")
