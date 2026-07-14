@@ -44,6 +44,11 @@ def register_all() -> None:
         count += 1
     logger.debug("Registered %d static tools from tool_specs", count)
 
+    # Publish snapshot so agents see a consistent tool set
+    from nexusagent.tools.registry import registry
+
+    registry.freeze()
+
 
 # ═══════════════════════════════════════════════════════════════════════
 # MCP Plugin Loader (dynamic tools from configured MCP servers)
@@ -132,6 +137,12 @@ async def register_mcp_tools() -> list[str]:
 
             registered.append(tool_name)
             logger.info("Registered MCP tool: %s (from %s)", tool_name, server_name)
+
+    # Publish new snapshot for agents and prune old ones
+    from nexusagent.tools.registry import registry
+
+    registry.freeze()
+    registry.prune(max(0, registry.version - 2))  # keep last 2 snapshots
 
     return registered
 
