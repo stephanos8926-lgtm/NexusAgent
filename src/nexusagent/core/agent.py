@@ -120,56 +120,23 @@ async def _ensure_mcp_tools_loaded():
         _role_tools_version += 1
 
 
-# ─── Build Tool Lists per Role ────────────────────────────────────────
-
-# Version counter — incremented when MCP tools are loaded
-_role_tools_version: int = 0
-_built_version: int = -1  # version at which _ROLE_TOOLS was last built
-
-
-def _refresh_role_tools_if_needed() -> None:
-    """Rebuild _ROLE_TOOLS if MCP tools have been loaded since last build."""
-    from nexusagent.tools.registry import ROLE_MANIFESTS
-
-    global _built_version
-    if _built_version != _role_tools_version:
-        _ROLE_TOOLS.clear()
-        for _role in ROLE_MANIFESTS:
-            _ROLE_TOOLS[_role] = _build_role_tools(_role)
-        _ROLE_TOOLS["full"] = _build_role_tools("full")
-        _built_version = _role_tools_version
+# ─── Build Tool List helpers ──────────────────────────────────────
 
 
 def _build_role_tools(role: str) -> list:
-    """Build the list of tool functions for a given role."""
-    # Ensure tools are registered before building role tool lists
-    _ensure_tools_registered()
-
-    from nexusagent.tools.registry import _REGISTRY, get_manifest
+    """Build the list of tool functions for a given role from registry."""
+    from nexusagent.tools.registry import registry, get_manifest
 
     if role == "full":
-        return [info.func for info in _REGISTRY.values()]
+        return [info.func for info in registry.current.values()]
 
     manifest = get_manifest(role)
     tools = []
     for name in sorted(manifest):
-        if name in _REGISTRY:
-            tools.append(_REGISTRY[name].func)
+        info = registry.current.get(name)
+        if info is not None:
+            tools.append(info.func)
     return tools
-
-
-# Role tool lists - initialized lazily
-_ROLE_TOOLS: dict[str, list] = {}
-
-
-def _init_role_tools() -> None:
-    """Initialize role tool lists, triggering lazy tool registration."""
-    from nexusagent.tools.registry import ROLE_MANIFESTS
-
-    _ensure_tools_registered()
-    for _role in ROLE_MANIFESTS:
-        _ROLE_TOOLS[_role] = _build_role_tools(_role)
-    _ROLE_TOOLS["full"] = _build_role_tools("full")
 
 
 # ─── Agent ───────────────────────────────────────────────────
@@ -237,7 +204,7 @@ class Agent:
 
         return model_name
 
-    def __init__(
+    async def __init__(
         self,
         role: str = "full",
         policy: str = "permissive",
@@ -246,7 +213,7 @@ class Agent:
         *args: Any,
         **kwargs: Any,
     ) -> None:
-        """Initialize the agent.
+        """Initialize the agent (async — awaits MCP tool loading).
 
         Args:
             role: Tool access role. One of: minimal, reader, writer, coder,
@@ -260,31 +227,36 @@ class Agent:
         from nexusagent.infrastructure.config import settings
         from nexusagent.tools.registry import set_policy_context
 
-        # Ensure tools are registered and role tools are initialized
+        # Ensure static tools are registered (thread-safe)
         _ensure_tools_registered()
-        if not _ROLE_TOOLS:
-            _init_role_tools()
 
         model_name = self._resolve_model(model_override, provider_override)
 
         # Set policy context for this agent (thread-local)
         set_policy_context(role, policy)
-        # Ensure MCP + memory index tools are loaded before building tool list
-        import asyncio
 
-        try:
-            loop = asyncio.get_running_loop()
-            # Schedule MCP loading; agent creation is sync so we fire-and-forget
-            _ = loop.create_task(_ensure_mcp_tools_loaded())  # noqa: RUF006
-        except RuntimeError:
-            # No event loop — skip async MCP loading (tools already in registry)
-            pass
+        # Await MCP tool loading before capturing snapshot
+        await _ensure_mcp_tools_loaded()
 
-        # Refresh role tool lists if MCP tools were loaded since module import
-        _refresh_role_tools_if_needed()
+        # Capture per-agent snapshot of current registry
+        from nexusagent.tools.registry import registry
 
-        # Get tools for this role
-        tools = _ROLE_TOOLS.get(role, _ROLE_TOOLS["full"])
+        self._snapshot = registry.current
+        self._snapshot_version = registry.version
+        self._role = role
+
+        # Build tools for this role from the frozen snapshot
+        if role == "full":
+            self._tools = [info.func for info in self._snapshot.values()]
+        else:
+            from nexusagent.tools.registry import get_manifest
+
+            manifest = get_manifest(role)
+            self._tools = []
+            for name in sorted(manifest):
+                info = self._snapshot.get(name)
+                if info is not None:
+                    self._tools.append(info.func)
 
         # Build the chat model explicitly with a request timeout + retry
         # policy, rather than handing create_deep_agent a bare model string.
@@ -327,7 +299,7 @@ class Agent:
 
         self._inner = create_deep_agent(
             model=model,
-            tools=tools,
+            tools=self._tools,
         )
         self._role = role
         self._policy = policy
@@ -352,7 +324,7 @@ class Agent:
             yield chunk
 
 
-def run_agent_task(state: dict) -> dict:
+async def run_agent_task(state: dict) -> dict:
     """Process a task through the agent.
 
     Reads role, policy, and optional model/provider overrides from state.
@@ -370,7 +342,7 @@ def run_agent_task(state: dict) -> dict:
     _setup_workspace_context(working_dir)
 
     try:
-        agent = Agent(
+        agent = await Agent(
             role=role,
             policy=policy,
             model_override=model_override,
