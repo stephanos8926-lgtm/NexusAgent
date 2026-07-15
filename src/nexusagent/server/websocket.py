@@ -184,6 +184,19 @@ async def session_websocket(
                                 "error": str(e),
                             }
                         )
+                elif msg_type == "change_model":
+                    model = msg.get("model", "")
+                    provider = msg.get("provider", "")
+                    if model:
+                        from nexusagent.infrastructure.config import settings as _settings
+                        _settings.agent.default_model = model
+                        if provider:
+                            _settings.agent.primary_provider = provider
+                        await websocket.send_json({
+                            "type": "model_changed",
+                            "model": model,
+                            "provider": provider,
+                        })
                 elif msg_type == "compact":
                     # Trigger context compaction for this session
                     try:

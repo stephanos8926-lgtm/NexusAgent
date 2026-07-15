@@ -254,7 +254,7 @@ async def _handle_tool_result_event(app, event: dict) -> None:
                 app._failure_repeat_count += 1
                 app._current_tool._collapsed = True
                 app._current_tool.update_output(
-                    f"(same error ×{app._failure_repeat_count})"
+                    f"(same error ×{app._failure_repeat_count})"  # noqa: RUF001
                 )
                 app._current_tool.refresh()
             else:
@@ -398,7 +398,7 @@ async def handle_slash_command(app, cmd: str) -> bool:
     if command == "/theme":
         cycle_theme(app)
         return True
-    if command == "/auto":
+    if command in ("/auto", "/yolo"):
         app.action_toggle_auto_approve()
         return True
     if command == "/compact":

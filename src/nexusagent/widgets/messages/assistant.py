@@ -38,6 +38,9 @@ class AssistantMessage(Vertical):
         background: transparent;
         padding: 0;
         margin: 0;
+        overflow-x: hidden;
+        overflow-y: hidden;
+        height: auto;
     }
     """
 

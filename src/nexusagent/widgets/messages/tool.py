@@ -23,6 +23,30 @@ _COLLAPSE_LINE_THRESHOLD = 4
 _COLLAPSE_CHAR_THRESHOLD = 300
 
 
+def _detect_lang_from_path(path: str) -> str | None:
+    import os
+    _, ext = os.path.splitext(path.lower())
+    mapping = {
+        ".py": "python",
+        ".js": "javascript",
+        ".ts": "typescript",
+        ".tsx": "typescript",
+        ".jsx": "javascript",
+        ".json": "json",
+        ".yaml": "yaml",
+        ".yml": "yaml",
+        ".md": "markdown",
+        ".html": "html",
+        ".css": "css",
+        ".sh": "bash",
+        ".bash": "bash",
+        ".toml": "toml",
+        ".xml": "xml",
+        ".sql": "sql",
+    }
+    return mapping.get(ext)
+
+
 class ToolCallMessage(Static):
     """Widget displaying a tool call with output.
 
@@ -220,8 +244,14 @@ class ToolCallMessage(Static):
         """
         stripped = output.strip()
 
-        # JSON output: pretty-print and syntax-highlight rather than dumping
-        # the raw (often single-line, escaped) string.
+        # 1. Diff detection (git_diff, apply_patch, git_show, or unified diff pattern)
+        if (self._tool in ("git_diff", "git_show", "apply_patch") or
+                stripped.startswith("diff --git") or
+                ("--- " in stripped and "+++ " in stripped) or
+                "@@ -" in stripped):
+            return Syntax(output, "diff", theme="ansi_dark", word_wrap=True, background_color="default")
+
+        # 2. JSON output: pretty-print and syntax-highlight
         if stripped.startswith(("{", "[")):
             try:
                 parsed = json.loads(stripped)
@@ -231,7 +261,7 @@ class ToolCallMessage(Static):
                 pretty = json.dumps(parsed, indent=2, ensure_ascii=False)
                 return Syntax(pretty, "json", theme="ansi_dark", word_wrap=True, background_color="default")
 
-        # Fenced code block: highlight just the code, keep surrounding text plain.
+        # 3. Fenced code block: highlight just the code
         match = _CODE_BLOCK_LANG_RE.search(output)
         if match:
             lang = match.group(1) or "text"
@@ -240,6 +270,20 @@ class ToolCallMessage(Static):
             return Syntax(
                 code.rstrip("\n"), lang, theme="ansi_dark", word_wrap=True, background_color="default"
             )
+
+        # 4. Path-based language detection (e.g. read_file, edit_file)
+        path = ""
+        if isinstance(self._args_raw, dict):
+            path = self._args_raw.get("path") or self._args_raw.get("file") or ""
+        elif isinstance(self._args_raw, str):
+            p_match = re.search(r'(?:path|file)=["\']([^"\']+)["\']', self._args_raw)
+            if p_match:
+                path = p_match.group(1)
+
+        if path:
+            lang = _detect_lang_from_path(str(path))
+            if lang:
+                return Syntax(output, lang, theme="ansi_dark", word_wrap=True, background_color="default")
 
         return Text(output)
 

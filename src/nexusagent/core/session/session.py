@@ -18,6 +18,7 @@ from typing import Any
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 
+from nexusagent.core.agent import _current_session
 from nexusagent.core.session.helpers import (
     _build_environment_context,
     _build_session_history_context,
@@ -86,6 +87,8 @@ class Session(SessionBase):
         self._event_queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue(maxsize=1000)
         self._pending_approvals: dict[str, asyncio.Event] = {}
         self._approval_results: dict[str, bool] = {}
+        self._pending_answers: dict[str, asyncio.Event] = {}
+        self._ask_user_answers: dict[str, str] = {}
         self._seen_tool_results: set[str] = set()
         self._seen_tool_calls: set[str] = set()
         self._conversation_history: list[Any] = []
@@ -429,6 +432,7 @@ class Session(SessionBase):
         self._enqueue(ErrorEvent(message=str(exc)).model_dump())
 
     async def send(self, user_message: str, images: list[str] | None = None) -> None:
+        _current_session.set(self)
         """Process a user message: store in DB, recall memory, stream agent response."""
         if self.status != "active":
             # Cancel any zombie heartbeat task from previous run
@@ -580,6 +584,19 @@ class Session(SessionBase):
         if call_id not in self._pending_approvals:
             self._pending_approvals[call_id] = asyncio.Event()
         return self._pending_approvals[call_id]
+
+    async def answer(self, call_id: str, answer_text: str) -> None:
+        """Record an answer for an ask_user tool call."""
+        self._ask_user_answers[call_id] = answer_text
+        gate = self._pending_answers.get(call_id)
+        if gate is not None:
+            gate.set()
+
+    def _wait_for_answer(self, call_id: str) -> asyncio.Event:
+        """Create (or return existing) answer gate for an ask_user call."""
+        if call_id not in self._pending_answers:
+            self._pending_answers[call_id] = asyncio.Event()
+        return self._pending_answers[call_id]
 
     # ── Interrupt / Cancel ─────────────────────────────────────────────
 
