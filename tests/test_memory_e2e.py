@@ -227,7 +227,7 @@ class TestTTL:
         fm = FileMemory(temp_memory_dir)
         fm.initialize()
 
-        path = fm.write_entry(
+        fm.write_entry(
             content="This is a future observation",
             entry_type=MemoryEntryType.OBSERVATION,
             description="Future entry",

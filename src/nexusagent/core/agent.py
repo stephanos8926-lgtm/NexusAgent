@@ -89,7 +89,7 @@ def _check_test_mode() -> None:
 
         guard = get_budget_guard()
         if guard.state.value in ("exceeded", "quota_exhausted"):
-            raise BudgetExceededError(  # noqa: F821
+            raise BudgetExceededError(
                 message="NEXUS_TEST_MODE: Budget exceeded or quota exhausted - refusing to call LLM",
                 budget_type="daily",
                 spent=0.0,
@@ -275,7 +275,7 @@ class Agent:
         try:
             loop = asyncio.get_running_loop()
             # Schedule MCP loading; agent creation is sync so we fire-and-forget
-            _ = loop.create_task(_ensure_mcp_tools_loaded())  # noqa: RUF006
+            _ = loop.create_task(_ensure_mcp_tools_loaded())
         except RuntimeError:
             # No event loop — skip async MCP loading (tools already in registry)
             pass
@@ -469,7 +469,7 @@ def _setup_workspace_context(working_dir: str) -> None:
 
 
 # Thread-local override for per-worker memory directory
-import contextvars  # noqa: E402
+import contextvars
 
 _ws_memory_dir: contextvars.ContextVar[str | None] = contextvars.ContextVar(
     "ws_memory_dir", default=None

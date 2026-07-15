@@ -277,34 +277,6 @@ class HooksConfig(BaseModel):
     hooks_dir: str = Field(default="~/.nexusagent/hooks")
 
 
-class BudgetConfig(BaseModel):
-    """Budget guard configuration for LLM spend tracking."""
-
-    daily_budget_usd: float = Field(
-        default=10.0,
-        ge=0.0,
-        description="Daily spend limit in USD. Set to 0 to disable daily limit."
-    )
-    monthly_budget_usd: float = Field(
-        default=100.0,
-        ge=0.0,
-        description="Monthly spend limit in USD. Set to 0 to disable monthly limit."
-    )
-    alert_thresholds: list[float] = Field(
-        default_factory=lambda: [0.5, 0.8, 0.95],
-        description="Thresholds (0.0-1.0) to trigger budget alerts. Default: 50%/80%/95%"
-    )
-    quota_cooldown_seconds: float = Field(
-        default=3600.0,
-        ge=0.0,
-        description="Seconds to wait after quota exhaustion before allowing calls again"
-    )
-    enabled: bool = Field(
-        default=True,
-        description="Enable budget guard. Set false to disable entirely (not recommended)"
-    )
-
-
 class TestModeConfig(BaseModel):
     """Test mode configuration to prevent accidental real API calls."""
 
@@ -578,7 +550,7 @@ def create_user_config_from_template() -> Path:
 
 def ensure_user_config_exists() -> Path:
     """Ensure user config exists, creating from template if needed.
-    
+
     Returns the path to the user config file.
     """
     user_config = Path.home() / ".nexusagent" / "config" / "nexusagent.yaml"

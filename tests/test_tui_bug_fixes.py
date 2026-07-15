@@ -11,9 +11,8 @@ Covers:
 from __future__ import annotations
 
 import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch, PropertyMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 import websockets.exceptions
 
 from nexusagent.interfaces.tui.app import NexusApp
@@ -61,7 +60,7 @@ class TestBusyResetOnDisconnect:
         """ConnectionClosedOK resets _busy to False."""
         mock_settings.client.api_key = None
         mock_settings.server.api_port = 8080
-        mock_ws = AsyncMock()
+        AsyncMock()
         mock_connect.return_value.__aenter__ = AsyncMock(
             side_effect=websockets.exceptions.ConnectionClosedOK(None, None)
         )

@@ -287,7 +287,7 @@ class NexusApp(App):
 
     def action_quit(self) -> None:
         """Quit the TUI application, canceling background tasks."""
-        _ = asyncio.create_task(self._input_queue.put(None))  # noqa: RUF006
+        _ = asyncio.create_task(self._input_queue.put(None))
         if hasattr(self, "_ws_task"):
             self._ws_task.cancel()
         self.exit()
@@ -361,7 +361,7 @@ class NexusApp(App):
         return await handle_slash_command(self, cmd)
 
 
-import click  # noqa: E402
+import click
 
 
 @click.command()

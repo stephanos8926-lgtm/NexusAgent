@@ -90,7 +90,6 @@ def test_worker_pool_passes_working_dir_to_metadata():
         handle.is_cancelled = MagicMock(return_value=False)
 
         # Capture the task schema that gets created
-        original_execute = pool._execute_bounded
         captured_task = None
 
         async def mock_execute(task, handle):

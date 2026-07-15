@@ -129,7 +129,7 @@ class TestWriteTodos:
 
         # Overwrite with new todos
         new = [{"task": "New task", "status": "in_progress"}]
-        result = write_todos(todos=new, path=tmp_todos_file)
+        write_todos(todos=new, path=tmp_todos_file)
 
         with open(tmp_todos_file) as f:
             data = json.load(f)
@@ -153,7 +153,7 @@ class TestWriteTodos:
     def test_write_todos_empty_list(self, tmp_todos_file):
         """write_todos should handle empty todos list."""
         from nexusagent.tools.write_todos import write_todos
-        result = write_todos(todos=[], path=tmp_todos_file)
+        write_todos(todos=[], path=tmp_todos_file)
         assert os.path.exists(tmp_todos_file)
 
         with open(tmp_todos_file) as f:
@@ -165,7 +165,7 @@ class TestWriteTodos:
         """write_todos should create parent directories if needed."""
         from nexusagent.tools.write_todos import write_todos
         nested_path = str(tmp_path / "sub" / "dir" / "todos.json")
-        result = write_todos(todos=[{"task": "Test", "status": "pending"}], path=nested_path)
+        write_todos(todos=[{"task": "Test", "status": "pending"}], path=nested_path)
         assert os.path.exists(nested_path)
 
 

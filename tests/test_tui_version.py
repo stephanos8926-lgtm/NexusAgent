@@ -8,6 +8,7 @@ Covers:
 """
 
 import asyncio
+import contextlib
 import json
 import urllib.request
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -186,15 +187,13 @@ class TestTuiWsLoopVersionIntegration:
 
         app._check_server_version = fake_check
 
-        with patch("websockets.connect", return_value=fake_ws) as mock_ws_connect:
+        with patch("websockets.connect", return_value=fake_ws):
             # Run _ws_loop but stop after first iteration
             task = asyncio.create_task(app._ws_loop())
             await asyncio.sleep(0.1)
             task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError, Exception):
                 await task
-            except (asyncio.CancelledError, Exception):
-                pass
 
         assert "version_check" in call_order, "version check must be called"
         # version_check should come before websockets.connect

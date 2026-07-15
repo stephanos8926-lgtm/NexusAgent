@@ -11,8 +11,9 @@ Run: python3 tests/test_e2e_tui_features.py
 import asyncio
 import json
 import sys
-import websockets
 from pathlib import Path
+
+import websockets
 
 # Test configuration - NO HEAVY IMPORTS
 API_KEY = "nexus-2638f25daba9af9c"  # From ~/.nexusagent/config/nexusagent.yaml
@@ -81,11 +82,11 @@ class E2ETester:
             """Send a message and collect all events."""
             self.events = []
             log(f"Sending: '{message[:50]}...'", "TEST")
-        
+
             try:
                 # Send message
                 await self.ws.send(json.dumps({"type": "user_input", "content": message}))
-            
+
                 # Collect events with timeout
                 import time
                 start = time.time()
@@ -95,27 +96,27 @@ class E2ETester:
                         if remaining <= 0:
                             log(f"⏱️ Timeout after {timeout}s", "WARN")
                             break
-                    
+
                         event_raw = await asyncio.wait_for(self.ws.recv(), timeout=remaining)
                         event = json.loads(event_raw)
                         self.events.append(event)
-                    
+
                         # Stop on response or error
                         if event.get("type") in ("response", "error"):
                             break
                         # Stop on tool approval request (we'll handle it)
                         if event.get("type") == "approval_request":
                             break
-                    
-                    except asyncio.TimeoutError:
+
+                    except TimeoutError:
                         log("⏱️ No more events", "INFO")
                         break
-            
+
                 log(f"Received {len(self.events)} events", "INFO")
                 if self.events:
                     log(f"Event types: {[e.get('type') for e in self.events]}", "INFO")
                 return self.events
-        
+
             except Exception as e:
                 log(f"❌ Send failed: {e}", "FAIL")
                 return []
@@ -299,7 +300,7 @@ class E2ETester:
         )
 
         # Should extract as observation/decision
-        has_extraction = any(e.get("type") in ("thinking", "response") for e in events)
+        any(e.get("type") in ("thinking", "response") for e in events)
         log(f"Extraction events: {len(events)}", "INFO")
 
         # Recall memory (new message to trigger recall)

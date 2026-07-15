@@ -620,10 +620,10 @@ class HybridMemoryIndex:
         Includes an OOM guard: estimates memory for all embeddings before loading.
         If estimated usage exceeds the threshold, processes in batches instead.
         """
-        import psutil
-
         # Allow override via env var for test environments
         import os
+
+        import psutil
         oom_threshold = float(os.getenv("NEXUS_VECTOR_OOM_THRESHOLD", "0.90"))
 
         conn = sqlite3.connect(str(self.db_path))

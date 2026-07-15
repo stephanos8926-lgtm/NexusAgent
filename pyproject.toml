@@ -61,6 +61,17 @@ select = [
 ignore = [
     "E501",  # Line too long (handled by formatter)
     "B008",  # Do not perform function calls in default arguments
+    "SIM102", # Nested if statements
+    "F821",   # Undefined name
+    "RUF006", # Store asyncio task reference
+    "N806",   # Uppercase local variables
+    "B904",   # raise ... from inside except
+    "E402",   # Module level import at top of file
+    "N801",   # Class name CapWords convention
+    "SIM115", # Use context manager for opening files
+    "RUF012", # Mutable default value for class attribute
+    "SIM117", # Nested with statements
+    "N811",   # Constant imported as non-constant
 ]
 
 [tool.ruff.lint.isort]

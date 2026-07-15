@@ -13,7 +13,6 @@ except ImportError:
 
 # Initialize auth keystore for tests
 # The fail-closed auth requires a valid keystore. Create one for tests.
-import os
 import tempfile
 from pathlib import Path as _Path
 

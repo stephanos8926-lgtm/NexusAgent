@@ -1,6 +1,6 @@
 import asyncio
-import os
 import logging
+import os
 
 import httpx
 import pytest
@@ -26,7 +26,6 @@ async def setup_system():
     """Initialize the system for E2E testing.
     Overwrites the db path for testing.
     """
-    from nexusagent.infrastructure.config import settings
 
     settings.server.nats_url = "nats://localhost:4222"
     settings.server.db_path = TEST_DB_PATH

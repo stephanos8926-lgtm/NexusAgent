@@ -317,7 +317,7 @@ async def handle_slash_command(app, cmd: str) -> bool:
             msg = AppMessage(f"Search results for: {query}\n\n{result}")
             _mount_with_limit(app, msg)
 
-        _ = asyncio.create_task(_do_search())  # noqa: RUF006
+        _ = asyncio.create_task(_do_search())
         msg = AppMessage(f"Searching for: {query}...")
         _mount_with_limit(app, msg)
         return True
@@ -334,7 +334,7 @@ async def handle_slash_command(app, cmd: str) -> bool:
             msg = AppMessage(f"Fetched: {url}\n\n{result}")
             _mount_with_limit(app, msg)
 
-        _ = asyncio.create_task(_do_fetch())  # noqa: RUF006
+        _ = asyncio.create_task(_do_fetch())
         msg = AppMessage(f"Fetching: {url}...")
         _mount_with_limit(app, msg)
         return True
@@ -555,7 +555,7 @@ def process_next_in_queue(app) -> None:
     app.status_bar.set_status("Thinking...")
     app.status_bar.set_spinner(True)
 
-    asyncio.create_task(app._input_queue.put(next_msg))  # noqa: RUF006
+    asyncio.create_task(app._input_queue.put(next_msg))
     update_queue_status(app)
 
 
