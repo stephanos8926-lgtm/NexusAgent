@@ -416,8 +416,28 @@ class LLMBudgetGuard:
             f"  Remaining: ${budget - spent:.2f}"
         )
         logger.warning(msg)
-        # TODO: Hook integration for webhook/alerting
-        # Could call: run_hook("on_budget_alert", window_type, threshold, spent, budget)
+        # Fire hook for webhook/alerting integration
+        try:
+            from nexusagent.hooks import get_hook_manager, HookEvent
+            hook_manager = get_hook_manager()
+            import asyncio
+            # Run hook as fire-and-forget
+            asyncio.create_task(
+                hook_manager.run_hooks(
+                    HookEvent.BUDGET_ALERT,
+                    {
+                        "event_type": "budget_alert",
+                        "window_type": window_type,
+                        "threshold": threshold,
+                        "spent": spent,
+                        "budget": budget,
+                        "percentage": int(threshold * 100),
+                        "message": msg,
+                    }
+                )
+            )
+        except Exception as e:
+            logger.debug(f"Budget alert hook failed (fail-open): {e}")
 
     async def record_quota_exhausted(
         self, window_type: Literal["daily", "monthly"] | None = None
