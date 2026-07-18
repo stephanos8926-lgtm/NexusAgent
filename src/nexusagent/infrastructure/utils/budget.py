@@ -32,7 +32,6 @@ Usage::
 import asyncio
 import json
 import logging
-import os
 import time
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta

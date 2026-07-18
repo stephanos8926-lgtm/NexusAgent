@@ -118,8 +118,6 @@ def submit(task, skip_version_check):
     """
     from nexusagent.infrastructure.config import (
         settings,
-        create_user_config_from_template,
-        ensure_user_config_exists,
     )
 
     # Handle --check-server
@@ -618,11 +616,11 @@ def server(host, port, reload):
 @main.command()
 def config_init():
     """Create user config file from project template.
-    
+
     Copies config/nexusagent.yaml to ~/.nexusagent/config/nexusagent.yaml
     if it doesn't already exist. This is the first thing to run after
     installing NexusAgent.
-    
+
     Example:
         nexus config init
     """
@@ -643,10 +641,10 @@ def config_init():
 @click.option("--force", is_flag=True, default=False, help="Overwrite existing user config")
 def config_reset(force):
     """Reset user config to project template defaults.
-    
+
     WARNING: This overwrites your existing ~/.nexusagent/config/nexusagent.yaml
     Use --force to confirm.
-    
+
     Example:
         nexus config reset --force
     """
@@ -654,15 +652,15 @@ def config_reset(force):
     if not force:
         click.echo("Error: Use --force to confirm overwrite", err=True)
         raise SystemExit(1)
-    
+
     user_config = Path.home() / ".nexusagent" / "config" / "nexusagent.yaml"
     project_root = get_project_root()
     project_config = project_root / "config" / "nexusagent.yaml"
-    
+
     if not project_config.exists():
         click.echo(f"Error: Project config not found at {project_config}", err=True)
         raise SystemExit(1)
-    
+
     import shutil
     shutil.copy2(project_config, user_config)
     click.echo(f"User config reset to template: {user_config}")

@@ -2,6 +2,7 @@
 import threading
 import time
 
+
 def task(name, duration):
     print(f"Task {name}: Starting (duration={duration}s)")
     time.sleep(duration)

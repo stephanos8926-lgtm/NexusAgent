@@ -138,9 +138,7 @@ class TestPutResultSizeCheck:
     def test_even_truncated_is_too_large_raises(self):
         """If truncation still exceeds limit, ValueError is raised."""
         # Create a result where even the wrapper is huge
-        huge_key_data = {}
         filler = "x" * (NATS_MAX_MESSAGE_SIZE + 1000)
-        result = {"task_id": "big-task", "success": True, "extra": filler}
         # Remove 'data' field so truncation path won't help
         result_no_data = {"task_id": "big-task", "success": True, "extra": filler}
 

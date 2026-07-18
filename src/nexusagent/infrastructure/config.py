@@ -593,7 +593,7 @@ def create_user_config_from_template() -> Path:
 
 def ensure_user_config_exists() -> Path:
     """Ensure user config exists, creating from template if needed.
-    
+
     Returns the path to the user config file.
     """
     user_config = Path.home() / ".nexusagent" / "config" / "nexusagent.yaml"

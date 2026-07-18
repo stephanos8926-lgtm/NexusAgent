@@ -235,7 +235,7 @@ class Agent:
         # Set policy context for this agent (thread-local)
         set_policy_context(role, policy)
 
-        # Await MCP tool loading before capturing snapshot
+# Await MCP tool loading before capturing snapshot
         await _ensure_mcp_tools_loaded()
 
         # Capture per-agent snapshot of current registry
@@ -445,4 +445,8 @@ import contextvars
 
 _ws_memory_dir: contextvars.ContextVar[str | None] = contextvars.ContextVar(
     "ws_memory_dir", default=None
+)
+
+_current_session: contextvars.ContextVar[Any | None] = contextvars.ContextVar(
+    "current_session", default=None
 )

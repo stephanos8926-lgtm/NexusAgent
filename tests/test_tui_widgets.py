@@ -245,7 +245,7 @@ class TestToolCallMessage:
         msg = ToolCallMessage(tool="search", args="query=test")
         rendered = str(msg.render())
         assert "search" in rendered
-        parts = msg.render()
+        msg.render()
         assert "⚙" in rendered
 
     def test_json_args_pretty_print(self):

@@ -13,6 +13,7 @@ from __future__ import annotations
 import logging
 import re
 
+import nexusagent.tools.write_todos  # noqa: F401
 from nexusagent.memory.rate_limiter import MemoryRateLimiter
 from nexusagent.tools.registry import register_tool
 
@@ -381,21 +382,26 @@ async def spawn_subagent(
     category="interaction",
     returns="str — the user's response",
 )
-def ask_user(question: str, options: list[str] | None = None) -> str:
+async def ask_user(question: str, options: list[str] | None = None) -> str:
     """Ask the user a question. In TUI mode, pauses for user input.
 
     Returns the user's response, or a fallback if non-interactive.
     """
-    # Check if we're running in TUI mode (event loop available)
-    try:
-        import asyncio
+    from nexusagent.core.agent import _current_session
 
-        asyncio.get_running_loop()
-        # We're in an async context — this is the TUI
-        # Return a signal that the TUI will handle via push_screen_wait
-        return f"__ASK_USER__{question}__OPTIONS__{','.join(options or [])}__"
-    except RuntimeError:
-        pass
+    session = _current_session.get()
+    if session is not None:
+        import uuid
+        call_id = f"ask-{uuid.uuid4().hex[:8]}"
+        session._enqueue({
+            "type": "ask_user",
+            "question": question,
+            "options": options or [],
+            "call_id": call_id,
+        })
+        gate = session._wait_for_answer(call_id)
+        await gate.wait()
+        return session._ask_user_answers.get(call_id, "")
 
     # Non-interactive fallback
     if options:
@@ -405,7 +411,6 @@ def ask_user(question: str, options: list[str] | None = None) -> str:
             f"[No interactive session — returning default: {options[0]}]"
         )
     return f"[ask_user] {question}\n[No interactive session — please respond in the TUI]"
-
 
 # ═══════════════════════════════════════════════════════════════════════
 # Memory Tools

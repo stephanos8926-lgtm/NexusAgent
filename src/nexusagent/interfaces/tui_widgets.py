@@ -10,7 +10,7 @@ import logging
 import os
 import shutil
 import time
-from typing import Any
+from typing import Any, ClassVar
 
 from textual.app import ComposeResult
 from textual.containers import Horizontal, ScrollableContainer, Vertical
@@ -203,6 +203,37 @@ def _sigwinch_handler(app: Any) -> None:
 class ApprovalModal(ModalScreen[bool]):
     """Modal dialog for approving or rejecting a tool call before execution."""
 
+    DEFAULT_CSS = """
+    ApprovalModal {
+        align: center middle;
+        background: rgba(0, 0, 0, 0.6);
+    }
+    #approval-dialog {
+        width: 70;
+        height: 18;
+        border: thick $warning;
+        background: $surface;
+        padding: 1 2;
+        layout: vertical;
+    }
+    #approval-title {
+        text-align: center;
+        text-style: bold;
+        color: $warning;
+        margin-bottom: 1;
+    }
+    #approval-scroll {
+        height: 10;
+        overflow-y: scroll;
+        margin-bottom: 1;
+        border: solid $border-subtle;
+        padding: 1;
+    }
+    #approval-buttons {
+        align: center middle;
+    }
+    """
+
     def __init__(self, tool_name: str, tool_args: dict, call_id: str = "") -> None:
         """Initialize the approval modal.
 
@@ -244,18 +275,199 @@ class ApprovalModal(ModalScreen[bool]):
 class ErrorModal(ModalScreen[None]):
     """Modal dialog for displaying errors."""
 
+    DEFAULT_CSS = """
+    ErrorModal {
+        align: center middle;
+        background: rgba(0, 0, 0, 0.6);
+    }
+    #error-dialog {
+        width: 60;
+        height: 14;
+        border: thick $error;
+        background: $surface;
+        padding: 1 2;
+        layout: vertical;
+    }
+    #error-title {
+        text-align: center;
+        text-style: bold;
+        color: $error;
+        margin-bottom: 1;
+    }
+    #error-scroll {
+        height: 6;
+        overflow-y: scroll;
+        margin-bottom: 1;
+        border: solid $border-subtle;
+        padding: 1;
+    }
+    #error-buttons {
+        align: center middle;
+    }
+    """
+
+    # Let's override compose to use error-dialog and error-scroll classes
+    def compose(self) -> ComposeResult:
+        with Vertical(id="error-dialog"):
+            yield Static("⚠ Error", id="error-title")
+            with ScrollableContainer(id="error-scroll"):
+                yield Static(self.error_message, id="error-args")
+            with Horizontal(id="error-buttons"):
+                yield Button("OK", id="ok", variant="primary")
+
+
     def __init__(self, error_message: str) -> None:
         """Initialize the error modal with the message to display."""
         super().__init__()
         self.error_message = error_message
 
-    def compose(self) -> ComposeResult:
-        """Build the error dialog UI with message and OK button."""
-        with Vertical(id="approval-dialog"):
-            yield Static("⚠ Error", id="approval-title")
-            yield Static(self.error_message, id="approval-args")
-            with Horizontal(id="approval-buttons"):
-                yield Button("OK", id="ok", variant="primary")
+
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         """Dismiss the error dialog when OK is pressed."""
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# ThreadsModal — interactive session switcher
+# ═══════════════════════════════════════════════════════════════════════════
+
+class ThreadsModal(ModalScreen[str | None]):
+    """Modal dialog for browsing and switching between previous sessions."""
+
+    DEFAULT_CSS = """
+    ThreadsModal {
+        align: center middle;
+        background: rgba(0, 0, 0, 0.6);
+    }
+    #threads-dialog {
+        width: 70;
+        height: 22;
+        border: thick $primary;
+        background: $surface;
+        padding: 1 2;
+        layout: vertical;
+    }
+    #threads-title {
+        text-align: center;
+        text-style: bold;
+        color: $primary;
+        margin-bottom: 1;
+    }
+    #threads-scroll {
+        height: 12;
+        overflow-y: scroll;
+        margin-bottom: 1;
+        border: solid $border-subtle;
+        padding: 1;
+    }
+    .thread-button {
+        width: 100%;
+        margin-bottom: 1;
+        text-align: left;
+    }
+    #threads-buttons {
+        align: center middle;
+    }
+    """
+
+    def __init__(self, sessions: list[dict]) -> None:
+        """Initialize the ThreadsModal with session list."""
+        super().__init__()
+        self.sessions = sessions
+
+    def compose(self) -> ComposeResult:
+        """Compose the interactive session switcher UI."""
+        with Vertical(id="threads-dialog"):
+            yield Static("📑 Switch Active Session", id="threads-title")
+            with ScrollableContainer(id="threads-scroll"):
+                if not self.sessions:
+                    yield Static("No other sessions found.", id="no-sessions")
+                else:
+                    for s in self.sessions:
+                        sid = s.get("id", "unknown")
+                        wdir = s.get("working_dir", "")
+                        status = s.get("status", "unknown")
+                        label = f"{sid[:12]}...  [{status.upper()}]  Dir: {wdir}"
+                        yield Button(label, id=f"sess_{sid}", classes="thread-button")
+            with Horizontal(id="threads-buttons"):
+                yield Button("Cancel", id="cancel", variant="primary")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        """Handle session selection or cancel."""
+        btn_id = event.button.id or ""
+        if btn_id == "cancel":
+            self.dismiss(None)
+        elif btn_id.startswith("sess_"):
+            selected_id = btn_id[5:]  # Strip 'sess_'
+            self.dismiss(selected_id)
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# ModelModal — interactive model switcher
+# ═══════════════════════════════════════════════════════════════════════════
+
+class ModelModal(ModalScreen[tuple[str, str] | None]):
+    """Modal dialog for switching active LLM models mid-session."""
+
+    DEFAULT_CSS = """
+    ModelModal {
+        align: center middle;
+        background: rgba(0, 0, 0, 0.6);
+    }
+    #model-dialog {
+        width: 60;
+        height: 18;
+        border: thick $primary;
+        background: $surface;
+        padding: 1 2;
+        layout: vertical;
+    }
+    #model-title {
+        text-align: center;
+        text-style: bold;
+        color: $primary;
+        margin-bottom: 1;
+    }
+    #model-scroll {
+        height: 8;
+        overflow-y: scroll;
+        margin-bottom: 1;
+        border: solid $border-subtle;
+        padding: 1;
+    }
+    .model-button {
+        width: 100%;
+        margin-bottom: 1;
+    }
+    #model-buttons {
+        align: center middle;
+    }
+    """
+
+    MODELS: ClassVar[list[tuple[str, str, str]]] = [
+        ("gemini-2.5-flash", "gemini", "Gemini 2.5 Flash (Fast, default)"),
+        ("gemini-2.5-pro", "gemini", "Gemini 2.5 Pro (Powerful, reasoning)"),
+        ("anthropic/claude-3.5-sonnet", "openrouter", "Claude 3.5 Sonnet (State-of-the-art)"),
+        ("openai/gpt-4o", "openrouter", "GPT-4o (High capability)"),
+        ("google/gemini-2.5-pro", "openrouter", "Gemini 2.5 Pro via OpenRouter"),
+    ]
+
+    def compose(self) -> ComposeResult:
+        """Compose the interactive model switcher UI."""
+        with Vertical(id="model-dialog"):
+            yield Static("🤖 Switch LLM Model", id="model-title")
+            with ScrollableContainer(id="model-scroll"):
+                for i, (_model, _provider, desc) in enumerate(self.MODELS):
+                    yield Button(desc, id=f"model_{i}", classes="model-button")
+            with Horizontal(id="model-buttons"):
+                yield Button("Cancel", id="cancel", variant="primary")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        """Handle model selection or cancel."""
+        btn_id = event.button.id or ""
+        if btn_id == "cancel":
+            self.dismiss(None)
+        elif btn_id.startswith("model_"):
+            idx = int(btn_id[6:])  # Strip 'model_'
+            model, provider, _ = self.MODELS[idx]
+            self.dismiss((model, provider))

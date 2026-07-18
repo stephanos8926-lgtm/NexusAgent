@@ -12,6 +12,7 @@ Covers:
 
 from __future__ import annotations
 
+import contextlib
 import os
 from unittest.mock import MagicMock, patch
 
@@ -308,15 +309,13 @@ class TestSigwinchHandler:
 
         app = NexusApp(session_id="test")
         try:
-            original = signal.getsignal(signal.SIGWINCH)
+            signal.getsignal(signal.SIGWINCH)
             app._install_sigwinch()
-            installed = signal.getsignal(signal.SIGWINCH)
-            assert installed != original or True  # May be same if already set
+            signal.getsignal(signal.SIGWINCH)
+            assert True  # May be same if already set
         finally:
-            try:
+            with contextlib.suppress(Exception):
                 signal.signal(signal.SIGWINCH, signal.SIG_DFL)
-            except Exception:
-                pass
 
     def test_restore_sigwinch_no_error_without_install(self):
         """_restore_sigwinch doesn't error if _install wasn't called."""

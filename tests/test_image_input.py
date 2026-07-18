@@ -94,7 +94,7 @@ class TestImageAttachment:
         img_path.write_bytes(b"fake data")
 
         attachment = ImageAttachment(path=str(img_path))
-        result = attachment.encode()
+        attachment.encode()
 
         assert attachment.mime_type == "image/png"
 

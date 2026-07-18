@@ -65,6 +65,7 @@ class NexusApp(App):
         Binding("ctrl+l", "clear", "Clear", show=True),
         Binding("ctrl+t", "cycle_theme", "Theme", show=True),
         Binding("ctrl+underscore", "toggle_auto_approve", "Auto-approve", show=False),
+        Binding("ctrl+y", "toggle_auto_approve", "YOLO", show=True),
         Binding("f1", "show_help", "Help", show=True),
         # Legacy single-key bindings (lower priority so they don't eat input)
         Binding("q", "quit", "Quit", priority=False, show=False),
@@ -89,6 +90,7 @@ class NexusApp(App):
         padding: 0 1;
         background: $background;
         overflow-y: scroll;
+        overflow-x: hidden;
     }
     #messages {
         layout: stream;
@@ -285,7 +287,7 @@ class NexusApp(App):
 
     def action_quit(self) -> None:
         """Quit the TUI application, canceling background tasks."""
-        _ = asyncio.create_task(self._input_queue.put(None))  # noqa: RUF006
+        _ = asyncio.create_task(self._input_queue.put(None))
         if hasattr(self, "_ws_task"):
             self._ws_task.cancel()
         self.exit()
@@ -359,12 +361,20 @@ class NexusApp(App):
         return await handle_slash_command(self, cmd)
 
 
-def main(yolo: bool = False) -> None:
-    """Entry point for launching the NexusAgent TUI.
+import click
 
-    Args:
-        yolo: If True, enable auto-approve mode by default.
-    """
+
+@click.command()
+@click.option(
+    "--yolo",
+    "-y",
+    "--auto-approve",
+    is_flag=True,
+    default=False,
+    help="Enable YOLO auto-approve mode for all tools by default."
+)
+def main(yolo: bool = False) -> None:
+    """Entry point for launching the NexusAgent TUI."""
     app = NexusApp(yolo=yolo)
     app.run()
 

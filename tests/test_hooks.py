@@ -91,7 +91,8 @@ class TestHookRegistration:
 
 class TestHookManager:
     def test_register_hook(self, manager):
-        callback = lambda ctx: None
+        def callback(ctx):
+            return None
         manager.register_hook(HookEvent.SESSION_INIT, callback, name="init")
         assert len(manager.get_hooks(HookEvent.SESSION_INIT)) == 1
 

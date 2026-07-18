@@ -539,7 +539,7 @@ def main():
     p_cleanup.add_argument("--force", "-f", action="store_true", help="Force removal of dirty worktrees")
 
     # doctor
-    p_doctor = sub.add_parser("doctor", help="Diagnose common issues")
+    sub.add_parser("doctor", help="Diagnose common issues")
 
     args = parser.parse_args()
 

@@ -11,7 +11,6 @@ import logging
 
 from nexusagent.core.agent import run_agent_task
 from nexusagent.infrastructure.db import get_task_repo
-from nexusagent.infrastructure.utils.budget import get_budget_guard
 from nexusagent.infrastructure.utils.circuit import CircuitBreaker
 from nexusagent.llm.models import TaskSchema
 
