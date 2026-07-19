@@ -20,10 +20,9 @@ from threading import RLock
 from types import MappingProxyType
 from typing import Any
 
-from .types import ToolInfo
-
 from nexusagent.core.trust import TrustLevel
 
+from .types import ToolInfo
 
 # ─── ToolRegistry ────────────────────────────────────────────────────────
 

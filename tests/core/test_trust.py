@@ -1,13 +1,13 @@
 """Tests for the trust subsystem (TrustLevel, TrustedContent, AnomalyScorer)."""
 
+
 import pytest
-from types import MappingProxyType
 
 from nexusagent.core.trust import (
     AnomalyScorer,
     TrustConfig,
-    TrustLevel,
     TrustedContent,
+    TrustLevel,
     get_anomaly_scorer,
 )
 

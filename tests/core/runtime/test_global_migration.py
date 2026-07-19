@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
-from nexusagent.runtime.context import RuntimeContext, current_context, set_current_context
+from nexusagent.runtime.context import RuntimeContext, set_current_context
 
 
 class TestShimBackwardCompat:

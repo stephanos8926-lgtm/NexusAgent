@@ -1,10 +1,11 @@
-import pytest
 from threading import Thread
 from time import sleep
 from types import MappingProxyType
 from unittest.mock import MagicMock
 
-from src.nexusagent.tools.registry.core import ToolRegistry, registry, register_tool
+import pytest
+
+from src.nexusagent.tools.registry.core import register_tool, registry
 from src.nexusagent.tools.registry.types import ToolInfo
 
 

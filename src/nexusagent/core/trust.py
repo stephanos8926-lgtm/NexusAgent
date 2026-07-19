@@ -10,11 +10,10 @@ from __future__ import annotations
 
 import math
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import IntEnum
 from threading import Lock
 from typing import Any
-
 
 # ─── TrustLevel ──────────────────────────────────────────────────────────
 
