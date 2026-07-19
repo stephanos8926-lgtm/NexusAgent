@@ -105,7 +105,7 @@ class ChatInput(TextArea):
     - Command history persistence to ~/.nexusagent/history.json
     """
 
-    BINDINGS: ClassVar[list[Binding]] = [
+    BINDINGS: ClassVar[list[Binding | tuple[str, str] | tuple[str, str, str]]] = [
         Binding("enter", "submit", "Submit", show=False),
         Binding("shift+enter", "newline", "Newline", show=False),
         Binding("escape", "cancel", "Cancel", show=False),
@@ -141,6 +141,8 @@ class ChatInput(TextArea):
         Args:
             **kwargs: Additional keyword arguments passed to TextArea.
         """
+        if "placeholder" not in kwargs:
+            kwargs["placeholder"] = "Type a message or /help... (Shift+Enter for newline)"
         super().__init__(**kwargs)
         self._history: list[str] = _load_history()
         self._history_idx = len(self._history)
@@ -187,7 +189,7 @@ class ChatInput(TextArea):
         else:
             self.text = self._history[self._history_idx]
 
-    def on_key(self, event: KeyEvent) -> None:
+    async def on_key(self, event: KeyEvent) -> None:
         """Intercept Enter before TextArea's internal handler.
 
         TextArea handles keys internally via its _on_key method.
@@ -208,7 +210,7 @@ class ChatInput(TextArea):
         # NOTE: TextArea doesn't expose on_key in newer Textual versions,
         # so we call the internal _on_key directly.
         elif hasattr(self, "_on_key"):
-            self._on_key(event)
+            await self._on_key(event)
 
     def action_submit(self) -> None:
         """Submit the current input."""

@@ -25,6 +25,7 @@ _COLLAPSE_CHAR_THRESHOLD = 300
 
 def _detect_lang_from_path(path: str) -> str | None:
     import os
+
     _, ext = os.path.splitext(path.lower())
     mapping = {
         ".py": "python",
@@ -245,11 +246,15 @@ class ToolCallMessage(Static):
         stripped = output.strip()
 
         # 1. Diff detection (git_diff, apply_patch, git_show, or unified diff pattern)
-        if (self._tool in ("git_diff", "git_show", "apply_patch") or
-                stripped.startswith("diff --git") or
-                ("--- " in stripped and "+++ " in stripped) or
-                "@@ -" in stripped):
-            return Syntax(output, "diff", theme="ansi_dark", word_wrap=True, background_color="default")
+        if (
+            self._tool in ("git_diff", "git_show", "apply_patch")
+            or stripped.startswith("diff --git")
+            or ("--- " in stripped and "+++ " in stripped)
+            or "@@ -" in stripped
+        ):
+            return Syntax(
+                output, "diff", theme="ansi_dark", word_wrap=True, background_color="default"
+            )
 
         # 2. JSON output: pretty-print and syntax-highlight
         if stripped.startswith(("{", "[")):
@@ -259,7 +264,9 @@ class ToolCallMessage(Static):
                 parsed = None
             if parsed is not None:
                 pretty = json.dumps(parsed, indent=2, ensure_ascii=False)
-                return Syntax(pretty, "json", theme="ansi_dark", word_wrap=True, background_color="default")
+                return Syntax(
+                    pretty, "json", theme="ansi_dark", word_wrap=True, background_color="default"
+                )
 
         # 3. Fenced code block: highlight just the code
         match = _CODE_BLOCK_LANG_RE.search(output)
@@ -268,7 +275,11 @@ class ToolCallMessage(Static):
             code_match = re.search(r"```\w*\n([\s\S]*?)```", output)
             code = code_match.group(1) if code_match else output
             return Syntax(
-                code.rstrip("\n"), lang, theme="ansi_dark", word_wrap=True, background_color="default"
+                code.rstrip("\n"),
+                lang,
+                theme="ansi_dark",
+                word_wrap=True,
+                background_color="default",
             )
 
         # 4. Path-based language detection (e.g. read_file, edit_file)
@@ -283,7 +294,9 @@ class ToolCallMessage(Static):
         if path:
             lang = _detect_lang_from_path(str(path))
             if lang:
-                return Syntax(output, lang, theme="ansi_dark", word_wrap=True, background_color="default")
+                return Syntax(
+                    output, lang, theme="ansi_dark", word_wrap=True, background_color="default"
+                )
 
         return Text(output)
 
@@ -332,7 +345,10 @@ class ToolCallMessage(Static):
         )
 
         header_text = Text()
-        header_text.append(f"{icon} {self._tool}({formatted_args})", style=self._STATUS_RICH_STYLES.get(self._status, "bold yellow"))
+        header_text.append(
+            f"{icon} {self._tool}({formatted_args})",
+            style=self._STATUS_RICH_STYLES.get(self._status, "bold yellow"),
+        )
         if syntax_hint:
             header_text.append(f"  [{syntax_hint}]", style="dim")
 

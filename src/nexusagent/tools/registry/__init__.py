@@ -25,7 +25,7 @@ Architecture:
         3. Auto-correction: wrong name/params get helpful hints
 """
 
-from .core import registry, ToolRegistry, auto_correct, get_tool_info, list_all_tools, register_tool
+from .core import ToolRegistry, auto_correct, get_tool_info, list_all_tools, register_tool, registry
 from .policy import (
     ROLE_MANIFESTS,
     check_tool_access,
@@ -39,13 +39,9 @@ from .search import tool_search
 from .types import ToolInfo
 
 __all__ = [
-    # Roles
     "ROLE_MANIFESTS",
-    # Registry Singleton
-    "registry",
-    "ToolRegistry",
-    # Types
     "ToolInfo",
+    "ToolRegistry",
     "auto_correct",
     "check_tool_access",
     "clear_policy_context",
@@ -53,12 +49,9 @@ __all__ = [
     "get_policy_context",
     "get_tool_info",
     "list_all_tools",
-    # Registration
     "register_tool",
-    # Policy enforcement
+    "registry",
     "require_policy",
-    # Policy context
     "set_policy_context",
-    # Search & correction
     "tool_search",
 ]

@@ -1,10 +1,11 @@
-import pytest
 from threading import Thread
 from time import sleep
 from types import MappingProxyType
 from unittest.mock import MagicMock
 
-from src.nexusagent.tools.registry.core import ToolRegistry, registry, register_tool
+import pytest
+
+from src.nexusagent.tools.registry.core import register_tool, registry
 from src.nexusagent.tools.registry.types import ToolInfo
 
 
@@ -15,6 +16,7 @@ def clear_registry_for_tests():
         registry._pending.clear()
         registry._snapshots.clear()
         registry._latest_version = 0
+
 
 def test_toolinfo_is_frozen():
     with pytest.raises(AttributeError, match="cannot assign to field 'name'"):
@@ -75,6 +77,7 @@ def test_toolregistry_concurrent_rlock_safety():
 
     def register_and_freeze(thread_id):
         for i in range(5):
+
             @register_tool(
                 name=f"thread{thread_id}_tool{i}",
                 description="desc",
@@ -106,19 +109,19 @@ def test_toolregistry_concurrent_rlock_safety():
 
 def test_toolregistry_prune():
     @register_tool(name="toolA", description="descA", parameters={}, example="exA")
-    def toolA():
+    def toola():
         pass
 
     registry.freeze()  # version 1
 
     @register_tool(name="toolB", description="descB", parameters={}, example="exB")
-    def toolB():
+    def toolb():
         pass
 
     registry.freeze()  # version 2
 
     @register_tool(name="toolC", description="descC", parameters={}, example="exC")
-    def toolC():
+    def toolc():
         pass
 
     registry.freeze()  # version 3
@@ -141,14 +144,14 @@ def test_toolregistry_prune():
 def test_toolregistry_get_snapshot_graceful_handling():
     assert registry.get_snapshot() is None  # Before first freeze, it's None
 
-    registry.freeze() # Freeze to create version 1
-    assert isinstance(registry.get_snapshot(), MappingProxyType) # Now it's a MappingProxyType
+    registry.freeze()  # Freeze to create version 1
+    assert isinstance(registry.get_snapshot(), MappingProxyType)  # Now it's a MappingProxyType
     assert registry.get_snapshot(999) is None  # Non-existent version still None
 
 
 def test_toolregistry_registryproxy_typeerror_on_mutation():
     @register_tool(name="toolX", description="descX", parameters={}, example="exX")
-    def toolX():
+    def toolx():
         pass
 
     registry.freeze()

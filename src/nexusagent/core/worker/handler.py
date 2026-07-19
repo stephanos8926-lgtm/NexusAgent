@@ -6,7 +6,6 @@ plus circuit breaker protection and the research/code routing logic.
 
 from __future__ import annotations
 
-import asyncio
 import logging
 
 from nexusagent.core.agent import run_agent_task
@@ -54,7 +53,6 @@ async def _run_agent_task(task: TaskSchema) -> str:
         if is_research:
             return await _run_research_workflow(task, working_dir)
         else:
-            loop = asyncio.get_running_loop()
             state = {
                 "task": task.description,
                 "id": task.id,

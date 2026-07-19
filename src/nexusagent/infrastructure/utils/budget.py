@@ -418,7 +418,7 @@ class LLMBudgetGuard:
         logger.warning(msg)
         # Fire hook for webhook/alerting integration
         try:
-            from nexusagent.hooks import get_hook_manager, HookEvent
+            from nexusagent.hooks import HookEvent, get_hook_manager
             hook_manager = get_hook_manager()
             import asyncio
             # Run hook as fire-and-forget

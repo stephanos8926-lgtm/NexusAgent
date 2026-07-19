@@ -234,42 +234,6 @@ class LoggingConfig(BaseModel):
     format: str = Field(default="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 
 
-class BudgetConfig(BaseModel):
-    """LLM token budget configuration.
-
-    Controls spend limits, alert thresholds, and quota cooldown behavior.
-    All values are in USD unless noted.
-    """
-
-    enabled: bool = Field(
-        default=True,
-        description="Enable budget guard. If False, all budget checks pass.",
-    )
-    daily_budget_usd: float = Field(
-        default=10.0,
-        ge=0.0,
-        description="Daily spend limit in USD. 0 = disabled. "
-                    "Sensible default for new users (~1M tokens/day on gemini-2.5-flash).",
-    )
-    monthly_budget_usd: float = Field(
-        default=100.0,
-        ge=0.0,
-        description="Monthly spend limit in USD. 0 = disabled. "
-                    "Sensible default for new users (~10M tokens/month on gemini-2.5-flash).",
-    )
-    alert_thresholds: list[float] = Field(
-        default_factory=lambda: [0.5, 0.8, 0.95],
-        description="Alert thresholds as fraction of budget (0.0-1.0). "
-                    "Default: 50%, 80%, 95%. Alerts logged at WARNING level.",
-    )
-    quota_cooldown_seconds: float = Field(
-        default=3600.0,
-        gt=0,
-        description="Cooldown period after quota exhaustion (seconds). "
-                    "Default: 1 hour (3600s).",
-    )
-
-
 class HooksConfig(BaseModel):
     """Configuration for the hooks system."""
 
@@ -279,6 +243,7 @@ class HooksConfig(BaseModel):
 
 class TrustConfig(BaseModel):
     """Configuration for the trust subsystem (anomaly scoring, trust levels)."""
+
     enabled: bool = True
     anomaly_threshold: float = 0.60
     min_score: float = 0.0
@@ -296,25 +261,25 @@ class BudgetConfig(BaseModel):
     daily_budget_usd: float = Field(
         default=10.0,
         ge=0.0,
-        description="Daily spend limit in USD. Set to 0 to disable daily limit."
+        description="Daily spend limit in USD. Set to 0 to disable daily limit.",
     )
     monthly_budget_usd: float = Field(
         default=100.0,
         ge=0.0,
-        description="Monthly spend limit in USD. Set to 0 to disable monthly limit."
+        description="Monthly spend limit in USD. Set to 0 to disable monthly limit.",
     )
     alert_thresholds: list[float] = Field(
         default_factory=lambda: [0.5, 0.8, 0.95],
-        description="Thresholds (0.0-1.0) to trigger budget alerts. Default: 50%/80%/95%"
+        description="Thresholds (0.0-1.0) to trigger budget alerts. Default: 50%/80%/95%",
     )
     quota_cooldown_seconds: float = Field(
         default=3600.0,
         ge=0.0,
-        description="Seconds to wait after quota exhaustion before allowing calls again"
+        description="Seconds to wait after quota exhaustion before allowing calls again",
     )
     enabled: bool = Field(
         default=True,
-        description="Enable budget guard. Set false to disable entirely (not recommended)"
+        description="Enable budget guard. Set false to disable entirely (not recommended)",
     )
 
 
@@ -322,8 +287,7 @@ class TestModeConfig(BaseModel):
     """Test mode configuration to prevent accidental real API calls."""
 
     block_real_api: bool = Field(
-        default=True,
-        description="When true and NEXUS_TEST_MODE=1, blocks real LLM API calls"
+        default=True, description="When true and NEXUS_TEST_MODE=1, blocks real LLM API calls"
     )
 
 
@@ -585,6 +549,7 @@ def create_user_config_from_template() -> Path:
 
     # Copy template to user config location
     import shutil
+
     shutil.copy2(project_config, user_config)
     logger.info(f"Created user config from template: {user_config}")
 

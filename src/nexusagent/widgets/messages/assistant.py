@@ -55,6 +55,7 @@ class AssistantMessage(Vertical):
     def _ensure_streaming_widget(self) -> None:
         """Mount the streaming buffer on first use (must be called after self is mounted)."""
         from textual.widget import MountError
+
         try:
             if self._streaming_text not in self.children:
                 self.mount(self._streaming_text)
