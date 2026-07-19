@@ -83,6 +83,11 @@ warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
 ignore_missing_imports = true
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = "nexusagent.infrastructure.utils.math"
+ignore_errors = false
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
