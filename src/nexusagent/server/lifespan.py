@@ -92,10 +92,6 @@ def create_server_app() -> fastapi.FastAPI:
     return app
 
 
-# Default app instance (for uvicorn import string)
-app = create_server_app()
-
-
 def _wire_runtime_health(app: fastapi.FastAPI) -> None:
     """Add a runtime-aware health endpoint to an existing route."""
 
@@ -120,3 +116,7 @@ def _wire_runtime_health(app: fastapi.FastAPI) -> None:
             "uptime_seconds": round(uptime, 1),
             "runtime": runtime_health,
         }
+
+
+# Default app instance (for uvicorn import string)
+app = create_server_app()
