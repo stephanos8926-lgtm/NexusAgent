@@ -14,6 +14,7 @@ dependencies = [
     "fastapi",
     "uvicorn",
     "pytest",
+    "pytest-asyncio",
     "ruff",
     "mypy",
     "pydantic",
@@ -83,11 +84,10 @@ warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
 ignore_missing_imports = true
-ignore_errors = true
 
 [[tool.mypy.overrides]]
-module = "nexusagent.infrastructure.utils.math"
-ignore_errors = false
+module = "nexusagent.core.*,src.nexusagent.core.*,nexusagent.tools.*,src.nexusagent.tools.*,nexusagent.server.*,src.nexusagent.server.*,nexusagent.interfaces.*,src.nexusagent.interfaces.*,nexusagent.widgets.*,src.nexusagent.widgets.*,nexusagent.memory.*,src.nexusagent.memory.*,nexusagent.llm.*,src.nexusagent.llm.*,nexusagent.hooks.*,src.nexusagent.hooks.*,nexusagent.infrastructure.config,nexusagent.infrastructure.auth,nexusagent.infrastructure.bus,nexusagent.infrastructure.db.*,nexusagent.infrastructure.prompt_loader,nexusagent.infrastructure.rate_limit,nexusagent.infrastructure.template_includes,src.nexusagent.infrastructure.config,src.nexusagent.infrastructure.auth,src.nexusagent.infrastructure.bus,src.nexusagent.infrastructure.db.*,src.nexusagent.infrastructure.prompt_loader,src.nexusagent.infrastructure.rate_limit,src.nexusagent.infrastructure.template_includes,nexusagent.infrastructure.utils.retry,nexusagent.infrastructure.utils.circuit,nexusagent.infrastructure.utils.budget,src.nexusagent.infrastructure.utils.retry,src.nexusagent.infrastructure.utils.circuit,src.nexusagent.infrastructure.utils.budget"
+ignore_errors = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

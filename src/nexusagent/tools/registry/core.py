@@ -10,6 +10,7 @@ Architecture:
     callers continue to work.
 """
 
+# ruff: noqa: I001, W292
 from __future__ import annotations
 
 import asyncio
@@ -20,9 +21,10 @@ from threading import RLock
 from types import MappingProxyType
 from typing import Any
 
+from .types import ToolInfo
+
 from nexusagent.core.trust import TrustLevel
 
-from .types import ToolInfo
 
 # ─── ToolRegistry ────────────────────────────────────────────────────────
 

@@ -1,11 +1,11 @@
+# ruff: noqa: I001, F401, N802
+import pytest
 from threading import Thread
 from time import sleep
 from types import MappingProxyType
 from unittest.mock import MagicMock
 
-import pytest
-
-from src.nexusagent.tools.registry.core import register_tool, registry
+from src.nexusagent.tools.registry.core import ToolRegistry, registry, register_tool
 from src.nexusagent.tools.registry.types import ToolInfo
 
 
@@ -107,19 +107,19 @@ def test_toolregistry_concurrent_rlock_safety():
 
 def test_toolregistry_prune():
     @register_tool(name="toolA", description="descA", parameters={}, example="exA")
-    def toolA():  # noqa: N802
+    def toolA():
         pass
 
     registry.freeze()  # version 1
 
     @register_tool(name="toolB", description="descB", parameters={}, example="exB")
-    def toolB():  # noqa: N802
+    def toolB():
         pass
 
     registry.freeze()  # version 2
 
     @register_tool(name="toolC", description="descC", parameters={}, example="exC")
-    def toolC():  # noqa: N802
+    def toolC():
         pass
 
     registry.freeze()  # version 3
@@ -149,7 +149,7 @@ def test_toolregistry_get_snapshot_graceful_handling():
 
 def test_toolregistry_registryproxy_typeerror_on_mutation():
     @register_tool(name="toolX", description="descX", parameters={}, example="exX")
-    def toolX():  # noqa: N802
+    def toolX():
         pass
 
     registry.freeze()

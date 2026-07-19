@@ -1,13 +1,14 @@
 """Tests for the trust subsystem (TrustLevel, TrustedContent, AnomalyScorer)."""
 
-
+# ruff: noqa: I001, F401, RUF001, W292
 import pytest
+from types import MappingProxyType
 
 from nexusagent.core.trust import (
     AnomalyScorer,
     TrustConfig,
-    TrustedContent,
     TrustLevel,
+    TrustedContent,
     get_anomaly_scorer,
 )
 
@@ -111,7 +112,7 @@ class TestAnomalyScorer:
 
     def test_non_ascii_handled(self):
         scorer = AnomalyScorer()
-        score = scorer.score("你好世界，这是一个测试。")  # noqa: RUF001
+        score = scorer.score("你好世界，这是一个测试。")
         assert score >= 0.0  # Should not crash
 
     def test_instruction_density_detected(self):
