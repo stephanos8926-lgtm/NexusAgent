@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import logging
 import threading
-from typing import Optional
 
 from nexusagent.runtime.context import RuntimeContext
 from nexusagent.runtime.lifecycle import (
@@ -29,7 +28,7 @@ class ToolManager(LifecycleMixin):
     instead of the module-level bool.
     """
 
-    def __init__(self, context: Optional[RuntimeContext] = None) -> None:
+    def __init__(self, context: RuntimeContext | None = None) -> None:
         self._state = LifecycleState.CREATED
         self._context = context
         self._lock = threading.RLock()

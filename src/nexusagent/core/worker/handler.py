@@ -54,7 +54,7 @@ async def _run_agent_task(task: TaskSchema) -> str:
         if is_research:
             return await _run_research_workflow(task, working_dir)
         else:
-            loop = asyncio.get_running_loop()
+            asyncio.get_running_loop()
             state = {
                 "task": task.description,
                 "id": task.id,

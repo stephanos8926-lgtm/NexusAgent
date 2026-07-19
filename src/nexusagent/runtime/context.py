@@ -10,19 +10,15 @@ from __future__ import annotations
 import contextvars
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from nexusagent.hooks import HookManager
-    from nexusagent.infrastructure.bus import AgentBus
-    from nexusagent.infrastructure.config import ConfigSchema
-    from nexusagent.infrastructure.db.manager import DBManager
-    from nexusagent.tools.registry.core import ToolRegistry
+    pass
 
 
 # ContextVar-based accessor — fallback for during the transition period.
 # Components should receive RuntimeContext explicitly whenever possible.
-_runtime_context_var: contextvars.ContextVar[Optional["RuntimeContext"]] = (
+_runtime_context_var: contextvars.ContextVar[RuntimeContext | None] = (
     contextvars.ContextVar("runtime_context", default=None)
 )
 
@@ -48,35 +44,35 @@ class RuntimeContext:
     config: Any  # ConfigSchema — avoid circular import at runtime
 
     # Tool system (set by ToolManager)
-    tool_registry: Optional[Any] = None  # ToolRegistry
-    tool_roles: Optional[dict[str, list[str]]] = None
+    tool_registry: Any | None = None  # ToolRegistry
+    tool_roles: dict[str, list[str]] | None = None
     tool_initialized: bool = False
 
     # Session identity (migrated from core.agent ContextVars)
-    current_session_id: Optional[str] = None
-    workspace_memory_dir: Optional[str] = None
+    current_session_id: str | None = None
+    workspace_memory_dir: str | None = None
 
     # Workspace path jail (migrated from tools.fs_base ContextVar)
-    workspace_root: Optional[Path] = None
+    workspace_root: Path | None = None
 
     # Tool policy (migrated from tools.registry.policy ContextVar)
     # NOTE: Owned by ManagedSession lifecycle — set on init, cleared on shutdown
-    policy_context: Optional[dict[str, Any]] = None
+    policy_context: dict[str, Any] | None = None
 
     # Sub-system references (set by Runtime)
-    bus: Optional[Any] = None  # AgentBus
-    db_manager: Optional[Any] = None  # DBManager
-    hook_manager: Optional[Any] = None  # HookManager
+    bus: Any | None = None  # AgentBus
+    db_manager: Any | None = None  # DBManager
+    hook_manager: Any | None = None  # HookManager
 
     # Session/worker managers — owned by Runtime, stored here for convenience
-    session_manager: Optional[Any] = None
-    worker_manager: Optional[Any] = None
+    session_manager: Any | None = None
+    worker_manager: Any | None = None
 
     # Arbitrary extra state for extensions (not frozen after all)
     extra: dict[str, Any] = field(default_factory=dict)
 
 
-def current_context() -> Optional[RuntimeContext]:
+def current_context() -> RuntimeContext | None:
     """Return the active RuntimeContext, or None if no Runtime is active.
 
     This is a fallback accessor for the transition period. Components that
@@ -85,7 +81,7 @@ def current_context() -> Optional[RuntimeContext]:
     return _runtime_context_var.get()
 
 
-def set_current_context(ctx: Optional[RuntimeContext]) -> None:
+def set_current_context(ctx: RuntimeContext | None) -> None:
     """Set the active RuntimeContext for the current task.
 
     Called by Runtime during initialize() and shutdown().

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any
 
 from nexusagent.runtime.context import RuntimeContext
 from nexusagent.runtime.lifecycle import (
@@ -41,8 +41,8 @@ class ManagedSession(LifecycleMixin):
     def __init__(
         self,
         session: Any,
-        context: Optional[RuntimeContext] = None,
-        metadata: Optional[SessionMetadata] = None,
+        context: RuntimeContext | None = None,
+        metadata: SessionMetadata | None = None,
     ) -> None:
         self._session = session
         self._context = context
@@ -100,7 +100,7 @@ class ManagedSession(LifecycleMixin):
 
     # --- Delegated API ---
 
-    async def send(self, user_message: str, images: Optional[list[str]] = None) -> None:
+    async def send(self, user_message: str, images: list[str] | None = None) -> None:
         """Process a user message. Delegates to session.send().
 
         Additionally sets current_session_id on RuntimeContext when active.
@@ -126,7 +126,7 @@ class RuntimeSessionManager(LifecycleMixin):
 
     def __init__(
         self,
-        context: Optional[RuntimeContext] = None,
+        context: RuntimeContext | None = None,
     ) -> None:
         self._context = context
         self._state = LifecycleState.CREATED
@@ -175,7 +175,7 @@ class RuntimeSessionManager(LifecycleMixin):
         working_dir: str,
         agent: Any,
         db_repo: Any,
-        memory_dir: Optional[str] = None,
+        memory_dir: str | None = None,
         **kwargs: Any,
     ) -> ManagedSession:
         """Get an existing session or create a new one.
@@ -209,7 +209,7 @@ class RuntimeSessionManager(LifecycleMixin):
         self._sessions[session_id] = managed
         return managed
 
-    def get(self, session_id: str) -> Optional[ManagedSession]:
+    def get(self, session_id: str) -> ManagedSession | None:
         """Get a managed session by ID."""
         return self._sessions.get(session_id)
 

@@ -24,7 +24,6 @@ from nexusagent.runtime.context import RuntimeContext
 from nexusagent.runtime.lifecycle import HealthStatus, LifecycleState
 from nexusagent.runtime.runtime import Runtime
 
-
 # =============================================================================
 # Runtime + existing SessionManager integration
 # =============================================================================
@@ -240,10 +239,10 @@ class TestRuntimeWorkerManagerIntegration:
         assert mgr._max_workers == 4
 
     @patch("nexusagent.core.worker.pool.WorkerPool")
-    async def test_initialize_creates_pool(self, MockPool):
+    async def test_initialize_creates_pool(self, mock_pool_cls):
         """initialize() creates a WorkerPool and sets it on context."""
         mock_pool_instance = MagicMock()
-        MockPool.return_value = mock_pool_instance
+        mock_pool_cls.return_value = mock_pool_instance
 
         ctx = RuntimeContext(config={})
         mgr = RuntimeWorkerManager(context=ctx, max_workers=4)
@@ -251,11 +250,11 @@ class TestRuntimeWorkerManagerIntegration:
 
         assert mgr.state == LifecycleState.RUNNING
         assert mgr._pool is mock_pool_instance
-        MockPool.assert_called_once_with(max_workers=4)
+        mock_pool_cls.assert_called_once_with(max_workers=4)
         assert ctx.worker_manager is mgr
 
     @patch("nexusagent.core.worker.pool.WorkerPool")
-    async def test_spawn_returns_managed_worker(self, MockPool):
+    async def test_spawn_returns_managed_worker(self, mock_pool_cls):
         """spawn() delegates to WorkerPool and wraps handle in ManagedWorker."""
         # Create a realistic mock SubAgentHandle
         mock_handle = MagicMock()
@@ -269,7 +268,7 @@ class TestRuntimeWorkerManagerIntegration:
 
         mock_pool = MagicMock()
         mock_pool.spawn = AsyncMock(return_value=mock_handle)
-        MockPool.return_value = mock_pool
+        mock_pool_cls.return_value = mock_pool
 
         ctx = RuntimeContext(config={})
         mgr = RuntimeWorkerManager(context=ctx)
@@ -285,14 +284,14 @@ class TestRuntimeWorkerManagerIntegration:
         assert mgr.active_count == 1
 
     @patch("nexusagent.core.worker.pool.WorkerPool")
-    async def test_spawn_raises_if_not_initialized(self, MockPool):
+    async def test_spawn_raises_if_not_initialized(self, mock_pool_cls):
         """spawn() raises RuntimeError if initialize() was not called."""
         mgr = RuntimeWorkerManager()
         with pytest.raises(RuntimeError, match="Worker manager not initialized"):
             await mgr.spawn(contract=MagicMock())
 
     @patch("nexusagent.core.worker.pool.WorkerPool")
-    async def test_get_retrieves_managed_worker(self, MockPool):
+    async def test_get_retrieves_managed_worker(self, mock_pool_cls):
         """get() returns a previously spawned ManagedWorker by ID."""
         mock_handle = MagicMock()
         mock_handle.worker_id = "worker-get-test"
@@ -304,7 +303,7 @@ class TestRuntimeWorkerManagerIntegration:
 
         mock_pool = MagicMock()
         mock_pool.spawn = AsyncMock(return_value=mock_handle)
-        MockPool.return_value = mock_pool
+        mock_pool_cls.return_value = mock_pool
 
         mgr = RuntimeWorkerManager()
         await mgr.initialize()
@@ -316,14 +315,14 @@ class TestRuntimeWorkerManagerIntegration:
         assert retrieved.worker_id == "worker-get-test"
 
     @patch("nexusagent.core.worker.pool.WorkerPool")
-    async def test_get_returns_none_for_missing(self, MockPool):
+    async def test_get_returns_none_for_missing(self, mock_pool_cls):
         """get() returns None for an unknown worker ID."""
         mgr = RuntimeWorkerManager()
         await mgr.initialize()
         assert mgr.get("nonexistent") is None
 
     @patch("nexusagent.core.worker.pool.WorkerPool")
-    async def test_shutdown_cancels_all_workers(self, MockPool):
+    async def test_shutdown_cancels_all_workers(self, mock_pool_cls):
         """shutdown() cancels all managed workers and clears the cache."""
         mock_handle = MagicMock()
         mock_handle.worker_id = "worker-shutdown"
@@ -335,7 +334,7 @@ class TestRuntimeWorkerManagerIntegration:
 
         mock_pool = MagicMock()
         mock_pool.spawn = AsyncMock(return_value=mock_handle)
-        MockPool.return_value = mock_pool
+        mock_pool_cls.return_value = mock_pool
 
         mgr = RuntimeWorkerManager()
         await mgr.initialize()
@@ -348,7 +347,7 @@ class TestRuntimeWorkerManagerIntegration:
         mock_handle.cancel.assert_called_once()
 
     @patch("nexusagent.core.worker.pool.WorkerPool")
-    async def test_health_status(self, MockPool):
+    async def test_health_status(self, mock_pool_cls):
         """health() reflects running state and active worker count."""
         mock_handle = MagicMock()
         mock_handle.worker_id = "worker-health"
@@ -360,7 +359,7 @@ class TestRuntimeWorkerManagerIntegration:
 
         mock_pool = MagicMock()
         mock_pool.spawn = AsyncMock(return_value=mock_handle)
-        MockPool.return_value = mock_pool
+        mock_pool_cls.return_value = mock_pool
 
         mgr = RuntimeWorkerManager()
         await mgr.initialize()
@@ -464,7 +463,7 @@ class TestRuntimeFullLifecycleIntegration:
     @patch("nexusagent.core.worker.pool.WorkerPool")
     async def test_full_lifecycle_state_transitions(
         self,
-        MockPool,
+        mock_pool_cls,
         mock_get_sm,
         mock_register,
         mock_get_bus,
@@ -504,7 +503,7 @@ class TestRuntimeFullLifecycleIntegration:
 
         mock_pool = MagicMock()
         mock_pool.spawn = AsyncMock(return_value=mock_handle)
-        MockPool.return_value = mock_pool
+        mock_pool_cls.return_value = mock_pool
 
         # ═══════ Phase 1: CREATED ═══════
         rt = Runtime(config={"lifecycle": True})
@@ -575,7 +574,7 @@ class TestRuntimeFullLifecycleIntegration:
     @patch("nexusagent.core.worker.pool.WorkerPool")
     async def test_shutdown_with_active_session_and_worker(
         self,
-        MockPool,
+        mock_pool_cls,
         mock_get_sm,
         mock_register,
         mock_get_bus,
@@ -612,7 +611,7 @@ class TestRuntimeFullLifecycleIntegration:
 
         mock_pool = MagicMock()
         mock_pool.spawn = AsyncMock(return_value=mock_handle)
-        MockPool.return_value = mock_pool
+        mock_pool_cls.return_value = mock_pool
 
         # ── Setup Runtime ──
         rt = Runtime(config={})

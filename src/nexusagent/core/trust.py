@@ -10,11 +10,10 @@ from __future__ import annotations
 
 import math
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import IntEnum
 from threading import Lock
 from typing import Any
-
 
 # ─── TrustLevel ──────────────────────────────────────────────────────────
 
@@ -229,7 +228,7 @@ class AnomalyScorer:
             std = math.sqrt(variance) if variance > 0 else 1.0
 
         z = abs(length - mean) / std
-        # Z-score > 3 is 3σ outlier
+        # Z-score > 3 is 3-sigma outlier
         return min(z / 6.0, 1.0)
 
     def _instruction_density(self, text: str) -> float:

@@ -125,15 +125,20 @@ class DeepResearchOrchestrator:
         return [SearchResult(url="search", title=query, snippet=raw or "")]
 
     async def _fetch(self, url: str) -> str | None:
-        """Fetch content from a URL using the existing fetch_url tool."""
+        """Fetch content from a URL using the existing fetch_url tool.
+
+        Delegates to the existing `fetch_url` function from `nexusagent.tools.research`.
+        Runs the synchronous tool function in an executor to avoid blocking.
+        """
+        import asyncio
+
+        from nexusagent.tools.research import fetch_url
+
         try:
-            # fetch_url is sync (uses httpx directly) — run in executor to avoid blocking
-            import asyncio
-
-            from nexusagent.tools.research import fetch_url
-
-            return await asyncio.get_event_loop().run_in_executor(None, fetch_url, url)
-        except Exception:
+            loop = asyncio.get_running_loop()
+            return await loop.run_in_executor(None, fetch_url, url)
+        except Exception as e:
+            logger.debug(f"Error fetching URL {url}: {e}")
             return None
 
     async def _generate_plan(self, query: str) -> ResearchPlan:
@@ -225,7 +230,7 @@ class DeepResearchOrchestrator:
         Instructions: Ensure every claim is backed by a source. Use citations like [1], [2].
         Maintain a {template_type} tone."""
         response = await llm.generate(prompt, system_prompt="You are a master technical writer.")
-        return response.content
+        return str(response.content)
 
 
 # Module-level singleton (lazy, injectable)
