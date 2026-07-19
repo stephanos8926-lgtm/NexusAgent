@@ -8,7 +8,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from typing import Any
 
 import fastapi
 
@@ -20,7 +22,7 @@ logger = logging.getLogger("nexusagent.server")
 
 
 @asynccontextmanager
-async def runtime_lifespan(app: fastapi.FastAPI):
+async def runtime_lifespan(app: fastapi.FastAPI) -> AsyncGenerator[None]:
     """FastAPI Lifespan with Runtime lifecycle management.
 
     Creates a Runtime at startup, initializes it, and shuts it down
@@ -84,17 +86,21 @@ def create_server_app() -> fastapi.FastAPI:
 
     # WebSocket endpoint
     @app.websocket("/ws/{session_id}")
-    async def ws_endpoint(websocket, session_id: str):
+    async def ws_endpoint(websocket: Any, session_id: str) -> None:
         await session_websocket(websocket, session_id)
 
     return app
+
+
+# Default app instance (for uvicorn import string)
+app = create_server_app()
 
 
 def _wire_runtime_health(app: fastapi.FastAPI) -> None:
     """Add a runtime-aware health endpoint to an existing route."""
 
     @app.get("/health")
-    async def health():
+    async def health() -> dict[str, Any]:
         """Return server health, including Runtime subsystem status."""
         import time
 

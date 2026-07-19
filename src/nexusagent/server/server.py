@@ -1,4 +1,4 @@
-# src/nexusagent/server.py
+# src/nexusagent/server/server.py
 """FastAPI WebSocket server for the NexusAgent platform."""
 
 import asyncio
@@ -122,7 +122,7 @@ def _acquire_singleton_lock() -> int | None:
     return fd
 
 
-def run(reload: bool = False) -> None:
+def run(reload: bool = False, use_lifespan_app: bool = False) -> None:
     """Entry point for the nexus-server command."""
     import uvicorn
 
@@ -130,8 +130,10 @@ def run(reload: bool = False) -> None:
     if lock_fd is None:
         return  # Another instance is already running
 
+    app_import_string = "nexusagent.server.lifespan:app" if use_lifespan_app else "nexusagent.server.server:app"
+
     uvicorn.run(
-        "nexusagent.server.server:app",
+        app_import_string,
         host="0.0.0.0",
         port=settings.server.api_port,
         reload=settings.server.reload,
