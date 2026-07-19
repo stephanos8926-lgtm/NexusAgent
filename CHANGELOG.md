@@ -17,6 +17,12 @@
 - **Dual audits:** Forward + reverse audit of spec before implementation
 - **104 runtime tests** — 8 test files, all passing on Python 3.12+3.13
 
+### Migration Framework
+- Established 12-phase architectural migration plan ([Chief Architect Directive](docs/architecture/migration/CHIEF-ARCHITECT-DIRECTIVE.md))
+- All 11 post-foundation phases specified: Task State Machine, Event-Driven Core, LangGraph Worker Runtime, Planner & Orchestrator, DAG Execution Engine, POL Control Plane, Capability Security, Memory Evolution, Observability, Production Readiness
+- Phase 1 (Runtime Foundation) gating dependency cleared for all subsequent phases
+- Migration tracking established in `docs/architecture/migration/TRACKING.md`
+
 ### Infrastructure
 - **Worktree plugin** — Fixed 13 handler signatures (`args: dict` → `**kwargs`), added registration wrappers
 - **Mistral/Vibe integration** — Rewrote `mistral.py` to use Vibe CLI programmatic mode (local + teleport)

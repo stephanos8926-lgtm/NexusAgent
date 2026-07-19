@@ -18,6 +18,12 @@
 | PR #5 merge (ChatInput placeholder) + ContextVar fix | `6a2c8dc` | ✅ |
 | **104/104 tests pass** | Python 3.12+3.13 verified | ✅ |
 
+### Migration Framework
+- **12-phase plan** defined: Runtime → Task Durable → Events → LangGraph Workers → Planner → DAG → POL → Capabilities → Memory Evolution → Observability → Production
+- **Chief Architect Directive** governs all migration order — phases cannot be skipped
+- Phase 1 ✅ clears gating dependency for all subsequent phases
+- Phase 2 (Task State Machine) is next in dependency order
+
 ### Archivecture Docs Updated
 
 | Document | Change |

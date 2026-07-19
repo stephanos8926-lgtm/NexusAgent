@@ -10,7 +10,9 @@ NexusAgent is a local AI coding agent platform that runs in your terminal. It co
 
 No cloud dependency. No data leaving your machine. Your keys, your code, your control.
 
-## Current Phase: Phase 1 Complete → Phase 2 Next
+## Current Phase: Phase 1 of 11 Complete → Phase 2 Next
+
+[12-Phase Migration Plan](docs/architecture/migration/00-master-transition-plan.md) — architecturally-ordered transition from agent framework to distributed autonomous agent runtime.
 
 **Phase 1: Runtime Foundation (✅ Delivered 2026-07-19)**
 - Runtime kernel with 7-state lifecycle (created → running → stopped)
