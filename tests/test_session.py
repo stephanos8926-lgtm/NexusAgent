@@ -191,7 +191,8 @@ async def test_session_send_error_handling(db_and_repo, mock_memory):
     # Agent that raises
     async def _bad_astream(input_data, stream_mode=None, **kwargs):
         raise RuntimeError("LLM connection failed")
-        yield  # noqa: unreachable, makes this an async generator
+        # makes this an async generator
+        yield
 
     bad_agent = MagicMock()
     bad_agent.astream = _bad_astream
