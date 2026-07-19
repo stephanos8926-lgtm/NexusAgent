@@ -1,105 +1,78 @@
-# SESSION STATE — Workstation
-**Date:** 2026-07-18
-**Branch:** master (NexusAgent)
-**Last Commit:** 03c80f2 — Merge PR #2: TUI visual and capability overhaul
+# NexusAgent — Session State
 
-## Active Project: NexusAgent
-**Repository:** `~/Workspaces/NexusAgent`
-**Branch:** master
-**Last Commit:** 03c80f2 (merged v3 security sprint + Jules' PR #2)
-**Test Status:** 26 targeted tests passing (trust + registry), full suite pending
+**Date:** 2026-07-19  
+**Phase:** 1 (Runtime Foundation) — ✅ Complete  
+**Next:** Phase 2 (Memory System Polish)  
 
-## Server
-**Host:** sysop@dev
-**Hermes Version:** 0.18.2
-**Status:** Board synced, worktrees cleaned, repo pulled to master
+---
 
-## Gateway Status
-**Workstation (rw-workstation-01):** Active — 486MB RAM (YELLOW), load elevated
-**Server (dev):** Active — Gateway running, no platform config
+## What's Done (Phase 1: Runtime Foundation)
 
-## Completed Workstreams
+| Deliverable | SHA / PR | Status |
+|---|---|---|
+| Runtime lifecycle (7-state), DI container, Runtime kernel | `889efd2` | ✅ Pushed |
+| CLI adapter: `create_server_app()` in `__main__.py` | `c3b32ef` (merge of PR #7 + our work) | ✅ Merged |
+| Integration tests: 20 tests, 4 groups | `b2ce23e` | ✅ Pushed |
+| `pytest-asyncio` dependency fix | `59c1e02` | ✅ Pushed |
+| Server lifespan health endpoint fix | `17c1f23` | ✅ Pushed |
+| Server-verified on dev VM | 104/104 pass | ✅ Verified |
+| Dev VM cleanup | — | ✅ Done |
 
-### ✅ v3 Security & Trust Overhaul Sprint (2026-07-14)
-6-phase sprint delivered, merged to master at 699619a:
+## What's In Progress
 
-| Phase | Title | Branch |
-|-------|-------|--------|
-| P1 | ToolInfo frozen dataclass + ToolRegistry with RLock snapshots | `wt/p1-tool-registry` |
-| P2 | async Agent.__init__ with await MCP loading + per-agent snapshots | `wt/p2-agent-async` |
-| P3 | freeze() + prune() in registration wiring | `wt/p2-agent-async` |
-| P4 | TrustLevel, TrustedContent, AnomalyScorer trust infrastructure | `wt/p4-trust-foundations` |
-| P5 | Trust integration into ToolInfo, registry, MCP, naming enforcement | `wt/p4-trust-foundations` |
-| P6 | 26 tests passing (9 registry + 16 trust + 1 config) | `wt/p4-trust-foundations` |
+### Worktree Plugin Fixes (needs session restart)
+- `tools.py`: 13 handlers `args: dict` → `**kwargs` ✅
+- `__init__.py`: Registration wrappers to bypass module cache ✅
+- `mistral.py`: Rewritten to use Vibe CLI (local + teleport modes) ✅
+- `vibe_code_enabled=true` in `~/.vibe/config.toml` ✅
 
-**Key artifacts:**
-- `src/nexusagent/core/trust.py` — TrustLevel, TrustedContent, AnomalyScorer
-- `src/nexusagent/tools/registry/core.py` — ToolRegistry class
-- `src/nexusagent/tools/registry/types.py` — frozen ToolInfo with trust/provenance
-- `src/nexusagent/core/agent.py` — async __init__ with per-agent snapshots
-- `src/nexusagent/infrastructure/config.py` — TrustConfig + BudgetConfig
+### Vibe Code Web (Mistral cloud dispatch)
+- Auth works (got past 401 to 429 rate limit)
+- Needs Vibe CLI API key from console.mistral.ai → Code → Vibe CLI
+- Env var takes precedence — current `MISTRAL_API_KEY` is a regular key, not a Vibe key
+- OR: run `vibe --setup` interactively once to store browser auth
 
-### ✅ PR #2 Merged: Jules' TUI Overhaul (2026-07-18)
-Merged at 03c80f2. Key additions:
-- ThreadsModal + ModelModal interactive switchers
-- write_todos/read_todos tools (+71 lines)
-- TUI diff visualization, /yolo command, Ctrl+Y binding
-- ask_user async rewrite with _current_session context var
-- BudgetConfig preserved (verified present in Jules' branch)
+## Open Pull Requests
 
-## Current Workstream: Architecture Migration Planning
+| PR | Title | Status | Notes |
+|---|---|---|---|
+| #5 | ChatInput placeholder micro-UX | 🟡 Open | Small, likely safe — review needed |
+| #1 | Import optimization + lazy tool reg | 🟡 Open | Risky, large — may conflict with runtime code |
 
-### Status: SPECIFICATION PHASE — No implementation started yet
+### Closed This Session
+- **#6** — Wire create_server_app (duplicate of #7)
+- **#8** — CI/CD workflow (subset of #9)
+- **#9** — _fetch() stub fix + lint sweep (_fetch() already in master via e8a4c20)
+- **#4** — is_prime utility (low priority)
 
-We have received and saved the complete 12-phase migration architecture for transforming NexusAgent from an agent framework into a distributed autonomous agent runtime platform.
+## Remaining Work (Priority Order)
 
-### Architecture Documents Saved
-All stored under `docs/architecture/migration/`:
+### Priority 1: Memory System Polish
+- [ ] Unify memory system — remove dead `Memory`/`MemoryManager` SQLite classes
+- [ ] Integration tests for DreamCycle end-to-end
+- [ ] Tests for ConsolidationEngine (duplicate/contradiction detection)
+- [ ] Tests for LLMRefinement layer
+- [ ] Test coverage target: 80%
 
-| Doc | Phase | Description |
-|-----|-------|-------------|
-| CHIEF-ARCHITECT-DIRECTIVE.md | All | Master specification covering all 12 phases |
-| 00-master-transition-plan.md | 0 | Architecture target, migration principles, phase overview |
-| 01-runtime-foundation.md | 1 | Runtime kernel, lifecycle states, DI boundaries |
-| 02-task-state-machine.md | 2 | Durable task model, state transitions, checkpoint recovery |
-| 03-event-driven-core.md | 3 | Event schema, NATS backbone, subscribers |
-| 04-langgraph-worker-runtime.md | 4 | Autonomous worker graph, checkpoint persistence, recovery |
-| 05-planner-orchestrator.md | 5 | Goal decomposition, separate reasoning from execution |
-| 06-dag-execution-engine.md | 6 | Graph validation, scheduling, parallel execution |
-| 07-pol-control-plane.md | 7 | AI governance, policy engine, intervention protocol |
-| 08-capability-security-model.md | 8 | Capability registry, policy router, audit trail |
-| 09-memory-evolution.md | 9 | 4-layer memory, trust-aware ingestion |
-| 10-observability-reliability.md | 10 | Structured logging, tracing, metrics, failure classification |
-| 11-production-readiness.md | 11 | Security, sandboxing, deployment, testing |
+### Priority 2: Remaining Refactoring
+- [ ] `tui/app.py` — Complete TUI split
+- [ ] `session/session.py` — Extract prompt building, approval flow
+- [ ] `memory/memory_files.py` — Split into frontmatter, entity_ops, daily_log
+- [ ] `memory/dream.py` — Split phases into separate modules
 
-### Target Architecture
-```
-NexusAgent Runtime → POL → Event Backbone → Interactive Sessions + Autonomous Workers → Memory System
-```
+### Priority 3: CI/CD
+- [ ] GitHub Actions for automated testing
+- [ ] Pre-commit hooks for ruff linting
+- [ ] Test coverage reporting
 
-### Key Principles
-1. Evolution over replacement — no rewrites
-2. Events as nervous system
-3. Capability-based execution (not direct tool access)
-4. Explicit state machines for all long-running tasks
-5. Every change requires 3+ approach evaluation with decision matrix
+### Priority 4: Feature Work
+- [ ] P0: MCP support
+- [ ] P0: Codebase indexing (Tree-sitter + embedding)
+- [ ] P1: Sandboxing for tool execution
 
-### Next Actions (NOT YET STARTED — awaiting signal)
-- Phase 1: Create `src/nexusagent/runtime/` package with Runtime kernel, lifecycle states, DI
-- Phase 2: Task entity with state machine validator and checkpoint persistence
-- Phase 3: Event schema, wire NATS as event backbone, create subscribers
-- Phase 4: LangGraph worker graph abstraction with checkpoint recovery
-- Phase 5: Planner schema + Orchestrator dispatcher
-- Phase 6: DAG validator, scheduler, parallel execution
-- Phase 7: POL service, policy engine, intervention protocol
-- Phase 8: Capability registry, router, policy enforcement
-- Phase 9: 4-layer memory refactor with trust-aware ingestion
-- Phase 10: Observability layer (logging, tracing, metrics, health)
-- Phase 11: Production hardening, security, sandboxing, deployment
+## Machine State
 
-## Known Issues
-- RAM critically low on workstation (486MB) — may need server offload for heavy tasks
-- Full test suite not run since v3 sprint merge (targeted tests only)
-- worktree-worker plugin now enabled (takes effect next session)
-- worktree branches cleaned up on both machines
-- Stale feature branches on origin (wt/p1-*, wt/p2-*, wt/p4-*) pending cleanup
+- **Workstation:** i3/4GB — RAM tight, avoid heavy parallelism
+- **Server (dev VM):** 83 runtime tests pass on Python 3.13
+- **Worktree plugin:** Fixed at source, needs session restart to activate
+- **Vibe CLI:** v2.21.0 installed, teleport fixed (was 401 auth, now 429 rate limit)

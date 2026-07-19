@@ -1,0 +1,53 @@
+name: rapidwebs-mcp-budget-hook
+version: 1.0.0
+description: MCP token budget enforcement hook with MistralAI compatibility
+author: RapidWebs (Lucien)
+license: MIT
+
+hooks:
+  - name: pre_llm_call
+    handler: hook_pre_llm_call
+    description: Pre-LLM call budget validation and emergency compression trigger
+    priority: 10  # Run early, before other hooks
+    timeout_ms: 500
+    fail_open: true
+
+config_schema:
+  warning_thresholds:
+    type: array
+    items:
+      type: number
+    default: [0.5, 0.8, 0.95]
+    description: "Budget usage thresholds to emit warnings (fraction of max context)"
+  hard_limit:
+    type: number
+    default: 0.95
+    description: "Hard limit as fraction of max context - requests beyond this are blocked"
+  emergency_compression_threshold:
+    type: number
+    default: 0.95
+    description: "Threshold to trigger emergency context compression"
+  fail_open:
+    type: boolean
+    default: true
+    description: "Allow requests through if hook fails (fail-open for availability)"
+
+model_contexts:
+  gpt-4: 8192
+  gpt-4-turbo: 128000
+  gpt-4o: 128000
+  gpt-3.5-turbo: 16384
+  claude-3-opus: 200000
+  claude-3-sonnet: 200000
+  claude-3-haiku: 200000
+  gemini-1.5-pro: 2000000
+  gemini-1.5-flash: 1000000
+  mistral-large: 32768
+  mistral-small: 32768
+  nemotron-3-ultra: 4096
+
+# Add custom models here
+custom_models: {}
+
+# Token estimation
+chars_per_token: 4
