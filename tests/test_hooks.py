@@ -55,9 +55,10 @@ class TestHookEvent:
         assert HookEvent.SUBAGENT_STOP.value == "subagent_stop"
         assert HookEvent.ERROR.value == "error"
         assert HookEvent.USER_PROMPT_SUBMIT.value == "user_prompt_submit"
+        assert HookEvent.BUDGET_ALERT.value == "budget_alert"
 
     def test_all_events_count(self):
-        assert len(HookEvent) == 6
+        assert len(HookEvent) == 7
 
 
 # ── HookRegistration ────────────────────────────────────────────────────────

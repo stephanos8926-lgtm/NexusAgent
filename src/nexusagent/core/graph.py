@@ -214,15 +214,20 @@ async def create_research_graph(db_path: str | None = None) -> Any:
     # SECURITY: Validate db_path is within allowed workspace
     if db_path is not None:
         from pathlib import Path
+        import tempfile
 
         db_path_resolved = Path(db_path).resolve()
         workspace_root = Path.cwd().resolve()
+        temp_dir = Path(tempfile.gettempdir()).resolve()
         try:
             db_path_resolved.relative_to(workspace_root)
-        except ValueError as exc:
-            raise ValueError(
-                f"SECURITY: db_path '{db_path}' resolves outside workspace root"
-            ) from exc
+        except ValueError:
+            try:
+                db_path_resolved.relative_to(temp_dir)
+            except ValueError as exc:
+                raise ValueError(
+                    f"SECURITY: db_path '{db_path}' resolves outside workspace or temporary root"
+                ) from exc
 
     workflow = StateGraph(dict)
 
