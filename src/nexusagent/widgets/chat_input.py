@@ -141,6 +141,8 @@ class ChatInput(TextArea):
         Args:
             **kwargs: Additional keyword arguments passed to TextArea.
         """
+        if "placeholder" not in kwargs:
+            kwargs["placeholder"] = "Type a message or /help... (Shift+Enter for newline)"
         super().__init__(**kwargs)
         self._history: list[str] = _load_history()
         self._history_idx = len(self._history)
