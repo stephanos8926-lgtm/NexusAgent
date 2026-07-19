@@ -117,23 +117,28 @@ ADRs 0009, 0010, 0011 committed
 
 ---
 
-## Acceptance Criteria (Updated)
+## Acceptance Criteria (Updated) — ✅ ALL COMPLETE
 
-- [ ] AC1: `RuntimeContext` creation (7 fields + config)
-- [ ] AC2: `LifecycleState` invalid transition rejection
-- [ ] AC3: `LifecycleMixin` ABC enforcement
-- [ ] AC4: `Runtime.initialize()`: CREATED → INITIALIZING → RUNNING
-- [ ] AC5: `Runtime.shutdown()`: RUNNING → TERMINATING → TERMINATED (error-isolated)
-- [ ] AC6: `ToolManager.ensure_registered()` dual-path (Runtime + legacy)
-- [ ] AC7: `ManagedSession` wraps Session + lifecycle
-- [ ] AC8: `ManagedWorker` wraps SubAgentHandle + lifecycle
-- [ ] AC9: **7** global shims + backward-compat fallback
-- [ ] AC10: Server starts/stops via Runtime
-- [ ] AC11: Pre-migration test baseline matches post-migration
-- [ ] AC12: 3 ADRs committed
-- [ ] AC13: Clean server shutdown
-- [ ] AC14: `current_context()` returns None safely
-- [ ] AC15: `Session.send()` works with/without RuntimeContext
+- [x] AC1: `RuntimeContext` creation (7 fields + config)
+- [x] AC2: `LifecycleState` invalid transition rejection
+- [x] AC3: `LifecycleMixin` ABC enforcement
+- [x] AC4: `Runtime.initialize()`: CREATED → INITIALIZING → RUNNING
+- [x] AC5: `Runtime.shutdown()`: RUNNING → TERMINATING → TERMINATED (error-isolated)
+- [x] AC6: `ToolManager.ensure_registered()` dual-path (Runtime + legacy)
+- [x] AC7: `ManagedSession` wraps Session + lifecycle
+- [x] AC8: `ManagedWorker` wraps SubAgentHandle + lifecycle
+- [x] AC9: **7** global shims + backward-compat fallback
+- [x] AC10: Server starts/stops via Runtime (create_server_app + lifespan)
+- [x] AC11: Pre-migration test baseline matches post-migration
+- [x] AC12: 3 ADRs committed (0009, 0010, 0011)
+- [x] AC13: Clean server shutdown
+- [x] AC14: `current_context()` returns None safely
+- [x] AC15: `Session.send()` works with/without RuntimeContext
+- [x] AC16: CLI adapter wires `create_server_app()` into `__main__.py`
+- [x] AC17: Integration tests for all Runtime subsystems (104 tests)
+- [x] AC18: Jules PR #7 merged — server lifespan + wire-up
+- [x] AC19: Worktree plugin dispatch handlers fixed (`**kwargs`)
+- [x] AC20: Mistral Vibe CLI wired for cloud task dispatch
 
 ---
 

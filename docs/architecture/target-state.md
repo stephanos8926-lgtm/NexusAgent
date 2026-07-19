@@ -367,22 +367,30 @@ These are recorded as **ADRs** but summarized here for architectural context:
 
 ---
 
-## Completion Criteria (Phase 1)
+## Completion Criteria (Phase 1) — ✅ ALL COMPLETE
 
-- [ ] Agents execute through `Runtime` kernel abstractions (not directly via `run_agent_task()` free function)
-- [ ] Lifecycle state is observable for every runtime component
-- [ ] Sessions have identity (not just ContextVar)
-- [ ] Workers have identity (not just process-less singleton)
-- [ ] Execution context is explicit (`RuntimeContext` passed to components)
-- [ ] Global state migration plan executed for top-5 singletons:
-  - [ ] `_current_session` → `RuntimeContext.current_session_id`
-  - [ ] `_ws_memory_dir` → `RuntimeContext.workspace_memory_dir`
-  - [ ] `_tools_registered` → `ToolManager.ensure_registered()`
-  - [ ] `_session_manager_instance` → `Runtime.session_manager`
-  - [ ] `_manager` (HookManager) → `Runtime.context.hook_manager`
-- [ ] Existing tests pass (baseline: ~680 passing)
-- [ ] ADRs created for all significant decisions
-- [ ] `docs/architecture/target-state.md` kept in sync with implementation
+- [x] Agents execute through `Runtime` kernel abstractions (not directly via `run_agent_task()` free function)
+- [x] Lifecycle state is observable for every runtime component
+- [x] Sessions have identity (not just ContextVar)
+- [x] Workers have identity (not just process-less singleton)
+- [x] Execution context is explicit (`RuntimeContext` passed to components)
+- [x] Global state migration plan executed for top-5 singletons:
+  - [x] `_current_session` → `RuntimeContext.current_session_id`
+  - [x] `_ws_memory_dir` → `RuntimeContext.workspace_memory_dir`
+  - [x] `_tools_registered` → `ToolManager.ensure_registered()`
+  - [x] `_session_manager_instance` → `Runtime.session_manager`
+  - [x] `_manager` (HookManager) → `Runtime.context.hook_manager`
+- [x] Existing tests pass (104 core runtime + 680 baseline: 684+ total)
+- [x] ADRs created for all significant decisions (0009, 0010, 0011)
+- [x] `docs/architecture/target-state.md` kept in sync with implementation
+- [x] CLI adapter wired (`__main__.py` uses `create_server_app()`)
+- [x] Integration tests for Runtime subsystems (20 new tests)
+- [x] Server lifespan integrated (Runtime-backed create_server_app)
+- [x] Plugin dispatchers fixed for worktree-worker (13 handlers)
+
+**Commit:** `889efd2` (foundation) + `b2ce23e` (CLI adapter + integration tests) + `c3b32ef` (Jules PR merge) + `17c1f23` (fixes)  
+**Pushed:** master — `17c1f23`  
+**Test status:** 104/104 runtime tests passing
 
 ---
 
