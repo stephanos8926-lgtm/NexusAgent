@@ -14,10 +14,9 @@ import logging
 import re
 
 import nexusagent.tools.write_todos  # noqa: F401
+from nexusagent.core.trust import TrustLevel
 from nexusagent.memory.rate_limiter import MemoryRateLimiter
 from nexusagent.tools.registry import register_tool
-
-from nexusagent.core.trust import TrustLevel
 
 logger = logging.getLogger(__name__)
 

@@ -125,7 +125,7 @@ async def _ensure_mcp_tools_loaded():
 
 def _build_role_tools(role: str) -> list:
     """Build the list of tool functions for a given role from registry."""
-    from nexusagent.tools.registry import registry, get_manifest
+    from nexusagent.tools.registry import get_manifest, registry
 
     if role == "full":
         return [info.func for info in registry.current.values()]
