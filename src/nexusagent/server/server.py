@@ -89,8 +89,10 @@ def create_app() -> FastAPI:
     return app
 
 
+from nexusagent.server.lifespan import create_server_app
+
 # Default app instance (for uvicorn import string)
-app = create_app()
+app = create_server_app()
 
 
 def _acquire_singleton_lock() -> int | None:
