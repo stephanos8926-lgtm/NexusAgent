@@ -5,7 +5,7 @@
 | # | Document | Status | Purpose |
 |---|----------|--------|---------|
 | 00 | Master Transition Plan | ✅ | Architecture target, migration principles, phase overview |
-| 01 | Runtime Foundation | ✅ | Runtime kernel, lifecycle states, dependency injection |
+|| 01 | Runtime Foundation | ✅ IMPLEMENTED | 2026-07-19 — Runtime kernel, lifecycle, DI, server integration. 104 tests. |
 | 02 | Task State Machine | ✅ | Durable task model, state transitions, checkpoint recovery |
 | 03 | Event-Driven Core | ✅ | Event schema, NATS backbone, subscribers |
 | 04 | LangGraph Worker Runtime | ✅ | Autonomous worker graph, checkpoint persistence, retry/rollback/escalate |

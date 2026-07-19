@@ -10,8 +10,24 @@ NexusAgent is a local AI coding agent platform that runs in your terminal. It co
 
 No cloud dependency. No data leaving your machine. Your keys, your code, your control.
 
+## Current Phase: Phase 1 Complete → Phase 2 Next
+
+**Phase 1: Runtime Foundation (✅ Delivered 2026-07-19)**
+- Runtime kernel with 7-state lifecycle (created → running → stopped)
+- `RuntimeContext` DI container replacing 7 global ContextVars
+- `ManagedSession`/`ManagedWorker` lifecycle wrappers
+- Server lifespan adapter (FastAPI ↔ Runtime lifecycle)
+- **104 tests, 3 ADRs, dual-audited spec**
+- **Cloud dispatch via Jules (15/day) + Mistral Vibe Code Web (in progress)**
+
+**Phase 2: Memory System Polish (🔜 Next)**
+- Remove dead `Memory`/`MemoryManager` SQLite classes
+- DreamCycle + ConsolidationEngine integration tests
+- Push test coverage toward 80%
+
 ## Features
 
+- **Runtime v1** — 7-state lifecycle, DI container, backward-compat shims for all global singletons
 - **Rich TUI** — Markdown rendering, collapsible tool output, 7 themes, responsive layout, streaming
 - **Multi-provider LLM** — Gemini, OpenRouter, local models via unified provider bridge
 - **Tool system** — 30+ tools: shell, filesystem, code review, web search, subagent spawning, git, AST search, memory
@@ -23,6 +39,8 @@ No cloud dependency. No data leaving your machine. Your keys, your code, your co
 - **NATS bus** — Scalable JetStream messaging for multi-agent deployments
 - **Policy enforcement** — Per-role tool access (permissive/restricted/strict) with auto-unlock
 - **Version handshake** — Client/server version preflight with compatibility warnings
+- **Cloud dispatch** — Jules (Google sandbox, Pro Gemini, 15 PRs/day) + Mistral Vibe (in progress)
+- **Worktree worker** — Isolated git worktrees for parallel task execution on remote servers
 - **Web UI** — Optional browser-based interface alongside the TUI
 - **SDK** — Python SDK for programmatic task submission and orchestration
 
@@ -53,8 +71,9 @@ python -m nexusagent --check-server
 - [Codebase Map](docs/CODEBASE_MAP.md) — Annotated source map with module inventory
 - [Semantic Index](docs/SEMANTIC_INDEX.md) — Data flows, state management, extension points
 - [Roadmap](docs/ROADMAP/index.html) — Interactive audit dashboard & roadmap
-- [ADRs](docs/adrs/index.md) — Architecture decision records (0001-0008)
+- [ADRs](docs/adrs/index.md) — Architecture decision records (0001-0011)
 - [Research](docs/research/) — Feature parity and design research
+- [Architecture](docs/architecture/) — Migration plan (12 phases), current/target state, gap analysis
 
 ## Architecture
 
@@ -68,7 +87,7 @@ python -m nexusagent --check-server
 │       └──────────────┴──────────────┴──────────────┘        │
 │                          │                                  │
 │                   ┌──────┴──────┐                           │
-│                   │ Agent (Core)│                           │
+│                   │   Runtime   │  ← Phase 1: lifecycle + DI │
 │                   └──────┬──────┘                           │
 │                          │                                  │
 │       ┌──────────────────┼──────────────────┐              │

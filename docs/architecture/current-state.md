@@ -973,5 +973,6 @@ Tool System (tools/)
 
 ---
 
-**Document version:** 1.0  
-**Next review:** Before Phase 1 implementation begins
+**Document version:** 1.1  
+**Last updated:** 2026-07-19 — Added runtime/ section reflecting Phase 1 delivery
+**Next review:** After Phase 2 (Memory System Polish)

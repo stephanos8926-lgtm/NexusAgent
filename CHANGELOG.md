@@ -1,5 +1,38 @@
 # Changelog
 
+## 2026-07-19 — Phase 1 Runtime Foundation Delivered
+
+### Runtime Foundation (Phase 1)
+- **Runtime kernel** — `Runtime` class with 7-state lifecycle (created → initializing → running → pausing → paused → resuming → shutting_down → stopped)
+- **Lifecycle model** — `LifecycleMixin` base class validating all state transitions
+- **Dependency Injection** — `RuntimeContext` dataclass replacing 7 global ContextVars. Single container for config, tool_registry, tool_roles, session_id, workspace_root, policy_context, bus, db_manager, hook_manager, session_manager, worker_manager
+- **ManagedSession** — Wraps existing sessions with lifecycle, health endpoint, ContextVar synchronization
+- **ManagedWorker** — Wraps SubAgentHandle with lifecycle tracking, metadata, cancellation
+- **ToolManager** — Runtime-backed tool initialization replacing module-level bools
+- **Server lifespan adapter** — FastAPI lifespan integrating Runtime lifecycle with server startup/shutdown
+- **CLI adapter** — `create_server_app()` wired into `__main__.py` with full settings, TLS config, uvloop
+- **Backward compat shims** — All 7 global ContextVars preserved with runtime-first / fallback behavior
+- **3 ADRs:** 0009 (lifecycle model), 0010 (dependency injection), 0011 (adapter strategy)
+- **2 SPEC revisions:** SPEC-007 v1 → v2, synthesis v1 → v2
+- **Dual audits:** Forward + reverse audit of spec before implementation
+- **104 runtime tests** — 8 test files, all passing on Python 3.12+3.13
+
+### Infrastructure
+- **Worktree plugin** — Fixed 13 handler signatures (`args: dict` → `**kwargs`), added registration wrappers
+- **Mistral/Vibe integration** — Rewrote `mistral.py` to use Vibe CLI programmatic mode (local + teleport)
+- **Vibe Code Web** — Auth resolved (was 401), needs Vibe CLI API key to bypass rate limits
+- **Jules dispatch** — Integrated PR #7 (CLI adapter), closed stale PRs #4, #6, #8, #9
+- **SOUL.md** — Added Cloud Dispatch section (Jules/Mistral rules, worktree plugin reference)
+- **Memory updates** — Jules limits (15/day, batch into 1), Vibe key requirements, worktree fix notes
+- **`pytest-asyncio`** added to project dependencies (server install failed without it)
+
+### Merged PRs
+- **PR #7** — Wire Runtime-backed create_server_app into Server Entry Point (Jules)
+- **PR #5** — ChatInput placeholder micro-UX + widget test modernization (Jules)
+
+### Test Fixes
+- ContextVar isolation fix — `test_global_migration.py` failures resolved with autouse reset fixture
+
 ## 2026-07-22 — Memory System v2 Complete
 
 ### Memory System v2

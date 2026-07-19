@@ -2,77 +2,70 @@
 
 **Date:** 2026-07-19  
 **Phase:** 1 (Runtime Foundation) — ✅ Complete  
-**Next:** Phase 2 (Memory System Polish)  
+**Next:** Phase 2 (Memory System Polish)
 
 ---
 
-## What's Done (Phase 1: Runtime Foundation)
+## Phase 1: Runtime Foundation — Delivered
 
-| Deliverable | SHA / PR | Status |
+| Deliverable | SHA | Status |
 |---|---|---|
-| Runtime lifecycle (7-state), DI container, Runtime kernel | `889efd2` | ✅ Pushed |
-| CLI adapter: `create_server_app()` in `__main__.py` | `c3b32ef` (merge of PR #7 + our work) | ✅ Merged |
-| Integration tests: 20 tests, 4 groups | `b2ce23e` | ✅ Pushed |
-| `pytest-asyncio` dependency fix | `59c1e02` | ✅ Pushed |
-| Server lifespan health endpoint fix | `17c1f23` | ✅ Pushed |
-| Server-verified on dev VM | 104/104 pass | ✅ Verified |
-| Dev VM cleanup | — | ✅ Done |
+| Runtime kernel (7-state lifecycle, DI, adapters) | `889efd2` | ✅ |
+| CLI adapter (`create_server_app()` in `__main__.py`) | `c3b32ef` (merge PR #7) | ✅ |
+| Integration tests (20 tests, 4 groups) | `b2ce23e` | ✅ |
+| `pytest-asyncio` dependency fix | `59c1e02` | ✅ |
+| Server lifespan health endpoint fix | `17c1f23` | ✅ |
+| PR #5 merge (ChatInput placeholder) + ContextVar fix | `6a2c8dc` | ✅ |
+| **104/104 tests pass** | Python 3.12+3.13 verified | ✅ |
 
-## What's In Progress
+### Archivecture Docs Updated
 
-### Worktree Plugin Fixes (needs session restart)
-- `tools.py`: 13 handlers `args: dict` → `**kwargs` ✅
-- `__init__.py`: Registration wrappers to bypass module cache ✅
-- `mistral.py`: Rewritten to use Vibe CLI (local + teleport modes) ✅
-- `vibe_code_enabled=true` in `~/.vibe/config.toml` ✅
+| Document | Change |
+|---|---|
+| `docs/architecture/migration/TRACKING.md` | Phase 01 marked IMPLEMENTED |
+| `docs/architecture/target-state.md` | Phase 1 ✅, target now Phase 2 |
+| `docs/architecture/current-state.md` | Version 1.1, post-Phase 1 |
+| `CHANGELOG.md` | 2026-07-19 section added |
+| `README.md` | Runtime v1, cloud dispatch, Phase status |
+| `~/.hermes/SESSION_STATE.md` | Global cross-project state |
+| `~/.hermes/SOUL.md` | Cloud Dispatch section added |
 
-### Vibe Code Web (Mistral cloud dispatch)
-- Auth works (got past 401 to 429 rate limit)
-- Needs Vibe CLI API key from console.mistral.ai → Code → Vibe CLI
-- Env var takes precedence — current `MISTRAL_API_KEY` is a regular key, not a Vibe key
-- OR: run `vibe --setup` interactively once to store browser auth
+### Infrastructure
 
-## Open Pull Requests
+| Component | Status |
+|---|---|
+| **Worktree plugin** | 13 handler sigs fixed, needs session restart |
+| **Mistral Vibe Code Web** | Auth resolved, rate-limited (needs Vibe CLI key) |
+| **Jules dispatch** | PR #7 integrated, stale PRs triaged |
+| **Jules limits** | 15/day — batch into 1 comprehensive PR |
 
-| PR | Title | Status | Notes |
-|---|---|---|---|
-| #5 | ChatInput placeholder micro-UX | 🟡 Open | Small, likely safe — review needed |
-| #1 | Import optimization + lazy tool reg | 🟡 Open | Risky, large — may conflict with runtime code |
+---
 
-### Closed This Session
-- **#6** — Wire create_server_app (duplicate of #7)
-- **#8** — CI/CD workflow (subset of #9)
-- **#9** — _fetch() stub fix + lint sweep (_fetch() already in master via e8a4c20)
-- **#4** — is_prime utility (low priority)
+## Phase 2: Memory System Polish (Next)
 
-## Remaining Work (Priority Order)
-
-### Priority 1: Memory System Polish
-- [ ] Unify memory system — remove dead `Memory`/`MemoryManager` SQLite classes
-- [ ] Integration tests for DreamCycle end-to-end
-- [ ] Tests for ConsolidationEngine (duplicate/contradiction detection)
-- [ ] Tests for LLMRefinement layer
-- [ ] Test coverage target: 80%
+### Priority 1: Cleanup + Test Coverage
+- Remove dead `Memory`/`MemoryManager` SQLite classes
+- DreamCycle end-to-end integration tests
+- ConsolidationEngine (duplicate/contradiction detection) tests
+- LLMRefinement layer tests
+- Target: 80% coverage
 
 ### Priority 2: Remaining Refactoring
-- [ ] `tui/app.py` — Complete TUI split
-- [ ] `session/session.py` — Extract prompt building, approval flow
-- [ ] `memory/memory_files.py` — Split into frontmatter, entity_ops, daily_log
-- [ ] `memory/dream.py` — Split phases into separate modules
+- `tui/app.py` — Complete TUI split
+- `session/session.py` — Extract prompt building, approval flow
+- `memory/memory_files.py` — Split into frontmatter, entity_ops, daily_log
+- `memory/dream.py` — Split phases into separate modules
 
 ### Priority 3: CI/CD
-- [ ] GitHub Actions for automated testing
-- [ ] Pre-commit hooks for ruff linting
-- [ ] Test coverage reporting
+- GitHub Actions for automated testing
+- Pre-commit hooks for ruff linting
+- Test coverage reporting
 
 ### Priority 4: Feature Work
-- [ ] P0: MCP support
-- [ ] P0: Codebase indexing (Tree-sitter + embedding)
-- [ ] P1: Sandboxing for tool execution
+- P0: MCP support
+- P0: Codebase indexing (Tree-sitter + embedding)
+- P1: Sandboxing for tool execution
 
-## Machine State
-
-- **Workstation:** i3/4GB — RAM tight, avoid heavy parallelism
-- **Server (dev VM):** 83 runtime tests pass on Python 3.13
-- **Worktree plugin:** Fixed at source, needs session restart to activate
-- **Vibe CLI:** v2.21.0 installed, teleport fixed (was 401 auth, now 429 rate limit)
+### Jules Strategy for Phase 2
+- **One consolidated PR** for memory system polish (cleanup + tests)
+- All refactoring/CI/CD done locally with ast-tools

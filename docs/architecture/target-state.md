@@ -411,5 +411,6 @@ These are recorded as **ADRs** but summarized here for architectural context:
 
 ---
 
-**Document version:** 1.0  
-**Target phase:** Phase 1 — Runtime Foundation
+**Document version:** 1.1  
+**Phase 1 status:** ✅ Delivered (2026-07-19) — Runtime kernel, lifecycle, DI, adapters, server integration, 104 tests
+**Target phase:** Phase 2 — Memory System Polish
