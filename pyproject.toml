@@ -2,7 +2,7 @@
 name = "nexusagent"
 version = "0.1.0"
 description = "Production-grade AI coding agent platform — terminal-native, privacy-first, with hybrid memory and multi-agent orchestration"
-requires-python = ">=3.13"
+requires-python = ">=3.12"
 dependencies = [
     "langgraph",
     "langgraph-checkpoint",
