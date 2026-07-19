@@ -433,6 +433,12 @@ class Session(SessionBase):
 
     async def send(self, user_message: str, images: list[str] | None = None) -> None:
         _current_session.set(self)
+        # Sync session identity to RuntimeContext when active
+        from nexusagent.runtime.context import current_context
+
+        ctx = current_context()
+        if ctx is not None:
+            ctx.current_session_id = self.session_id
         """Process a user message: store in DB, recall memory, stream agent response."""
         if self.status != "active":
             # Cancel any zombie heartbeat task from previous run

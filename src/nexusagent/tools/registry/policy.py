@@ -20,17 +20,30 @@ _policy_context: contextvars.ContextVar[dict | None] = contextvars.ContextVar(
 
 def _get_ctx() -> dict:
     """Get or create the current context's policy context."""
-    ctx = _policy_context.get()
-    if not isinstance(ctx, dict):
-        ctx = {"role": "full", "policy": "permissive", "unlocked": set()}
-        _policy_context.set(ctx)
-    return ctx
+    # Check RuntimeContext first (if active)
+    from nexusagent.runtime.context import current_context
+
+    ctx = current_context()
+    if ctx is not None and ctx.policy_context is not None:
+        return ctx.policy_context
+
+    local_ctx = _policy_context.get()
+    if not isinstance(local_ctx, dict):
+        local_ctx = {"role": "full", "policy": "permissive", "unlocked": set()}
+        _policy_context.set(local_ctx)
+    return local_ctx
 
 
 def set_policy_context(role: str, policy: str):
     """Set the policy context for the current agent session."""
     ctx = {"role": role, "policy": policy, "unlocked": set()}
     _policy_context.set(ctx)
+    # Sync to RuntimeContext if active
+    from nexusagent.runtime.context import current_context
+
+    rctx = current_context()
+    if rctx is not None:
+        rctx.policy_context = ctx
 
 
 def get_policy_context() -> dict:

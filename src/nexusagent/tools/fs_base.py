@@ -58,10 +58,22 @@ _workspace_root_var: contextvars.ContextVar[Path | None] = contextvars.ContextVa
 def set_workspace_root(path: str) -> None:
     """Set the workspace root directory for path jail (current task only)."""
     _workspace_root_var.set(Path(path).resolve())
+    # If RuntimeContext is active, sync the value
+    from nexusagent.runtime.context import current_context
+
+    ctx = current_context()
+    if ctx is not None:
+        ctx.workspace_root = Path(path).resolve()
 
 
 def _get_workspace_root() -> Path:
     """Get the workspace root for the current task, defaulting to CWD if unset."""
+    # Check RuntimeContext first (if active)
+    from nexusagent.runtime.context import current_context
+
+    ctx = current_context()
+    if ctx is not None and ctx.workspace_root is not None:
+        return ctx.workspace_root
     root = _workspace_root_var.get()
     if root is not None:
         return root

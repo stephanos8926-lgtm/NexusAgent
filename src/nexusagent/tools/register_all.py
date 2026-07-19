@@ -390,6 +390,15 @@ async def ask_user(question: str, options: list[str] | None = None) -> str:
     from nexusagent.core.agent import _current_session
 
     session = _current_session.get()
+    # Fall back to RuntimeContext session if available
+    if session is None:
+        from nexusagent.runtime.context import current_context
+
+        ctx = current_context()
+        if ctx is not None and ctx.session_manager is not None and ctx.current_session_id:
+            managed = ctx.session_manager.get(ctx.current_session_id)
+            if managed is not None:
+                session = managed.session
     if session is not None:
         import uuid
         call_id = f"ask-{uuid.uuid4().hex[:8]}"
@@ -461,6 +470,15 @@ def _get_memory_workspace() -> str:
     # 1. Check thread-local worker override
     from nexusagent.core.agent import _ws_memory_dir
     from nexusagent.infrastructure.config import settings
+
+    # Check RuntimeContext first (if active)
+    from nexusagent.runtime.context import current_context
+
+    ctx = current_context()
+    if ctx is not None and ctx.workspace_memory_dir is not None:
+        ws = ctx.workspace_memory_dir
+        os.makedirs(ws, exist_ok=True)
+        return ws
 
     ws = _ws_memory_dir.get()
     if ws:

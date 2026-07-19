@@ -34,8 +34,23 @@ def _ensure_tools_registered() -> None:
     """Lazily register all tools on first use.
 
     Thread-safe via RLock — concurrent calls serialize.
-    Uses double-checked locking pattern.
+    Uses double-checked locking pattern. When RuntimeContext is active,
+    delegates to ToolManager.
     """
+    # Check RuntimeContext first (if active)
+    from nexusagent.runtime.context import current_context
+
+    ctx = current_context()
+    if ctx is not None and ctx.tool_initialized:
+        return
+    if ctx is not None:
+        from nexusagent.runtime.tools import ToolManager
+
+        tm = ToolManager(context=ctx)
+        tm.ensure_registered()
+        return
+
+    # Legacy path (no RuntimeContext)
     global _tools_registered
     if _tools_registered:
         return
@@ -438,6 +453,12 @@ def _setup_workspace_context(working_dir: str) -> None:
     # Note: memory tools use _get_memory_workspace() which checks config.
     # For per-worker memory, we set a thread-local override.
     _ws_memory_dir.set(str(ws_memory))
+    # Sync to RuntimeContext when active
+    from nexusagent.runtime.context import current_context
+
+    ctx = current_context()
+    if ctx is not None:
+        ctx.workspace_memory_dir = str(ws_memory)
 
 
 # Thread-local override for per-worker memory directory
