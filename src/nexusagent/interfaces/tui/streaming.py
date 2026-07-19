@@ -254,7 +254,7 @@ async def _handle_tool_result_event(app, event: dict) -> None:
                 app._failure_repeat_count += 1
                 app._current_tool._collapsed = True
                 app._current_tool.update_output(
-                    f"(same error ×{app._failure_repeat_count})"  # noqa: RUF001
+                    f"(same error ×{app._failure_repeat_count})"
                 )
                 app._current_tool.refresh()
             else:

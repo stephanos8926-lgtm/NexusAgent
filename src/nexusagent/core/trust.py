@@ -228,7 +228,7 @@ class AnomalyScorer:
             std = math.sqrt(variance) if variance > 0 else 1.0
 
         z = abs(length - mean) / std
-        # Z-score > 3 is 3σ outlier
+        # Z-score > 3 is 3-sigma outlier
         return min(z / 6.0, 1.0)
 
     def _instruction_density(self, text: str) -> float:

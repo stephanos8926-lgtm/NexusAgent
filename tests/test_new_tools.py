@@ -99,7 +99,7 @@ class TestReviewCode:
         result = review_code(code=buggy)
         assert isinstance(result, str)
         # Should contain some form of severity marker
-        has_severity = any(marker in result for marker in ["HIGH", "MEDIUM", "LOW", "CRITICAL", "⚠", "🔴", "🟡", "ℹ"])  # noqa: RUF001
+        has_severity = any(marker in result for marker in ["HIGH", "MEDIUM", "LOW", "CRITICAL", "⚠", "🔴", "🟡", "ℹ"])
         assert has_severity, f"Expected severity markers in output: {result}"
 
 
