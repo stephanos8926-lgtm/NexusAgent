@@ -1,131 +1,105 @@
-# SESSION STATE — NexusAgent
-# Last updated: 2026-07-09
-# Maintained by: Lucien (Dagoth)
-## Active Work Summary
+# SESSION STATE — Workstation
+**Date:** 2026-07-18
+**Branch:** master (NexusAgent)
+**Last Commit:** 03c80f2 — Merge PR #2: TUI visual and capability overhaul
 
-**CRITICAL INCIDENT RESPONDED TO:**
-- 30,000+ LLM API calls in 4 hours exhausted monthly spend cap
-- Root cause: e2e tests ran against production with real API keys
-- No budget guards, circuit breaker didn't trip on quota errors
+## Active Project: NexusAgent
+**Repository:** `~/Workspaces/NexusAgent`
+**Branch:** master
+**Last Commit:** 03c80f2 (merged v3 security sprint + Jules' PR #2)
+**Test Status:** 26 targeted tests passing (trust + registry), full suite pending
 
-<<<<<<< HEAD
-## Current Status
+## Server
+**Host:** sysop@dev
+**Hermes Version:** 0.18.2
+**Status:** Board synced, worktrees cleaned, repo pulled to master
 
-**Last active git commit:** 2026-06-29 — Version mismatch detection + E2E tests
-**Branch:** `master`
-**Test baseline:** 680 pass / 11 pre-existing fail (as of memory system v2)
-**Python:** 3.13+ | **Package:** `nexusagent` (src layout)
+## Gateway Status
+**Workstation (rw-workstation-01):** Active — 486MB RAM (YELLOW), load elevated
+**Server (dev):** Active — Gateway running, no platform config
 
----
+## Completed Workstreams
 
-## Completed Work (since Memory System v2 on 2026-06-21)
+### ✅ v3 Security & Trust Overhaul Sprint (2026-07-14)
+6-phase sprint delivered, merged to master at 699619a:
 
-### Phase: Security Hardening — Waves 0–5 (2026-06-22 → 2026-06-29)
+| Phase | Title | Branch |
+|-------|-------|--------|
+| P1 | ToolInfo frozen dataclass + ToolRegistry with RLock snapshots | `wt/p1-tool-registry` |
+| P2 | async Agent.__init__ with await MCP loading + per-agent snapshots | `wt/p2-agent-async` |
+| P3 | freeze() + prune() in registration wiring | `wt/p2-agent-async` |
+| P4 | TrustLevel, TrustedContent, AnomalyScorer trust infrastructure | `wt/p4-trust-foundations` |
+| P5 | Trust integration into ToolInfo, registry, MCP, naming enforcement | `wt/p4-trust-foundations` |
+| P6 | 26 tests passing (9 registry + 16 trust + 1 config) | `wt/p4-trust-foundations` |
 
-| Wave | Focus | Key Outcomes |
-|------|-------|-------------|
-| **Wave 0** | Lint & dead code | Ruff cleanup, circular import fixes, API key URL removal, import ordering |
-| **Wave 1** | Critical security | 8 vulnerabilities fixed — TOCTOU approval race, workspace root, heartbeat cancellation |
-| **Wave 2** | Core infrastructure | Persistent SQLite connection pool, async search, dict access fixes |
-| **Wave 3** | TUI + medium bugs | Sliding window fix, `_busy` state, queue management, stale reference cleanup |
-| **Wave 4** | Modified GO complete | All medium-impact audit items verified complete |
-| **Wave 5** | Session refactoring | `Session.send()` complexity reduced from 28 to 5 |
+**Key artifacts:**
+- `src/nexusagent/core/trust.py` — TrustLevel, TrustedContent, AnomalyScorer
+- `src/nexusagent/tools/registry/core.py` — ToolRegistry class
+- `src/nexusagent/tools/registry/types.py` — frozen ToolInfo with trust/provenance
+- `src/nexusagent/core/agent.py` — async __init__ with per-agent snapshots
+- `src/nexusagent/infrastructure/config.py` — TrustConfig + BudgetConfig
 
-### Feature Work
+### ✅ PR #2 Merged: Jules' TUI Overhaul (2026-07-18)
+Merged at 03c80f2. Key additions:
+- ThreadsModal + ModelModal interactive switchers
+- write_todos/read_todos tools (+71 lines)
+- TUI diff visualization, /yolo command, Ctrl+Y binding
+- ask_user async rewrite with _current_session context var
+- BudgetConfig preserved (verified present in Jules' branch)
 
-| Feature | Commits | Date |
-|---------|---------|------|
-| Gemini native tool calling (Interactions API) | `f4bb7e3` | 2026-06-28 |
-| Version mismatch detection + NEXUS_STRICT_VERSION | `c723d44`, `b8871b5` | 2026-06-29 |
+## Current Workstream: Architecture Migration Planning
 
-### Testing
+### Status: SPECIFICATION PHASE — No implementation started yet
 
-| Suite | Commits | Date |
-|-------|---------|------|
-| Comprehensive TUI E2E test suite | `c31a327` | 2026-06-29 |
-| WebSocket E2E test suite + minimal connection test | `95be381` | 2026-06-29 |
-| Debug print cleanup, color restoration | `d1ba409` | 2026-06-29 |
+We have received and saved the complete 12-phase migration architecture for transforming NexusAgent from an agent framework into a distributed autonomous agent runtime platform.
 
-### Documentation
+### Architecture Documents Saved
+All stored under `docs/architecture/migration/`:
 
-| Doc | Commits | Date |
-|-----|---------|------|
-| Memory Architecture v2 documentation | `aa386ed` | 2026-06-28 |
-| Wave 4 execution report | `5b122f7` | 2026-06-28 |
-| HIGH mode audit summary | `251320a` | 2026-06-28 |
-| AGENTS.md — NEXUS_STRICT_VERSION | `c723d44` | 2026-06-29 |
+| Doc | Phase | Description |
+|-----|-------|-------------|
+| CHIEF-ARCHITECT-DIRECTIVE.md | All | Master specification covering all 12 phases |
+| 00-master-transition-plan.md | 0 | Architecture target, migration principles, phase overview |
+| 01-runtime-foundation.md | 1 | Runtime kernel, lifecycle states, DI boundaries |
+| 02-task-state-machine.md | 2 | Durable task model, state transitions, checkpoint recovery |
+| 03-event-driven-core.md | 3 | Event schema, NATS backbone, subscribers |
+| 04-langgraph-worker-runtime.md | 4 | Autonomous worker graph, checkpoint persistence, recovery |
+| 05-planner-orchestrator.md | 5 | Goal decomposition, separate reasoning from execution |
+| 06-dag-execution-engine.md | 6 | Graph validation, scheduling, parallel execution |
+| 07-pol-control-plane.md | 7 | AI governance, policy engine, intervention protocol |
+| 08-capability-security-model.md | 8 | Capability registry, policy router, audit trail |
+| 09-memory-evolution.md | 9 | 4-layer memory, trust-aware ingestion |
+| 10-observability-reliability.md | 10 | Structured logging, tracing, metrics, failure classification |
+| 11-production-readiness.md | 11 | Security, sandboxing, deployment, testing |
 
----
+### Target Architecture
+```
+NexusAgent Runtime → POL → Event Backbone → Interactive Sessions + Autonomous Workers → Memory System
+```
 
-## Documentation Health
+### Key Principles
+1. Evolution over replacement — no rewrites
+2. Events as nervous system
+3. Capability-based execution (not direct tool access)
+4. Explicit state machines for all long-running tasks
+5. Every change requires 3+ approach evaluation with decision matrix
 
-| Document | Last Updated | Status | Action Needed |
-|----------|-------------|--------|---------------|
-| AGENTS.md | 2026-07-22 | 🟢 Good | N/A (most current) |
-| SESSION_STATE.md | **2026-06-21** | 🔴 Stale | ✅ Updated this session |
-| STATE.md | **2026-06-20** | 🔴 Stale | ⚠️ Header claims 2026-07-22 but git disagrees |
-| CODEBASE_MAP.md | **2026-06-20** | 🔴 Stale | ⚠️ Same discrepancy |
-| SEMANTIC_INDEX.md | ~2026-06-20 | 🟡 Verify | May need refresh |
-| REFACTORING_PLAN.md | ~2026-06-20 | 🟡 Verify | May need refresh |
-| DOC_COMPLIANCE.md | ~2026-06-20 | 🟡 Verify | May need refresh |
-
----
+### Next Actions (NOT YET STARTED — awaiting signal)
+- Phase 1: Create `src/nexusagent/runtime/` package with Runtime kernel, lifecycle states, DI
+- Phase 2: Task entity with state machine validator and checkpoint persistence
+- Phase 3: Event schema, wire NATS as event backbone, create subscribers
+- Phase 4: LangGraph worker graph abstraction with checkpoint recovery
+- Phase 5: Planner schema + Orchestrator dispatcher
+- Phase 6: DAG validator, scheduler, parallel execution
+- Phase 7: POL service, policy engine, intervention protocol
+- Phase 8: Capability registry, router, policy enforcement
+- Phase 9: 4-layer memory refactor with trust-aware ingestion
+- Phase 10: Observability layer (logging, tracing, metrics, health)
+- Phase 11: Production hardening, security, sandboxing, deployment
 
 ## Known Issues
-
-1. **No .venv on server** — Cannot run tests without setting up venv
-2. **11 pre-existing test failures** — Baseline noted in AGENTS.md
-3. **Feature branch divergence** — rw_exfil has feature/phase-14.5 ahead of master
-4. **Documentation half-life** — STATE.md and CODEBASE_MAP.md headers claim dates that don't match git history
-
----
-
-## Next Steps (Prioritized)
-
-1. 🔴 Resolve STATE.md / CODEBASE_MAP.md date discrepancies
-2. 🟡 Re-establish test baseline (setup .venv, run full suite)
-3. 🟡 Audit remaining stale docs (SEMANTIC_INDEX, REFACTORING_PLAN, DOC_COMPLIANCE)
-4. 🟢 Add OSS community health files (CONTRIBUTING, SECURITY, CODE_OF_CONDUCT)
-5. 🟢 Update pyproject.toml description from placeholder "Add your description here"
-=======
-**IMPLEMENTED FIXES (commit 4a5cde7):**
-1. LLMBudgetGuard — hard spend caps, daily/monthly, persisted state
-2. CircuitBreaker enhancement — quota_error_classes, immediate trip on RESOURCE_EXHAUSTED
-3. Worker integration — budget check before task acceptance
-4. NEXUS_TEST_MODE=1 — blocks real API calls in tests
-5. Cost estimation utility — token-to-USD conversion
-6. SOUL.md updated with incident mandates
-
-## Completed (this session)
-- ✅ Created `src/nexusagent/infrastructure/utils/budget.py` — LLMBudgetGuard
-- ✅ Created `src/nexusagent/infrastructure/utils/cost.py` — cost estimation
-- ✅ Enhanced `src/nexusagent/infrastructure/utils/circuit.py` — quota error handling
-- ✅ Updated `src/nexusagent/core/worker/worker.py` — budget check in handle_task()
-- ✅ Updated `src/nexusagent/core/worker/handler.py` — agent breaker with quota detection
-- ✅ Updated `src/nexusagent/core/agent.py` — NEXUS_TEST_MODE guard
-- ✅ Updated `~/.hermes/SOUL.md` — incident mandates + validation protocol
-- ✅ Committed as `4a5cde7`
-
-## Pending (next session)
-- [ ] Fix `test_e2e_production.py` — add mocks, use NEXUS_TEST_MODE
-- [ ] Add startup check in server.py lifespan — refuse start if quota exhausted
-- [ ] Add alerting webhook integration for budget thresholds
-- [ ] Test full worker pipeline with budget guard active
-
-## Key Files Modified
-```
-src/nexusagent/infrastructure/utils/budget.py       (new)
-src/nexusagent/infrastructure/utils/cost.py         (new)
-src/nexusagent/infrastructure/utils/circuit.py      (enhanced)
-src/nexusagent/core/worker/worker.py                (budget check)
-src/nexusagent/core/worker/handler.py               (quota breaker)
-src/nexusagent/core/agent.py                        (NEXUS_TEST_MODE)
-~/.hermes/SOUL.md                                   (incident mandates)
-```
-
-## Current Machine State
-- Server processes: KILLED (was PID 1910744, running since 04:49)
-- TUI: Still running (PID 1902551)
-- Gemini API: Monthly spend cap exceeded — check https://ai.studio/spend
-- Budget guard state: `~/.nexusagent/budget_state.json` (will be created on first run)
->>>>>>> 55d33bc (feat(config): Overhaul configuration system with three-tier loading philosophy)
+- RAM critically low on workstation (486MB) — may need server offload for heavy tasks
+- Full test suite not run since v3 sprint merge (targeted tests only)
+- worktree-worker plugin now enabled (takes effect next session)
+- worktree branches cleaned up on both machines
+- Stale feature branches on origin (wt/p1-*, wt/p2-*, wt/p4-*) pending cleanup
