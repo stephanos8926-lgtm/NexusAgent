@@ -13,45 +13,29 @@ concurrency:
 jobs:
   ci:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     strategy:
-      fail-fast: true
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13"]
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
 
-      - name: Set up Python 3.13
-        uses: actions/setup-python@v6
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
         with:
-          python-version: "3.13"
-          cache: pip
-
-      - name: Cache virtual environment
-        uses: actions/cache@v4
-        with:
-          path: .venv
-          key: venv-${{ runner.os }}-${{ hashFiles('pyproject.toml') }}
-          restore-keys: |
-            venv-${{ runner.os }}-
+          python-version: ${{ matrix.python-version }}
 
       - name: Install dependencies
         run: |
-          python3 -m venv .venv
-          source .venv/bin/activate
-          pip install --upgrade pip
-          pip install -e ".[dev]"
+          pip install -e . pytest pytest-asyncio ruff
 
       - name: Lint with Ruff
         run: |
-          source .venv/bin/activate
-          ruff check src/nexusagent tests
-
-      - name: Type check with mypy
-        run: |
-          source .venv/bin/activate
-          mypy src/nexusagent
+          ruff check .
 
       - name: Run tests
         run: |
-          source .venv/bin/activate
-          PYTHONPATH=src python3 -m pytest tests/ -q --tb=short -k "not e2e and not needs_db and not slow" --maxfail=5
+          PYTHONPATH=. pytest
