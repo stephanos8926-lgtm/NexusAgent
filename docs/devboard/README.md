@@ -99,12 +99,14 @@
 ### Active
 | Channel | Task | Status |
 |---------|------|--------|
-| 🤖 Jules | Phase 3: Event-Driven Core | `18382944495923151438` — IN_PROGRESS |
+| 🤖 Jules | Phase 3: Event-Driven Core (Event Store + Subscribers) | `18382944495923151438` — IN_PROGRESS (unblocked 22:46 EDT) |
 
 ### Blocked
 | Channel | Blocker | Fix |
 |---------|---------|-----|
 | 🌀 Mistral/Vibe | 429 rate limit | Needs Vibe CLI API key from console.mistral.ai → Code → Vibe CLI |
+| 🧵 Subagents | No remaining delegatable Phase 3 work | Event Store + Subscribers in Jules's lap |
+| ☁️ Dev VM | NATS not on dev (lives on infra VM) | Phase 3 integration tests need NATS — run on infra when ready |
 
 ---
 
