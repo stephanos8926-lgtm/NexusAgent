@@ -60,13 +60,13 @@
 | Channel | Status | Session/Ref |
 |---------|--------|-------------|
 | 🤖 Jules (cloud) | ✅ Memory system polish | `1777915438102205450` — **COMPLETED + MERGED** (`f5cb696`) |
-| 🤖 Jules (cloud) | ✅ Phase 2 full implementation | `6790340144769840547` — **COMPLETED** (awaiting PR) |
+| 🤖 Jules (cloud) | ✅ Phase 2 full implementation | `6790340144769840547` — **COMPLETED + PR #10 created** |
 | 🤖 Subagent (bg) | ✅ Worker pool wiring | `deleg_44461844` — pool.py modified |
 | 🤖 Subagent (bg) | ✅ SessionManager integration | `deleg_212c83e0` — manager.py modified |
 | 🤖 Subagent (bg) | ✅ Phase 3 gap analysis | `deleg_c63ec2ab` — analysis saved |
 | 🌀 Mistral/Vibe (cloud) | 🔴 Rate-limited — local mode triggered | Awaiting output |
 | ☁️ Server dev VM (worktree) | ⚠️ `phase2-task-state` synced, venv broken | Need `uv pip install pytest-asyncio` |
-| 📝 Inline (local) | ✅ Core model delivered — 156 tests | Committed `f06ff5f` |
+| 📝 Inline (local) | ✅ Core model delivered — 156 tests | Committed `f06ff5f` → `f5cb696` |
 
 ---
 
