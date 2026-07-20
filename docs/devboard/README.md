@@ -59,11 +59,14 @@
 
 | Channel | Status | Session/Ref |
 |---------|--------|-------------|
-| 🤖 Jules (cloud) | 🟡 Phase 2 PR: `6790340144769840547` | IN_PROGRESS |
-| 🤖 Jules (cloud) | 🟡 Memory polish: `1777915438102205450` | AWAITING_FEEDBACK (unblocked) |
-| 🌀 Mistral/Vibe (cloud) | 🔴 Rate-limited | Needs Vibe CLI API key |
-| ☁️ Server dev VM (worktree) | 🟢 `phase2-task-state` provisioned | Worktree + venv ready |
-| 📝 Inline (local) | ✅ Core task model, store, recovery, 35 tests | Committed `f06ff5f` |
+| 🤖 Jules (cloud) | 🟡 Phase 2 full implementation | `6790340144769840547` — IN_PROGRESS |
+| 🤖 Jules (cloud) | 🟡 Memory system polish | `1777915438102205450` — IN_PROGRESS |
+| 🤖 Subagent (bg) | 🟡 Worker pool wiring | `deleg_44461844` — dispatched |
+| 🤖 Subagent (bg) | 🟡 SessionManager integration | `deleg_212c83e0` — dispatched |
+| 🤖 Subagent (bg) | 🟡 Phase 3 gap analysis | `deleg_c63ec2ab` — dispatched |
+| 🌀 Mistral/Vibe (cloud) | 🔴 Rate-limited — local mode triggered | Awaiting output |
+| ☁️ Server dev VM (worktree) | 🟢 `phase2-task-state` provisioned | Venv + .env ready for Hermes |
+| 📝 Inline (local) | ✅ Core model delivered — 156 tests | Committed `f06ff5f` |
 
 ---
 
