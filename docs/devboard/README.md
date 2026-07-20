@@ -13,7 +13,7 @@
 |---|-------|------|--------|----------|-------------|
 | 1 | Runtime Foundation | `01-runtime-foundation.md` | ✅ **DELIVERED** | Lucien + Jules | `889efd2`→`8f7f844` |
 | 2 | Durable Task Execution | `02-task-state-machine.md` | ✅ **DELIVERED** | Lucien + Jules #679034...547 | `f06ff5f` `f5cb696` `732c61e` |
-| 3 | Event-Driven Core | `03-event-driven-core.md` | ✅ **DELIVERED** | Lucien + Subagents + Jules #183829...138 | `b736844` `0dcce1b` |
+| 3 | Event-Driven Core | `03-event-driven-core.md` | ✅ **DELIVERED** | Lucien + Jules #183829...138 | `b736844` `afe48c9` PR #11 |
 | 4 | LangGraph Worker Runtime | `04-langgraph-worker-runtime.md` | ⬜ Not Started | — | — |
 | 5 | Planner & Orchestrator | `05-planner-orchestrator.md` | ⬜ Not Started | — | — |
 | 6 | DAG Execution Engine | `06-dag-execution-engine.md` | ⬜ Not Started | — | — |
@@ -70,43 +70,46 @@
 - [x] `Task.transition_to()` wired to emit TaskEvents
 - [x] `WorkerPool._run_worker()` wired to emit WorkerEvents (started, failed)
 
-### Event Store ⬜
-- [ ] Append-only log (SQLite or NATS stream)
-- [ ] Query-by-time/source/type
+### Event Store ✅
+- [x] Append-only SQLite log with `EventStore` (query-by-time/source/type, replay)
+- [x] SQLAlchemy model for events in `infrastructure/db/models.py`
+- [x] 93-line test suite for store operations
 
-### Subscribers ⬜
-- [ ] Base subscriber framework with JetStream durable consumers
-- [ ] POL subscriber
-- [ ] Memory subscriber
-- [ ] Dashboard subscriber
+### Subscribers ✅
+- [x] Base subscriber framework with JetStream durable consumers in `subscribers.py`
+- [x] POL subscriber (`pol_subscriber.py`)
+- [x] Memory subscriber (`memory_subscriber.py`)
+- [x] Dashboard subscriber (`dashboard_subscriber.py`)
+
+### API Endpoints ✅
+- [x] `GET /events` REST endpoint with query parameters
+- [x] WebSocket `/ws/events` streaming endpoint
+- [x] Wired into server lifespan (start/stop subscribers)
 
 ---
 
 ## Dispatch & Channel Status
-
 ### Completed
 | Channel | Task | Link |
 |---------|------|------|
+| 🤖 Jules | Phase 3: Event-Driven Core (EventStore, Subscribers, API) | `18382944495923151438` — MERGED PR #11 `afe48c9` |
 | 🤖 Jules | Memory system polish | `1777915438102205450` — MERGED `f5cb696` |
 | 🤖 Jules | Phase 2 full implementation | `6790340144769840547` — PR #10 |
 | 🧵 Subagent | Worker pool wiring | `deleg_44461844` — pool.py |
 | 🧵 Subagent | SessionManager integration | `deleg_212c83e0` — manager.py |
 | 🧵 Subagent | Phase 3 gap analysis | `deleg_c63ec2ab` — analysis |
 | 🧵 Subagent | Phase 3 event integration | `deleg_97e757a1` — task_state.py + pool.py |
-| 📝 Inline | Core model + tests | `0dcce1b` — 171 tests |
-| ☁️ Dev VM | Worktree provisioned, tests green | 171 passed |
+| 📝 Inline | Core model + tests | `afe48c9` — 173 tests |
+| ☁️ Dev VM | Worktree provisioned, tests green | 173 passed |
 
-### Active
-| Channel | Task | Status |
-|---------|------|--------|
-| 🤖 Jules | Phase 3: Event-Driven Core (Event Store + Subscribers) | `18382944495923151438` — IN_PROGRESS (unblocked 22:46 EDT) |
+### No Active Dispatches
+All channels idle. Ready for Phase 4.
 
 ### Blocked
 | Channel | Blocker | Fix |
 |---------|---------|-----|
 | 🌀 Mistral/Vibe | 429 rate limit | Needs Vibe CLI API key from console.mistral.ai → Code → Vibe CLI |
-| 🧵 Subagents | No remaining delegatable Phase 3 work | Event Store + Subscribers in Jules's lap |
-| ☁️ Dev VM | NATS not on dev (lives on infra VM) | Phase 3 integration tests need NATS — run on infra when ready |
+| ☁️ Dev VM | NATS not on dev (lives on infra VM) | Full integration tests need infra VM |
 
 ---
 
