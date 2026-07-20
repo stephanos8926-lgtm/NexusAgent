@@ -105,10 +105,11 @@
 ### Active
 | Channel | Task | Est. | Status |
 |---------|------|------|--------|
-| 🤖 Jules | Phase 4: LangGraph Worker Runtime | ~1,000 lines | `4093038977148740812` — IN_PROGRESS |
+| 🤖 Jules | Phase 4: LangGraph Worker Runtime | ~1,000 lines | `4093038977148740812` — IN_PROGRESS (re-pushing, PR #13 was empty) |
 | 🌀 Mistral/Vibe | Phase 4 test skeleton | ✅ Delivered | conftest.py + test skeletons committed |
 | 🧵 Subagent | Worker integration investigation | ✅ Done | Intel forwarded to Jules |
 | ☁️ Dev VM | `phase4-worker-graph` worktree | 173 tests | 🟢 Synced, venv ready |
+| 📝 Inline | Jules onboarding docs | ✅ Done | `b33fe7b` — 4 files under `docs/.jules/` |
 
 ---
 
