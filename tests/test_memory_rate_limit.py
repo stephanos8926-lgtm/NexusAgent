@@ -26,8 +26,11 @@ def _reset_rate_limiter():
     with patch("nexusagent.memory.rate_limiter._clock", return_value=0.0):
         ra._memory_rate_limiter.reset()
     yield
-    with patch("nexusagent.memory.rate_limiter._clock", return_value=0.0):
-        ra._memory_rate_limiter.reset()
+    # Restore global rate limiter to default settings so other tests are not affected
+    ra._memory_rate_limiter = MemoryRateLimiter(
+        max_writes_per_minute=30,
+        max_searches_per_minute=60,
+    )
 
 
 # ── Unit tests for MemoryRateLimiter ──────────────────────────────────

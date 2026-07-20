@@ -64,6 +64,7 @@ class HybridMemoryIndex:
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self.embedder = EmbeddingProvider()
         self._db_pool = None
+        self._conn_lock = asyncio.Lock()
         self._init_db()
 
     @asynccontextmanager
@@ -74,14 +75,15 @@ class HybridMemoryIndex:
             yield None
             return
 
-        if self._db_pool is None:
-            self._db_pool = await aiosqlite.connect(
-                str(self.db_path), detect_types=sqlite3.PARSE_DECLTYPES
-            )
-            self._db_pool.row_factory = aiosqlite.Row
-            await self._db_pool.enable_load_extension(True)
-            sqlite_vec.load(self._db_pool)
-            await self._db_pool.enable_load_extension(False)
+        async with self._conn_lock:
+            if self._db_pool is None:
+                self._db_pool = await aiosqlite.connect(
+                    str(self.db_path), detect_types=sqlite3.PARSE_DECLTYPES
+                )
+                self._db_pool.row_factory = aiosqlite.Row
+                await self._db_pool.enable_load_extension(True)
+                await self._db_pool.load_extension(sqlite_vec.loadable_path())
+                await self._db_pool.enable_load_extension(False)
         yield self._db_pool
 
     async def close(self):
@@ -623,20 +625,26 @@ class HybridMemoryIndex:
         # Allow override via env var for test environments
         import os
 
-        import psutil
+        try:
+            import psutil
+            has_psutil = True
+        except ImportError:
+            has_psutil = False
+
         oom_threshold = float(os.getenv("NEXUS_VECTOR_OOM_THRESHOLD", "0.90"))
 
         conn = sqlite3.connect(str(self.db_path))
         try:
             # OOM guard: check system memory before bulk-load
-            mem = psutil.virtual_memory()
-            if mem.percent > oom_threshold * 100:
-                logger.warning(
-                    "Skipping brute-force vector search: system memory at %d%% (threshold %d%%)",
-                    mem.percent,
-                    int(oom_threshold * 100),
-                )
-                return []
+            if has_psutil:
+                mem = psutil.virtual_memory()
+                if mem.percent > oom_threshold * 100:
+                    logger.warning(
+                        "Skipping brute-force vector search: system memory at %d%% (threshold %d%%)",
+                        mem.percent,
+                        int(oom_threshold * 100),
+                    )
+                    return []
 
             row_count = conn.execute(
                 "SELECT COUNT(*) FROM chunks WHERE embedding IS NOT NULL"

@@ -1,8 +1,8 @@
 # NexusAgent — Session State
 
 **Date:** 2026-07-19  
-**Phase:** 1 (Runtime Foundation) — ✅ Complete  
-**Next:** Phase 2 (Memory System Polish)
+**Phase:** 2 (Durable Task Execution) — 🟡 Core v1 Delivered  
+**Next:** Phase 2 integration (worker wiring) + Phase 3 (Event-Driven Core)
 
 ---
 
@@ -18,60 +18,49 @@
 | PR #5 merge (ChatInput placeholder) + ContextVar fix | `6a2c8dc` | ✅ |
 | **104/104 tests pass** | Python 3.12+3.13 verified | ✅ |
 
-### Migration Framework
-- **12-phase plan** defined: Runtime → Task Durable → Events → LangGraph Workers → Planner → DAG → POL → Capabilities → Memory Evolution → Observability → Production
-- **Chief Architect Directive** governs all migration order — phases cannot be skipped
-- Phase 1 ✅ clears gating dependency for all subsequent phases
-- Phase 2 (Task State Machine) is next in dependency order
+## Phase 2: Durable Task Execution — Core v1 Delivered
 
-### Archivecture Docs Updated
+| Deliverable | SHA | Status |
+|---|---|---|
+| `task_state.py` — TaskState, Task, Checkpoint, validator | `f06ff5f` | ✅ |
+| `task_store.py` — Persistent CRUD + checkpoint I/O | `f06ff5f` | ✅ |
+| `recovery.py` — Retry/rollback/escalate chain | `f06ff5f` | ✅ |
+| **35 new tests** (state + store + recovery) | `f06ff5f` | ✅ |
+| **156 total tests passing** | All green | ✅ |
+| Worker pool wiring | Jules `6790340144769840547` | 🟡 IN_PROGRESS |
+| SessionManager integration | Pending worker wiring | ⬜ |
+| Memory polish (dead code + tests) | Jules `1777915438102205450` | 🟡 Unblocked |
 
-| Document | Change |
+## Phase 3-11: Specified, Ready for Dependency Chain
+
+| Phase | Specification |
+|-------|-------------|
+| 3 | Event-Driven Core (`03-event-driven-core.md`) |
+| 4 | LangGraph Worker Runtime (`04-langgraph-worker-runtime.md`) |
+| 5 | Planner & Orchestrator (`05-planner-orchestrator.md`) |
+| 6 | DAG Execution Engine (`06-dag-execution-engine.md`) |
+| 7 | POL Control Plane (`07-pol-control-plane.md`) |
+| 8 | Capability Security Model (`08-capability-security-model.md`) |
+| 9 | Memory Evolution (`09-memory-evolution.md`) |
+| 10 | Observability & Reliability (`10-observability-reliability.md`) |
+| 11 | Production Readiness (`11-production-readiness.md`) |
+
+## Active Agents
+
+| Agent | Session ID | Task | Status |
+|-------|-----------|------|--------|
+| Jules | `6790340144769840547` | Phase 2 full implementation | IN_PROGRESS |
+| Jules | `1777915438102205450` | Memory police (dead code + tests) | Unblocked (feedback sent) |
+| Server (dev) | worktree `phase2-task-state` | Worktree provisioned, venv ready | 🟢 Ready |
+| Mistral | — | Rate-limited (needs Vibe CLI key) | 🔴 Blocked |
+
+## Architecture Docs Up To Date
+
+| Document | Version |
 |---|---|
-| `docs/architecture/migration/TRACKING.md` | Phase 01 marked IMPLEMENTED |
-| `docs/architecture/target-state.md` | Phase 1 ✅, target now Phase 2 |
-| `docs/architecture/current-state.md` | Version 1.1, post-Phase 1 |
-| `CHANGELOG.md` | 2026-07-19 section added |
-| `README.md` | Runtime v1, cloud dispatch, Phase status |
+| `README.md` | Phase 2 status, Jules sessions |
+| `CHANGELOG.md` | Phase 1 + Phase 2 Core v1 deliverables |
+| `docs/devboard/README.md` | Per-phase task tracking |
+| `docs/architecture/migration/TRACKING.md` | Phase 01 IMPLEMENTED, 02-11 specified |
 | `~/.hermes/SESSION_STATE.md` | Global cross-project state |
-| `~/.hermes/SOUL.md` | Cloud Dispatch section added |
-
-### Infrastructure
-
-| Component | Status |
-|---|---|
-| **Worktree plugin** | 13 handler sigs fixed, needs session restart |
-| **Mistral Vibe Code Web** | Auth resolved, rate-limited (needs Vibe CLI key) |
-| **Jules dispatch** | PR #7 integrated, stale PRs triaged |
-| **Jules limits** | 15/day — batch into 1 comprehensive PR |
-
----
-
-## Phase 2: Memory System Polish (Next)
-
-### Priority 1: Cleanup + Test Coverage
-- Remove dead `Memory`/`MemoryManager` SQLite classes
-- DreamCycle end-to-end integration tests
-- ConsolidationEngine (duplicate/contradiction detection) tests
-- LLMRefinement layer tests
-- Target: 80% coverage
-
-### Priority 2: Remaining Refactoring
-- `tui/app.py` — Complete TUI split
-- `session/session.py` — Extract prompt building, approval flow
-- `memory/memory_files.py` — Split into frontmatter, entity_ops, daily_log
-- `memory/dream.py` — Split phases into separate modules
-
-### Priority 3: CI/CD
-- GitHub Actions for automated testing
-- Pre-commit hooks for ruff linting
-- Test coverage reporting
-
-### Priority 4: Feature Work
-- P0: MCP support
-- P0: Codebase indexing (Tree-sitter + embedding)
-- P1: Sandboxing for tool execution
-
-### Jules Strategy for Phase 2
-- **One consolidated PR** for memory system polish (cleanup + tests)
-- All refactoring/CI/CD done locally with ast-tools
+| `~/.hermes/SOUL.md` | Cloud Dispatch rules (Jules/Mistral) |

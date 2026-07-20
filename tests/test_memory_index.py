@@ -17,7 +17,7 @@ def tmp_index_dir():
 
 
 @pytest.fixture
-def populated_index(tmp_index_dir):
+async def populated_index(tmp_index_dir):
     """Create an index with some test data."""
     idx = HybridMemoryIndex(tmp_index_dir)
 
@@ -37,7 +37,10 @@ def populated_index(tmp_index_dir):
     idx.index_file("bank/auth.md")
     idx.index_file("bank/testing.md")
 
-    return idx
+    try:
+        yield idx
+    finally:
+        await idx.close()
 
 
 @pytest.mark.asyncio
@@ -69,17 +72,21 @@ def test_citation_format(populated_index):
         assert "score" in r
 
 
-def test_rebuild_index(tmp_index_dir):
+@pytest.mark.asyncio
+async def test_rebuild_index(tmp_index_dir):
     idx = HybridMemoryIndex(tmp_index_dir)
-    workspace = Path(tmp_index_dir)
-    (workspace / "bank").mkdir(exist_ok=True)
-    (workspace / "bank" / "test.md").write_text("Test content about Python")
+    try:
+        workspace = Path(tmp_index_dir)
+        (workspace / "bank").mkdir(exist_ok=True)
+        (workspace / "bank" / "test.md").write_text("Test content about Python")
 
-    idx.index_file("bank/test.md")
-    idx.rebuild()
+        idx.index_file("bank/test.md")
+        idx.rebuild()
 
-    results = idx.search_sync("Python", max_results=5)
-    assert len(results) >= 1
+        results = idx.search_sync("Python", max_results=5)
+        assert len(results) >= 1
+    finally:
+        await idx.close()
 
 
 @pytest.mark.asyncio

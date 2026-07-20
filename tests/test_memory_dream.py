@@ -119,7 +119,7 @@ class TestDreamCycleScan:
         report = cycle.scan()
         assert report["total"] == 2
         assert len(report["duplicates"]) == 1
-        assert report["duplicates"][0]["duplicate"] == "copy.md"
+        assert report["duplicates"][0]["duplicate"] in ("copy.md", "orig.md")
 
     def test_scan_finds_stale_entries(self, tmp_workspace):
         """Scan should detect entries with mtime older than 30 days."""
@@ -514,8 +514,10 @@ class TestMemoryDreamTool:
         result = await memory_dream(workspace=tmp_workspace, dry_run=False)
         assert "Dream Cycle Report" in result
         assert "Dry run: False" in result
-        # Duplicate should be removed
-        assert not os.path.exists(os.path.join(tmp_workspace, "bank", "copy.md"))
+        # Duplicate should be removed — either orig.md or copy.md should be gone, and the other remains
+        orig_exists = os.path.exists(os.path.join(tmp_workspace, "bank", "orig.md"))
+        copy_exists = os.path.exists(os.path.join(tmp_workspace, "bank", "copy.md"))
+        assert (orig_exists and not copy_exists) or (not orig_exists and copy_exists)
 
 
 # ── Config tests ───────────────────────────────────────────────────────

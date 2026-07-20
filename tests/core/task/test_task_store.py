@@ -1,101 +1,90 @@
-"""Tests for SQLite database TaskStore persistence operations."""
+# tests/core/task/test_task_store.py
+"""Tests for the Task persistence layer."""
+
+from __future__ import annotations
 
 import pytest
 
-from nexusagent.core.task.checkpoint import Checkpoint
-from nexusagent.core.task.task_state import Task, TaskState
+from nexusagent.core.task.task_state import Checkpoint, Task, TaskState
 from nexusagent.core.task.task_store import TaskStore
-from nexusagent.infrastructure.db.manager import DatabaseManager
 
 
-@pytest.fixture
-async def temp_db_store():
-    """Create a temporary in-memory SQLite database manager and TaskStore."""
-    db_manager = DatabaseManager(db_url="sqlite+aiosqlite:///:memory:")
-    await db_manager.init_db()
-    store = TaskStore(db_manager=db_manager)
-    await store.init_tables()
-    yield store
-    await db_manager.close()
+class TestTaskStore:
+    """TaskStore CRUD operations."""
 
+    @pytest.fixture
+    def store(self):
+        return TaskStore()
 
-@pytest.mark.anyio
-async def test_save_and_load_task(temp_db_store):
-    """Verify task can be saved and loaded from the database."""
-    task = Task(id="task-123", objective="Compile app", owner="Tester")
-    await temp_db_store.save_task(task)
+    @pytest.fixture
+    def sample_task(self):
+        return Task(objective="test task", owner="worker1")
 
-    loaded = await temp_db_store.load_task("task-123")
-    assert loaded is not None
-    assert loaded.id == "task-123"
-    assert loaded.objective == "Compile app"
-    assert loaded.owner == "Tester"
-    assert loaded.state == TaskState.CREATED
-    assert loaded.checkpoints == []
+    async def test_save_and_load(self, store, sample_task):
+        await store.save_task(sample_task)
+        loaded = await store.load_task(sample_task.id)
+        assert loaded is not None
+        assert loaded.id == sample_task.id
+        assert loaded.objective == "test task"
 
+    async def test_load_missing(self, store):
+        loaded = await store.load_task("nonexistent")
+        assert loaded is None
 
-@pytest.mark.anyio
-async def test_update_task_state(temp_db_store):
-    """Verify task state changes are persisted successfully."""
-    task = Task(id="task-456", objective="Compile app", owner="Tester")
-    await temp_db_store.save_task(task)
+    async def test_list_all(self, store):
+        t1 = Task(objective="a")
+        t2 = Task(objective="b")
+        await store.save_task(t1)
+        await store.save_task(t2)
+        tasks = await store.list_tasks()
+        assert len(tasks) == 2
 
-    task.transition_to(TaskState.PLANNING)
-    await temp_db_store.save_task(task)
+    async def test_list_by_state(self, store):
+        t1 = Task(objective="running", state=TaskState.EXECUTING)
+        t2 = Task(objective="planned", state=TaskState.PLANNING)
+        await store.save_task(t1)
+        await store.save_task(t2)
+        executing = await store.list_tasks(state_filter=TaskState.EXECUTING)
+        assert len(executing) == 1
+        assert executing[0].objective == "running"
 
-    loaded = await temp_db_store.load_task("task-456")
-    assert loaded.state == TaskState.PLANNING
+    async def test_save_checkpoint(self, store, sample_task):
+        await store.save_task(sample_task)
+        cp = Checkpoint(current_node="main", completed_actions=["step1"])
+        await store.save_checkpoint(sample_task.id, cp)
+        loaded = await store.load_task(sample_task.id)
+        assert loaded is not None
+        assert len(loaded.checkpoints) == 1
 
+    async def test_save_checkpoint_missing_task(self, store):
+        cp = Checkpoint(current_node="main")
+        with pytest.raises(KeyError):
+            await store.save_checkpoint("nonexistent", cp)
 
-@pytest.mark.anyio
-async def test_list_tasks(temp_db_store):
-    """Verify list_tasks filtering by state works correctly."""
-    task1 = Task(id="task-a", objective="Obj A", owner="O", state=TaskState.CREATED)
-    task2 = Task(id="task-b", objective="Obj B", owner="O", state=TaskState.EXECUTING)
-    await temp_db_store.save_task(task1)
-    await temp_db_store.save_task(task2)
+    async def test_load_latest_checkpoint(self, store, sample_task):
+        await store.save_task(sample_task)
+        cp1 = Checkpoint(current_node="step1")
+        cp2 = Checkpoint(current_node="step2")
+        await store.save_checkpoint(sample_task.id, cp1)
+        await store.save_checkpoint(sample_task.id, cp2)
+        latest = await store.load_latest_checkpoint(sample_task.id)
+        assert latest is not None
+        assert latest.current_node == "step2"
 
-    all_tasks = await temp_db_store.list_tasks()
-    assert len(all_tasks) == 2
+    async def test_load_latest_checkpoint_no_task(self, store):
+        latest = await store.load_latest_checkpoint("nonexistent")
+        assert latest is None
 
-    executing_tasks = await temp_db_store.list_tasks(TaskState.EXECUTING)
-    assert len(executing_tasks) == 1
-    assert executing_tasks[0].id == "task-b"
+    async def test_delete_task(self, store, sample_task):
+        await store.save_task(sample_task)
+        await store.delete_task(sample_task.id)
+        loaded = await store.load_task(sample_task.id)
+        assert loaded is None
 
-
-@pytest.mark.anyio
-async def test_save_and_load_latest_checkpoint(temp_db_store):
-    """Verify checkpoint persistence operations work correctly."""
-    task = Task(id="task-789", objective="Verify DB", owner="Tester")
-    await temp_db_store.save_task(task)
-
-    cp1 = Checkpoint(
-        current_node="node-1",
-        completed_actions=["act-1"],
-        files_changed=["a.txt"],
-        tool_results=[],
-        next_action="act-2",
-    )
-    await temp_db_store.save_checkpoint("task-789", cp1)
-
-    cp2 = Checkpoint(
-        current_node="node-2",
-        completed_actions=["act-1", "act-2"],
-        files_changed=["a.txt", "b.txt"],
-        tool_results=[{"success": True}],
-        next_action="act-3",
-    )
-    await temp_db_store.save_checkpoint("task-789", cp2)
-
-    loaded_cp = await temp_db_store.load_latest_checkpoint("task-789")
-    assert loaded_cp is not None
-    assert loaded_cp.current_node == "node-2"
-    assert loaded_cp.completed_actions == ["act-1", "act-2"]
-    assert loaded_cp.files_changed == ["a.txt", "b.txt"]
-    assert loaded_cp.tool_results == [{"success": True}]
-    assert loaded_cp.next_action == "act-3"
-
-    # Verify task's internal checkpoints list got updated in DB as well
-    loaded_task = await temp_db_store.load_task("task-789")
-    assert len(loaded_task.checkpoints) == 2
-    assert loaded_task.checkpoints[1].current_node == "node-2"
+    async def test_update_task(self, store, sample_task):
+        await store.save_task(sample_task)
+        sample_task.transition_to(TaskState.PLANNING)
+        await store.save_task(sample_task)
+        loaded = await store.load_task(sample_task.id)
+        assert loaded is not None
+        assert loaded.state == TaskState.PLANNING

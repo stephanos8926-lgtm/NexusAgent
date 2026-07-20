@@ -1,6 +1,6 @@
 # Changelog
 
-## 2026-07-19 — Phase 1 Runtime Foundation Delivered
+## 2026-07-19 — Phase 1 Runtime Foundation Delivered (+ Phase 2 Core v1)
 
 ### Runtime Foundation (Phase 1)
 - **Runtime kernel** — `Runtime` class with 7-state lifecycle (created → initializing → running → pausing → paused → resuming → shutting_down → stopped)
@@ -17,6 +17,18 @@
 - **Dual audits:** Forward + reverse audit of spec before implementation
 - **104 runtime tests** — 8 test files, all passing on Python 3.12+3.13
 
+### Durable Task Execution (Phase 2 — Core v1)
+- **TaskState enum** — 7 states: CREATED, PLANNING, EXECUTING, VERIFYING, COMPLETED, FAILED, RECOVERING
+- **`Task` dataclass** — Durable unit of work with checkpoint support, parent/child hierarchy, dict serialization
+- **`StateTransitionValidator`** — Enforces legal transitions (CREATED→PLANNING→EXECUTING→VERIFYING→COMPLETED, FAILED→RECOVERING, etc.)
+- **`Checkpoint` dataclass** — Execution snapshot (current_node, completed_actions, files_changed, tool_results, next_action)
+- **`TaskStore`** — In-memory persistence layer with checkpoint I/O (CRUD + list_by_state)
+- **`RecoveryManager`** — Retry (exponential backoff), rollback, escalate to POL chain
+- **35 new tests** — State transitions, checkpoint serialization, store operations, recovery paths
+- **156 total tests** — All passing (104 runtime + 35 task + 17 pre-existing)
+- **3 Jules sessions dispatched:** Phase 2 PR (`6790340144769840547`), memory polish (`1777915438102205450` — unblocked)
+- **DevBoard created:** `docs/devboard/README.md` tracking all 12 phases
+
 ### Migration Framework
 - Established 12-phase architectural migration plan ([Chief Architect Directive](docs/architecture/migration/CHIEF-ARCHITECT-DIRECTIVE.md))
 - All 11 post-foundation phases specified: Task State Machine, Event-Driven Core, LangGraph Worker Runtime, Planner & Orchestrator, DAG Execution Engine, POL Control Plane, Capability Security, Memory Evolution, Observability, Production Readiness
@@ -30,7 +42,6 @@
 - **Jules dispatch** — Integrated PR #7 (CLI adapter), closed stale PRs #4, #6, #8, #9
 - **SOUL.md** — Added Cloud Dispatch section (Jules/Mistral rules, worktree plugin reference)
 - **Memory updates** — Jules limits (15/day, batch into 1), Vibe key requirements, worktree fix notes
-- **`pytest-asyncio`** added to project dependencies (server install failed without it)
 
 ### Merged PRs
 - **PR #7** — Wire Runtime-backed create_server_app into Server Entry Point (Jules)
