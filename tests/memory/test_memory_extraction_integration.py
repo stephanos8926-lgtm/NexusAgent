@@ -1,7 +1,5 @@
 """Integration tests verifying memory extraction runs and stores results after agent turns."""
 
-import asyncio
-import os
 import shutil
 import tempfile
 from pathlib import Path
@@ -10,7 +8,6 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from nexusagent.core.session.session import Session
-from nexusagent.memory.extraction import MemoryExtractor
 
 
 @pytest.fixture

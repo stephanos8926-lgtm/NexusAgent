@@ -24,7 +24,6 @@ from nexusagent.runtime.context import RuntimeContext
 from nexusagent.runtime.lifecycle import HealthStatus, LifecycleState
 from nexusagent.runtime.runtime import Runtime
 
-
 # =============================================================================
 # Runtime + existing SessionManager integration
 # =============================================================================

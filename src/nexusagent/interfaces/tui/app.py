@@ -213,22 +213,33 @@ class NexusApp(App):
     # ── Git branch detection ────────────────────────────────────────────
 
     def _refresh_git_branch(self) -> None:
-        """Detect git branch and update the status bar."""
-        import subprocess
+        """Schedule asynchronous detection of git branch and status to update the status bar."""
+        async def _async_detect():
+            import subprocess
 
-        try:
-            result = subprocess.run(
-                ["git", "branch", "--show-current"],
-                capture_output=True,
-                text=True,
-                timeout=3,
-                cwd=str(pathlib.Path.cwd()),
-            )
-            branch = result.stdout.strip() if result.returncode == 0 else ""
+            from nexusagent.widgets.status import GitStatus
+
+            def _get_git_info():
+                try:
+                    res_branch = subprocess.run(
+                        ["git", "branch", "--show-current"],
+                        capture_output=True,
+                        text=True,
+                        timeout=3,
+                        cwd=str(pathlib.Path.cwd()),
+                    )
+                    branch = res_branch.stdout.strip() if res_branch.returncode == 0 else ""
+                    status = GitStatus.detect()
+                    return branch, status
+                except Exception:
+                    return "", None
+
+            branch, status = await asyncio.to_thread(_get_git_info)
             if branch:
                 self.status_bar.set_branch(branch)
-        except Exception:
-            pass  # Git branch detection is best-effort
+                self.status_bar.set_git_status(status)
+
+        asyncio.create_task(_async_detect())
 
     # ── Greeting ──────────────────────────────────────────────────────
 
@@ -337,6 +348,7 @@ class NexusApp(App):
     async def on_chat_input_submitted(self, event) -> None:
         """Handle chat input submission. Delegates to input module."""
         await _on_chat_input_submitted(self, event)
+        self._refresh_git_branch()
 
     # ── Internal method wrappers for backward compat (tests call these) ──
 

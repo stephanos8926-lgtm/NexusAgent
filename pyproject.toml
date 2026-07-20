@@ -73,6 +73,11 @@ ignore = [
     "RUF012", # Mutable default value for class attribute
     "SIM117", # Nested with statements
     "N811",   # Constant imported as non-constant
+    "N802",   # Function name should be lowercase
+    "N803",   # Argument name should be lowercase
+    "N999",   # Invalid module name
+    "RUF001", # String contains ambiguous character
+    "RUF003", # Comment contains ambiguous character
 ]
 
 [tool.ruff.lint.isort]

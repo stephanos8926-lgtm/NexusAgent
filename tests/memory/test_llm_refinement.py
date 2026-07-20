@@ -1,9 +1,10 @@
 """Integration and unit tests for the LLMRefinement synthesis layer."""
 
-import pytest
 from unittest.mock import AsyncMock
 
-from nexusagent.memory.refinement import LLMRefinement, RefinementResult
+import pytest
+
+from nexusagent.memory.refinement import LLMRefinement
 
 
 @pytest.mark.asyncio

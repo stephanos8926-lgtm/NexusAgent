@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from nexusagent.runtime.context import RuntimeContext
 from nexusagent.runtime.lifecycle import LifecycleState
-from nexusagent.runtime.worker import ManagedWorker, RuntimeWorkerManager, WorkerMetadata
+from nexusagent.runtime.worker import ManagedWorker, RuntimeWorkerManager
 
 
 class TestManagedWorker:

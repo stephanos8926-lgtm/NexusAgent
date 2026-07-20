@@ -2,6 +2,7 @@
 """WebSocket session handler for real-time interactive agent sessions."""
 
 import asyncio
+import contextlib
 import logging
 
 from fastapi import HTTPException, WebSocket, WebSocketDisconnect
@@ -271,8 +272,9 @@ async def events_websocket(websocket: WebSocket) -> None:
 
     await websocket.accept()
 
-    from nexusagent.infrastructure.bus import get_bus
     import json
+
+    from nexusagent.infrastructure.bus import get_bus
 
     bus = get_bus()
     queue: asyncio.Queue = asyncio.Queue()
@@ -297,7 +299,5 @@ async def events_websocket(websocket: WebSocket) -> None:
     except Exception as e:
         logger.error(f"Error in events_websocket: {e}")
     finally:
-        try:
+        with contextlib.suppress(Exception):
             await sub.unsubscribe()
-        except Exception:
-            pass

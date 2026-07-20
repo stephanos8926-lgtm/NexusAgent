@@ -11,8 +11,9 @@ import logging
 import time
 import uuid
 
-from nexusagent.core.events import WorkerEvent, WorkerEventType, emit_event_sync
+from nexusagent.core.events import WorkerEvent, emit_event_sync
 from nexusagent.core.subagent import SubAgentHandle
+from nexusagent.core.task import Checkpoint, Task, TaskState, TaskStore
 from nexusagent.core.worker.handler import _run_agent_task
 from nexusagent.llm.models import TaskSchema
 
@@ -48,9 +49,20 @@ class WorkerPool:
         worker_id = f"worker-{str(uuid.uuid4())[:8]}"
         handle = SubAgentHandle(worker_id=worker_id, contract=contract, depth=depth)
         self._active[worker_id] = handle
-        task = asyncio.create_task(self._run_worker(handle))
-        self._tasks.add(task)
-        task.add_done_callback(self._tasks.discard)
+
+        # Create a Task for checkpoint persistence
+        task = Task(
+            id=contract.task_id,
+            objective=contract.description,
+            owner=worker_id,
+            state=TaskState.CREATED,
+        )
+        self._worker_tasks[worker_id] = task
+        await self._task_store.save_task(task)
+
+        task_obj = asyncio.create_task(self._run_worker(handle))
+        self._tasks.add(task_obj)
+        task_obj.add_done_callback(self._tasks.discard)
         return handle
 
     async def _run_worker(self, handle: SubAgentHandle):
@@ -61,6 +73,24 @@ class WorkerPool:
 
         async with self._semaphore:
             handle._mark_running()
+            task = self._worker_tasks.get(handle.worker_id)
+
+            # Emit worker started event
+            if task:
+                emit_event_sync(
+                    WorkerEvent.started(
+                        source="worker_pool",
+                        worker_id=handle.worker_id,
+                        task_id=task.id,
+                        description=task.objective,
+                    )
+                )
+
+            if task:
+                task.transition_to(TaskState.PLANNING)
+                await self._task_store.save_task(task)
+                task.transition_to(TaskState.EXECUTING)
+                await self._task_store.save_task(task)
             try:
                 meta = dict(handle.contract.metadata)
                 meta.setdefault("agent_model", handle.model)
@@ -156,22 +186,24 @@ class WorkerPool:
             finally:
                 self._active.pop(handle.worker_id, None)
 
-    async def _execute_bounded(self, task, handle, checkpoint=None) -> str:
-        """Execute with turn counting, wall time, and cancellation checks."""
-        from nexusagent.core.task.checkpoint import Checkpoint
-        from nexusagent.core.task.task_store import get_task_store
+    async def _execute_bounded(self, task, handle) -> str:
+        """Execute with turn counting, wall time, and cancellation checks.
 
+        Before each tool call, saves a checkpoint to the TaskStore.
+        On restart, loads the latest checkpoint and resumes from there.
+        """
         start = time.time()
         turn = 0
         last_result = None
         contract = handle.contract
-        store = get_task_store()
 
-        if checkpoint:
-            # Resume from checkpoint logic
-            turn = len(checkpoint.completed_actions)
-            if checkpoint.tool_results:
-                last_result = checkpoint.tool_results[-1].get("output")
+        # Try to load latest checkpoint on restart
+        latest_checkpoint = await self._task_store.load_latest_checkpoint(contract.task_id)
+        if latest_checkpoint:
+            logger.info(f"Resuming task {contract.task_id} from checkpoint at node: {latest_checkpoint.current_node}")
+            # Restore state from checkpoint
+            turn = len(latest_checkpoint.completed_actions)
+            last_result = latest_checkpoint.tool_results[-1] if latest_checkpoint.tool_results else None
 
         while turn < contract.max_turns:
             if handle.is_cancelled():
@@ -205,7 +237,28 @@ class WorkerPool:
                 )
                 result = await _run_agent_task(turn_task)
                 last_result = result
-                if result.get("success") is True or result.get("status") == "complete":
+
+                # Save checkpoint after each successful tool execution
+                task_obj = self._worker_tasks.get(handle.worker_id)
+                if task_obj:
+                    # Handle both dict and string results
+                    tool_result = result if isinstance(result, dict) else {"result": str(result)}
+                    checkpoint = Checkpoint(
+                        current_node="agent_execution",
+                        completed_actions=[f"turn_{turn}"],
+                        files_changed=[],
+                        tool_results=[tool_result],
+                        next_action=f"turn_{turn + 1}",
+                    )
+                    task_obj.add_checkpoint(checkpoint)
+                    await self._task_store.save_checkpoint(task_obj.id, checkpoint)
+
+                # Check for completion - handle both dict and string results
+                if isinstance(result, dict):
+                    success = result.get("success") is True or result.get("status") == "complete"
+                else:
+                    success = True  # String result means completion
+                if success:
                     return last_result
             except Exception as e:
                 if contract.on_failure == "abort":

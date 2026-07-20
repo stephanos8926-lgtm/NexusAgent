@@ -12,7 +12,6 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any
 
-
 # Valid transition map: source → set of allowed target values
 _LIFECYCLE_TRANSITIONS: dict[str, set[str]] = {
     "created": {"initializing"},
@@ -25,7 +24,7 @@ _LIFECYCLE_TRANSITIONS: dict[str, set[str]] = {
 }
 
 
-class LifecycleState(str, enum.Enum):
+class LifecycleState(enum.StrEnum):
     """Universal 7-state lifecycle for runtime components.
 
     Transitions:

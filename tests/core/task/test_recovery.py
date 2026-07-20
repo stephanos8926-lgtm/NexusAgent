@@ -8,7 +8,6 @@ import pytest
 from nexusagent.core.task.recovery import RecoveryManager, RecoveryStrategy
 from nexusagent.core.task.task_state import (
     Checkpoint,
-    StateTransitionError,
     Task,
     TaskState,
 )

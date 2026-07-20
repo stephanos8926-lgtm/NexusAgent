@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
-import pytest
-
 from nexusagent.runtime.context import RuntimeContext
 from nexusagent.runtime.lifecycle import LifecycleState
 from nexusagent.runtime.tools import ToolManager

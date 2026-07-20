@@ -9,8 +9,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Callable
 from enum import Enum
-from typing import Callable
 
 from nexusagent.core.task.task_state import StateTransitionError, Task, TaskState
 

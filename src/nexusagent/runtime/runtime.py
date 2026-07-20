@@ -8,7 +8,7 @@ lifecycles.
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
 
 from nexusagent.runtime.context import RuntimeContext, set_current_context
 from nexusagent.runtime.lifecycle import (
@@ -18,7 +18,7 @@ from nexusagent.runtime.lifecycle import (
 )
 
 if TYPE_CHECKING:
-    from nexusagent.tools.registry.core import ToolRegistry
+    pass
 
 logger = logging.getLogger("nexusagent.runtime")
 

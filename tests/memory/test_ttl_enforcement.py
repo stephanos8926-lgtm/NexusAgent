@@ -1,10 +1,7 @@
 """Integration tests for TTL enforcement, expired item sweeping, and index exclusion."""
 
-import os
 import shutil
 import tempfile
-import time
-from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest

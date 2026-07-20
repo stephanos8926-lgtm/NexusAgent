@@ -142,6 +142,7 @@ class StatusBar(Horizontal):
         self._status_message = "Ready"
         self._cwd = ""
         self._branch = ""
+        self._git_status: str | None = None
         self._tokens = 0
         self._model_provider = ""
         self._model_name = ""
@@ -209,7 +210,17 @@ class StatusBar(Horizontal):
 
             if self._branch and term_width > 80:
                 # Plain text branch — no ⎇ glyph (breaks non-NF terminals)
-                branch.update(f"[{self._branch}]")
+                if self._git_status:
+                    label = GitStatus.label(self._git_status)
+                    if self._git_status == "clean" or self._git_status == "staged":
+                        color = "green"
+                    elif self._git_status == "dirty":
+                        color = "yellow"
+                    else:
+                        color = "white"
+                    branch.update(f"[{self._branch} | [{color}]{label}[/{color}]]")
+                else:
+                    branch.update(f"[{self._branch}]")
             else:
                 branch.update("")
 
@@ -265,6 +276,15 @@ class StatusBar(Horizontal):
             branch: The branch name to show.
         """
         self._branch = branch
+        self._update_widgets()
+
+    def set_git_status(self, status: str | None) -> None:
+        """Update the git status display.
+
+        Args:
+            status: The git status to show ('clean', 'dirty', 'staged', or None).
+        """
+        self._git_status = status
         self._update_widgets()
 
     def set_tokens(self, count: int) -> None:

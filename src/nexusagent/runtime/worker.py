@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any
 
 from nexusagent.runtime.context import RuntimeContext
 from nexusagent.runtime.lifecycle import (
@@ -44,8 +44,8 @@ class ManagedWorker(LifecycleMixin):
     def __init__(
         self,
         handle: Any,
-        context: Optional[RuntimeContext] = None,
-        metadata: Optional[WorkerMetadata] = None,
+        context: RuntimeContext | None = None,
+        metadata: WorkerMetadata | None = None,
     ) -> None:
         self._handle = handle
         self._context = context
@@ -143,7 +143,7 @@ class RuntimeWorkerManager(LifecycleMixin):
 
     def __init__(
         self,
-        context: Optional[RuntimeContext] = None,
+        context: RuntimeContext | None = None,
         max_workers: int = 4,
     ) -> None:
         self._context = context
@@ -204,7 +204,7 @@ class RuntimeWorkerManager(LifecycleMixin):
         self._workers[handle.worker_id] = managed
         return managed
 
-    def get(self, worker_id: str) -> Optional[ManagedWorker]:
+    def get(self, worker_id: str) -> ManagedWorker | None:
         """Get a managed worker by ID."""
         return self._workers.get(worker_id)
 
