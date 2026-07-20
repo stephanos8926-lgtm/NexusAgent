@@ -2,7 +2,7 @@
 
 Provides concurrency-limited spawning of sub-agent workers with turn counting,
 wall-time bounds, and cancellation support. Integrates with Phase 2 Task model
-for checkpoint persistence and recovery.
+for checkpoint persistence and recovery. Phase 3: emits WorkerEvents to NATS.
 """
 
 from __future__ import annotations
@@ -12,6 +12,7 @@ import logging
 import time
 import uuid
 
+from nexusagent.core.events import WorkerEvent, WorkerEventType, emit_event_sync
 from nexusagent.core.subagent import SubAgentHandle
 from nexusagent.core.task import Task, TaskState, Checkpoint, TaskStore
 from nexusagent.core.worker.handler import _run_agent_task
@@ -73,12 +74,22 @@ class WorkerPool:
             handle._mark_running()
             task = self._worker_tasks.get(handle.worker_id)
             
+            # Emit worker started event
+            if task:
+                emit_event_sync(
+                    WorkerEvent.started(
+                        source="worker_pool",
+                        worker_id=handle.worker_id,
+                        task_id=task.id,
+                        description=task.objective,
+                    )
+                )
+            
             if task:
                 task.transition_to(TaskState.PLANNING)
                 await self._task_store.save_task(task)
                 task.transition_to(TaskState.EXECUTING)
                 await self._task_store.save_task(task)
-            
             try:
                 meta = dict(handle.contract.metadata)
                 meta.setdefault("agent_model", handle.model)
@@ -100,6 +111,14 @@ class WorkerPool:
                     if task:
                         task.transition_to(TaskState.FAILED)
                         await self._task_store.save_task(task)
+                        emit_event_sync(
+                            WorkerEvent.failed(
+                                source="worker_pool",
+                                worker_id=handle.worker_id,
+                                task_id=task.id,
+                                error="Cancelled by user",
+                            )
+                        )
                 else:
                     handle._mark_completed(result)
                     if task:
@@ -112,6 +131,14 @@ class WorkerPool:
                 if task:
                     task.transition_to(TaskState.FAILED)
                     await self._task_store.save_task(task)
+                    emit_event_sync(
+                        WorkerEvent.failed(
+                            source="worker_pool",
+                            worker_id=handle.worker_id,
+                            task_id=task.id,
+                            error=str(e),
+                        )
+                    )
             finally:
                 self._active.pop(handle.worker_id, None)
                 self._worker_tasks.pop(handle.worker_id, None)
