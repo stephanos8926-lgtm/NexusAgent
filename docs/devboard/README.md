@@ -14,8 +14,8 @@
 | 1 | Runtime Foundation | `01-runtime-foundation.md` | ✅ **DELIVERED** | Lucien + Jules | `889efd2`→`8f7f844` |
 | 2 | Durable Task Execution | `02-task-state-machine.md` | ✅ **DELIVERED** | Lucien + Jules #679034...547 | `f06ff5f` `f5cb696` `732c61e` |
 | 3 | Event-Driven Core | `03-event-driven-core.md` | ✅ **DELIVERED** | Lucien + Jules #183829...138 | `b736844` `afe48c9` PR #11 |
-| 4 | LangGraph Worker Runtime | `04-langgraph-worker-runtime.md` | ⬜ Not Started | — | — |
-| 5 | Planner & Orchestrator | `05-planner-orchestrator.md` | ⬜ Not Started | — | — |
+| 4 | LangGraph Worker Runtime | `04-langgraph-worker-runtime.md` | ✅ **DELIVERED** | Lucien + Jules #409303...812 | `1f83221` PR #13 |
+| 5 | Planner & Orchestrator | `05-planner-orchestrator.md` | 🟡 Jules | Jules (dispatched) | — |
 | 6 | DAG Execution Engine | `06-dag-execution-engine.md` | ⬜ Not Started | — | — |
 | 7 | POL Control Plane | `07-pol-control-plane.md` | ⬜ Not Started | — | — |
 | 8 | Capability Security Model | `08-capability-security-model.md` | ⬜ Not Started | — | — |
@@ -105,9 +105,9 @@
 ### Active
 | Channel | Task | Est. | Status |
 |---------|------|------|--------|
-| 🤖 Jules | Phase 4: LangGraph Worker Runtime | ~1,000 lines | `4093038977148740812` — IN_PROGRESS (re-pushing, PR #13 was empty) |
-| ☁️ Dev VM | `phase4-worker-graph` worktree | 173 tests | 🟢 Synced, venv ready |
-| 📝 Inline | Codebase deep analysis | ✅ Done | `e3a1de6` — AGENTS.md + MEMORIES.md refreshed |
+| 🤖 Jules | Phase 5: Planner & Orchestrator | ~1,200 lines | Dispatching now |
+| ☁️ Dev VM | Test suite validation | 189+ tests | Dispatching now |
+| 📝 Inline | Devboard + docs update | — | 🟢 On it |
 
 ---
 
