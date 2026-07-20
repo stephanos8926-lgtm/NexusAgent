@@ -13,27 +13,41 @@ Events are published to NATS subjects following the pattern:
 - nexus.policy.* - Policy enforcement events
 """
 
-from nexusagent.core.events.base import SystemEvent, EventType
-from nexusagent.core.events.task_events import TaskEvent, TaskEventType
-from nexusagent.core.events.worker_events import WorkerEvent, WorkerEventType
-from nexusagent.core.events.tool_events import ToolEvent, ToolEventType
+from nexusagent.core.events.base import EventType, SystemEvent
+from nexusagent.core.events.dashboard_subscriber import DashboardSubscriber
+from nexusagent.core.events.emitter import (
+    EventEmitter,
+    emit_event,
+    emit_event_sync,
+    get_emitter,
+    set_emitter,
+)
+from nexusagent.core.events.memory_subscriber import MemorySubscriber
+from nexusagent.core.events.pol_subscriber import POLSubscriber
 from nexusagent.core.events.policy_events import PolicyEvent, PolicyEventType
-from nexusagent.core.events.emitter import EventEmitter, get_emitter, set_emitter, emit_event, emit_event_sync
+from nexusagent.core.events.subscribers import EventSubscriber
+from nexusagent.core.events.task_events import TaskEvent, TaskEventType
+from nexusagent.core.events.tool_events import ToolEvent, ToolEventType
+from nexusagent.core.events.worker_events import WorkerEvent, WorkerEventType
 
 __all__ = [
-    "SystemEvent",
+    "DashboardSubscriber",
+    "EventEmitter",
+    "EventSubscriber",
     "EventType",
-    "TaskEvent",
-    "TaskEventType",
-    "WorkerEvent",
-    "WorkerEventType",
-    "ToolEvent",
-    "ToolEventType",
+    "MemorySubscriber",
+    "POLSubscriber",
     "PolicyEvent",
     "PolicyEventType",
-    "EventEmitter",
-    "get_emitter",
-    "set_emitter",
+    "SystemEvent",
+    "TaskEvent",
+    "TaskEventType",
+    "ToolEvent",
+    "ToolEventType",
+    "WorkerEvent",
+    "WorkerEventType",
     "emit_event",
     "emit_event_sync",
+    "get_emitter",
+    "set_emitter",
 ]

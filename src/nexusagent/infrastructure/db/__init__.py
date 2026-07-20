@@ -2,7 +2,7 @@
 
 from .base import Base
 from .manager import DatabaseManager
-from .models import MessageModel, ResultModel, SessionModel, TaskModel
+from .models import EventModel, MessageModel, ResultModel, SessionModel, TaskModel
 from .session_repo import SessionRepository
 from .task_repo import TaskRepository
 
@@ -11,6 +11,7 @@ __all__ = [
     "Base",
     # Manager
     "DatabaseManager",
+    "EventModel",
     "MessageModel",
     "ResultModel",
     "SessionModel",

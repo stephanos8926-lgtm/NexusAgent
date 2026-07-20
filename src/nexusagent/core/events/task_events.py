@@ -9,15 +9,16 @@ Defines TaskEvent and its subtypes for task lifecycle tracking:
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 from typing import Any
 
-from nexusagent.core.events.base import SystemEvent, EventType
+from nexusagent.core.events.base import EventType, SystemEvent
 
 
 class TaskEventType(Enum):
     """Task event types as defined in the architecture."""
+
     CREATED = "created"
     STARTED = "started"
     COMPLETED = "completed"
@@ -27,10 +28,10 @@ class TaskEventType(Enum):
 @dataclass
 class TaskEvent(SystemEvent):
     """Event emitted during task lifecycle transitions.
-    
+
     Category: task
     NATS subjects: nexus.task.created, nexus.task.started, nexus.task.completed, nexus.task.failed
-    
+
     Payload contains task-specific data:
     - task_id: The unique task identifier
     - objective: Task description/objective
@@ -40,9 +41,9 @@ class TaskEvent(SystemEvent):
     - error: Error message for failed events
     - checkpoint: Checkpoint data for recovery
     """
-    
+
     category: EventType = EventType.TASK
-    
+
     # Convenience factory methods for each event type
     @classmethod
     def created(
@@ -53,7 +54,7 @@ class TaskEvent(SystemEvent):
         owner: str = "",
         parent_task: str | None = None,
         **extra: Any,
-    ) -> "TaskEvent":
+    ) -> TaskEvent:
         """Create a task.created event."""
         return cls(
             source=source,
@@ -66,7 +67,7 @@ class TaskEvent(SystemEvent):
                 **extra,
             },
         )
-    
+
     @classmethod
     def started(
         cls,
@@ -74,7 +75,7 @@ class TaskEvent(SystemEvent):
         task_id: str,
         owner: str = "",
         **extra: Any,
-    ) -> "TaskEvent":
+    ) -> TaskEvent:
         """Create a task.started event."""
         return cls(
             source=source,
@@ -85,7 +86,7 @@ class TaskEvent(SystemEvent):
                 **extra,
             },
         )
-    
+
     @classmethod
     def completed(
         cls,
@@ -94,7 +95,7 @@ class TaskEvent(SystemEvent):
         owner: str = "",
         result: Any = None,
         **extra: Any,
-    ) -> "TaskEvent":
+    ) -> TaskEvent:
         """Create a task.completed event."""
         return cls(
             source=source,
@@ -106,7 +107,7 @@ class TaskEvent(SystemEvent):
                 **extra,
             },
         )
-    
+
     @classmethod
     def failed(
         cls,
@@ -115,7 +116,7 @@ class TaskEvent(SystemEvent):
         owner: str = "",
         error: str = "",
         **extra: Any,
-    ) -> "TaskEvent":
+    ) -> TaskEvent:
         """Create a task.failed event."""
         return cls(
             source=source,
@@ -127,17 +128,17 @@ class TaskEvent(SystemEvent):
                 **extra,
             },
         )
-    
+
     @property
     def task_id(self) -> str | None:
         """Extract task_id from payload."""
         return self.payload.get("task_id")
-    
+
     @property
     def error(self) -> str | None:
         """Extract error from payload (for failed events)."""
         return self.payload.get("error")
-    
+
     @property
     def result(self) -> Any:
         """Extract result from payload (for completed events)."""

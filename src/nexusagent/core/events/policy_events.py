@@ -13,11 +13,12 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any
 
-from nexusagent.core.events.base import SystemEvent, EventType
+from nexusagent.core.events.base import EventType, SystemEvent
 
 
 class PolicyEventType(Enum):
     """Policy event types."""
+
     DENIED = "denied"
     ALLOWED = "allowed"
     UPDATED = "updated"
@@ -27,10 +28,10 @@ class PolicyEventType(Enum):
 @dataclass
 class PolicyEvent(SystemEvent):
     """Event emitted during policy enforcement.
-    
+
     Category: policy
     NATS subjects: nexus.policy.denied, nexus.policy.allowed, nexus.policy.updated, nexus.policy.violation
-    
+
     Payload contains policy-specific data:
     - action: The action being checked (e.g., "tool_read_file", "access_secret")
     - resource: The resource being accessed
@@ -41,9 +42,9 @@ class PolicyEvent(SystemEvent):
     - worker_id: Worker context
     - task_id: Task context
     """
-    
+
     category: EventType = EventType.POLICY
-    
+
     # Convenience factory methods for each event type
     @classmethod
     def denied(
@@ -58,7 +59,7 @@ class PolicyEvent(SystemEvent):
         task_id: str = "",
         worker_id: str = "",
         **extra: Any,
-    ) -> "PolicyEvent":
+    ) -> PolicyEvent:
         """Create a policy.denied event."""
         return cls(
             source=source,
@@ -75,7 +76,7 @@ class PolicyEvent(SystemEvent):
                 **extra,
             },
         )
-    
+
     @classmethod
     def allowed(
         cls,
@@ -88,7 +89,7 @@ class PolicyEvent(SystemEvent):
         task_id: str = "",
         worker_id: str = "",
         **extra: Any,
-    ) -> "PolicyEvent":
+    ) -> PolicyEvent:
         """Create a policy.allowed event."""
         return cls(
             source=source,
@@ -104,7 +105,7 @@ class PolicyEvent(SystemEvent):
                 **extra,
             },
         )
-    
+
     @classmethod
     def updated(
         cls,
@@ -112,7 +113,7 @@ class PolicyEvent(SystemEvent):
         policy_name: str,
         new_config: dict,
         **extra: Any,
-    ) -> "PolicyEvent":
+    ) -> PolicyEvent:
         """Create a policy.updated event."""
         return cls(
             source=source,
@@ -123,7 +124,7 @@ class PolicyEvent(SystemEvent):
                 **extra,
             },
         )
-    
+
     @classmethod
     def violation(
         cls,
@@ -133,7 +134,7 @@ class PolicyEvent(SystemEvent):
         role: str = "",
         policy: str = "",
         **extra: Any,
-    ) -> "PolicyEvent":
+    ) -> PolicyEvent:
         """Create a policy.violation event."""
         return cls(
             source=source,
@@ -146,27 +147,27 @@ class PolicyEvent(SystemEvent):
                 **extra,
             },
         )
-    
+
     @property
     def action(self) -> str | None:
         """Extract action from payload."""
         return self.payload.get("action")
-    
+
     @property
     def reason(self) -> str | None:
         """Extract reason from payload."""
         return self.payload.get("reason")
-    
+
     @property
     def role(self) -> str | None:
         """Extract role from payload."""
         return self.payload.get("role")
-    
+
     @property
     def policy(self) -> str | None:
         """Extract policy from payload."""
         return self.payload.get("policy")
-    
+
     @property
     def tool_name(self) -> str | None:
         """Extract tool_name from payload."""

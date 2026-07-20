@@ -161,6 +161,49 @@ class Task:
             import logging
             logging.getLogger(__name__).warning(f"Failed to emit task event: {e}")
 
+        # Emit TaskEvent based on state transition
+        self._emit_transition_event(old_state, new_state)
+
+    def _emit_transition_event(self, old_state: TaskState, new_state: TaskState) -> None:
+        """Emit TaskEvent for state transitions."""
+        try:
+            # Map TaskState transitions to TaskEvent types
+            event_map = {
+                (TaskState.CREATED, TaskState.PLANNING): TaskEventType.CREATED,
+                (TaskState.CREATED, TaskState.FAILED): TaskEventType.FAILED,
+                (TaskState.PLANNING, TaskState.EXECUTING): TaskEventType.STARTED,
+                (TaskState.PLANNING, TaskState.FAILED): TaskEventType.FAILED,
+                (TaskState.EXECUTING, TaskState.VERIFYING): TaskEventType.COMPLETED,
+                (TaskState.EXECUTING, TaskState.FAILED): TaskEventType.FAILED,
+                (TaskState.VERIFYING, TaskState.COMPLETED): TaskEventType.COMPLETED,
+                (TaskState.VERIFYING, TaskState.FAILED): TaskEventType.FAILED,
+                (TaskState.FAILED, TaskState.RECOVERING): TaskEventType.FAILED,  # FAILED → RECOVERING emits failed
+            }
+
+            event_type = event_map.get((old_state, new_state))
+            if event_type is None:
+                return  # No event for this transition (e.g., RECOVERING → EXECUTING)
+
+            # Build event
+            event = TaskEvent(
+                source="task_state",
+                type=event_type.value,
+                payload={
+                    "task_id": self.id,
+                    "objective": self.objective,
+                    "owner": self.owner,
+                    "state": new_state.value,
+                    "previous_state": old_state.value,
+                },
+            )
+
+            # Emit synchronously (non-blocking fire-and-forget)
+            emit_event_sync(event)
+        except Exception as e:
+            # Never let event emission break the state transition
+            import logging
+            logging.getLogger(__name__).warning(f"Failed to emit task event: {e}")
+
     def add_checkpoint(self, checkpoint: Checkpoint) -> None:
         """Add a checkpoint and record the state."""
         self.checkpoints.append(checkpoint)
