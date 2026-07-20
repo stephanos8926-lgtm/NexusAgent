@@ -22,10 +22,13 @@ No cloud dependency. No data leaving your machine. Your keys, your code, your co
 - **104 tests, 3 ADRs, dual-audited spec**
 - **Cloud dispatch via Jules (15/day) + Mistral Vibe Code Web (in progress)**
 
-**Phase 2: Memory System Polish (🔜 Next)**
-- Remove dead `Memory`/`MemoryManager` SQLite classes
-- DreamCycle + ConsolidationEngine integration tests
-- Push test coverage toward 80%
+**Phase 2: Durable Task Execution (🟡 Core v1 Delivered)**
+- Task state machine with 7 states and validated transitions
+- Checkpoint persistence, RecoveryManager with retry/rollback/escalate chain
+- `TaskStore` persistence layer, 35 new tests (156 total)
+- **Jules PR `6790340144769840547` implementing full Phase 2 in cloud**
+
+**Phase 3: Event-Driven Core (🔜 Next after Phase 2 completes)**
 
 ## Features
 

@@ -59,11 +59,11 @@
 
 | Channel | Status | Session/Ref |
 |---------|--------|-------------|
-| 🤖 Jules (cloud) | 🟡 Phase 2 PR: `6790340144769840547` | Implementing |
-| 🤖 Jules (cloud) | 🟡 Phase 2.5 memory polish: `1777915438102205450` | IN_PROGRESS |
+| 🤖 Jules (cloud) | 🟡 Phase 2 PR: `6790340144769840547` | IN_PROGRESS |
+| 🤖 Jules (cloud) | 🟡 Memory polish: `1777915438102205450` | AWAITING_FEEDBACK (unblocked) |
 | 🌀 Mistral/Vibe (cloud) | 🔴 Rate-limited | Needs Vibe CLI API key |
 | ☁️ Server dev VM (worktree) | 🟢 `phase2-task-state` provisioned | Worktree + venv ready |
-| 📝 Inline (local) | ✅ Core task model, store, recovery, 35 tests | Committed `9f33fb8` |
+| 📝 Inline (local) | ✅ Core task model, store, recovery, 35 tests | Committed `f06ff5f` |
 
 ---
 
