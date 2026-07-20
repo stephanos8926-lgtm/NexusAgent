@@ -143,23 +143,59 @@ Key patterns to copy:
 
 ---
 
-## 9. Infrastructure Topology — 3 Incus VMs
+## 9. Infrastructure Topology — 3 Incus VMs (see AGENTS.md for full)
 
-NexusAgent runs across 3 Incus VMs over Tailscale mesh:
+NexusAgent runs across 3 Incus VMs over Tailscale mesh: `infra` (NATS, PG, Caddy), `enterprise` (apps), `dev` (worktrees). See `AGENTS.md` §Infrastructure Topology for full table and IPs.
 
-| VM | Tailscale IP | SSH Host | Role | Services |
-|----|-------------|----------|------|----------|
-| `infra` | 100.122.246.112 | `ssh infra` | Infrastructure | NATS JetStream, PostgreSQL 16, Caddy, Honcho API |
-| `enterprise` | 100.81.49.91 | `ssh enterprise` | Enterprise apps | — |
-| `dev` | 100.109.15.31 | `ssh dev` | Development | Phase worktrees, test execution, dev builds |
-
-- **NATS** runs on `infra` VM at port 4222 (NOT on `dev` — do not expect it there)
-- **Dev VM worktrees** at `/home/sysop/Workspaces/NexusAgent/.hermes/worktrees/<name>/` with their own venv
-- **Workstation RAM ceiling: 4GB** — do NOT run heavy parallel processes locally
+- **NATS runs on `infra` VM port 4222** — do NOT expect it on `dev`
+- **Workstation RAM: 4GB** — offload heavy work to dev VM or Jules
+- **Jules** sandbox on Google Cloud (Pro Gemini, 15 PRs/day)
 
 ---
 
-## 10. What NOT To Do
+## 11. Codebase Scale & Async Architecture
+
+The codebase is **150 Python files, 27,201 LOC**, with **273 async defs** (heavily async). There are **1,000 total tests** across 88 files — **441 async**, **473 mock usages** — reflecting strong isolation culture. Two critical edge cases to know: (a) NEVER call `asyncio.run()` inside an `async def` — it creates silent failures where memory injection/dream cycle silently break; (b) `ContextVar` is invisible across `asyncio.create_task()` boundaries — LangGraph runs each tool in its own task, so ContextVar-based state tracking (workspace root, file safety sets) appears broken. Use plain module-level sets instead.
+
+---
+
+## 12. The Runtime Foundation Layer
+
+The `src/nexusagent/runtime/` package is the **DI container + lifecycle manager** for all components. Key exports: `LifecycleState` (CREATED→INITIALIZING→RUNNING→STOPPING→TERMINATED), `RuntimeContext` (`current_context()`/`set_current_context()` for context-stack-based DI), `RuntimeSessionManager`/`RuntimeWorkerManager`/`ToolManager`. The runtime manages a **context stack** — push on start, pop on stop — replacing the prior singleton pattern. This is Phase 1 delivered and is where all new component wiring should go. Do NOT add new module-level singletons.
+
+---
+
+## 13. Deepagent Execution Model + Prompt Injection Defense
+
+Agent execution goes through `src/nexusagent/core/agent.py` → `create_deep_agent()` with tool registration, policy resolution, and prompt injection defense. Five regex patterns detect injection attempts (`ignore previous instructions`, `system: you are now`, `override instructions`, etc.). Tool output is marked with `[TOOL OUTPUT - UNTRUSTED CONTENT BELOW]` marker. The `Agent` class handles multi-resolution model/provider selection (`resolve_model()` → `apply_provider_profile()`). ALL tool output is treated as untrusted by default — `sanitize_tool_output()` always marks it, even when no injection detected (known limitation per audit).
+
+---
+
+## 14. Biggest Files — Know These Before You Touch Them
+
+| File | LOC | What It Does | Risk |
+|------|-----|-------------|------|
+| `tools/register_all.py` | 1,308 | Tool registration + MCP discovery + wrapping **needs splitting** | High — import order fragile |
+| `memory/index/index.py` | 836 | Hybrid search (FTS5+vector, RRF fusion, embedding, sync/async) | High — sync blocks event loop |
+| `memory/dream.py` | 794 | 4-phase dream consolidation | Medium — file locking |
+| `core/session/session.py` | 713 | Session lifecycle + streaming + extraction + compact | High — most patched file |
+| `memory/memory_files.py` | 680 | FileMemory + git ops + TTL sweep | Low — well factored |
+| `interfaces/cli.py` | 670 | Click CLI — 15+ commands | Low — stable |
+| `infrastructure/utils/budget.py` | 541 | Budget guard + pricing + alerting | Medium — critical safety |
+
+---
+
+## 15. Module Coupling Map — What Depends on What
+
+The import graph reveals which subsystems form the architectural spine:
+
+- **`infrastructure`** (76 imports from) — Config, DB, bus, auth. THE backbone. Almost everything depends on it.
+- **`tools`** (55 imports from) — Tool registry + MCP discovery. Core + memory read tools.
+- **`core`** (51 imports from) — Session, worker, agent. The business logic layer.
+- **`memory`** (40 imports from) — Memory system. Used by session and tools but NOT by core worker.
+- **`runtime`** (19 imports from) — Growing foundation layer. Eventually should replace infrastructure as spine.
+
+**Architectural insight**: `infrastructure` and `tools` are the tightest-coupled subsystems. Any change to config schema or tool registration can break many dependents. The runtime layer is designed to eventually absorb infrastructure's role as the DI backbone — prioritize runtime adoption.
 
 - **NEVER modify the Hermes Agent repo** (`~/.hermes/hermes-agent/` — belongs to Nous Research). Zero exceptions.
 - **Do NOT modify `src/` files without tests** — every change must maintain 173+ passing baseline
