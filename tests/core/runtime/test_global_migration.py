@@ -16,7 +16,7 @@ class TestShimBackwardCompat:
     @pytest.fixture(autouse=True)
     def _clear_contextvars(self):
         """Reset shared ContextVars before each test to ensure clean state.
-        
+
         ContextVars are process-global and persist across tests, so tests that
         check default None values must reset them explicitly.
         """

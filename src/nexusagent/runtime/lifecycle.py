@@ -24,7 +24,7 @@ _LIFECYCLE_TRANSITIONS: dict[str, set[str]] = {
 }
 
 
-class LifecycleState(str, enum.Enum):
+class LifecycleState(enum.StrEnum):
     """Universal 7-state lifecycle for runtime components.
 
     Transitions:

@@ -51,7 +51,7 @@ async def pre_llm_call_budget_check(
 ) -> dict[str, Any]:
     """
     Pre-LLM call budget validation.
-    
+
     Returns:
         {
             "allowed": bool,
@@ -113,7 +113,7 @@ async def pre_llm_call_budget_check(
 async def hook_pre_llm_call(hook_context: dict[str, Any]) -> dict[str, Any]:
     """
     Hermes pre_llm_call hook entry point.
-    
+
     Expected hook_context:
     {
         "model": "gpt-4",

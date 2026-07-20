@@ -145,7 +145,7 @@ class WorkerPool:
 
     async def _execute_bounded(self, task, handle) -> str:
         """Execute with turn counting, wall time, and cancellation checks.
-        
+
         Before each tool call, saves a checkpoint to the TaskStore.
         On restart, loads the latest checkpoint and resumes from there.
         """
@@ -188,10 +188,7 @@ class WorkerPool:
                 task_obj = self._worker_tasks.get(handle.worker_id)
                 if task_obj:
                     # Handle both dict and string results
-                    if isinstance(result, dict):
-                        tool_result = result
-                    else:
-                        tool_result = {"result": str(result)}
+                    tool_result = result if isinstance(result, dict) else {"result": str(result)}
                     checkpoint = Checkpoint(
                         current_node="agent_execution",
                         completed_actions=[f"turn_{turn}"],
