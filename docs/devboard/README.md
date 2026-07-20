@@ -65,10 +65,10 @@
 | 🤖 Subagent (bg) | ✅ Worker pool wiring | `deleg_44461844` — pool.py modified |
 | 🤖 Subagent (bg) | ✅ SessionManager integration | `deleg_212c83e0` — manager.py modified |
 | 🤖 Subagent (bg) | ✅ Phase 3 gap analysis | `deleg_c63ec2ab` — analysis saved |
+| 🤖 Subagent (bg) | ✅ Phase 3 event integration | `deleg_97e757a1` — task_state.py + pool.py + tests |
 | 🌀 Mistral/Vibe (cloud) | 🔴 Rate-limited — local mode triggered | Awaiting output |
 | ☁️ Server dev VM (worktree) | ✅ `phase2-task-state` synced, tests green | 156 passed — NATS on infra VM |
-| 📝 Inline (local) | ✅ Core model delivered — 156 tests | Committed `f06ff5f` → `f5cb696` |
-
+| 📝 Inline (local) | ✅ Core model delivered — 156 tests | Committed `b736844` → 169 tests |
 ---
 
 ## Phase 3+: Readiness Tracking
