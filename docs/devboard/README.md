@@ -59,6 +59,7 @@
 
 | Channel | Status | Session/Ref |
 |---------|--------|-------------|
+| 🤖 Jules (cloud) | ✅ Phase 3: Event-Driven Core | `18382944495923151438` — IN_PROGRESS |
 | 🤖 Jules (cloud) | ✅ Memory system polish | `1777915438102205450` — **COMPLETED + MERGED** (`f5cb696`) |
 | 🤖 Jules (cloud) | ✅ Phase 2 full implementation | `6790340144769840547` — **COMPLETED + PR #10 created** |
 | 🤖 Subagent (bg) | ✅ Worker pool wiring | `deleg_44461844` — pool.py modified |
