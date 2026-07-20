@@ -1,8 +1,7 @@
 """WorkerPool — manages a pool of isolated worker executions.
 
 Provides concurrency-limited spawning of sub-agent workers with turn counting,
-wall-time bounds, and cancellation support. Integrates with Phase 2 Task model
-for checkpoint persistence and recovery. Phase 3: emits WorkerEvents to NATS.
+wall-time bounds, and cancellation support.
 """
 
 from __future__ import annotations
@@ -14,7 +13,6 @@ import uuid
 
 from nexusagent.core.events import WorkerEvent, WorkerEventType, emit_event_sync
 from nexusagent.core.subagent import SubAgentHandle
-from nexusagent.core.task import Task, TaskState, Checkpoint, TaskStore
 from nexusagent.core.worker.handler import _run_agent_task
 from nexusagent.llm.models import TaskSchema
 
@@ -34,8 +32,6 @@ class WorkerPool:
         self._active: dict[str, SubAgentHandle] = {}
         self._tasks: set[asyncio.Task] = set()
         self._semaphore = asyncio.Semaphore(max_workers)
-        self._task_store = TaskStore()
-        self._worker_tasks: dict[str, Task] = {}  # worker_id -> Task
 
     async def spawn(self, contract, depth: int = 0) -> SubAgentHandle:
         """Spawn an isolated worker. Returns a handle to monitor/control it.
@@ -52,44 +48,19 @@ class WorkerPool:
         worker_id = f"worker-{str(uuid.uuid4())[:8]}"
         handle = SubAgentHandle(worker_id=worker_id, contract=contract, depth=depth)
         self._active[worker_id] = handle
-        
-        # Create a Task for checkpoint persistence
-        task = Task(
-            id=contract.task_id,
-            objective=contract.description,
-            owner=worker_id,
-            state=TaskState.CREATED,
-        )
-        self._worker_tasks[worker_id] = task
-        await self._task_store.save_task(task)
-        
-        task_obj = asyncio.create_task(self._run_worker(handle))
-        self._tasks.add(task_obj)
-        task_obj.add_done_callback(self._tasks.discard)
+        task = asyncio.create_task(self._run_worker(handle))
+        self._tasks.add(task)
+        task.add_done_callback(self._tasks.discard)
         return handle
 
     async def _run_worker(self, handle: SubAgentHandle):
         """Run a worker to completion within its contract bounds."""
+        from nexusagent.core.task.recovery import RecoveryManager
+        from nexusagent.core.task.task_state import Task, TaskState
+        from nexusagent.core.task.task_store import get_task_store
+
         async with self._semaphore:
             handle._mark_running()
-            task = self._worker_tasks.get(handle.worker_id)
-            
-            # Emit worker started event
-            if task:
-                emit_event_sync(
-                    WorkerEvent.started(
-                        source="worker_pool",
-                        worker_id=handle.worker_id,
-                        task_id=task.id,
-                        description=task.objective,
-                    )
-                )
-            
-            if task:
-                task.transition_to(TaskState.PLANNING)
-                await self._task_store.save_task(task)
-                task.transition_to(TaskState.EXECUTING)
-                await self._task_store.save_task(task)
             try:
                 meta = dict(handle.contract.metadata)
                 meta.setdefault("agent_model", handle.model)
@@ -105,62 +76,102 @@ class WorkerPool:
                     priority=handle.contract.priority,
                     metadata=meta,
                 )
-                result = await self._execute_bounded(task_schema, handle)
+
+                # Step 1: Create or Load Durable Task and transition to PLANNING / EXECUTING
+                store = get_task_store()
+                durable_task = await store.load_task(task_schema.id)
+                if not durable_task:
+                    durable_task = Task(
+                        id=task_schema.id,
+                        objective=task_schema.description,
+                        owner="worker_pool",
+                        state=TaskState.CREATED,
+                    )
+                    await store.save_task(durable_task)
+
+                # Check if we should recover/resume (skip if already completed)
+                latest_cp = await store.load_latest_checkpoint(task_schema.id)
+                if latest_cp and durable_task.state not in {TaskState.COMPLETED}:
+                    # Task crashed/restarted; recover using RecoveryManager
+                    if durable_task.state != TaskState.FAILED:
+                        try:
+                            durable_task.transition_to(TaskState.FAILED)
+                            await store.save_task(durable_task)
+                        except ValueError:
+                            durable_task.state = TaskState.FAILED
+                            await store.save_task(durable_task)
+
+                    async def execute_task_fn(t, cp):
+                        # Ensure we resume with the last checkpoint in mind
+                        return await self._execute_bounded(task_schema, handle, cp)
+
+                    recovery_mgr = RecoveryManager(store)
+                    # We can use a fast mock handler or trigger the failed event
+                    async def on_failed_event(t_id, err_msg):
+                        logger.error(f"POL Escalate: Task {t_id} failed: {err_msg}")
+
+                    result = await recovery_mgr.recover_task(
+                        task_id=task_schema.id,
+                        execute_fn=execute_task_fn,
+                        on_failed_event=on_failed_event,
+                    )
+                else:
+                    # Clean/normal run
+                    durable_task.state = TaskState.CREATED
+                    await store.save_task(durable_task)
+
+                    durable_task.transition_to(TaskState.PLANNING)
+                    await store.save_task(durable_task)
+
+                    durable_task.transition_to(TaskState.EXECUTING)
+                    await store.save_task(durable_task)
+
+                    result = await self._execute_bounded(task_schema, handle)
+
+                    durable_task.transition_to(TaskState.VERIFYING)
+                    await store.save_task(durable_task)
+
+                    durable_task.transition_to(TaskState.COMPLETED)
+                    await store.save_task(durable_task)
+
                 if handle.is_cancelled():
                     handle._mark_failed("Cancelled by user")
-                    if task:
-                        task.transition_to(TaskState.FAILED)
-                        await self._task_store.save_task(task)
-                        emit_event_sync(
-                            WorkerEvent.failed(
-                                source="worker_pool",
-                                worker_id=handle.worker_id,
-                                task_id=task.id,
-                                error="Cancelled by user",
-                            )
-                        )
                 else:
                     handle._mark_completed(result)
-                    if task:
-                        task.transition_to(TaskState.VERIFYING)
-                        await self._task_store.save_task(task)
-                        task.transition_to(TaskState.COMPLETED)
-                        await self._task_store.save_task(task)
             except Exception as e:
+                # Mark as FAILED in durable store
+                try:
+                    durable_task = await store.load_task(task_schema.id)
+                    if durable_task and durable_task.state != TaskState.FAILED:
+                        try:
+                            durable_task.transition_to(TaskState.FAILED)
+                            await store.save_task(durable_task)
+                        except ValueError:
+                            # If direct transition is not valid, force it or handle accordingly
+                            durable_task.state = TaskState.FAILED
+                            await store.save_task(durable_task)
+                except Exception as store_err:
+                    logger.error(f"Failed to update task state to FAILED: {store_err}")
                 handle._mark_failed(str(e))
-                if task:
-                    task.transition_to(TaskState.FAILED)
-                    await self._task_store.save_task(task)
-                    emit_event_sync(
-                        WorkerEvent.failed(
-                            source="worker_pool",
-                            worker_id=handle.worker_id,
-                            task_id=task.id,
-                            error=str(e),
-                        )
-                    )
             finally:
                 self._active.pop(handle.worker_id, None)
-                self._worker_tasks.pop(handle.worker_id, None)
 
-    async def _execute_bounded(self, task, handle) -> str:
-        """Execute with turn counting, wall time, and cancellation checks.
-        
-        Before each tool call, saves a checkpoint to the TaskStore.
-        On restart, loads the latest checkpoint and resumes from there.
-        """
+    async def _execute_bounded(self, task, handle, checkpoint=None) -> str:
+        """Execute with turn counting, wall time, and cancellation checks."""
+        from nexusagent.core.task.checkpoint import Checkpoint
+        from nexusagent.core.task.task_store import get_task_store
+
         start = time.time()
         turn = 0
         last_result = None
         contract = handle.contract
-        
-        # Try to load latest checkpoint on restart
-        latest_checkpoint = await self._task_store.load_latest_checkpoint(contract.task_id)
-        if latest_checkpoint:
-            logger.info(f"Resuming task {contract.task_id} from checkpoint at node: {latest_checkpoint.current_node}")
-            # Restore state from checkpoint
-            turn = len(latest_checkpoint.completed_actions)
-            last_result = latest_checkpoint.tool_results[-1] if latest_checkpoint.tool_results else None
+        store = get_task_store()
+
+        if checkpoint:
+            # Resume from checkpoint logic
+            turn = len(checkpoint.completed_actions)
+            if checkpoint.tool_results:
+                last_result = checkpoint.tool_results[-1].get("output")
 
         while turn < contract.max_turns:
             if handle.is_cancelled():
@@ -169,6 +180,17 @@ class WorkerPool:
             if elapsed >= contract.max_wall_time:
                 return f"Timed out after {elapsed:.1f}s"
             try:
+                # Save checkpoint BEFORE tool call (or turn execution here)
+                cp = Checkpoint(
+                    current_node=checkpoint.current_node if checkpoint else f"node-{turn}",
+                    completed_actions=(checkpoint.completed_actions if checkpoint else []) + [f"action-{turn}"],
+                    files_changed=checkpoint.files_changed if checkpoint else [],
+                    tool_results=(checkpoint.tool_results if checkpoint else []) + [{"turn": turn, "output": last_result}],
+                    next_action=f"action-{turn+1}",
+                )
+                await store.save_checkpoint(task.id, cp)
+                checkpoint = cp
+
                 turn_task = TaskSchema(
                     id=task.id,
                     description=task.description,
@@ -183,31 +205,7 @@ class WorkerPool:
                 )
                 result = await _run_agent_task(turn_task)
                 last_result = result
-                
-                # Save checkpoint after each successful tool execution
-                task_obj = self._worker_tasks.get(handle.worker_id)
-                if task_obj:
-                    # Handle both dict and string results
-                    if isinstance(result, dict):
-                        tool_result = result
-                    else:
-                        tool_result = {"result": str(result)}
-                    checkpoint = Checkpoint(
-                        current_node="agent_execution",
-                        completed_actions=[f"turn_{turn}"],
-                        files_changed=[],
-                        tool_results=[tool_result],
-                        next_action=f"turn_{turn + 1}",
-                    )
-                    task_obj.add_checkpoint(checkpoint)
-                    await self._task_store.save_checkpoint(task_obj.id, checkpoint)
-                
-                # Check for completion - handle both dict and string results
-                if isinstance(result, dict):
-                    success = result.get("success") is True or result.get("status") == "complete"
-                else:
-                    success = True  # String result means completion
-                if success:
+                if result.get("success") is True or result.get("status") == "complete":
                     return last_result
             except Exception as e:
                 if contract.on_failure == "abort":
