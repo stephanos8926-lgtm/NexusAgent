@@ -102,14 +102,17 @@
 | 📝 Inline | Core model + tests | `afe48c9` — 173 tests |
 | ☁️ Dev VM | Worktree provisioned, tests green | 173 passed |
 
-### No Active Dispatches
-All channels idle. Ready for Phase 4.
+### Active
+| Channel | Task | Est. | Status |
+|---------|------|------|--------|
+| 🤖 Jules | Phase 4: LangGraph Worker Runtime | ~1,000 lines | `4093038977148740812` — just dispatched |
+| 🧵 Subagent | Worker integration investigation | read-only, 5-8 calls | `deleg_78fc0b67` — dispatched |
+| ☁️ Dev VM | `phase4-worker-graph` worktree | venv ready, 173 tests | 🟢 Ready for work |
 
 ### Blocked
 | Channel | Blocker | Fix |
 |---------|---------|-----|
 | 🌀 Mistral/Vibe | 429 rate limit | Needs Vibe CLI API key from console.mistral.ai → Code → Vibe CLI |
-| ☁️ Dev VM | NATS not on dev (lives on infra VM) | Full integration tests need infra VM |
 
 ---
 
