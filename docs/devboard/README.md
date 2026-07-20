@@ -59,8 +59,8 @@
 
 | Channel | Status | Session/Ref |
 |---------|--------|-------------|
-| 🤖 Jules (cloud) | 🟡 Phase 2 full implementation | `6790340144769840547` — IN_PROGRESS |
-| 🤖 Jules (cloud) | ✅ Memory system polish | `1777915438102205450` — **COMPLETED** |
+| 🤖 Jules (cloud) | ✅ Memory system polish | `1777915438102205450` — **COMPLETED + MERGED** (`f5cb696`) |
+| 🤖 Jules (cloud) | ✅ Phase 2 full implementation | `6790340144769840547` — **COMPLETED** (awaiting PR) |
 | 🤖 Subagent (bg) | ✅ Worker pool wiring | `deleg_44461844` — pool.py modified |
 | 🤖 Subagent (bg) | ✅ SessionManager integration | `deleg_212c83e0` — manager.py modified |
 | 🤖 Subagent (bg) | ✅ Phase 3 gap analysis | `deleg_c63ec2ab` — analysis saved |
