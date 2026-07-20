@@ -74,6 +74,23 @@
 
 Phases 3-11 will be populated when Phase 2 completes. Per Chief Architect Directive: **no skipping phases.**
 
+### Phase 3 Gap Analysis: ~35% Ready
+**Delivered:** `docs/architecture/migration/phase3-gap-analysis.md`
+
+| Foundation | Status |
+|------------|--------|
+| NATS JetStream Bus | ✅ Complete — `bus.py` (491 lines): connection mgmt, health checks, pub/sub, KV store, durable pull consumers |
+| Task State Machine | ✅ Complete — 7 states, validated transitions, checkpoints, serialization |
+| Task Persistence | ⚠️ In-memory only (SQLAlchemy models exist in `infrastructure/db/` but not wired) |
+| Recovery Manager | ✅ Complete — retry/rollback/escalate strategies |
+| Worker Pool | ✅ Complete — concurrency limits, turn/wall-time bounds, cancellation |
+| Event Schema (`SystemEvent`) | ❌ **MISSING** — no typed event definitions |
+| Event Emission | ❌ **MISSING** — Task/Worker/Tool transitions emit no events |
+| Event Store (append-only log) | ❌ **MISSING** — no event persistence or query |
+| Subscribers (POL, Memory, Dashboard) | ❌ **MISSING** — no subscriber infrastructure |
+
+**Est. Implementation:** 10 new files, 9 modified, ~1,210 lines, ~100 tests across 6 categories.
+
 ---
 
 ## Key Dependencies
