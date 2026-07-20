@@ -66,7 +66,7 @@
 | 🤖 Subagent (bg) | ✅ SessionManager integration | `deleg_212c83e0` — manager.py modified |
 | 🤖 Subagent (bg) | ✅ Phase 3 gap analysis | `deleg_c63ec2ab` — analysis saved |
 | 🌀 Mistral/Vibe (cloud) | 🔴 Rate-limited — local mode triggered | Awaiting output |
-| ☁️ Server dev VM (worktree) | ⚠️ `phase2-task-state` synced, venv broken | Need `uv pip install pytest-asyncio` |
+| ☁️ Server dev VM (worktree) | ✅ `phase2-task-state` synced, tests green | 156 passed |
 | 📝 Inline (local) | ✅ Core model delivered — 156 tests | Committed `f06ff5f` → `f5cb696` |
 
 ---
