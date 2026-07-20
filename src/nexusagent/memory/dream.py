@@ -158,55 +158,7 @@ class DreamCycle:
             content=content,
             entry_type=MemoryEntryType.OBSERVATION,
             description=description,
-            confidence=0.8,
-            entities=entities or None,
-        )
-
-        # ── Phase 1: Scan ───────────────────────────────────────────────────
-        """Load existing insight memories to avoid duplication."""
-        if not self.bank_dir.exists():
-            return []
-        insights = []
-        for f in self.bank_dir.glob("*.md"):
-            try:
-                content = f.read_text()
-                if (
-                    "type: insight" in content or "type: synthesis" in content
-                ) and content.startswith("---"):
-                    parts = content.split("---", 2)
-                    if len(parts) >= 3:
-                        body = parts[2].strip()
-                        if body:
-                            insights.append(body[:200])
-            except Exception:
-                continue
-        return insights
-
-    async def _store_refinement_results(self, results) -> None:
-        """Store LLM refinement results as new insight memories."""
-        for r in results:
-            content = r.content
-            description = f"Synthesized from {r.source_count} observations"
-            await self._write_insight(
-                content=content,
-                description=description,
-                confidence=r.confidence,
-                entities=r.entities,
-            )
-
-    async def _write_insight(
-        self, content: str, description: str, confidence: float, entities: list[str]
-    ):
-        """Write a synthesized insight as a new memory file."""
-        from nexusagent.memory.memory_files import FileMemory
-
-        fm = FileMemory(str(self.workspace_dir))
-        fm.initialize()
-        fm.write_entry(
-            content=content,
-            entry_type="insight",
-            description=description,
-            confidence=0.8,
+            confidence=confidence,
             entities=entities or None,
         )
 
@@ -522,6 +474,16 @@ class DreamCycle:
             "expired_swept": {},
         }
 
+        # Sweep expired TTL entries first so they are gone before index rebuild
+        try:
+            fm = FileMemory(str(self.workspace))
+            sweep_report = fm.sweep_expired()
+            report["expired_swept"] = sweep_report
+            if sweep_report["files_removed"] > 0:
+                logger.info("Trim swept %d expired entries", sweep_report["files_removed"])
+        except Exception as e:
+            logger.warning("Expired sweep failed during trim: %s", e)
+
         # Rebuild FTS5 index
         try:
             from nexusagent.memory.index.index import HybridMemoryIndex
@@ -532,16 +494,6 @@ class DreamCycle:
             logger.info("Rebuilt FTS5 index")
         except Exception as e:
             logger.error("Index rebuild failed: %s", e)
-
-        # Sweep expired TTL entries
-        try:
-            fm = FileMemory(str(self.workspace))
-            sweep_report = fm.sweep_expired()
-            report["expired_swept"] = sweep_report
-            if sweep_report["files_removed"] > 0:
-                logger.info("Trim swept %d expired entries", sweep_report["files_removed"])
-        except Exception as e:
-            logger.warning("Expired sweep failed during trim: %s", e)
 
         # Trim MEMORY.md
         if self.index_file.exists():
