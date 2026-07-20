@@ -65,7 +65,7 @@
 | 🤖 Subagent (bg) | 🟡 SessionManager integration | `deleg_212c83e0` — dispatched |
 | 🤖 Subagent (bg) | 🟡 Phase 3 gap analysis | `deleg_c63ec2ab` — dispatched |
 | 🌀 Mistral/Vibe (cloud) | 🔴 Rate-limited — local mode triggered | Awaiting output |
-| ☁️ Server dev VM (worktree) | 🟢 `phase2-task-state` provisioned | Venv + .env ready for Hermes |
+| ☁️ Server dev VM (worktree) | ⚠️ `phase2-task-state` synced, venv broken | Need `uv pip install pytest-asyncio` |
 | 📝 Inline (local) | ✅ Core model delivered — 156 tests | Committed `f06ff5f` |
 
 ---
