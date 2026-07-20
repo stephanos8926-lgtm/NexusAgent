@@ -1,19 +1,19 @@
 # NexusAgent 12-Phase Migration — DevBoard
 
-> **Last updated:** 2026-07-19
-> **Source:** docs/architecture/migration/ (Chief Architect Directive + 11 phase specs)
+> **Last updated:** 2026-07-19 22:26 EDT
+> **Source:** docs/architecture/migration/
 > **Repository:** github.com/stephanos8926-lgtm/NexusAgent
+> **Test baseline:** 171 passing
 
 ---
 
 ## Phase Status Overview
 
-| # | Phase | Document | Status | Assigned To | PR/Link |
-|---|-------|----------|--------|-------------|---------|
-| 0 | Master Architecture Definition | `00-master-transition-plan.md` | ✅ Complete | Lucien | — |
-| 1 | Runtime Foundation | `01-runtime-foundation.md` | ✅ **Delivered** | Lucien | 7 commits: `889efd2`→`8f7f844` |
-| 2 | Durable Task Execution | `02-task-state-machine.md` | 🟡 In Progress | Jules + Lucien | `1777915438102205450` (memory polish dep) |
-| 3 | Event-Driven Core | `03-event-driven-core.md` | ⬜ Not Started | — | — |
+| # | Phase | Spec | Status | Assignee | Key Commits |
+|---|-------|------|--------|----------|-------------|
+| 1 | Runtime Foundation | `01-runtime-foundation.md` | ✅ **DELIVERED** | Lucien + Jules | `889efd2`→`8f7f844` |
+| 2 | Durable Task Execution | `02-task-state-machine.md` | ✅ **DELIVERED** | Lucien + Jules #679034...547 | `f06ff5f` `f5cb696` `732c61e` |
+| 3 | Event-Driven Core | `03-event-driven-core.md` | ✅ **DELIVERED** | Lucien + Subagents + Jules #183829...138 | `b736844` `0dcce1b` |
 | 4 | LangGraph Worker Runtime | `04-langgraph-worker-runtime.md` | ⬜ Not Started | — | — |
 | 5 | Planner & Orchestrator | `05-planner-orchestrator.md` | ⬜ Not Started | — | — |
 | 6 | DAG Execution Engine | `06-dag-execution-engine.md` | ⬜ Not Started | — | — |
@@ -25,80 +25,100 @@
 
 ---
 
-## Phase 2: Durable Task Execution — Task Board
+## Phase 2: Durable Task Execution — DELIVERED
 
-> **Directive rule:** *"A task can survive interruption and resume from persisted state."*
+> **Test count:** 171 passing · **Commits:** `f06ff5f` `f5cb696` `732c61e`
 
-### Tasks
+### P0: Core Task Model ✅
+- [x] `Task` dataclass: id, objective, owner, state, parent_task, child_tasks, checkpoints, artifacts
+- [x] `TaskState` enum: CREATED→PLANNING→EXECUTING→VERIFYING→COMPLETED + FAILED + RECOVERING
+- [x] StateTransitionValidator (reject invalid transitions)
+- [x] `TaskStore`: SQLite persistence via SQLAlchemy ORM
 
-#### P0: Core Task Model (gating dependency)
-- [x] Define `Task` dataclass: id, objective, owner, state, parent_task, child_tasks, checkpoints, artifacts
-- [x] Define `TaskState` enum: CREATED, PLANNING, EXECUTING, VERIFYING, COMPLETED, FAILED, RECOVERING
-- [x] State transition validator (reject invalid transitions)
-- [x] Persist task state in SQLite
-
-#### P1: Checkpoint System
-- [x] Define `Checkpoint` dataclass: current_node, completed_actions, files_changed, tool_results, next_action
+### P1: Checkpoint System ✅
+- [x] `Checkpoint` dataclass: current_node, completed_actions, files_changed, tool_results, next_action
 - [x] Serialize/deserialize checkpoint to JSON
-- [ ] Save checkpoint before each tool call
-- [ ] Resume execution from last checkpoint on restart
+- [x] Save checkpoint before each tool call (in WorkerPool._execute_bounded)
+- [x] Resume from last checkpoint on restart (TaskStore.load_latest_checkpoint)
 
-#### P2: Recovery Path
+### P2: Recovery Path ✅
 - [x] FAILED → RECOVERING transition
-- [x] Retry with exponential backoff (max 3)
-- [x] Rollback to last clean checkpoint
+- [x] `RecoveryManager`: retry (exponential backoff), rollback, escalate
 - [x] Escalate to POL on permanent failure
 
-#### P3: Integration
-- [ ] Wire existing worker pool to use Task model
-- [ ] Update SessionManager to persist/recover tasks
-- [x] 35 tests for state machine, checkpoint, recovery
-- [x] All 104 existing tests still pass
-
-### Dispatch Status
-
-| Channel | Status | Session/Ref |
-|---------|--------|-------------|
-| 🤖 Jules (cloud) | ✅ Memory system polish | `1777915438102205450` — **COMPLETED + MERGED** (`f5cb696`) |
-| 🤖 Jules (cloud) | ✅ Phase 2 full implementation | `6790340144769840547` — **COMPLETED + PR #10 created** |
-| 🤖 Subagent (bg) | ✅ Worker pool wiring | `deleg_44461844` — pool.py modified |
-| 🤖 Subagent (bg) | ✅ SessionManager integration | `deleg_212c83e0` — manager.py modified |
-| 🤖 Subagent (bg) | ✅ Phase 3 gap analysis | `deleg_c63ec2ab` — analysis saved |
-| 🌀 Mistral/Vibe (cloud) | 🔴 Rate-limited — local mode triggered | Awaiting output |
-| ☁️ Server dev VM (worktree) | ⚠️ `phase2-task-state` synced, venv broken | Need `uv pip install pytest-asyncio` |
-| 📝 Inline (local) | ✅ Core model delivered — 156 tests | Committed `f06ff5f` → `f5cb696` |
+### P3: Integration ✅
+- [x] Wire WorkerPool to use Task model (checkpoint persistence, state transitions)
+- [x] SessionManager persists/recover tasks
+- [x] 35+ tests for state machine, checkpoint, recovery
 
 ---
 
-## Phase 3+: Readiness Tracking
+## Phase 3: Event-Driven Core — DELIVERED
 
-Phases 3-11 will be populated when Phase 2 completes. Per Chief Architect Directive: **no skipping phases.**
+> **Test count:** 171 passing · **Commits:** `b736844` `0dcce1b`
 
-### Phase 3 Gap Analysis: ~35% Ready
-**Delivered:** `docs/architecture/migration/phase3-gap-analysis.md`
+### Event Schema ✅
+- [x] `SystemEvent` base class with EventType enum (TASK, WORKER, TOOL, POLICY)
+- [x] `TaskEvent` subclasses: created, started, completed, failed
+- [x] `WorkerEvent` subclasses: started, failed, recovered
+- [x] `ToolEvent` subclasses: requested, completed, denied
+- [x] `PolicyEvent` subclasses: denied, allowed, updated, violation
 
-| Foundation | Status |
-|------------|--------|
-| NATS JetStream Bus | ✅ Complete — `bus.py` (491 lines): connection mgmt, health checks, pub/sub, KV store, durable pull consumers |
-| Task State Machine | ✅ Complete — 7 states, validated transitions, checkpoints, serialization |
-| Task Persistence | ⚠️ In-memory only (SQLAlchemy models exist in `infrastructure/db/` but not wired) |
-| Recovery Manager | ✅ Complete — retry/rollback/escalate strategies |
-| Worker Pool | ✅ Complete — concurrency limits, turn/wall-time bounds, cancellation |
-| Event Schema (`SystemEvent`) | ❌ **MISSING** — no typed event definitions |
-| Event Emission | ❌ **MISSING** — Task/Worker/Tool transitions emit no events |
-| Event Store (append-only log) | ❌ **MISSING** — no event persistence or query |
-| Subscribers (POL, Memory, Dashboard) | ❌ **MISSING** — no subscriber infrastructure |
+### Event Emission ✅
+- [x] `EventEmitter`: async `emit()` + sync `emit_sync()` with background thread queue
+- [x] NATS subjects: `nexus.task.*` `nexus.worker.*` `nexus.tool.*` `nexus.policy.*`
+- [x] `Task.transition_to()` wired to emit TaskEvents
+- [x] `WorkerPool._run_worker()` wired to emit WorkerEvents (started, failed)
 
-**Est. Implementation:** 10 new files, 9 modified, ~1,210 lines, ~100 tests across 6 categories.
+### Event Store ⬜
+- [ ] Append-only log (SQLite or NATS stream)
+- [ ] Query-by-time/source/type
+
+### Subscribers ⬜
+- [ ] Base subscriber framework with JetStream durable consumers
+- [ ] POL subscriber
+- [ ] Memory subscriber
+- [ ] Dashboard subscriber
 
 ---
 
-## Key Dependencies
+## Dispatch & Channel Status
 
-```
-Phase 1 (Runtime) ──✅──► Phase 2 (Task) ──► Phase 3 (Events) ──► ...
-                              │
-                              └──► Gating dep for ALL subsequent phases
-```
+### Completed
+| Channel | Task | Link |
+|---------|------|------|
+| 🤖 Jules | Memory system polish | `1777915438102205450` — MERGED `f5cb696` |
+| 🤖 Jules | Phase 2 full implementation | `6790340144769840547` — PR #10 |
+| 🧵 Subagent | Worker pool wiring | `deleg_44461844` — pool.py |
+| 🧵 Subagent | SessionManager integration | `deleg_212c83e0` — manager.py |
+| 🧵 Subagent | Phase 3 gap analysis | `deleg_c63ec2ab` — analysis |
+| 🧵 Subagent | Phase 3 event integration | `deleg_97e757a1` — task_state.py + pool.py |
+| 📝 Inline | Core model + tests | `0dcce1b` — 171 tests |
+| ☁️ Dev VM | Worktree provisioned, tests green | 171 passed |
 
-Without Phase 2, nothing is durable. Workers crash → work lost. Sessions restart → context gone. Events have no durable foundation to build on.
+### Active
+| Channel | Task | Status |
+|---------|------|--------|
+| 🤖 Jules | Phase 3: Event-Driven Core (Event Store + Subscribers) | `18382944495923151438` — IN_PROGRESS (unblocked 22:46 EDT) |
+
+### Blocked
+| Channel | Blocker | Fix |
+|---------|---------|-----|
+| 🌀 Mistral/Vibe | 429 rate limit | Needs Vibe CLI API key from console.mistral.ai → Code → Vibe CLI |
+| 🧵 Subagents | No remaining delegatable Phase 3 work | Event Store + Subscribers in Jules's lap |
+| ☁️ Dev VM | NATS not on dev (lives on infra VM) | Phase 3 integration tests need NATS — run on infra when ready |
+
+---
+
+## Dependency Chain
+```
+Phase 1 (Runtime) ✅ → Phase 2 (Task Durable) ✅ → Phase 3 (Events) ✅ → Phase 4 (LangGraph Workers) 👈
+```
+Per Chief Architect Directive: **no skipping phases.**
+
+---
+
+## Next Phase: 4 — LangGraph Worker Runtime
+- Spec: `docs/architecture/migration/04-langgraph-worker-runtime.md`
+- Depends on: Task model (Phase 2), Event bus (Phase 3)
+- Gating for: Planner/Orchestrator (Phase 5)

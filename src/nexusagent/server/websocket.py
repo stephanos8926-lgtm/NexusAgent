@@ -235,3 +235,69 @@ async def session_websocket(
         if session._heartbeat_task is not None and not session._heartbeat_task.done():
             session._heartbeat_task.cancel()
         await websocket.close(code=1011)
+
+
+async def events_websocket(websocket: WebSocket) -> None:
+    """Real-time system events streaming via WebSocket.
+
+    Accepts API key via headers, Authorization header, or token query parameter.
+    """
+    logger.info("events_websocket CALLED")
+    header_key = websocket.headers.get("x-api-key")
+    auth_header = websocket.headers.get("authorization", "")
+    if auth_header.lower().startswith("bearer "):
+        header_key = header_key or auth_header[7:]
+    token_param = websocket.query_params.get("token")
+    if token_param and not header_key:
+        header_key = token_param
+
+    if not header_key:
+        await websocket.close(code=4001, reason="Missing API key — use Authorization: Bearer <key>")
+        return
+
+    try:
+        await verify_api_key(header_key)
+    except HTTPException as e:
+        logger.warning(f"WS auth failed for events_websocket: {e}")
+        await websocket.close(code=4001, reason="Invalid or missing API key")
+        return
+
+    # Validate Origin header to prevent CSRF
+    origin = websocket.headers.get("origin", "")
+    if origin and origin not in _WS_ALLOWED_ORIGINS:
+        logger.warning(f"Rejected WebSocket from unauthorized origin: {origin}")
+        await websocket.close(code=4003, reason="Forbidden origin")
+        return
+
+    await websocket.accept()
+
+    from nexusagent.infrastructure.bus import get_bus
+    import json
+
+    bus = get_bus()
+    queue: asyncio.Queue = asyncio.Queue()
+
+    async def callback(msg) -> None:
+        try:
+            data = json.loads(msg.data.decode())
+            await queue.put(data)
+        except Exception:
+            pass
+
+    # Subscribe to all nexus events
+    sub = await bus.nc.subscribe("nexus.>", cb=callback)
+
+    try:
+        while True:
+            # Get event from queue and send over WebSocket
+            event_data = await queue.get()
+            await websocket.send_json(event_data)
+    except WebSocketDisconnect:
+        logger.info("Events WebSocket disconnected")
+    except Exception as e:
+        logger.error(f"Error in events_websocket: {e}")
+    finally:
+        try:
+            await sub.unsubscribe()
+        except Exception:
+            pass

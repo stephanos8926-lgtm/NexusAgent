@@ -72,7 +72,7 @@ def create_server_app() -> fastapi.FastAPI:
     All routes, middleware, and config remain identical.
     """
     from nexusagent.server.routes import register_routes
-    from nexusagent.server.websocket import session_websocket
+    from nexusagent.server.websocket import events_websocket, session_websocket
 
     app = fastapi.FastAPI(
         title="NexusAgent API",
@@ -88,6 +88,10 @@ def create_server_app() -> fastapi.FastAPI:
     @app.websocket("/ws/{session_id}")
     async def ws_endpoint(websocket: Any, session_id: str) -> None:
         await session_websocket(websocket, session_id)
+
+    @app.websocket("/events/ws")
+    async def events_ws_endpoint(websocket: Any) -> None:
+        await events_websocket(websocket)
 
     return app
 

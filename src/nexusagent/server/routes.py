@@ -301,3 +301,36 @@ def register_routes(app: FastAPI) -> None:
             token=request.api_key,
             expires_in=300,
         )
+
+    # ─── Events Log Query API ───────────────────────────────────────────
+
+    @app.get("/events", dependencies=[Depends(verify_api_key)])
+    async def list_events(
+        since: str | None = None,
+        until: str | None = None,
+        source: str | None = None,
+        type: str | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ):
+        """List system events with optional filtering and pagination."""
+        from nexusagent.infrastructure.events.event_store import get_event_store
+
+        limit = max(1, min(limit, 200))
+        offset = max(0, offset)
+
+        store = get_event_store()
+        events = await store.query(
+            since=since,
+            until=until,
+            source=source,
+            type=type,
+            limit=limit,
+            offset=offset,
+        )
+        return {
+            "events": [e.to_dict() for e in events],
+            "count": len(events),
+            "limit": limit,
+            "offset": offset,
+        }

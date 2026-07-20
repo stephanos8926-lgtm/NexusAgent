@@ -65,3 +65,14 @@ class MessageModel(Base):
     tool_name = Column(String, nullable=True)
     tool_args = Column(JSON, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(UTC))
+
+
+class EventModel(Base):
+    """ORM model for the ``events`` table."""
+
+    __tablename__ = "events"
+    id = Column(String, primary_key=True)
+    timestamp = Column(String, nullable=False)
+    source = Column(String, nullable=False)
+    type = Column(String, nullable=False)
+    payload_json = Column(JSON, default=dict)

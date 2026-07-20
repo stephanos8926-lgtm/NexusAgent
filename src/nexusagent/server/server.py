@@ -13,7 +13,7 @@ from fastapi import FastAPI, WebSocket
 from nexusagent.infrastructure.bus import get_bus
 from nexusagent.infrastructure.config import settings
 from nexusagent.server.routes import register_routes
-from nexusagent.server.websocket import session_websocket
+from nexusagent.server.websocket import events_websocket, session_websocket
 from nexusagent.version import VERSION
 
 # Singleton lock — prevents multiple server instances on the same host
@@ -85,6 +85,10 @@ def create_app() -> FastAPI:
     @app.websocket("/sessions/{session_id}/ws")
     async def ws_endpoint(websocket: WebSocket, session_id: str):
         await session_websocket(websocket, session_id)
+
+    @app.websocket("/events/ws")
+    async def events_ws_endpoint(websocket: WebSocket):
+        await events_websocket(websocket)
 
     return app
 
