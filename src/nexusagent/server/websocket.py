@@ -271,8 +271,9 @@ async def events_websocket(websocket: WebSocket) -> None:
 
     await websocket.accept()
 
-    from nexusagent.infrastructure.bus import get_bus
     import json
+
+    from nexusagent.infrastructure.bus import get_bus
 
     bus = get_bus()
     queue: asyncio.Queue = asyncio.Queue()

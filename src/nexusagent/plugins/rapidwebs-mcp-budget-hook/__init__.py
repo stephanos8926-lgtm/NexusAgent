@@ -64,27 +64,27 @@ async def pre_llm_call_budget_check(
     """
     max_context = get_context_budget(model)
     hard_limit = int(max_context * HARD_LIMIT)
-    
+
     # Estimate input tokens
     input_text = " ".join(m.get("content", "") for m in messages if m.get("content"))
     input_tokens = estimate_tokens(input_text)
-    
+
     # Estimate tool schema tokens if present
     tool_tokens = 0
     if tools:
         import json
         tool_tokens = estimate_tokens(json.dumps(tools))
-    
+
     total_estimated = input_tokens + tool_tokens + estimated_output
     usage_pct = total_estimated / max_context
-    
+
     warnings = []
-    
+
     # Check thresholds
     for threshold in WARNING_THRESHOLDS:
         if usage_pct >= threshold:
             warnings.append(f"Context usage at {usage_pct:.1%} (threshold: {threshold:.0%})")
-    
+
     # Hard limit check
     if total_estimated > hard_limit:
         return {
@@ -95,10 +95,10 @@ async def pre_llm_call_budget_check(
             "current_usage": total_estimated,
             "max_context": max_context,
         }
-    
+
     # Emergency compression flag
     emergency = total_estimated > int(max_context * EMERGENCY_COMPRESSION_THRESHOLD)
-    
+
     return {
         "allowed": True,
         "reason": "Within budget",
@@ -129,24 +129,24 @@ async def hook_pre_llm_call(hook_context: dict[str, Any]) -> dict[str, Any]:
             tools=hook_context.get("tools"),
             estimated_output=hook_context.get("max_tokens", 1024),
         )
-        
+
         # Log warnings
         for warning in result.get("warnings", []):
             logger.warning(f"MCP Budget: {warning}")
-        
+
         if result.get("emergency_compression"):
             logger.critical(f"MCP Budget: EMERGENCY COMPRESSION TRIGGERED at {result['current_usage']}/{result['max_context']} tokens")
-        
+
         if not result["allowed"]:
             logger.error(f"MCP Budget: BLOCKED - {result['reason']}")
-        
+
         return {
             "action": "allow" if result["allowed"] else "block",
             "reason": result["reason"],
             "warnings": result["warnings"],
             "emergency_compression": result["emergency_compression"],
         }
-        
+
     except Exception as e:
         logger.exception(f"MCP Budget hook failed: {e}")
         # Fail open - don't block on hook errors

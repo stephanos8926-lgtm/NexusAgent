@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
-from nexusagent.runtime.context import RuntimeContext, current_context, set_current_context
+from nexusagent.runtime.context import RuntimeContext, set_current_context
 
 
 class TestShimBackwardCompat:
@@ -23,12 +23,12 @@ class TestShimBackwardCompat:
         from nexusagent.core.agent import _current_session, _ws_memory_dir
         from nexusagent.tools.fs_base import _workspace_root_var
         from nexusagent.tools.registry.policy import _policy_context
-        
+
         _current_session.set(None)
         _ws_memory_dir.set(None)
         _workspace_root_var.set(None)
         _policy_context.set(None)
-    
+
     def test_current_session_var_no_context(self):
         """_current_session ContextVar works without RuntimeContext."""
         from nexusagent.core.agent import _current_session

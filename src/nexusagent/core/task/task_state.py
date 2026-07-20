@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
@@ -16,7 +16,6 @@ from typing import Any
 from nexusagent.core.events import (
     TaskEvent,
     TaskEventType,
-    get_emitter,
     emit_event_sync,
 )
 
@@ -86,7 +85,7 @@ class Checkpoint:
         }
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "Checkpoint":
+    def from_dict(cls, data: dict[str, Any]) -> Checkpoint:
         return cls(
             current_node=data["current_node"],
             completed_actions=data.get("completed_actions", []),
@@ -108,16 +107,16 @@ class Task:
     child_tasks: list[str] = field(default_factory=list)
     checkpoints: list[Checkpoint] = field(default_factory=list)
     artifacts: dict[str, Any] = field(default_factory=dict)
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def transition_to(self, new_state: TaskState) -> None:
         """Transition to new_state, validating first."""
         old_state = self.state
         StateTransitionValidator.validate(self.state, new_state)
         self.state = new_state
-        self.updated_at = datetime.now(timezone.utc)
-        
+        self.updated_at = datetime.now(UTC)
+
         # Emit TaskEvent based on state transition
         self._emit_transition_event(old_state, new_state)
 
@@ -136,11 +135,11 @@ class Task:
                 (TaskState.VERIFYING, TaskState.FAILED): TaskEventType.FAILED,
                 (TaskState.FAILED, TaskState.RECOVERING): TaskEventType.FAILED,  # FAILED → RECOVERING emits failed
             }
-            
+
             event_type = event_map.get((old_state, new_state))
             if event_type is None:
                 return  # No event for this transition (e.g., RECOVERING → EXECUTING)
-            
+
             # Build event
             event = TaskEvent(
                 source="task_state",
@@ -153,7 +152,7 @@ class Task:
                     "previous_state": old_state.value,
                 },
             )
-            
+
             # Emit synchronously (non-blocking fire-and-forget)
             emit_event_sync(event)
         except Exception as e:
@@ -207,7 +206,7 @@ class Task:
     def add_checkpoint(self, checkpoint: Checkpoint) -> None:
         """Add a checkpoint and record the state."""
         self.checkpoints.append(checkpoint)
-        self.updated_at = datetime.now(timezone.utc)
+        self.updated_at = datetime.now(UTC)
 
     @property
     def latest_checkpoint(self) -> Checkpoint | None:
@@ -229,7 +228,7 @@ class Task:
         }
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "Task":
+    def from_dict(cls, data: dict[str, Any]) -> Task:
         return cls(
             id=data["id"],
             objective=data.get("objective", ""),

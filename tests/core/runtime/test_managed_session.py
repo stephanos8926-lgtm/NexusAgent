@@ -8,7 +8,7 @@ import pytest
 
 from nexusagent.runtime.context import RuntimeContext
 from nexusagent.runtime.lifecycle import LifecycleState
-from nexusagent.runtime.session import ManagedSession, RuntimeSessionManager, SessionMetadata
+from nexusagent.runtime.session import ManagedSession, RuntimeSessionManager
 
 
 class TestManagedSession:

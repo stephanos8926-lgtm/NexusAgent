@@ -5,20 +5,12 @@ from __future__ import annotations
 import pytest
 
 from nexusagent.core.events import (
-    SystemEvent,
-    EventType,
-    TaskEvent,
-    TaskEventType,
-    WorkerEvent,
-    WorkerEventType,
-    ToolEvent,
-    ToolEventType,
-    PolicyEvent,
-    PolicyEventType,
     EventEmitter,
+    EventType,
+    SystemEvent,
+    TaskEvent,
+    WorkerEvent,
     get_emitter,
-    emit_event,
-    emit_event_sync,
 )
 
 
@@ -191,7 +183,7 @@ class TestEventEmitter:
     async def test_emit_event(self):
         """Test async event emission."""
         emitter = EventEmitter()
-        from nexusagent.core.events import TaskEvent, EventType
+        from nexusagent.core.events import EventType, TaskEvent
         event = TaskEvent(
             source="test",
             type="created",
@@ -208,7 +200,7 @@ class TestEventEmitter:
     def test_emit_event_sync(self):
         """Test synchronous event emission."""
         emitter = EventEmitter()
-        from nexusagent.core.events import TaskEvent, EventType
+        from nexusagent.core.events import EventType, TaskEvent
         event = TaskEvent(
             source="test",
             type="created",
@@ -225,23 +217,22 @@ class TestEventIntegration:
     def test_task_transition_emits_event(self):
         """Verify Task.transition_to emits events."""
         from nexusagent.core.task.task_state import Task, TaskState
-        from nexusagent.core.events import get_emitter
-        
+
         # Replace emitter with a mock to capture events
         captured = []
         original_emit = get_emitter().emit_sync
-        
+
         def capture_emit(event):
             captured.append(event)
-        
+
         import nexusagent.core.events as events_module
         events_module.get_emitter().emit_sync = capture_emit
-        
+
         try:
             task = Task(id="test-1", objective="Test", owner="test")
             task.transition_to(TaskState.PLANNING)
             task.transition_to(TaskState.EXECUTING)
-            
+
             assert len(captured) == 2
             assert captured[0].type == "created"
             assert captured[1].type == "started"

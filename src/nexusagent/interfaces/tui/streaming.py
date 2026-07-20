@@ -272,6 +272,9 @@ async def _handle_tool_result_event(app, event: dict) -> None:
         )
         _mount_with_limit(app, msg)
 
+    if hasattr(app, "_refresh_git_branch"):
+        app._refresh_git_branch()
+
     app.status_bar.set_status("Processing response...")
 
 

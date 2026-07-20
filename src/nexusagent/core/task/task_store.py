@@ -6,9 +6,7 @@ Stores tasks and their checkpoints for recovery across restarts.
 
 from __future__ import annotations
 
-import json
 import logging
-from typing import Any
 
 from nexusagent.core.task.task_state import Checkpoint, Task, TaskState
 

@@ -23,6 +23,7 @@ from nexusagent.widgets.status import (
     BrailleSpinner,
     ContextWindowBar,
     GitStatus,
+    StatusBar,
 )
 from nexusagent.widgets.theme import (
     ALL_THEMES,
@@ -440,3 +441,90 @@ class TestBrailleSpinner:
             spinner.tick()
         spinner.reset()
         assert spinner.frame == 0
+
+
+# ---------------------------------------------------------------------------
+# StatusBar Tests
+# ---------------------------------------------------------------------------
+
+class TestStatusBar:
+    """Tests for the StatusBar widget's Git status integration."""
+
+    def test_status_bar_initial_state(self):
+        """StatusBar starts with no git status."""
+        bar = StatusBar()
+        assert bar._git_status is None
+
+    def test_set_git_status(self):
+        """set_git_status updates internal status and calls update_widgets."""
+        bar = StatusBar()
+        with patch.object(bar, "_update_widgets") as mock_update:
+            bar.set_git_status("clean")
+            assert bar._git_status == "clean"
+            mock_update.assert_called_once()
+
+    def test_update_widgets_branch_clean(self):
+        """_update_widgets correctly formats branch and clean status."""
+        from unittest.mock import MagicMock, PropertyMock, patch
+        bar = StatusBar()
+        bar._branch = "feature-abc"
+        bar._git_status = "clean"
+
+        mock_branch_widget = MagicMock()
+
+        def mock_query_one(query_id, cls):
+            if query_id == "#status-branch":
+                return mock_branch_widget
+            return MagicMock()
+
+        bar.query_one = mock_query_one
+
+        with patch.object(StatusBar, "content_size", new_callable=PropertyMock) as mock_size:
+            mock_size.return_value.width = 100
+            bar._update_widgets()
+
+        mock_branch_widget.update.assert_called_with("[feature-abc | [green]✓ clean[/green]]")
+
+    def test_update_widgets_branch_staged(self):
+        """_update_widgets correctly formats branch and staged status."""
+        from unittest.mock import MagicMock, PropertyMock, patch
+        bar = StatusBar()
+        bar._branch = "main"
+        bar._git_status = "staged"
+
+        mock_branch_widget = MagicMock()
+
+        def mock_query_one(query_id, cls):
+            if query_id == "#status-branch":
+                return mock_branch_widget
+            return MagicMock()
+
+        bar.query_one = mock_query_one
+
+        with patch.object(StatusBar, "content_size", new_callable=PropertyMock) as mock_size:
+            mock_size.return_value.width = 100
+            bar._update_widgets()
+
+        mock_branch_widget.update.assert_called_with("[main | [green]✔ staged[/green]]")
+
+    def test_update_widgets_branch_dirty(self):
+        """_update_widgets correctly formats branch and dirty status."""
+        from unittest.mock import MagicMock, PropertyMock, patch
+        bar = StatusBar()
+        bar._branch = "dev"
+        bar._git_status = "dirty"
+
+        mock_branch_widget = MagicMock()
+
+        def mock_query_one(query_id, cls):
+            if query_id == "#status-branch":
+                return mock_branch_widget
+            return MagicMock()
+
+        bar.query_one = mock_query_one
+
+        with patch.object(StatusBar, "content_size", new_callable=PropertyMock) as mock_size:
+            mock_size.return_value.width = 100
+            bar._update_widgets()
+
+        mock_branch_widget.update.assert_called_with("[dev | [yellow]✗ dirty[/yellow]]")
