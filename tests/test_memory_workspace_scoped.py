@@ -11,6 +11,27 @@ from nexusagent.infrastructure.config import AgentConfig, load_config
 from nexusagent.memory.memory_files import FileMemory
 
 
+@pytest.fixture(autouse=True)
+def _reset_workspace_context():
+    """Reset the workspace-scoped memory ContextVar so tests don't pollute
+    each other when run in arbitrary order.
+
+    The session-running tests (test_tui* + test_worker_workspace_scoping)
+    mutate ``_ws_memory_dir``; without an explicit reset, a later test
+    may see a stale value.
+    """
+    from nexusagent.core.agent import _ws_memory_dir
+    from nexusagent.tools.fs_base import set_workspace_root
+
+    token = _ws_memory_dir.set(None)
+    prev_root = set_workspace_root(".")
+    try:
+        yield
+    finally:
+        _ws_memory_dir.reset(token)
+        set_workspace_root(str(prev_root))
+
+
 @pytest.fixture
 def tmp_workspace():
     d = tempfile.mkdtemp()
