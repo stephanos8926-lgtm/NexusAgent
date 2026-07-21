@@ -33,6 +33,8 @@ class WorkerPool:
         self._active: dict[str, SubAgentHandle] = {}
         self._tasks: set[asyncio.Task] = set()
         self._semaphore = asyncio.Semaphore(max_workers)
+        self._worker_tasks: dict[str, Task] = {}
+        self._task_store: TaskStore = TaskStore()
 
     async def spawn(self, contract, depth: int = 0) -> SubAgentHandle:
         """Spawn an isolated worker. Returns a handle to monitor/control it.
@@ -186,7 +188,7 @@ class WorkerPool:
             finally:
                 self._active.pop(handle.worker_id, None)
 
-    async def _execute_bounded(self, task, handle) -> str:
+    async def _execute_bounded(self, task, handle, checkpoint=None) -> str:
         """Execute with turn counting, wall time, and cancellation checks.
 
         Before each tool call, saves a checkpoint to the TaskStore.
@@ -196,14 +198,17 @@ class WorkerPool:
         turn = 0
         last_result = None
         contract = handle.contract
+        from nexusagent.core.task.task_store import get_task_store as _gts
+        store = _gts()
 
-        # Try to load latest checkpoint on restart
-        latest_checkpoint = await self._task_store.load_latest_checkpoint(contract.task_id)
-        if latest_checkpoint:
-            logger.info(f"Resuming task {contract.task_id} from checkpoint at node: {latest_checkpoint.current_node}")
+        # Try to load latest checkpoint on restart if none provided
+        if checkpoint is None:
+            checkpoint = await store.load_latest_checkpoint(contract.task_id)
+        if checkpoint:
+            logger.info(f"Resuming task {contract.task_id} from checkpoint at node: {checkpoint.current_node}")
             # Restore state from checkpoint
-            turn = len(latest_checkpoint.completed_actions)
-            last_result = latest_checkpoint.tool_results[-1] if latest_checkpoint.tool_results else None
+            turn = len(checkpoint.completed_actions)
+            last_result = checkpoint.tool_results[-1] if checkpoint.tool_results else None
 
         while turn < contract.max_turns:
             if handle.is_cancelled():
@@ -241,7 +246,6 @@ class WorkerPool:
                 # Save checkpoint after each successful tool execution
                 task_obj = self._worker_tasks.get(handle.worker_id)
                 if task_obj:
-                    # Handle both dict and string results
                     tool_result = result if isinstance(result, dict) else {"result": str(result)}
                     checkpoint = Checkpoint(
                         current_node="agent_execution",
@@ -251,7 +255,7 @@ class WorkerPool:
                         next_action=f"turn_{turn + 1}",
                     )
                     task_obj.add_checkpoint(checkpoint)
-                    await self._task_store.save_checkpoint(task_obj.id, checkpoint)
+                    await store.save_checkpoint(task_obj.id, checkpoint)
 
                 # Check for completion - handle both dict and string results
                 if isinstance(result, dict):
