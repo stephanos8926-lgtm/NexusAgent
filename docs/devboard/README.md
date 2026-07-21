@@ -1,9 +1,9 @@
 # NexusAgent 12-Phase Migration — DevBoard
 
-> **Last updated:** 2026-07-19 22:26 EDT
+> **Last updated:** 2026-07-21 09:51 EDT
 > **Source:** docs/architecture/migration/
 > **Repository:** github.com/stephanos8926-lgtm/NexusAgent
-> **Test baseline:** 171 passing
+> **Test baseline:** 995 collected · 953 passing · 28 pre-existing flake
 
 ---
 
@@ -105,9 +105,9 @@
 ### Active
 | Channel | Task | Est. | Status |
 |---------|------|------|--------|
-| 🤖 Jules | Phase 5: Planner & Orchestrator | ~1,200 lines | Dispatching now |
-| ☁️ Dev VM | Test suite validation | 189+ tests | Dispatching now |
-| 📝 Inline | Devboard + docs update | — | 🟢 On it |
+| 🤖 Jules | Phase 5: Planner & Orchestrator | ~1,200 lines | `892402701598275722` — APPROVED, building Planner+Orchestrator+tests now |
+| 📝 Inline | WorkerPool init + get_task_store fix | — | ✅ `b7ad624`, `65c7e7e` — pushed |
+| ☁️ Dev VM | Test validation | 995 tests | ✅ 953 passing post-merge, 3 WorkerPool tests now green |
 
 ---
 
