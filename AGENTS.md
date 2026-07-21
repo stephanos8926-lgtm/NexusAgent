@@ -10,7 +10,7 @@
 
 NexusAgent is a production-grade AI coding agent platform. It combines an LLM-powered agent (via `deepagents` / LangGraph) with a NATS-backed task orchestration system, a Textual TUI, a FastAPI WebSocket server, and a hybrid file+vector memory system.
 
-**Language:** Python 3.13+ | **Package:** `nexusagent` (src layout) | **Codebase:** 150 Python files, 27,201 LOC | **Tests:** pytest (182 collected, 173 core passing baseline, 1,000 total tests across 88 files)
+**Language:** Python 3.13+ | **Package:** `nexusagent` (src layout) | **Codebase:** 150 Python files, ~27K LOC | **Tests:** pytest (189+ collected, baseline ~173 passing)
 
 ---
 

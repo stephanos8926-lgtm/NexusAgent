@@ -14,6 +14,7 @@ import uuid
 from nexusagent.core.events import WorkerEvent, emit_event_sync
 from nexusagent.core.subagent import SubAgentHandle
 from nexusagent.core.task import Checkpoint, Task, TaskState, TaskStore
+from nexusagent.core.task.task_store import get_task_store
 from nexusagent.core.worker.handler import _run_agent_task
 from nexusagent.llm.models import TaskSchema
 
@@ -198,8 +199,7 @@ class WorkerPool:
         turn = 0
         last_result = None
         contract = handle.contract
-        from nexusagent.core.task.task_store import get_task_store as _gts
-        store = _gts()
+        store = get_task_store()
 
         # Try to load latest checkpoint on restart if none provided
         if checkpoint is None:

@@ -67,3 +67,21 @@ class TaskStore:
     async def close(self) -> None:
         """Cleanup — no-op for in-memory store."""
         pass
+
+
+# Module-level singleton (lazy, injectable)
+_task_store_instance: TaskStore | None = None
+
+
+def get_task_store() -> TaskStore:
+    """Get or create the module-level TaskStore singleton."""
+    global _task_store_instance
+    if _task_store_instance is None:
+        _task_store_instance = TaskStore()
+    return _task_store_instance
+
+
+def set_task_store(instance: TaskStore) -> None:
+    """Override the module-level TaskStore singleton (for testing/DI)."""
+    global _task_store_instance
+    _task_store_instance = instance
