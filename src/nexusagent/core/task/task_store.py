@@ -13,6 +13,23 @@ from nexusagent.core.task.task_state import Checkpoint, Task, TaskState
 logger = logging.getLogger(__name__)
 
 
+_task_store_instance: TaskStore | None = None
+
+
+def get_task_store() -> TaskStore:
+    """Get the global TaskStore singleton."""
+    global _task_store_instance
+    if _task_store_instance is None:
+        _task_store_instance = TaskStore()
+    return _task_store_instance
+
+
+def set_task_store(instance: TaskStore) -> None:
+    """Set or override the global TaskStore singleton."""
+    global _task_store_instance
+    _task_store_instance = instance
+
+
 class TaskStore:
     """Persists Task state and checkpoints.
 
