@@ -57,10 +57,14 @@ async def check_server_version(app) -> bool:
         Raises SystemExit if NEXUS_STRICT_VERSION=1 and versions mismatch.
     """
     import os
+    from nexusagent.widgets.messages import AppMessage
 
     data = await app._fetch_server_version()
     if data is None:
         logger.warning("Version check failed: server unreachable (will retry via WebSocket)")
+        unreachable_msg = "⚠️  VERSION CHECK FAILED: Server is unreachable. Please make sure the server is running."
+        if hasattr(app, "messages_container") and app.messages_container:
+            app.messages_container.mount(AppMessage(unreachable_msg))
         return False
 
     server_ver = data.get("version", "unknown")
@@ -76,8 +80,16 @@ async def check_server_version(app) -> bool:
             print("Run the server with: cd ~/Workspaces/NexusAgent && .venv/bin/python -m nexusagent.server")
             raise SystemExit(1)
 
+        # Show warning as AppMessage in conversation log
+        if hasattr(app, "messages_container") and app.messages_container:
+            app.messages_container.mount(AppMessage(mismatch_msg))
+
         # Show warning in TUI status bar
-        app.notify(mismatch_msg, timeout=10)
+        if hasattr(app, "notify"):
+            try:
+                app.notify(mismatch_msg, timeout=10)
+            except Exception as exc:
+                logger.debug("Failed to call app.notify: %s", exc)
 
     return True
 

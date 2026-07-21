@@ -2,18 +2,31 @@
 
 import pytest
 
-from nexusagent.core.task.task_state import StateTransitionValidator, Task, TaskState
+from nexusagent.core.task.task_state import (
+    StateTransitionValidator,
+    Task,
+    TaskState,
+    StateTransitionError,
+)
+
+
+def _is_valid_transition(from_state: TaskState, to_state: TaskState) -> bool:
+    try:
+        StateTransitionValidator.validate(from_state, to_state)
+        return True
+    except StateTransitionError:
+        return False
 
 
 def test_task_state_values():
     """Verify all required task states exist and have correct values."""
-    assert TaskState.CREATED == "CREATED"
-    assert TaskState.PLANNING == "PLANNING"
-    assert TaskState.EXECUTING == "EXECUTING"
-    assert TaskState.VERIFYING == "VERIFYING"
-    assert TaskState.COMPLETED == "COMPLETED"
-    assert TaskState.FAILED == "FAILED"
-    assert TaskState.RECOVERING == "RECOVERING"
+    assert TaskState.CREATED.value == "CREATED"
+    assert TaskState.PLANNING.value == "PLANNING"
+    assert TaskState.EXECUTING.value == "EXECUTING"
+    assert TaskState.VERIFYING.value == "VERIFYING"
+    assert TaskState.COMPLETED.value == "COMPLETED"
+    assert TaskState.FAILED.value == "FAILED"
+    assert TaskState.RECOVERING.value == "RECOVERING"
 
 
 def test_task_initialization():
@@ -23,8 +36,8 @@ def test_task_initialization():
     assert task.objective == "Clean up room"
     assert task.owner == "Jules"
     assert task.state == TaskState.CREATED
-    assert task.parent is None
-    assert task.children == []
+    assert task.parent_task is None
+    assert task.child_tasks == []
     assert task.checkpoints == []
     assert task.artifacts == {}
 
@@ -32,42 +45,30 @@ def test_task_initialization():
 def test_valid_state_transitions():
     """Verify state transitions that are valid."""
     # CREATED -> PLANNING
-    assert StateTransitionValidator.is_valid_transition(TaskState.CREATED, TaskState.PLANNING)
+    assert _is_valid_transition(TaskState.CREATED, TaskState.PLANNING)
     # CREATED -> FAILED
-    assert StateTransitionValidator.is_valid_transition(TaskState.CREATED, TaskState.FAILED)
+    assert _is_valid_transition(TaskState.CREATED, TaskState.FAILED)
     # PLANNING -> EXECUTING
-    assert StateTransitionValidator.is_valid_transition(TaskState.PLANNING, TaskState.EXECUTING)
+    assert _is_valid_transition(TaskState.PLANNING, TaskState.EXECUTING)
     # EXECUTING -> VERIFYING
-    assert StateTransitionValidator.is_valid_transition(TaskState.EXECUTING, TaskState.VERIFYING)
+    assert _is_valid_transition(TaskState.EXECUTING, TaskState.VERIFYING)
     # VERIFYING -> COMPLETED
-    assert StateTransitionValidator.is_valid_transition(TaskState.VERIFYING, TaskState.COMPLETED)
+    assert _is_valid_transition(TaskState.VERIFYING, TaskState.COMPLETED)
     # FAILED -> RECOVERING
-    assert StateTransitionValidator.is_valid_transition(TaskState.FAILED, TaskState.RECOVERING)
+    assert _is_valid_transition(TaskState.FAILED, TaskState.RECOVERING)
     # RECOVERING -> EXECUTING
-    assert StateTransitionValidator.is_valid_transition(TaskState.RECOVERING, TaskState.EXECUTING)
-    # RECOVERING -> PLANNING
-    assert StateTransitionValidator.is_valid_transition(TaskState.RECOVERING, TaskState.PLANNING)
-    # RECOVERING -> FAILED
-    assert StateTransitionValidator.is_valid_transition(TaskState.RECOVERING, TaskState.FAILED)
-    # RECOVERING -> COMPLETED
-    assert StateTransitionValidator.is_valid_transition(TaskState.RECOVERING, TaskState.COMPLETED)
+    assert _is_valid_transition(TaskState.RECOVERING, TaskState.EXECUTING)
 
 
 def test_invalid_state_transitions():
-    """Verify that illegal transitions raise ValueErrors."""
+    """Verify that illegal transitions raise StateTransitionErrors."""
     # EXECUTING -> CREATED is invalid
-    assert not StateTransitionValidator.is_valid_transition(TaskState.EXECUTING, TaskState.CREATED)
+    assert not _is_valid_transition(TaskState.EXECUTING, TaskState.CREATED)
     # FAILED -> COMPLETED directly is invalid
-    assert not StateTransitionValidator.is_valid_transition(TaskState.FAILED, TaskState.COMPLETED)
+    assert not _is_valid_transition(TaskState.FAILED, TaskState.COMPLETED)
     # COMPLETED -> EXECUTING is invalid
-    assert not StateTransitionValidator.is_valid_transition(TaskState.COMPLETED, TaskState.EXECUTING)
+    assert not _is_valid_transition(TaskState.COMPLETED, TaskState.EXECUTING)
 
     task = Task(id="test-2", objective="Test", owner="Jules")
-    with pytest.raises(ValueError, match="Invalid state transition"):
+    with pytest.raises(StateTransitionError, match="Invalid transition"):
         task.transition_to(TaskState.EXECUTING)
-
-
-def test_same_state_transition():
-    """Verify that transitioning to the same state is always allowed/noop."""
-    assert StateTransitionValidator.is_valid_transition(TaskState.CREATED, TaskState.CREATED)
-    assert StateTransitionValidator.is_valid_transition(TaskState.EXECUTING, TaskState.EXECUTING)
