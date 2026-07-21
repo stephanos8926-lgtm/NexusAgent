@@ -25,6 +25,7 @@ logger = logging.getLogger(__name__)
 
 class DAGEngineEvent(SystemEvent):
     """Event class for DAG and node execution lifecycle transitions."""
+
     category = EventType.TASK
 
 
@@ -67,32 +68,20 @@ class DAGEngine:
         """
         # Step 1: Create and validate the graph
         self._emit_dag_event(
-            "graph.created",
-            "dag_engine",
-            {"graph_id": dag.graph_id, "nodes_count": len(dag.nodes)}
+            "graph.created", "dag_engine", {"graph_id": dag.graph_id, "nodes_count": len(dag.nodes)}
         )
 
         try:
             dag.validate_graph()
-            self._emit_dag_event(
-                "graph.validated",
-                "dag_engine",
-                {"graph_id": dag.graph_id}
-            )
+            self._emit_dag_event("graph.validated", "dag_engine", {"graph_id": dag.graph_id})
         except DAGValidationError as exc:
             self._emit_dag_event(
-                "graph.failed",
-                "dag_engine",
-                {"graph_id": dag.graph_id, "error": str(exc)}
+                "graph.failed", "dag_engine", {"graph_id": dag.graph_id, "error": str(exc)}
             )
             raise
 
         # Step 2: Initialize Graph State
-        self._emit_dag_event(
-            "graph.started",
-            "dag_engine",
-            {"graph_id": dag.graph_id}
-        )
+        self._emit_dag_event("graph.started", "dag_engine", {"graph_id": dag.graph_id})
 
         # Pre-populate all nodes in the TaskStore as CREATED
         for node in dag.nodes:
@@ -136,6 +125,36 @@ class DAGEngine:
 
         # Step 3: Main Scheduler Loop
         while len(completed_nodes) + len(failed_nodes) < len(dag.nodes):
+            # POL Interruption Check: Query the TaskStore for running nodes to see if they were set to FAILED externally (e.g., by POL)
+            for nid in list(running_nodes):
+                durable_task = await self.store.load_task(nid)
+                if durable_task and durable_task.state == TaskState.FAILED:
+                    logger.warning(
+                        f"[DAGEngine] Node {nid} was set to FAILED externally (e.g. by POL control plane)"
+                    )
+                    failed_nodes.add(nid)
+                    running_nodes.discard(nid)
+                    errors[nid] = "Cancelled/Failed by external POL control plane signal"
+
+            # POL Direct Intervension/Cancellation Check
+            from nexusagent.core.pol import get_pol_control_plane
+
+            pol = get_pol_control_plane()
+            for intv in pol.list_interventions(status_filter="pending"):
+                if intv.get("task_id") in running_nodes:
+                    if intv.get("action") == "cancel" or (
+                        intv.get("priority") == "high"
+                        and "cancel" in str(intv.get("reason")).lower()
+                    ):
+                        logger.warning(f"[DAGEngine] Interrupted by POL intervention {intv['id']}")
+                        for rnid, rhandle in list(handles.items()):
+                            if rnid in running_nodes:
+                                try:
+                                    rhandle.cancel()
+                                except Exception as re:
+                                    logger.warning(f"Failed to cancel running node '{rnid}': {re}")
+                        raise RuntimeError(f"DAG execution interrupted by POL: {intv['reason']}")
+
             if failed_nodes:
                 # Cancel all remaining running handles
                 for nid, handle in list(handles.items()):
@@ -148,9 +167,14 @@ class DAGEngine:
                 self._emit_dag_event(
                     "graph.failed",
                     "dag_engine",
-                    {"graph_id": dag.graph_id, "error": f"Graph failed due to node failures: {failed_nodes}"}
+                    {
+                        "graph_id": dag.graph_id,
+                        "error": f"Graph failed due to node failures: {failed_nodes}",
+                    },
                 )
-                raise RuntimeError(f"DAG execution aborted due to failures: {failed_nodes}. Errors: {errors}")
+                raise RuntimeError(
+                    f"DAG execution aborted due to failures: {failed_nodes}. Errors: {errors}"
+                )
 
             self._loop_event.clear()
 
@@ -158,8 +182,7 @@ class DAGEngine:
             ready_nodes = [
                 nid
                 for nid in node_map
-                if nid not in dispatched_nodes
-                and parents[nid].issubset(completed_nodes)
+                if nid not in dispatched_nodes and parents[nid].issubset(completed_nodes)
             ]
 
             # Emit execution blocked for pending nodes that are waiting
@@ -169,14 +192,21 @@ class DAGEngine:
                     self._emit_dag_event(
                         "execution.blocked",
                         "dag_engine",
-                        {"node_id": nid, "graph_id": dag.graph_id, "reason": f"Waiting on dependencies: {waiting_on}"}
+                        {
+                            "node_id": nid,
+                            "graph_id": dag.graph_id,
+                            "reason": f"Waiting on dependencies: {waiting_on}",
+                        },
                     )
 
             if not ready_nodes and not running_nodes:
                 self._emit_dag_event(
                     "graph.failed",
                     "dag_engine",
-                    {"graph_id": dag.graph_id, "error": "Deadlock detected - no ready nodes and nothing running"}
+                    {
+                        "graph_id": dag.graph_id,
+                        "error": "Deadlock detected - no ready nodes and nothing running",
+                    },
                 )
                 raise RuntimeError("DAG deadlock: no tasks are ready and nothing is running.")
 
@@ -188,22 +218,22 @@ class DAGEngine:
 
                 # Emit ready event
                 self._emit_dag_event(
-                    "node.ready",
-                    "dag_engine",
-                    {"node_id": nid, "graph_id": dag.graph_id}
+                    "node.ready", "dag_engine", {"node_id": nid, "graph_id": dag.graph_id}
                 )
 
                 # Emit worker assignment requested
                 self._emit_dag_event(
                     "worker.assignment.requested",
                     "dag_engine",
-                    {"node_id": nid, "graph_id": dag.graph_id}
+                    {"node_id": nid, "graph_id": dag.graph_id},
                 )
 
                 # Transition TaskState to PLANNING in TaskStore
                 durable_task = await self.store.load_task(nid)
                 if durable_task:
-                    if StateTransitionValidator.is_valid_transition(durable_task.state, TaskState.PLANNING):
+                    if StateTransitionValidator.is_valid_transition(
+                        durable_task.state, TaskState.PLANNING
+                    ):
                         durable_task.transition_to(TaskState.PLANNING)
                         await self.store.save_task(durable_task)
 
@@ -231,24 +261,39 @@ class DAGEngine:
                 self._emit_dag_event(
                     "worker.assignment.completed",
                     "dag_engine",
-                    {"node_id": nid, "graph_id": dag.graph_id, "worker_id": handle.worker_id}
+                    {"node_id": nid, "graph_id": dag.graph_id, "worker_id": handle.worker_id},
                 )
 
                 # Emit node started
                 self._emit_dag_event(
                     "node.started",
                     "dag_engine",
-                    {"node_id": nid, "graph_id": dag.graph_id, "worker_id": handle.worker_id}
+                    {"node_id": nid, "graph_id": dag.graph_id, "worker_id": handle.worker_id},
                 )
 
                 # Transition state to EXECUTING in TaskStore
                 if durable_task:
-                    if StateTransitionValidator.is_valid_transition(durable_task.state, TaskState.EXECUTING):
+                    if StateTransitionValidator.is_valid_transition(
+                        durable_task.state, TaskState.EXECUTING
+                    ):
                         durable_task.transition_to(TaskState.EXECUTING)
                         await self.store.save_task(durable_task)
 
                 # Run monitoring in the background
-                asyncio.create_task(self._monitor_node(node, handle, dag.graph_id, retry_counts, dispatched_nodes, running_nodes, completed_nodes, failed_nodes, results, errors))
+                asyncio.create_task(
+                    self._monitor_node(
+                        node,
+                        handle,
+                        dag.graph_id,
+                        retry_counts,
+                        dispatched_nodes,
+                        running_nodes,
+                        completed_nodes,
+                        failed_nodes,
+                        results,
+                        errors,
+                    )
+                )
 
             # Wait for any status change event to loop and check next dependencies
             if len(completed_nodes) + len(failed_nodes) < len(dag.nodes):
@@ -259,14 +304,12 @@ class DAGEngine:
             self._emit_dag_event(
                 "graph.failed",
                 "dag_engine",
-                {"graph_id": dag.graph_id, "error": f"Failed nodes: {failed_nodes}"}
+                {"graph_id": dag.graph_id, "error": f"Failed nodes: {failed_nodes}"},
             )
             raise RuntimeError(f"DAG execution failed on nodes: {failed_nodes}")
 
         self._emit_dag_event(
-            "graph.completed",
-            "dag_engine",
-            {"graph_id": dag.graph_id, "results": results}
+            "graph.completed", "dag_engine", {"graph_id": dag.graph_id, "results": results}
         )
         return results
 
@@ -291,10 +334,14 @@ class DAGEngine:
             # Transition task in TaskStore to VERIFYING and then COMPLETED
             durable_task = await self.store.load_task(nid)
             if durable_task:
-                if StateTransitionValidator.is_valid_transition(durable_task.state, TaskState.VERIFYING):
+                if StateTransitionValidator.is_valid_transition(
+                    durable_task.state, TaskState.VERIFYING
+                ):
                     durable_task.transition_to(TaskState.VERIFYING)
                     await self.store.save_task(durable_task)
-                if StateTransitionValidator.is_valid_transition(durable_task.state, TaskState.COMPLETED):
+                if StateTransitionValidator.is_valid_transition(
+                    durable_task.state, TaskState.COMPLETED
+                ):
                     durable_task.transition_to(TaskState.COMPLETED)
                     await self.store.save_task(durable_task)
 
@@ -306,7 +353,7 @@ class DAGEngine:
             self._emit_dag_event(
                 "node.completed",
                 "dag_engine",
-                {"node_id": nid, "graph_id": graph_id, "result": result}
+                {"node_id": nid, "graph_id": graph_id, "result": result},
             )
 
         except Exception as exc:
@@ -314,7 +361,9 @@ class DAGEngine:
             retries_used = retry_counts[nid]
             if retries_used < node.retries:
                 retry_counts[nid] += 1
-                logger.warning(f"Node '{nid}' failed with error: {exc}. Retrying ({retry_counts[nid]}/{node.retries})...")
+                logger.warning(
+                    f"Node '{nid}' failed with error: {exc}. Retrying ({retry_counts[nid]}/{node.retries})..."
+                )
 
                 # Update TaskStore to FAILED and RECOVERING
                 durable_task = await self.store.load_task(nid)
@@ -337,7 +386,7 @@ class DAGEngine:
                 self._emit_dag_event(
                     "node.recovered",
                     "dag_engine",
-                    {"node_id": nid, "graph_id": graph_id, "retry_count": retry_counts[nid]}
+                    {"node_id": nid, "graph_id": graph_id, "retry_count": retry_counts[nid]},
                 )
 
                 # Reset to ready for retry by clearing dispatched status
@@ -363,7 +412,7 @@ class DAGEngine:
                 self._emit_dag_event(
                     "node.failed",
                     "dag_engine",
-                    {"node_id": nid, "graph_id": graph_id, "error": str(exc), "escalated": True}
+                    {"node_id": nid, "graph_id": graph_id, "error": str(exc), "escalated": True},
                 )
 
         # Notify scheduler loop

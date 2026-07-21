@@ -30,6 +30,23 @@ class SubmitTaskRequest(BaseModel):
     metadata: dict = Field(default_factory=dict)
 
 
+class CreateInterventionRequest(BaseModel):
+    """Request body for creating a POL intervention."""
+
+    task_id: str | None = Field(None, description="Task ID associated with the intervention")
+    reason: str = Field(..., description="Reason for the intervention")
+    guidance: str = Field(..., description="Guidance to help resolve the anomaly")
+    priority: str = Field("high", description="Intervention priority (low, medium, high)")
+
+
+class ResolveInterventionRequest(BaseModel):
+    """Request body for resolving a POL intervention."""
+
+    action: str | None = Field(
+        None, description="Corrective action to apply (cancel, retry, override, escalate)"
+    )
+
+
 def register_routes(app: FastAPI) -> None:
     """Register all REST API routes on the given FastAPI app."""
 
@@ -334,3 +351,39 @@ def register_routes(app: FastAPI) -> None:
             "limit": limit,
             "offset": offset,
         }
+
+    # ─── POL Control Plane Endpoints ────────────────────────────────────
+
+    @app.get("/pol/interventions", dependencies=[Depends(verify_api_key)])
+    async def list_pol_interventions(status: str | None = None):
+        """List active/pending or history of system interventions (Operator Auth)."""
+        from nexusagent.core.pol import get_pol_control_plane
+
+        pol = get_pol_control_plane()
+        interventions = pol.list_interventions(status_filter=status)
+        return {"interventions": interventions, "count": len(interventions)}
+
+    @app.post("/pol/interventions", status_code=201, dependencies=[Depends(require_admin)])
+    async def create_pol_intervention(request: CreateInterventionRequest):
+        """Create a new POL system intervention (Admin Auth)."""
+        from nexusagent.core.pol import get_pol_control_plane
+
+        pol = get_pol_control_plane()
+        intv = await pol.create_intervention(
+            task_id=request.task_id,
+            reason=request.reason,
+            guidance=request.guidance,
+            priority=request.priority,
+        )
+        return intv
+
+    @app.post("/pol/interventions/{intervention_id}/resolve", dependencies=[Depends(require_admin)])
+    async def resolve_pol_intervention(intervention_id: str, request: ResolveInterventionRequest):
+        """Mark a system intervention as resolved and apply action (Admin Auth)."""
+        from nexusagent.core.pol import get_pol_control_plane
+
+        pol = get_pol_control_plane()
+        resolved_intv = await pol.resolve_intervention(intervention_id, action=request.action)
+        if resolved_intv is None:
+            raise HTTPException(status_code=404, detail="Intervention not found")
+        return resolved_intv
