@@ -190,14 +190,17 @@ async def session_websocket(
                     provider = msg.get("provider", "")
                     if model:
                         from nexusagent.infrastructure.config import settings as _settings
+
                         _settings.agent.default_model = model
                         if provider:
                             _settings.agent.primary_provider = provider
-                        await websocket.send_json({
-                            "type": "model_changed",
-                            "model": model,
-                            "provider": provider,
-                        })
+                        await websocket.send_json(
+                            {
+                                "type": "model_changed",
+                                "model": model,
+                                "provider": provider,
+                            }
+                        )
                 elif msg_type == "compact":
                     # Trigger context compaction for this session
                     try:
@@ -301,3 +304,63 @@ async def events_websocket(websocket: WebSocket) -> None:
     finally:
         with contextlib.suppress(Exception):
             await sub.unsubscribe()
+
+
+async def pol_websocket(websocket: WebSocket) -> None:
+    """Real-time POL system interventions streaming via WebSocket.
+
+    Accepts API key via headers, Authorization header, or token query parameter.
+    """
+    logger.info("pol_websocket CALLED")
+    header_key = websocket.headers.get("x-api-key")
+    auth_header = websocket.headers.get("authorization", "")
+    if auth_header.lower().startswith("bearer "):
+        header_key = header_key or auth_header[7:]
+    token_param = websocket.query_params.get("token")
+    if token_param and not header_key:
+        header_key = token_param
+
+    if not header_key:
+        await websocket.close(code=4001, reason="Missing API key — use Authorization: Bearer <key>")
+        return
+
+    try:
+        await verify_api_key(header_key)
+    except HTTPException as e:
+        logger.warning(f"WS auth failed for pol_websocket: {e}")
+        await websocket.close(code=4001, reason="Invalid or missing API key")
+        return
+
+    # Validate Origin header to prevent CSRF
+    origin = websocket.headers.get("origin", "")
+    if origin and origin not in _WS_ALLOWED_ORIGINS:
+        logger.warning(f"Rejected WebSocket from unauthorized origin: {origin}")
+        await websocket.close(code=4003, reason="Forbidden origin")
+        return
+
+    await websocket.accept()
+
+    from typing import Any
+
+    from nexusagent.core.pol import get_pol_control_plane
+
+    pol = get_pol_control_plane()
+    queue: asyncio.Queue = asyncio.Queue()
+
+    async def callback(intervention: dict[str, Any]) -> None:
+        await queue.put(intervention)
+
+    # Register the callback in POLControlPlane
+    pol.register_websocket_callback(callback)
+
+    try:
+        while True:
+            # Get intervention update from queue and send over WebSocket
+            intervention_data = await queue.get()
+            await websocket.send_json(intervention_data)
+    except WebSocketDisconnect:
+        logger.info("POL WebSocket disconnected")
+    except Exception as e:
+        logger.error(f"Error in pol_websocket: {e}")
+    finally:
+        pol.unregister_websocket_callback(callback)

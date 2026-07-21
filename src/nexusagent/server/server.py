@@ -13,13 +13,11 @@ from fastapi import FastAPI, WebSocket
 from nexusagent.infrastructure.bus import get_bus
 from nexusagent.infrastructure.config import settings
 from nexusagent.server.routes import register_routes
-from nexusagent.server.websocket import events_websocket, session_websocket
+from nexusagent.server.websocket import events_websocket, pol_websocket, session_websocket
 from nexusagent.version import VERSION
 
 # Singleton lock — prevents multiple server instances on the same host
-_PID_FILE = os.path.join(
-    os.path.expanduser("~"), ".nexusagent", "server.pid"
-)
+_PID_FILE = os.path.join(os.path.expanduser("~"), ".nexusagent", "server.pid")
 
 # Track server start time for uptime reporting
 _SERVER_START_TIME = time.monotonic()
@@ -90,6 +88,10 @@ def create_app() -> FastAPI:
     async def events_ws_endpoint(websocket: WebSocket):
         await events_websocket(websocket)
 
+    @app.websocket("/ws/pol")
+    async def pol_ws_endpoint(websocket: WebSocket):
+        await pol_websocket(websocket)
+
     return app
 
 
@@ -134,7 +136,9 @@ def run(reload: bool = False, use_lifespan_app: bool = False) -> None:
     if lock_fd is None:
         return  # Another instance is already running
 
-    app_import_string = "nexusagent.server.lifespan:app" if use_lifespan_app else "nexusagent.server.server:app"
+    app_import_string = (
+        "nexusagent.server.lifespan:app" if use_lifespan_app else "nexusagent.server.server:app"
+    )
 
     uvicorn.run(
         app_import_string,

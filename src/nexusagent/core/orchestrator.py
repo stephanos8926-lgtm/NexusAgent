@@ -102,6 +102,32 @@ class Orchestrator:
         logger.info(f"Starting DAG execution with {len(self.plan.tasks)} tasks...")
 
         while len(self.completed_tasks) + len(self.failed_tasks) < len(self.plan.tasks):
+            # POL Interruption Check: Query the TaskStore for running tasks to see if they were set to FAILED externally (e.g., by POL)
+            for tid in list(self.running_tasks):
+                durable_task = await self.store.load_task(tid)
+                if durable_task and durable_task.state == TaskState.FAILED:
+                    logger.warning(
+                        f"[Orchestrator] Task {tid} was set to FAILED externally (e.g. by POL control plane)"
+                    )
+                    self.failed_tasks.add(tid)
+                    self.running_tasks.discard(tid)
+
+            # POL Direct Intervension/Cancellation Check
+            from nexusagent.core.pol import get_pol_control_plane
+
+            pol = get_pol_control_plane()
+            for intv in pol.list_interventions(status_filter="pending"):
+                if intv.get("task_id") in self.running_tasks:
+                    if intv.get("action") == "cancel" or (
+                        intv.get("priority") == "high"
+                        and "cancel" in str(intv.get("reason")).lower()
+                    ):
+                        logger.warning(
+                            f"[Orchestrator] Interrupted by POL intervention {intv['id']}"
+                        )
+                        await self.cancel_all()
+                        raise RuntimeError(f"Orchestration interrupted by POL: {intv['reason']}")
+
             # Check for any failures. If any task fails, abort/cancel the rest
             if self.failed_tasks:
                 await self.cancel_all()
