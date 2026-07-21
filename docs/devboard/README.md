@@ -1,9 +1,9 @@
 # NexusAgent 12-Phase Migration — DevBoard
 
-> **Last updated:** 2026-07-21 16:32 EDT
+> **Last updated:** 2026-07-21 16:48 EDT
 > **Source:** docs/architecture/migration/
 > **Repository:** github.com/stephanos8926-lgtm/NexusAgent
-> **Test baseline:** 991 collected · 980 passing · 1 order-dependent flake
+> **Test baseline:** 1001 collected · **992 passing · 0 failures · 9 skipped**
 
 ---
 
@@ -97,6 +97,7 @@ Per Chief Architect Directive: **no skipping phases.**
 | 2026-07-21 13:48 | 995 | 958 | 14 | Workspace+state fix inline |
 | 2026-07-21 14:42 | 995 | 969 | 13 | PR #14 + #15 merged (Phase 4 preflight + Phase 5) |
 | 2026-07-21 16:32 | 991 | 980 | 1 | All clusters fixed, Phase 6 merged. Remaining: order-dependent `_ws_memory_dir` flake |
+| 2026-07-21 16:48 | 1001 | **992** | **0** | **Order-dep flakes eliminated** via autouse ContextVar reset fixtures. Master green. |
 
 ---
 
