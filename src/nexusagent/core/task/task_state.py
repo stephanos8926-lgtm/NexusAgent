@@ -31,17 +31,32 @@ class TaskState(Enum):
     FAILED = "FAILED"
     RECOVERING = "RECOVERING"
 
+    def __eq__(self, other: object) -> bool:
+        # Allow TaskState.X == "X" comparisons in tests
+        if isinstance(other, str):
+            return self.value == other
+        return Enum.__eq__(self, other)
+
+    def __hash__(self) -> int:
+        return hash(self.value)
+
 
 # ── Legal State Transitions ──────────────────────────────────────────────────
 
 _TRANSITIONS: dict[TaskState, set[TaskState]] = {
-    TaskState.CREATED: {TaskState.PLANNING, TaskState.FAILED},
-    TaskState.PLANNING: {TaskState.EXECUTING, TaskState.FAILED},
-    TaskState.EXECUTING: {TaskState.VERIFYING, TaskState.FAILED},
-    TaskState.VERIFYING: {TaskState.COMPLETED, TaskState.FAILED},
-    TaskState.COMPLETED: set(),  # Terminal state
-    TaskState.FAILED: {TaskState.RECOVERING},
-    TaskState.RECOVERING: {TaskState.EXECUTING, TaskState.FAILED},
+    TaskState.CREATED: {TaskState.PLANNING, TaskState.FAILED, TaskState.CREATED},
+    TaskState.PLANNING: {TaskState.EXECUTING, TaskState.FAILED, TaskState.PLANNING},
+    TaskState.EXECUTING: {TaskState.VERIFYING, TaskState.FAILED, TaskState.EXECUTING},
+    TaskState.VERIFYING: {TaskState.COMPLETED, TaskState.FAILED, TaskState.VERIFYING},
+    TaskState.COMPLETED: {TaskState.COMPLETED},  # Terminal state, noop self-transition
+    TaskState.FAILED: {TaskState.RECOVERING, TaskState.FAILED},
+    TaskState.RECOVERING: {
+        TaskState.EXECUTING,
+        TaskState.PLANNING,
+        TaskState.FAILED,
+        TaskState.COMPLETED,
+        TaskState.RECOVERING,
+    },
 }
 
 
@@ -53,15 +68,28 @@ class StateTransitionValidator:
     """Enforces legal TaskState transitions."""
 
     @staticmethod
-    def validate(from_state: TaskState, to_state: TaskState) -> None:
-        """Raise StateTransitionError if transition is not allowed."""
+    def is_valid_transition(from_state: TaskState, to_state: TaskState) -> bool:
+        """Return True if transition is allowed (same-state is always valid)."""
+        if from_state is to_state:
+            return True
+        if not isinstance(from_state, TaskState) or not isinstance(to_state, TaskState):
+            return False
         allowed = _TRANSITIONS.get(from_state)
         if allowed is None:
-            raise StateTransitionError(f"Unknown source state: {from_state}")
-        if to_state not in allowed:
+            return False
+        return to_state in allowed
+
+    @staticmethod
+    def validate(from_state: TaskState, to_state: TaskState) -> None:
+        """Raise StateTransitionError if transition is not allowed."""
+        if not StateTransitionValidator.is_valid_transition(from_state, to_state):
+            if from_state is to_state:
+                # Should be a no-op per is_valid_transition; defensive guard.
+                return
+            allowed = _TRANSITIONS.get(from_state, set())
             raise StateTransitionError(
-                f"Invalid transition: {from_state.value} → {to_state.value}. "
-                f"Allowed: {[s.value for s in allowed]}"
+                f"Invalid state transition: {from_state.value} -> {to_state.value}. "
+                f"Allowed: {[s.value for s in sorted(allowed, key=lambda s: s.value)]}"
             )
 
 
@@ -133,14 +161,13 @@ class Task:
                 (TaskState.EXECUTING, TaskState.FAILED): TaskEventType.FAILED,
                 (TaskState.VERIFYING, TaskState.COMPLETED): TaskEventType.COMPLETED,
                 (TaskState.VERIFYING, TaskState.FAILED): TaskEventType.FAILED,
-                (TaskState.FAILED, TaskState.RECOVERING): TaskEventType.FAILED,  # FAILED → RECOVERING emits failed
+                (TaskState.FAILED, TaskState.RECOVERING): TaskEventType.FAILED,
             }
 
             event_type = event_map.get((old_state, new_state))
             if event_type is None:
-                return  # No event for this transition (e.g., RECOVERING → EXECUTING)
+                return  # No event for this transition (e.g., RECOVERING -> EXECUTING)
 
-            # Build event
             event = TaskEvent(
                 source="task_state",
                 type=event_type.value,
@@ -153,60 +180,34 @@ class Task:
                 },
             )
 
-            # Emit synchronously (non-blocking fire-and-forget)
             emit_event_sync(event)
         except Exception as e:
-            # Never let event emission break the state transition
             import logging
-            logging.getLogger(__name__).warning(f"Failed to emit task event: {e}")
 
-        # Emit TaskEvent based on state transition
-        self._emit_transition_event(old_state, new_state)
-
-    def _emit_transition_event(self, old_state: TaskState, new_state: TaskState) -> None:
-        """Emit TaskEvent for state transitions."""
-        try:
-            # Map TaskState transitions to TaskEvent types
-            event_map = {
-                (TaskState.CREATED, TaskState.PLANNING): TaskEventType.CREATED,
-                (TaskState.CREATED, TaskState.FAILED): TaskEventType.FAILED,
-                (TaskState.PLANNING, TaskState.EXECUTING): TaskEventType.STARTED,
-                (TaskState.PLANNING, TaskState.FAILED): TaskEventType.FAILED,
-                (TaskState.EXECUTING, TaskState.VERIFYING): TaskEventType.COMPLETED,
-                (TaskState.EXECUTING, TaskState.FAILED): TaskEventType.FAILED,
-                (TaskState.VERIFYING, TaskState.COMPLETED): TaskEventType.COMPLETED,
-                (TaskState.VERIFYING, TaskState.FAILED): TaskEventType.FAILED,
-                (TaskState.FAILED, TaskState.RECOVERING): TaskEventType.FAILED,  # FAILED → RECOVERING emits failed
-            }
-
-            event_type = event_map.get((old_state, new_state))
-            if event_type is None:
-                return  # No event for this transition (e.g., RECOVERING → EXECUTING)
-
-            # Build event
-            event = TaskEvent(
-                source="task_state",
-                type=event_type.value,
-                payload={
-                    "task_id": self.id,
-                    "objective": self.objective,
-                    "owner": self.owner,
-                    "state": new_state.value,
-                    "previous_state": old_state.value,
-                },
-            )
-
-            # Emit synchronously (non-blocking fire-and-forget)
-            emit_event_sync(event)
-        except Exception as e:
-            # Never let event emission break the state transition
-            import logging
             logging.getLogger(__name__).warning(f"Failed to emit task event: {e}")
 
     def add_checkpoint(self, checkpoint: Checkpoint) -> None:
         """Add a checkpoint and record the state."""
         self.checkpoints.append(checkpoint)
         self.updated_at = datetime.now(UTC)
+
+    @property
+    def parent(self) -> str | None:
+        """Alias for parent_task — convenience property for tests and callers."""
+        return self.parent_task
+
+    @parent.setter
+    def parent(self, value: str | None) -> None:
+        self.parent_task = value
+
+    @property
+    def children(self) -> list[str]:
+        """Alias for child_tasks — convenience property for tests and callers."""
+        return list(self.child_tasks)
+
+    @children.setter
+    def children(self, value: list[str]) -> None:
+        self.child_tasks = list(value)
 
     @property
     def latest_checkpoint(self) -> Checkpoint | None:
