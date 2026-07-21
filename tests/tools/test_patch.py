@@ -6,7 +6,18 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../.
 import os
 import tempfile
 
+import pytest
+
+from nexusagent.tools.fs_base import set_workspace_root
 from nexusagent.tools.patch import apply_patch
+
+
+@pytest.fixture(autouse=True)
+def _tmp_workspace():
+    """Reset workspace root to /tmp so apply_patch accepts /tmp paths."""
+    set_workspace_root("/tmp")
+    yield
+    set_workspace_root(".")
 
 
 def test_apply_patch():

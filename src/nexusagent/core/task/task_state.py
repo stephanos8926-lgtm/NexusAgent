@@ -31,15 +31,6 @@ class TaskState(Enum):
     FAILED = "FAILED"
     RECOVERING = "RECOVERING"
 
-    def __eq__(self, other: object) -> bool:
-        # Allow TaskState.X == "X" comparisons in tests
-        if isinstance(other, str):
-            return self.value == other
-        return Enum.__eq__(self, other)
-
-    def __hash__(self) -> int:
-        return hash(self.value)
-
 
 # ── Legal State Transitions ──────────────────────────────────────────────────
 
@@ -82,15 +73,13 @@ class StateTransitionValidator:
     @staticmethod
     def validate(from_state: TaskState, to_state: TaskState) -> None:
         """Raise StateTransitionError if transition is not allowed."""
-        if not StateTransitionValidator.is_valid_transition(from_state, to_state):
-            if from_state is to_state:
-                # Should be a no-op per is_valid_transition; defensive guard.
-                return
-            allowed = _TRANSITIONS.get(from_state, set())
-            raise StateTransitionError(
-                f"Invalid state transition: {from_state.value} -> {to_state.value}. "
-                f"Allowed: {[s.value for s in sorted(allowed, key=lambda s: s.value)]}"
-            )
+        if StateTransitionValidator.is_valid_transition(from_state, to_state):
+            return
+        allowed = _TRANSITIONS.get(from_state, set())
+        raise StateTransitionError(
+            f"Invalid transition: {from_state.value} -> {to_state.value}. "
+            f"Allowed: {[s.value for s in sorted(allowed, key=lambda s: s.value)]}"
+        )
 
 
 @dataclass
@@ -190,24 +179,6 @@ class Task:
         """Add a checkpoint and record the state."""
         self.checkpoints.append(checkpoint)
         self.updated_at = datetime.now(UTC)
-
-    @property
-    def parent(self) -> str | None:
-        """Alias for parent_task — convenience property for tests and callers."""
-        return self.parent_task
-
-    @parent.setter
-    def parent(self, value: str | None) -> None:
-        self.parent_task = value
-
-    @property
-    def children(self) -> list[str]:
-        """Alias for child_tasks — convenience property for tests and callers."""
-        return list(self.child_tasks)
-
-    @children.setter
-    def children(self, value: list[str]) -> None:
-        self.child_tasks = list(value)
 
     @property
     def latest_checkpoint(self) -> Checkpoint | None:
