@@ -5,19 +5,27 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../.
 
 import os
 import tempfile
+from pathlib import Path
 
 import pytest
 
-from nexusagent.tools.fs_base import set_workspace_root
+from nexusagent.tools.fs_base import set_workspace_root, _get_workspace_root
 from nexusagent.tools.patch import apply_patch
 
 
 @pytest.fixture(autouse=True)
-def _tmp_workspace():
-    """Reset workspace root to /tmp so apply_patch accepts /tmp paths."""
-    set_workspace_root("/tmp")
+def _tmp_workspace(monkeypatch, tmp_path):
+    """Reset workspace root to a tmpdir so apply_patch accepts /tmp + /var/tmp paths.
+
+    Uses pytest's ``tmp_path`` (auto-created fresh per-test) so workspace_root
+    covers ``Path(tmp_path)`` — which is /tmp on most Linux runners and may
+    be /var/tmp elsewhere (Debian's ``TMPDIR=/var/tmp`` default). Also
+    forces ``tempfile.tempdir`` so NamedTemporaryFile lands inside it.
+    """
+    set_workspace_root(str(tmp_path))
+    monkeypatch.setattr(tempfile, "tempdir", str(tmp_path))
     yield
-    set_workspace_root(".")
+    set_workspace_root(str(_get_workspace_root()))
 
 
 def test_apply_patch():
