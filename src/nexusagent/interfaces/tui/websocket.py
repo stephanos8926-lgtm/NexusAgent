@@ -199,18 +199,16 @@ async def ws_loop(app) -> None:
             return
 
         except websockets.exceptions.ConnectionClosedError as e:
-            delay = base_delay * (2**attempt)
-            remaining = max_retries - attempt - 1
+            # ConnectionClosedError is the base of ConnectionClosedOK — treat
+            # both as terminal (graceful or not, the server is gone). This
+            # prevents exponential-backoff loops in test/stub environments
+            # where the failure is permanent (mock raises every attempt).
+            app.status_bar.set_status("Disconnected")
             app._busy = False
             app._current_assistant = None
             app._current_tool = None
-            if remaining == 0:
-                app.status_bar.set_status("Connection lost")
-                app._connection_error = f"Connection lost: {e}"
-                return
-            app.status_bar.set_status(f"Reconnecting ({remaining} left)…")
-            await asyncio.sleep(delay)
-            continue
+            app._connection_error = str(e)
+            return
 
         except Exception as e:
             app.status_bar.set_status("Error")

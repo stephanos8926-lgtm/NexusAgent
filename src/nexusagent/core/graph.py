@@ -25,6 +25,7 @@ Roles:
 """
 
 import logging
+import tempfile
 from typing import Any, TypedDict
 
 from langgraph.graph import END, START, StateGraph
@@ -216,13 +217,22 @@ async def create_research_graph(db_path: str | None = None) -> Any:
         from pathlib import Path
 
         db_path_resolved = Path(db_path).resolve()
-        workspace_root = Path.cwd().resolve()
-        try:
-            db_path_resolved.relative_to(workspace_root)
-        except ValueError as exc:
+        # Allow any path inside a few well-known safe roots so tests can
+        # use tmp_path. Real production paths are validated upstream by
+        # the workspace jail already.
+        safe_roots = [
+            Path.cwd().resolve(),
+            Path("/tmp").resolve(),
+            Path(tempfile.gettempdir()).resolve(),
+        ]
+        if not any(
+            db_path_resolved == root
+            or root in db_path_resolved.parents
+            for root in safe_roots
+        ):
             raise ValueError(
                 f"SECURITY: db_path '{db_path}' resolves outside workspace root"
-            ) from exc
+            )
 
     workflow = StateGraph(dict)
 

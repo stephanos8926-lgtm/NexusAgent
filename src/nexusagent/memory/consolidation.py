@@ -31,8 +31,8 @@ class ConsolidationEngine:
         if not self.bank_dir.exists():
             return {"status": "no_bank", "files": 0}
 
-        files = list(self.bank_dir.glob("*.md"))
-        entities = list(self.entities_dir.glob("*.md")) if self.entities_dir.exists() else []
+        files = sorted(self.bank_dir.glob("*.md"))
+        entities = sorted(self.entities_dir.glob("*.md")) if self.entities_dir.exists() else []
 
         report = {
             "status": "ok",
