@@ -29,6 +29,14 @@ async def on_chat_input_submitted(app, event) -> None:
     if not message:
         return
 
+    # Enforce strict client-side message size limit (32KB / 32768 chars)
+    if len(message) > 32768:
+        if event.input is not None:
+            event.input.value = ""
+        msg = AppMessage("⚠️ Error: Message is too long (maximum 32KB). Please shorten your input.")
+        _mount_with_limit(app, msg)
+        return
+
     if message.startswith("/"):
         if event.input is not None:
             event.input.value = ""

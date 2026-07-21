@@ -208,6 +208,16 @@ async def _handle_tool_call_event(app, event: dict) -> None:
     tool = event.get("tool", "?")
     args = event.get("args", {})
     app._last_tool_name = tool
+    call_id = event.get("call_id", "")
+
+    # Prevent duplicate rendering/processing of the same tool_call
+    if call_id:
+        if hasattr(app, "_seen_tool_calls"):
+            if call_id in app._seen_tool_calls:
+                return
+            app._seen_tool_calls.add(call_id)
+        if hasattr(app, "_call_id_to_tool"):
+            app._call_id_to_tool[call_id] = tool
 
     msg = ToolCallMessage(
         tool=tool,
@@ -222,7 +232,6 @@ async def _handle_tool_call_event(app, event: dict) -> None:
         if app._auto_approve and tool != "tool_search":
             from nexusagent.interfaces.tui.websocket import send_approval
 
-            call_id = event.get("call_id", "")
             app._auto_approve_task = (
                 __import__("asyncio").get_event_loop().create_task(send_approval(app, call_id, True))
             )
@@ -237,9 +246,24 @@ async def _handle_tool_result_event(app, event: dict) -> None:
         app: The NexusApp instance.
         event: The tool_result event dict.
     """
+    call_id = event.get("call_id", "")
+    # Prevent duplicate rendering/processing of the same tool_result
+    if call_id and hasattr(app, "_seen_tool_results"):
+        if call_id in app._seen_tool_results:
+            return
+        app._seen_tool_results.add(call_id)
+
     output = event.get("output", "")
     success = event.get("success", True)
-    tool_name = app._current_tool._tool if app._current_tool else app._last_tool_name
+
+    # Resolve "?" tool name if _current_tool is missing by using call_id mapping
+    tool_name = "?"
+    if app._current_tool:
+        tool_name = app._current_tool._tool
+    elif call_id and hasattr(app, "_call_id_to_tool"):
+        tool_name = app._call_id_to_tool.get(call_id, app._last_tool_name or "?")
+    else:
+        tool_name = app._last_tool_name or "?"
 
     if app._current_tool:
         app._current_tool.update_output(output)
@@ -265,7 +289,7 @@ async def _handle_tool_result_event(app, event: dict) -> None:
             app._failure_repeat_count = 0
     else:
         msg = ToolCallMessage(
-            tool=app._last_tool_name,
+            tool=tool_name,
             args="",
             output=output,
             status="success" if success else "failed",

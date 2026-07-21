@@ -154,6 +154,8 @@ class NexusApp(App):
         # Track seen tool calls/results to prevent duplicate rendering (for /new command)
         self._seen_tool_calls = set()
         self._seen_tool_results = set()
+        self._call_id_to_tool: dict[str, str] = {}
+        self._approved_call_ids: set[str] = set()
         # Collapse repeated identical failures (tool name + error text)
         self._last_failure_key: tuple[str, str] | None = None
         self._failure_repeat_count: int = 0
@@ -283,6 +285,16 @@ class NexusApp(App):
     def action_clear(self) -> None:
         """Clear all messages and show the welcome greeting."""
         self.messages_container.clear()
+        self._current_assistant = None
+        self._current_tool = None
+        if hasattr(self, "_seen_tool_calls"):
+            self._seen_tool_calls.clear()
+        if hasattr(self, "_seen_tool_results"):
+            self._seen_tool_results.clear()
+        if hasattr(self, "_call_id_to_tool"):
+            self._call_id_to_tool.clear()
+        if hasattr(self, "_approved_call_ids"):
+            self._approved_call_ids.clear()
         self._show_greeting()
 
     def action_quit(self) -> None:
