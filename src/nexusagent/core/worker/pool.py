@@ -34,8 +34,9 @@ class WorkerPool:
         self._active: dict[str, SubAgentHandle] = {}
         self._tasks: set[asyncio.Task] = set()
         self._semaphore = asyncio.Semaphore(max_workers)
+        from nexusagent.core.task.task_store import get_task_store
+        self._task_store = get_task_store()
         self._worker_tasks: dict[str, Task] = {}
-        self._task_store: TaskStore = TaskStore()
 
     async def spawn(self, contract, depth: int = 0) -> SubAgentHandle:
         """Spawn an isolated worker. Returns a handle to monitor/control it.
