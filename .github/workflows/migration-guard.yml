@@ -1,0 +1,89 @@
+name: Migration Guard
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+
+jobs:
+  protected-paths:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      # Migration-deliverable paths must never be deleted by a PR.
+      # Phase 5: planner.py, orchestrator.py, events/pol_subscriber.py
+      # Phase 6: dag.py, dag_engine.py
+      # Phase 7: pol.py, pol_subscriber.py
+      - name: Verify migration deliverables exist
+        run: |
+          set -e
+          for path in \
+            src/nexusagent/core/planner.py \
+            src/nexusagent/core/orchestrator.py \
+            src/nexusagent/core/dag.py \
+            src/nexusagent/core/dag_engine.py \
+            src/nexusagent/core/pol.py \
+            src/nexusagent/core/pol_subscriber.py \
+            src/nexusagent/core/events/pol_subscriber.py \
+            docs/devboard/README.md \
+            docs/architecture/migration/00-master-transition-plan.md \
+            ; do
+            if [ ! -f "$path" ]; then
+              echo "::error file= $path::Migration-deliverable file deleted by this PR."
+              exit 1
+            fi
+          done
+          echo "All migration deliverables present."
+
+      # PR-only: ensure no committed deletion against the protected paths
+      - name: Check for deletions on protected paths (PR)
+        if: github.event_name == 'pull_request'
+        run: |
+          set -e
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+          echo "Comparing $BASE_SHA..$HEAD_SHA"
+          for path in \
+            src/nexusagent/core/planner.py \
+            src/nexusagent/core/orchestrator.py \
+            src/nexusagent/core/dag.py \
+            src/nexusagent/core/dag_engine.py \
+            src/nexusagent/core/pol.py \
+            src/nexusagent/core/pol_subscriber.py \
+            ; do
+            DELDIFF=$(git diff --name-status "$BASE_SHA"..$HEAD_SHA" -- "$path" | grep '^D' || true)
+            if [ -n "$DELDIFF" ]; then
+              echo "::error file= $path::\
+              This PR deletes a Phase-deliverable file. \
+              See docs/devboard/README.md → 'WARNING — PR #18 (closed)' for the rationale. \
+              Migration-deliverable files must not be deleted; refactor in-place instead."
+              exit 1
+            fi
+          done
+          echo "No deletions against migration deliverables."
+
+      - name: Tests must remain green on master
+        run: |
+          python3 -m venv .venv
+          source .venv/bin/activate
+          pip install --upgrade pip
+          pip install -e ".[dev]" pytest-timeout
+          # Migration contract: master baseline must remain at >= 1000 passing
+          PYTHONPATH=src python3 -m pytest tests/ \
+            --timeout=30 -q \
+            --ignore=tests/api_e2e_project \
+            --ignore=tests/test_e2e_production.py \
+            --ignore=tests/test_graph_nodes.py \
+            --ignore=tests/test_bus.py \
+            --maxfail=5 2>&1 | tee /tmp/ci_test_output.txt
+          PASS=$(grep -E "passed" /tmp/ci_test_output.txt | tail -1)
+          echo "Result line: $PASS"
+          if echo "$PASS" | grep -qE "failed|error"; then
+            echo "::error::Master test baseline regressed. See /tmp/ci_test_output.txt"
+            exit 1
+          fi
