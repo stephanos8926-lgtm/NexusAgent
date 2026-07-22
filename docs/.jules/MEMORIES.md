@@ -59,25 +59,52 @@ Tests mirror source: `tests/core/` for `src/nexusagent/core/`. Configuration in 
 
 | Phase | Name | Status |
 |-------|------|--------|
-| 1 | Runtime Foundation | ✅ **Delivered** — 104 tests |
+| 1 | Runtime Foundation | ✅ **Delivered** |
 | 2 | Durable Task Execution | ✅ **Delivered** — PR #10 |
-| 3 | Event-Driven Core | ✅ **Delivered** — PR #11, 173 tests |
-| 4 | **LangGraph Worker Runtime** | 🟡 **IN PROGRESS** — PR #13 (empty commit, needs fix) |
-| 5 | Planner & Orchestrator | ⬜ Not started |
-| 6-11 | Remaining phases | ⬜ Not started |
+| 3 | Event-Driven Core | ✅ **Delivered** — PR #11 |
+| 4 | LangGraph Worker Runtime | ✅ **Delivered** — PR #13 |
+| 5 | Planner & Orchestrator | ✅ **Delivered** — PR #15 |
+| 6 | DAG Execution Engine | ✅ **Delivered** — PR #16 |
+| 7 | POL Control Plane | ✅ **Delivered** — PR #17 |
+| 8 | Capability Security Model | 🔄 **IN PROGRESS** |
+| 9 | Memory Evolution (4-layer) | 🟡 Queued |
+| 10 | Observability & Reliability | 🟡 Queued |
+| 11 | Production Readiness | 🟡 Queued |
+| 12 | Master Finish (version + tag) | 🟡 Queued |
 
-**Chief Architect Directive: NEVER skip phases.** Each phase gates the next. Phase 1 → 2 → 3 → 4 → 5 → ... in strict order. The full spec for every phase lives in `docs/architecture/migration/`.
+**Chief Architect Directive: NEVER skip phases.** Each phase gates the next. Phase 1 → 2 → 3 → ... → 11 → 12 in strict order. The full spec for every phase lives in `docs/architecture/migration/`.
+
+**CANONICAL Deliverable Paths — DO NOT DELETE** (Phase 18 Jules auto-PR closed 2026-07-21 for deleting these):
+```
+src/nexusagent/core/planner.py              # Phase 5
+src/nexusagent/core/orchestrator.py         # Phase 5
+src/nexusagent/core/dag.py                  # Phase 6
+src/nexusagent/core/dag_engine.py           # Phase 6
+src/nexusagent/core/pol.py                  # Phase 7
+src/nexusagent/core/pol_subscriber.py       # Phase 7
+src/nexusagent/core/events/pol_subscriber.py # Phase 7 (compat shim)
+```
+Tests: `tests/security/` (Phase 8), `tests/memory/` (Phase 9), `tests/observability/` (Phase 10), `tests/operations/` (Phase 11).
 
 ---
 
 ## 5. Testing Conventions
 
 - **Core tests:** `PYTHONPATH=src:. python3 -m pytest tests/core/ -q --tb=no --asyncio-mode=auto`
-- **Baseline:** 173 passing, 9 pre-existing skips (test skeletons for future features)
-- **2 tests may fail** when NATS isn't connected — expected, skip them with `-k "not nats"`
-- **DO NOT** run the full `tests/` suite — it times out on slow environments and includes e2e/mock/performance tests that aren't relevant
-- **Always use `--asyncio-mode=auto`** for async tests
-- New features need new tests under the matching `tests/` subdirectory
+- **Baseline (after Phase 7 merge, 2026-07-21):** 1004 passing, 9 skipped, 0 failed. Stable across 3 runs.
+- **Full suite** (excluding flaky e2e/bus/network):
+  ```bash
+  PYTHONPATH=src:. python3 -m pytest tests/ -q --timeout=30 \
+    --ignore=tests/api_e2e_project \
+    --ignore=tests/test_e2e_production.py \
+    --ignore=tests/test_graph_nodes.py \
+    --ignore=tests/test_bus.py
+  ```
+- **Order-dep flakes** — solved by autouse workspace ContextVar reset fixtures. Already in `tests/test_memory_workspace_scoped.py` and `tests/test_memory_dream.py`.
+- **NATS connection tests will fail without a live broker.** Skip with `--ignore=tests/test_bus.py`.
+- **Always use `--asyncio-mode=auto`** for async tests.
+- New features need new tests under the matching `tests/` subdirectory.
+- **Workspace jail in `apply_patch`:** `tests/tools/test_patch.py` uses an autouse fixture with `monkeypatch.setattr(tempfile, "tempdir", str(tmp_path))` so `NamedTemporaryFile` lands inside the workspace root. Do not remove this fixture.
 
 ---
 
