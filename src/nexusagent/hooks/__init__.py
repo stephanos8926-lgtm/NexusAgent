@@ -30,7 +30,6 @@ class HookEvent(StrEnum):
     SUBAGENT_STOP = "subagent_stop"
     ERROR = "error"
     USER_PROMPT_SUBMIT = "user_prompt_submit"
-    BUDGET_ALERT = "budget_alert"
 
 
 class HookRegistration:

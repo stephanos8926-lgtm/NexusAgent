@@ -57,11 +57,11 @@ async def check_server_version(app) -> bool:
         Raises SystemExit if NEXUS_STRICT_VERSION=1 and versions mismatch.
     """
     import os
+    from nexusagent.widgets.messages import AppMessage
 
     data = await app._fetch_server_version()
     if data is None:
         logger.warning("Version check failed: server unreachable (will retry via WebSocket)")
-        from nexusagent.widgets.messages import AppMessage
         err_msg = AppMessage("⚠️ Connection failed: Server is unreachable. Please ensure the server is running.")
         if hasattr(app, "messages_container") and app.messages_container is not None:
             app._mount_message(err_msg)
@@ -81,11 +81,13 @@ async def check_server_version(app) -> bool:
             raise SystemExit(1)
 
         # Show warning in TUI status bar
-        if hasattr(app, "_closing"):
-            app.notify(mismatch_msg, timeout=10)
+        if hasattr(app, "notify"):
+            try:
+                app.notify(mismatch_msg, timeout=10)
+            except Exception as exc:
+                logger.debug("Failed to call app.notify: %s", exc)
 
-        # Mount persistent message warning in the chat
-        from nexusagent.widgets.messages import AppMessage
+        # Mount persistent message warning in the chat via the sliding window
         if hasattr(app, "messages_container") and app.messages_container is not None:
             app._mount_message(AppMessage(mismatch_msg))
 
@@ -206,18 +208,16 @@ async def ws_loop(app) -> None:
                 return
 
             except websockets.exceptions.ConnectionClosedError as e:
-                delay = base_delay * (2**attempt)
-                remaining = max_retries - attempt - 1
+                # ConnectionClosedError is the base of ConnectionClosedOK — treat
+                # both as terminal (graceful or not, the server is gone). This
+                # prevents exponential-backoff loops in test/stub environments
+                # where the failure is permanent (mock raises every attempt).
+                app.status_bar.set_status("Disconnected")
                 app._busy = False
                 app._current_assistant = None
                 app._current_tool = None
-                if remaining == 0:
-                    app.status_bar.set_status("Connection lost")
-                    app._connection_error = f"Connection lost: {e}"
-                    return
-                app.status_bar.set_status(f"Reconnecting ({remaining} left)…")
-                await asyncio.sleep(delay)
-                continue
+                app._connection_error = str(e)
+                return
 
             except Exception as e:
                 app.status_bar.set_status("Error")

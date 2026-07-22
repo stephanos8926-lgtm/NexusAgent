@@ -13,6 +13,25 @@ import asyncio
 import os
 import shutil
 import tempfile
+
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def _reset_workspace_state():
+    """Ensure each test starts from a clean workspace state."""
+    from nexusagent.core.agent import _ws_memory_dir
+    from nexusagent.tools.fs_base import set_workspace_root
+
+    token = _ws_memory_dir.set(None)
+    prev_root = set_workspace_root(".")
+    try:
+        yield
+    finally:
+        _ws_memory_dir.reset(token)
+        set_workspace_root(str(prev_root))
+
+
 import time
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch

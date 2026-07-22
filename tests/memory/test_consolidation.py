@@ -10,7 +10,6 @@ import pytest
 
 from nexusagent.memory.consolidation import ConsolidationEngine
 from nexusagent.memory.memory_files import FileMemory, MemoryEntryType
-from nexusagent.memory.memory_index import HybridMemoryIndex
 
 
 @pytest.fixture

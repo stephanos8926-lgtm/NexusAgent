@@ -1,6 +1,6 @@
 # AGENTS.md — NexusAgent Project Knowledge Base
 
-> Last updated: 2026-07-22
+> Last updated: 2026-07-25
 > Maintained by: OWL (Lucien)
 > Purpose: Critical project knowledge for any agent working on this codebase
 
@@ -10,7 +10,7 @@
 
 NexusAgent is a production-grade AI coding agent platform. It combines an LLM-powered agent (via `deepagents` / LangGraph) with a NATS-backed task orchestration system, a Textual TUI, a FastAPI WebSocket server, and a hybrid file+vector memory system.
 
-**Language:** Python 3.13+ | **Package:** `nexusagent` (src layout) | **Tests:** pytest (680 pass / 11 pre-existing fail)
+**Language:** Python 3.13+ | **Package:** `nexusagent` (src layout) | **Codebase:** 150 Python files, ~27K LOC | **Tests:** pytest (189+ collected, baseline ~173 passing)
 
 ---
 
@@ -95,6 +95,95 @@ NexusAgent/
 │   └── NEXUS.md             # Base system prompt
 └── pyproject.toml           # Project metadata + dependencies
 ```
+
+---
+
+## Runtime Foundation Layer
+
+The `src/nexusagent/runtime/` package is the **foundation layer** for all NexusAgent component lifecycle:
+
+| Module | Purpose |
+|--------|---------|
+| `lifecycle.py` | Lifecycle state machine: `CREATED → INITIALIZING → RUNNING → STOPPING → TERMINATED` |
+| `context.py` | `RuntimeContext` — dependency injection container with `current_context()` / `set_current_context()` |
+| `runtime.py` | Runtime kernel — `initialize()`/`shutdown()` orchestration |
+| `session.py` | `RuntimeSessionManager` + `ManagedSession` — session lifecycle managed by runtime |
+| `worker.py` | `RuntimeWorkerManager` + `ManagedWorker` — worker lifecycle managed by runtime |
+| `tools.py` | `ToolManager` — tool registration and lifecycle |
+| `__init__.py` | Exports all above with lazy submodule loading |
+
+**Key pattern**: The runtime manages a **context stack** — when a new component starts, its context is pushed (`set_current_context`). Components access their context via `current_context()`. This replaces the prior singleton/module-level state pattern.
+
+**Fan-in**: `infrastructure` (76 references) and `runtime` (19 references) are the two most-imported subsystems — they form the backbone everything else depends on.
+
+---
+
+## Infrastructure Topology — 3 Incus VMs
+
+NexusAgent runs across 3 Incus VMs over Tailscale mesh:
+
+| VM | Tailscale IP | SSH Host | Role | Services |
+|----|-------------|----------|------|----------|
+| `infra` | 100.122.246.112 | `ssh infra` | Infrastructure | NATS JetStream (port 4222), PostgreSQL 16, Caddy, Honcho API |
+| `enterprise` | 100.81.49.91 | `ssh enterprise` | Enterprise apps | — |
+| `dev` | 100.109.15.31 | `ssh dev` | Development | Phase worktrees, test execution, dev builds |
+
+- **NATS runs on `infra` VM** (NOT `dev` — do not expect it there)
+- **Dev VM worktrees** at `/home/sysop/Workspaces/NexusAgent/.hermes/worktrees/<name>/` with own venv
+- **Workstation RAM ceiling: 4GB** (~300MB free during heavy work) — offload to dev VM or Jules
+- **Jules** runs on Google Cloud sandbox (Pro Gemini, 15 PRs/day limit)
+
+---
+
+## Codebase Scale & Coupling
+
+### Module Fan-In (most imported-from subsystems)
+
+| Module | Import References | Role |
+|--------|-------------------|------|
+| `infrastructure` | 76 | Config, DB, bus, auth — spine of the codebase |
+| `tools` | 55 | Tool registration, MCP discovery, policy |
+| `core` | 51 | Session, worker, agent, task, events |
+| `memory` | 40 | FileMemory + HybridMemoryIndex + DreamCycle |
+| `runtime` | 19 | Lifecycle + DI container (growing) |
+| `widgets` | 17 | TUI widgets |
+| `interfaces` | 14 | CLI, TUI, WebUI |
+| `llm` | 13 | LLM provider bridge, models |
+| `server` | 12 | FastAPI + WebSocket + SDK |
+
+### Biggest Files (Extraction Candidates)
+
+| File | LOC | Why Large |
+|------|-----|-----------|
+| `tools/register_all.py` | 1,308 | Tool registration + MCP discovery + wrapping — should be split |
+| `memory/index/index.py` | 836 | Single file with sync/async search, embeddings, RRF fusion |
+| `memory/dream.py` | 794 | 4-phase dream cycle — consolidation engine |
+| `core/session/session.py` | 713 | Session lifecycle + streaming + extraction + compact |
+| `memory/memory_files.py` | 680 | FileMemory + MemoryGitOps + TTL sweep |
+| `interfaces/cli.py` | 670 | Click CLI — 15+ commands |
+| `infrastructure/utils/budget.py` | 541 | Budget guard + pricing tables + alerting |
+
+### Async Architecture
+
+- **273 `async def` functions** across the codebase — heavily async throughout
+- **441 async tests** out of 1,000 total
+- **473 mock usages** in tests — strong isolation culture
+- **Edge case**: `asyncio.run()` inside async methods (found in session.py) creates silent failures — never call `asyncio.run()` inside `async def`
+- **Edge case**: `ContextVar` is invisible across `create_task()` boundaries — LangGraph runs tools in separate tasks
+
+---
+
+## Jules Environment Setup
+
+For Jules sessions working on this repo, configure in Jules UI (repo sidebar → Configuration → Initial Setup):
+
+```bash
+uv venv --python 3.13
+source .venv/bin/activate
+uv pip install -e .
+```
+
+Key reference files for Jules onboarding: `docs/.jules/MEMORIES.md` (10 high-value permanent memories), `docs/.jules/SESSION_START.md` (mandatory read-first), `docs/.jules/FILE_CHANGE_VERIFICATION.md` (empty commit prevention), `docs/.jules/BUDGET_SAFETY.md` (budget guard + circuit breaker rules). Read these before starting.
 
 ---
 
@@ -239,9 +328,9 @@ See CODEBASE_MAP.md for details. Established pattern: extract to subpackage → 
 - **Provenance**: `MemoryItem` has `extraction_method` (regex|llm|manual), `source_message_id`, `extraction_confidence` (0.0-1.0)
 
 ### Testing
-- **Baseline**: 663 pass / 11 fail (all pre-existing). Zero regressions allowed.
-- **Run command**: `PYTHONPATH=src python3 -m pytest tests/ -q --tb=short`
-- **Timeout**: Full suite takes ~100s. Use `timeout 120` for safety.
+- **Baseline**: 1,000 tests (182 collected core, 173 passing baseline). Zero regressions allowed.
+- **Core tests**: `PYTHONPATH=src python3 -m pytest tests/core/ -q --tb=no --asyncio-mode=auto`
+- **Full suite**: `PYTHONPATH=src python3 -m pytest tests/ -q --tb=short` — takes ~100s, use `timeout 120`
 - **Pre-existing failures**: `test_orchestration.py` (module path issues), `test_tui_responsive.py` (wrong mock paths), `test_e2e_production.py` (WebSocket dependency)
 - **New tests**: `test_version.py` (8), `test_server_version.py` (5), `test_memory_extraction.py` (8) — version system + memory extraction coverage
 - **Memory system tests**: All new memory tests pass (extraction, git ops, cross-session, compaction, dream cycle)

@@ -4,12 +4,12 @@ import os
 import shutil
 import tempfile
 import time
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
 
-from nexusagent.memory.dream import DreamCycle, STALE_THRESHOLD_DAYS
+from nexusagent.memory.dream import STALE_THRESHOLD_DAYS, DreamCycle
 from nexusagent.memory.memory_files import FileMemory, MemoryEntryType
 from nexusagent.memory.memory_index import HybridMemoryIndex
 

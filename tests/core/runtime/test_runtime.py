@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
-
 from nexusagent.runtime.context import RuntimeContext, current_context
 from nexusagent.runtime.lifecycle import HealthStatus, LifecycleState
 from nexusagent.runtime.runtime import Runtime

@@ -433,22 +433,31 @@ def _setup_workspace_context(working_dir: str) -> None:
     - Workspace-scoped memory directory
     - NEXUS.md loading from working_dir
     - Environment context injection
+
+    No-op when working_dir is "", ".", "."/"-equivalent" (current directory),
+    or any path that resolves to Path.cwd() — the default workspace.
     """
     from pathlib import Path
 
     if not working_dir:
         return
 
-    # Resolve "." and relative paths to absolute
-    working_dir = str(Path(working_dir).resolve())
+    # No-op for current-directory markers
+    resolved = Path(working_dir).resolve()
+    try:
+        if resolved == Path.cwd().resolve():
+            return
+    except (FileNotFoundError, RuntimeError):
+        # If cwd can't be resolved, fall through and treat as explicit dir
+        pass
 
     # 1. Set path jail
     from nexusagent.tools.fs_base import set_workspace_root
 
-    set_workspace_root(working_dir)
+    set_workspace_root(str(resolved))
 
     # 2. Set workspace-scoped memory directory
-    ws_memory = Path(working_dir) / ".nexusagent" / "memory"
+    ws_memory = resolved / ".nexusagent" / "memory"
     ws_memory.mkdir(parents=True, exist_ok=True)
     # Note: memory tools use _get_memory_workspace() which checks config.
     # For per-worker memory, we set a thread-local override.

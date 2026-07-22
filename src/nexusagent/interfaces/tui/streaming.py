@@ -278,7 +278,7 @@ async def _handle_tool_result_event(app, event: dict) -> None:
                 app._failure_repeat_count += 1
                 app._current_tool._collapsed = True
                 app._current_tool.update_output(
-                    f"(same error ×{app._failure_repeat_count})"  # noqa: RUF001
+                    f"(same error ×{app._failure_repeat_count})"
                 )
                 app._current_tool.refresh()
             else:
@@ -295,6 +295,9 @@ async def _handle_tool_result_event(app, event: dict) -> None:
             status="success" if success else "failed",
         )
         _mount_with_limit(app, msg)
+
+    if hasattr(app, "_refresh_git_branch"):
+        app._refresh_git_branch()
 
     app.status_bar.set_status("Processing response...")
 
