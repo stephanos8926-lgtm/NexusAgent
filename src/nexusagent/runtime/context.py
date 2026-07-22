@@ -48,6 +48,9 @@ class RuntimeContext:
     tool_roles: dict[str, list[str]] | None = None
     tool_initialized: bool = False
 
+    # Capabilities carried by RuntimeContext
+    capabilities: list[str] = field(default_factory=list)
+
     # Session identity (migrated from core.agent ContextVars)
     current_session_id: str | None = None
     workspace_memory_dir: str | None = None
