@@ -18,7 +18,7 @@
 | 5 | Planner & Orchestrator | `05-planner-orchestrator.md` | ✅ **DELIVERED** | Lucien + Jules #892402...722 | `c674fb8` PR #15 |
 | 6 | DAG Execution Engine | `06-dag-execution-engine.md` | ✅ **DELIVERED** | Jules #264522...856 | `a04e409` PR #16 |
 | 7 | POL Control Plane | `07-pol-control-plane.md` | ✅ **DELIVERED** | Jules #661066...817 | `d5c7fb5→24fb128` PR #17 |
-| 8 | Capability Security Model | `08-capability-security-model.md` | 🔄 Jules | `11705737674507167788` IN_PROGRESS | — |
+| 8 | Capability Security Model | `08-capability-security-model.md` | ✅ **DELIVERED** | Jules #117057...788 | PR #19 |
 | 9 | Memory Evolution (4-layer) | `09-memory-evolution.md` | 🟡 Queued | Prompt prepped | — |
 | 10 | Observability & Reliability | `10-observability-reliability.md` | 🟡 Queued | Prompt prepped | — |
 | 11 | Production Readiness | `11-production-readiness.md` | 🟡 Queued | Prompt prepped | — |

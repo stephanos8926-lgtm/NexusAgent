@@ -200,10 +200,13 @@ async def test_operator_key_allowed_on_read_endpoints():
             assert response.status_code == 200, f"Expected 200, got {response.status_code}"
 
             # GET /tasks/{id}/result — operator allowed
-            response = await client.get(
-                "/tasks/some-id/result",
-                headers={"X-API-Key": "operator-key-456"},
-            )
+            from unittest.mock import AsyncMock, patch
+            with patch("nexusagent.server.routes.sdk.get_result", new_callable=AsyncMock) as mock_get_result:
+                mock_get_result.return_value = None
+                response = await client.get(
+                    "/tasks/some-id/result",
+                    headers={"X-API-Key": "operator-key-456"},
+                )
             # 404 is fine — we're testing auth, not task existence
             assert response.status_code in (200, 404), f"Expected 200/404, got {response.status_code}"
 

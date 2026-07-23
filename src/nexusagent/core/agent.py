@@ -225,6 +225,7 @@ class Agent:
         policy: str = "permissive",
         model_override: str | None = None,
         provider_override: str | None = None,
+        capabilities: list[str] | None = None,
         *args: Any,
         **kwargs: Any,
     ) -> None:
@@ -238,6 +239,7 @@ class Agent:
                 If None, inherits from provider config.
             provider_override: Explicit provider (from TaskContract or CLI).
                 If None, uses settings.agent.primary_provider.
+            capabilities: Explicitly injected capabilities to grant at spawn time.
         """
         from nexusagent.infrastructure.config import settings
         from nexusagent.tools.registry import set_policy_context
@@ -249,6 +251,14 @@ class Agent:
 
         # Set policy context for this agent (thread-local)
         set_policy_context(role, policy)
+
+        if capabilities:
+            from nexusagent.tools.registry.policy import _get_ctx
+            ctx = _get_ctx()
+            if "unlocked" not in ctx:
+                ctx["unlocked"] = set()
+            for cap in capabilities:
+                ctx["unlocked"].add(cap)
 
 # Await MCP tool loading before capturing snapshot
         await _ensure_mcp_tools_loaded()

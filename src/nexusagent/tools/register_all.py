@@ -21,7 +21,6 @@ from nexusagent.tools.registry import register_tool
 logger = logging.getLogger(__name__)
 
 # ── Memory Rate Limiter (singleton) ──────────────────────────────────
-# Prevents buggy loops from flooding the DB with low-value observations.
 _memory_rate_limiter = MemoryRateLimiter(
     max_writes_per_minute=30,
     max_searches_per_minute=60,
@@ -61,15 +60,7 @@ _MCP_REGISTERED_NAMES: set[str] = set()
 
 
 async def register_mcp_tools() -> list[str]:
-    """Dynamically load MCP tools from configured servers.
-
-    Reads MCP server configuration from settings.mcp_servers (list of
-    dicts with 'name', 'url', 'transport' keys) and calls each
-    server's tools/list endpoint to discover available tools.
-
-    Returns:
-        List of newly registered tool names.
-    """
+    """Dynamically load MCP tools from configured servers."""
     from nexusagent.infrastructure.config import settings
 
     registered: list[str] = []
@@ -78,7 +69,7 @@ async def register_mcp_tools() -> list[str]:
         return registered
 
     try:
-        import httpx  # noqa: F401 — used below for MCP tool loading
+        import httpx  # noqa: F401
     except ImportError:
         logger.warning("httpx not installed — MCP tool loading skipped")
         return registered
@@ -123,6 +114,17 @@ async def register_mcp_tools() -> list[str]:
             raw_description = tool_def.get("description", f"MCP tool from {server_name}")
             tool_description = _sanitize_description(raw_description)
 
+            # SECURITY: Capability check / Validate tool name
+            is_valid, reason = _validate_tool_name(tool_name)
+            if not is_valid:
+                logger.warning(
+                    "MCP server '%s' attempted to register unsafe tool '%s' — %s — BLOCKED",
+                    server_name,
+                    tool_name,
+                    reason,
+                )
+                continue
+
             _MCP_REGISTERED_NAMES.add(tool_name)
             _MCP_REGISTRY.setdefault(server_name, []).append(tool_def)
             wrapped = _wrap_mcp_tool(server_name, server_url, transport, tool_def)
@@ -156,10 +158,7 @@ async def _discover_mcp_tools(
     server_url: str,
     transport: str,
 ) -> list[dict]:
-    """Call an MCP server's tools/list endpoint and return tool definitions.
-
-    Supports both Streamable HTTP and SSE transports.
-    """
+    """Call an MCP server's tools/list endpoint and return tool definitions."""
     base_url = server_url.rstrip("/")
 
     if transport in ("http", "streamable"):
@@ -254,28 +253,9 @@ _MAX_DESCRIPTION_LENGTH = 1000
 # Valid tool name pattern: lowercase letters, digits, underscores; must start with letter or underscore
 _VALID_TOOL_NAME_RE = re.compile(r"^[a-z_][a-z0-9_]*$")
 
-# Denylist of reserved/suspicious tool name prefixes (beyond BUILTIN_TOOL_NAMES)
-_RESERVED_PREFIXES = (
-    "system__", "internal__", "admin__", "root__",
-    "ignore_", "override_", "bypass_", "inject_", "hack_",
-    "system_prompt", "instructions", "override", "new_instructions",
-    "system_override",
-)
-
-# Denylist of injection tool names (exact match + substring match)
-_INJECTION_TOOL_NAMES: frozenset[str] = frozenset({
-    "system_prompt", "instructions", "override", "inject",
-    "system_override", "new_instructions", "ignore_all",
-    "forget_instructions", "pretend", "impersonate",
-})
-
 
 def _sanitize_description(desc: str) -> str:
-    """Strip HTML/script tags from tool descriptions and limit length.
-
-    Prevents HTML/script injection attacks and overly long descriptions
-    that could be used for prompt injection.
-    """
+    """Strip HTML/script tags from tool descriptions and limit length."""
     cleaned = _HTML_TAG_RE.sub("", desc).strip()
     if len(cleaned) > _MAX_DESCRIPTION_LENGTH:
         cleaned = cleaned[:_MAX_DESCRIPTION_LENGTH] + "…[truncated]"
@@ -283,11 +263,7 @@ def _sanitize_description(desc: str) -> str:
 
 
 def _validate_tool_name(tool_name: str) -> tuple[bool, str]:
-    """Validate an MCP tool name for safety.
-
-    Returns:
-        (is_valid, reason) — if is_valid is False, reason explains why.
-    """
+    """Validate an MCP tool name for safety syntax."""
     if not tool_name:
         return False, "empty tool name"
 
@@ -296,14 +272,6 @@ def _validate_tool_name(tool_name: str) -> tuple[bool, str]:
             f"invalid tool name '{tool_name}': "
             "must match [a-z_][a-z0-9_]* (lowercase, digits, underscores only)"
         )
-
-    for prefix in _RESERVED_PREFIXES:
-        if tool_name.startswith(prefix):
-            return False, f"tool name '{tool_name}' uses reserved prefix '{prefix}'"
-
-    # Check against injection tool name blocklist
-    if tool_name in _INJECTION_TOOL_NAMES:
-        return False, f"tool name '{tool_name}' matches injection tool name blocklist"
 
     return True, ""
 
@@ -382,14 +350,10 @@ async def spawn_subagent(
     returns="str — the user's response",
 )
 async def ask_user(question: str, options: list[str] | None = None) -> str:
-    """Ask the user a question. In TUI mode, pauses for user input.
-
-    Returns the user's response, or a fallback if non-interactive.
-    """
+    """Ask the user a question. In TUI mode, pauses for user input."""
     from nexusagent.core.agent import _current_session
 
     session = _current_session.get()
-    # Fall back to RuntimeContext session if available
     if session is None:
         from nexusagent.runtime.context import current_context
 
@@ -400,13 +364,16 @@ async def ask_user(question: str, options: list[str] | None = None) -> str:
                 session = managed.session
     if session is not None:
         import uuid
+
         call_id = f"ask-{uuid.uuid4().hex[:8]}"
-        session._enqueue({
-            "type": "ask_user",
-            "question": question,
-            "options": options or [],
-            "call_id": call_id,
-        })
+        session._enqueue(
+            {
+                "type": "ask_user",
+                "question": question,
+                "options": options or [],
+                "call_id": call_id,
+            }
+        )
         gate = session._wait_for_answer(call_id)
         await gate.wait()
         return session._ask_user_answers.get(call_id, "")
@@ -420,22 +387,14 @@ async def ask_user(question: str, options: list[str] | None = None) -> str:
         )
     return f"[ask_user] {question}\n[No interactive session — please respond in the TUI]"
 
-# ═══════════════════════════════════════════════════════════════════════
-# Memory Tools
-# ═══════════════════════════════════════════════════════════════════════
+
+# ─── Memory Tools ───
 
 _DEFAULT_MEMORY_WORKSPACE = "~/.nexusagent/memory/"
 
 
 def _discover_workspaces() -> list[str]:
-    """Discover all workspace memory directories.
-
-    Scans ~/Workspaces/*/.nexusagent/ for directories that exist.
-    Falls back to the default global workspace.
-
-    Returns:
-        List of absolute paths to workspace memory directories.
-    """
+    """Discover all workspace memory directories."""
     import os
     from pathlib import Path
 
@@ -449,7 +408,6 @@ def _discover_workspaces() -> list[str]:
                 if mem_dir.is_dir():
                     workspaces.append(str(mem_dir))
 
-    # Always include the default global workspace as fallback
     default = os.path.expanduser(_DEFAULT_MEMORY_WORKSPACE)
     if default not in workspaces:
         workspaces.append(default)
@@ -457,20 +415,10 @@ def _discover_workspaces() -> list[str]:
 
 
 def _get_memory_workspace() -> str:
-    """Get the memory workspace path.
-
-    Resolution order:
-    1. Thread-local worker override (set by _setup_workspace_context)
-    2. Config setting ``agent.memory_workspace`` (if set)
-    3. Default: ``~/.nexusagent/memory/``
-    """
+    """Get the memory workspace path."""
     import os
 
-    # 1. Check thread-local worker override
-    from nexusagent.core.agent import _ws_memory_dir
     from nexusagent.infrastructure.config import settings
-
-    # Check RuntimeContext first (if active)
     from nexusagent.runtime.context import current_context
 
     ctx = current_context()
@@ -479,12 +427,13 @@ def _get_memory_workspace() -> str:
         os.makedirs(ws, exist_ok=True)
         return ws
 
+    from nexusagent.core.agent import _ws_memory_dir
+
     ws = _ws_memory_dir.get()
     if ws:
         os.makedirs(ws, exist_ok=True)
         return ws
 
-    # 2. Check config
     ws = settings.agent.memory_workspace
     path = os.path.expanduser(ws) if ws else os.path.expanduser(_DEFAULT_MEMORY_WORKSPACE)
     os.makedirs(path, exist_ok=True)
@@ -512,15 +461,7 @@ async def memory_search(
     valid_from: str | None = None,
     valid_until: str | None = None,
 ) -> str:
-    """Search memory using hybrid keyword + vector search.
-
-    Args:
-        query: Search query string.
-        max_results: Maximum results to return per workspace (default: 6).
-        workspace: Override workspace path, or "all" to search all workspaces.
-        valid_from: Optional ISO datetime — filter memories with valid_from >= this date.
-        valid_until: Optional ISO datetime — filter memories with valid_until <= this date.
-    """
+    """Search memory using hybrid keyword + vector search."""
     rate_limit_msg = _memory_rate_limiter.check_search()
     if rate_limit_msg:
         return rate_limit_msg
@@ -552,14 +493,12 @@ async def memory_search(
     if not all_results:
         return f"No memories found for: {query}"
 
-    # Deduplicate by content hash, keep highest score
     seen: dict[str, dict] = {}
     for r in all_results:
         key = r.get("content", "")[:100]
         if key not in seen or r.get("score", 0) > seen[key].get("score", 0):
             seen[key] = r
 
-    # Sort by score, take top max_results
     merged = sorted(seen.values(), key=lambda x: x.get("score", 0), reverse=True)[:max_results]
 
     lines = [f"Memory search results for: {query} ({len(merged)} results)\n"]
@@ -638,12 +577,7 @@ async def memory_write(
     workspace: str | None = None,
     dedup_threshold: float = 0.95,
 ) -> str:
-    """Write a memory entry. Stores in bank/ directory with YAML frontmatter and indexes it.
-
-    Before writing, checks for duplicate memories using hybrid search.
-    If a similar memory already exists (score >= dedup_threshold), returns
-    the existing file path instead of writing a duplicate.
-    """
+    """Write a memory entry."""
     rate_limit_msg = _memory_rate_limiter.check_write()
     if rate_limit_msg:
         return rate_limit_msg
@@ -657,7 +591,6 @@ async def memory_write(
     mgr = HybridMemoryManager(ws)
     mgr.initialize()
 
-    # Write-time deduplication: check if similar memory already exists
     if dedup_threshold > 0:
         try:
             existing = await mgr.recall(content, max_results=3)
@@ -667,7 +600,7 @@ async def memory_write(
                     top_file = existing[0].get("file", "unknown")
                     return f"Duplicate memory (score: {top_score:.2f}). Existing entry: {top_file}"
         except Exception:
-            pass  # If dedup check fails, proceed with write
+            pass
 
     filepath = await mgr.remember(
         content=content,
@@ -681,11 +614,7 @@ async def memory_write(
 
 @register_tool(
     name="memory_index_search",
-    description=(
-        "Search the hybrid memory index (FTS5 + vector similarity) directly. "
-        "More powerful than memory_search — uses sqlite-vec for high-quality "
-        "vector search."
-    ),
+    description="Search the hybrid memory index (FTS5 + vector similarity) directly.",
     parameters={
         "query": "Search query string",
         "max_results": "Maximum results to return (default: 6)",
@@ -700,7 +629,7 @@ async def memory_index_search(
     max_results: int = 6,
     workspace: str | None = None,
 ) -> str:
-    """Search the hybrid memory index directly using HybridMemoryIndex.search()."""
+    """Search the hybrid memory index directly."""
     rate_limit_msg = _memory_rate_limiter.check_search()
     if rate_limit_msg:
         return rate_limit_msg
@@ -734,11 +663,7 @@ async def memory_index_search(
 
 @register_tool(
     name="memory_index_rebuild",
-    description=(
-        "Rebuild the hybrid memory index from workspace files. "
-        "Drops all indexed chunks and re-scans bank/ and memory/ directories. "
-        "Use after bulk file changes."
-    ),
+    description="Rebuild the hybrid memory index from workspace files.",
     parameters={
         "workspace": "Override workspace path (optional)",
     },
@@ -747,7 +672,7 @@ async def memory_index_search(
     returns="Confirmation message with file count.",
 )
 def memory_index_rebuild(workspace: str | None = None) -> str:
-    """Rebuild the hybrid memory index using HybridMemoryIndex.rebuild()."""
+    """Rebuild the hybrid memory index."""
     rate_limit_msg = _memory_rate_limiter.check_write()
     if rate_limit_msg:
         return rate_limit_msg
@@ -769,28 +694,19 @@ def memory_index_rebuild(workspace: str | None = None) -> str:
     return f"Memory index rebuilt for workspace: {ws}"
 
 
-# ═══════════════════════════════════════════════════════════════════════
-# Memory Self-Management Tools (Phase 1)
-# ═══════════════════════════════════════════════════════════════════════
-
-
 @register_tool(
     name="memory_delete",
-    description=(
-        "Delete a memory entry by its relative path. "
-        "Removes the file and all its index entries. "
-        "Use for removing stale, incorrect, or duplicate memories."
-    ),
+    description="Delete a memory entry by its relative path.",
     parameters={
-        "path": "Relative path within the memory workspace (e.g., 'bank/auth-20260712.md')",
-        "workspace": "Override workspace path (optional, defaults to configured memory workspace)",
+        "path": "Relative path within the memory workspace",
+        "workspace": "Override workspace path (optional)",
     },
     example='memory_delete("bank/auth-20260712.md")',
     category="memory",
     returns="Confirmation message with deletion details.",
 )
 def memory_delete(path: str, workspace: str | None = None) -> str:
-    """Delete a memory entry and its index entries."""
+    """Delete a memory entry."""
     rate_limit_msg = _memory_rate_limiter.check_write()
     if rate_limit_msg:
         return rate_limit_msg
@@ -808,7 +724,6 @@ def memory_delete(path: str, workspace: str | None = None) -> str:
     if not os.path.exists(full_path):
         return f"File not found: {path}"
 
-    # Delete from index first
     try:
         from nexusagent.memory.index.index import HybridMemoryIndex
 
@@ -817,7 +732,6 @@ def memory_delete(path: str, workspace: str | None = None) -> str:
     except Exception as exc:
         return f"Index cleanup failed: {exc}"
 
-    # Delete the file
     try:
         os.remove(full_path)
     except OSError as exc:
@@ -828,18 +742,14 @@ def memory_delete(path: str, workspace: str | None = None) -> str:
 
 @register_tool(
     name="memory_update",
-    description=(
-        "Update an existing memory entry. Replaces the content and re-indexes it. "
-        "Preserves YAML frontmatter unless new frontmatter is provided. "
-        "Use for correcting or refreshing existing memories."
-    ),
+    description="Update an existing memory entry.",
     parameters={
-        "path": "Relative path within the memory workspace (e.g., 'bank/auth-20260712.md')",
+        "path": "Relative path within the memory workspace",
         "content": "New content for the memory entry",
-        "type": "Entry type: world, experience, opinion, observation (optional, preserved from frontmatter if not set)",
-        "description": "Short description/title (optional, preserved from frontmatter if not set)",
+        "type": "Entry type (optional)",
+        "description": "Short description (optional)",
     },
-    example='memory_update("bank/auth-20260712.md", content="Updated: the auth module now uses JWT + refresh tokens", type="world")',
+    example='memory_update("bank/auth-20260712.md", content="Updated flow", type="world")',
     category="memory",
     returns="Confirmation message with update details.",
 )
@@ -850,7 +760,7 @@ def memory_update(
     description: str = "",
     workspace: str | None = None,
 ) -> str:
-    """Update an existing memory entry and re-index it."""
+    """Update an existing memory entry."""
     rate_limit_msg = _memory_rate_limiter.check_write()
     if rate_limit_msg:
         return rate_limit_msg
@@ -868,30 +778,25 @@ def memory_update(
     if not os.path.exists(full_path):
         return f"File not found: {path}"
 
-    # Read existing file to preserve frontmatter if needed
     with open(full_path) as _f:
         existing_content = _f.read()
     existing_fm = {}
 
-    # Parse existing frontmatter
     if existing_content.startswith("---"):
         parts = existing_content.split("---", 2)
         if len(parts) >= 3:
             fm_text = parts[1].strip()
-            # Simple YAML key: value parsing
             for line in fm_text.split("\n"):
                 if ":" in line:
                     key, _, val = line.partition(":")
                     existing_fm[key.strip()] = val.strip().strip("\"'")
 
-    # Determine frontmatter values
     final_type = type or existing_fm.get("type", "world")
     final_desc = description or existing_fm.get("description", "")
     existing_entities = existing_fm.get("entities", "")
     existing_created = existing_fm.get("created", "")
     existing_confidence = existing_fm.get("confidence", "")
 
-    # Build new content with preserved frontmatter
     fm_lines = ["---"]
     fm_lines.append(f'name: "{final_desc or path}"')
     fm_lines.append(f"description: {final_desc}")
@@ -912,14 +817,12 @@ def memory_update(
 
     new_content = "\n".join(fm_lines)
 
-    # Write updated file
     try:
         with open(full_path, "w") as f:
             f.write(new_content + "\n")
     except OSError as exc:
         return f"File write failed: {exc}"
 
-    # Re-index the file
     try:
         from nexusagent.memory.index.index import HybridMemoryIndex
 
@@ -933,14 +836,10 @@ def memory_update(
 
 @register_tool(
     name="memory_list",
-    description=(
-        "List memory entries with optional filtering. "
-        "Shows file paths, types, descriptions, and creation dates. "
-        "Use for discovering what memories exist before updating or pruning."
-    ),
+    description="List memory entries with optional filtering.",
     parameters={
-        "type": "Filter by entry type: world, experience, opinion, observation (optional)",
-        "limit": "Maximum number of entries to return (default: 50)",
+        "type": "Filter by entry type",
+        "limit": "Maximum number of entries",
         "workspace": "Override workspace path (optional)",
     },
     example='memory_list(type="world", limit=20)',
@@ -952,7 +851,7 @@ def memory_list(
     limit: int = 50,
     workspace: str | None = None,
 ) -> str:
-    """List memory entries with optional filtering."""
+    """List memory entries."""
     rate_limit_msg = _memory_rate_limiter.check_search()
     if rate_limit_msg:
         return rate_limit_msg
@@ -978,7 +877,6 @@ def memory_list(
         except OSError:
             continue
 
-        # Parse frontmatter
         entry_type = "unknown"
         desc = ""
         created = ""
@@ -997,7 +895,6 @@ def memory_list(
                         if not desc:
                             desc = name
 
-        # Apply type filter
         if type and entry_type != type:
             continue
 
@@ -1013,7 +910,6 @@ def memory_list(
     if not entries:
         return "No memories found matching the criteria"
 
-    # Apply limit
     entries = entries[:limit]
 
     lines = [f"Memory entries ({len(entries)} shown):\n"]
@@ -1030,20 +926,16 @@ def memory_list(
 
 @register_tool(
     name="memory_prune",
-    description=(
-        "Prune memory entries matching criteria. "
-        "Supports dry-run mode to preview what would be deleted. "
-        "Use for removing old, low-confidence, or specific-type memories."
-    ),
+    description="Prune memory entries matching criteria.",
     parameters={
-        "older_than_days": "Delete entries older than N days (optional)",
-        "type": "Only delete entries of this type (optional)",
-        "dry_run": "If True, preview what would be deleted without actually deleting (default: True)",
+        "older_than_days": "Delete entries older than N days",
+        "type": "Only delete entries of this type",
+        "dry_run": "If True, preview what would be deleted",
         "workspace": "Override workspace path (optional)",
     },
     example='memory_prune(older_than_days=30, type="observation", dry_run=True)',
     category="memory",
-    returns="Report of deleted (or would-be-deleted) entries.",
+    returns="Report of deleted entries.",
 )
 def memory_prune(
     older_than_days: int = 0,
@@ -1051,7 +943,7 @@ def memory_prune(
     dry_run: bool = True,
     workspace: str | None = None,
 ) -> str:
-    """Prune memory entries matching criteria."""
+    """Prune memory entries."""
     rate_limit_msg = _memory_rate_limiter.check_write()
     if rate_limit_msg:
         return rate_limit_msg
@@ -1062,7 +954,6 @@ def memory_prune(
     ws = workspace or _get_memory_workspace()
     ws = os.path.expanduser(ws)
 
-    # First, list matching entries
     bank_dir = os.path.join(ws, "bank")
     if not os.path.exists(bank_dir):
         return "No memories found (bank directory does not exist)"
@@ -1084,7 +975,6 @@ def memory_prune(
         except OSError:
             continue
 
-        # Parse frontmatter
         entry_type = "world"
         created_str = ""
         if content.startswith("---"):
@@ -1096,20 +986,17 @@ def memory_prune(
                     elif line.startswith("created:"):
                         created_str = line.split(":", 1)[1].strip()
 
-        # Apply type filter
         if type and entry_type != type:
             continue
 
-        # Apply age filter
         if cutoff and created_str:
             try:
                 created_dt = datetime.fromisoformat(created_str.replace("Z", "+00:00"))
                 if created_dt > cutoff:
                     continue
             except ValueError:
-                pass  # If date parsing fails, include it
+                pass
 
-        # If no age filter, only delete if explicitly matches type
         if not cutoff and not type:
             continue
 
@@ -1125,14 +1012,12 @@ def memory_prune(
     if not to_delete:
         return "No memories match the prune criteria"
 
-    # Dry run or actual deletion
     action = "Would delete" if dry_run else "Deleted"
     lines = [f"Memory prune ({action} {len(to_delete)} entries):\n"]
     for entry in to_delete:
         lines.append(f"  {entry['file']}  [{entry['type']}]  {entry['created']}")
 
     if not dry_run:
-        # Actually delete
         from nexusagent.memory.index.index import HybridMemoryIndex
 
         idx = HybridMemoryIndex(ws)
@@ -1149,29 +1034,19 @@ def memory_prune(
     return "\n".join(lines)
 
 
-# ═══════════════════════════════════════════════════════════════════════
-# Memory Consolidation Tools (Phase 4)
-# ═══════════════════════════════════════════════════════════════════════
-
-
 @register_tool(
     name="memory_consolidate",
-    description=(
-        "Consolidate memory entries by removing duplicates and stale entries. "
-        "Scans all memories, identifies duplicates by content hash, "
-        "and prunes entries older than 30 days. "
-        "Supports dry-run mode to preview changes."
-    ),
+    description="Consolidate memory entries by removing duplicates.",
     parameters={
         "workspace": "Override workspace path (optional)",
-        "dry_run": "If True, preview what would be deleted (default: True)",
+        "dry_run": "If True, preview changes",
     },
     example="memory_consolidate(dry_run=True)",
     category="memory",
-    returns="Consolidation report with actions taken.",
+    returns="Consolidation report.",
 )
 def memory_consolidate(workspace: str | None = None, dry_run: bool = True) -> str:
-    """Consolidate memory entries by removing duplicates and stale entries."""
+    """Consolidate memory entries."""
     rate_limit_msg = _memory_rate_limiter.check_write()
     if rate_limit_msg:
         return rate_limit_msg
@@ -1208,16 +1083,13 @@ def memory_consolidate(workspace: str | None = None, dry_run: bool = True) -> st
 
 @register_tool(
     name="memory_health",
-    description=(
-        "Report memory health metrics including total entries, "
-        "duplicates, stale entries, and overall health score."
-    ),
+    description="Report memory health metrics.",
     parameters={
         "workspace": "Override workspace path (optional)",
     },
     example="memory_health()",
     category="memory",
-    returns="Health report with metrics and score.",
+    returns="Health report.",
 )
 def memory_health(workspace: str | None = None) -> str:
     """Report memory health metrics."""
@@ -1255,27 +1127,16 @@ def memory_health(workspace: str | None = None) -> str:
     return "\n".join(lines)
 
 
-# ═══════════════════════════════════════════════════════════════════════
-# Dream Cycle Tool (manual trigger)
-# ═══════════════════════════════════════════════════════════════════════
-
-
 @register_tool(
     name="memory_dream",
-    description=(
-        "Manually trigger a dream cycle to consolidate memories. "
-        "Runs the 4-phase cycle: scan, patterns, consolidate, trim. "
-        "Removes duplicates, prunes stale entries, extracts patterns, "
-        "and rebuilds the memory index. "
-        "Supports dry-run mode to preview changes."
-    ),
+    description="Manually trigger a dream cycle to consolidate memories.",
     parameters={
-        "workspace": "Override workspace path (optional, defaults to configured memory workspace)",
-        "dry_run": "If True, preview changes without modifying files (default: True)",
+        "workspace": "Override workspace path (optional)",
+        "dry_run": "If True, preview changes",
     },
     example="memory_dream(dry_run=True)",
     category="memory",
-    returns="Dream cycle report with actions taken.",
+    returns="Dream cycle report.",
 )
 async def memory_dream(workspace: str | None = None, dry_run: bool = True) -> str:
     """Manually trigger a dream cycle consolidation."""

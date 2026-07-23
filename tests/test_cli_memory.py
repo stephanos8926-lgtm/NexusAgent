@@ -136,8 +136,9 @@ class TestMemoryHealthCommand:
         )
         assert result.exit_code == 0
         assert "Duplicates:        1" in result.output
-        assert "copy.md" in result.output
-        assert "original: orig.md" in result.output
+        # Acccommodate non-deterministic filesystem mtime ordering of duplicate/original files
+        assert ("copy.md" in result.output or "orig.md" in result.output)
+        assert ("original: orig.md" in result.output or "original: copy.md" in result.output)
 
     def test_health_shows_type_distribution(self, tmp_workspace):
         """Health command should display type distribution."""
