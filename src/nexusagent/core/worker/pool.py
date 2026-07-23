@@ -13,7 +13,7 @@ import uuid
 
 from nexusagent.core.events import WorkerEvent, emit_event_sync
 from nexusagent.core.subagent import SubAgentHandle
-from nexusagent.core.task import Checkpoint, Task, TaskState, TaskStore
+from nexusagent.core.task import Checkpoint, Task, TaskState
 from nexusagent.core.task.task_store import get_task_store
 from nexusagent.core.worker.handler import _run_agent_task
 from nexusagent.llm.models import TaskSchema

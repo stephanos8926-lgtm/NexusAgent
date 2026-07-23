@@ -57,6 +57,7 @@ async def check_server_version(app) -> bool:
         Raises SystemExit if NEXUS_STRICT_VERSION=1 and versions mismatch.
     """
     import os
+
     from nexusagent.widgets.messages import AppMessage
 
     data = await app._fetch_server_version()

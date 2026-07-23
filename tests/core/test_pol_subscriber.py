@@ -1,12 +1,12 @@
 # tests/core/test_pol_subscriber.py
 """Tests for POLSubscriber event routing and automatic intervention triggers."""
 
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock
 
 from nexusagent.core.events.base import SystemEvent
-from nexusagent.core.pol_subscriber import POLSubscriber
 from nexusagent.core.pol import POLControlPlane, set_pol_control_plane
+from nexusagent.core.pol_subscriber import POLSubscriber
 
 
 @pytest.mark.asyncio

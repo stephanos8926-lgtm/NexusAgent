@@ -3,13 +3,14 @@
 
 import os
 import tempfile
-import pytest
-from httpx import ASGITransport, AsyncClient
-from fastapi.testclient import TestClient
 
+import pytest
+from fastapi.testclient import TestClient
+from httpx import ASGITransport, AsyncClient
+
+from nexusagent.core.pol import get_pol_control_plane
 from nexusagent.infrastructure.db import get_db_manager
 from nexusagent.server.server import app
-from nexusagent.core.pol import get_pol_control_plane
 
 _TEST_API_KEY = "test-pol-api-key-2026"
 _TEST_OPERATOR_KEY = "operator-key-pol-123"
@@ -39,6 +40,7 @@ def _setup_test_auth():
     """Ensure auth manager is initialized with the test key before each test."""
     import secrets
     from pathlib import Path
+
     from nexusagent.infrastructure.auth import AuthManager, set_auth_manager
 
     _test_dir = tempfile.mkdtemp()
