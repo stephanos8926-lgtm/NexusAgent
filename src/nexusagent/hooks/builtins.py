@@ -164,9 +164,9 @@ async def subagent_stop_log(ctx: dict[str, Any]) -> dict[str, Any] | None:
 
 
 __all__ = [
-    "session_init_load_context",
-    "post_tool_use_telemetry",
     "error_log_to_file",
+    "post_tool_use_telemetry",
+    "session_init_load_context",
     "subagent_start_log",
     "subagent_stop_log",
 ]

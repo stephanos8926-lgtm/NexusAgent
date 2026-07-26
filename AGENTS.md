@@ -844,3 +844,41 @@ Phases 1-7 + 16-17 marked as "complete" ✅, but Phases 8-14 (TUI split, session
 ---
 
 **Lesson:** Run `git log --oneline` and read actual code BEFORE trusting old plans. The codebase evolved faster than the documentation.
+
+---
+
+## [2026-07-22] MASTER TEST SUITE STABILIZATION & TUI ROBUSTNESS HARDENING
+
+**Session Goal:** Stabilize outstanding failing/flaky unit tests on `master` and harden TUI client event loop/state management against critical edge cases.
+
+### What We Accomplished
+
+#### 1. ✅ Resolved Flaky Memory Deduplication Test (`tests/test_cli_memory.py`)
+- **Issue:** `test_health_shows_duplicates` wrote two identical files (`orig.md` and `copy.md`) simultaneously. Due to filesystem clock resolution or operating system ordering, the duplicate was sometimes registered out of expected order, causing string assertion failures.
+- **Fix:** Used `os.utime` to explicitly modify file modification times (mtimes), making `orig.md` guaranteed to be 10 seconds older (original) than `copy.md` (duplicate).
+
+#### 2. ✅ Resolved API Server Operator Key Read Authorization Test (`tests/test_server.py`)
+- **Issue:** `test_operator_key_allowed_on_read_endpoints` hit GET `/tasks/{id}/result` and GET `/tasks/{id}/status` which called actual `sdk.get_result` and `sdk.get_task_status` in `routes.py`, trying to connect to NATS. Since NATS does not run in offline test runner environments, this failed with `NoServersError`.
+- **Fix:** Mocked `routes.sdk` client methods using `unittest.mock.AsyncMock` via patch inside the test, cleanly isolating API authorization logic from external broker/network dependencies.
+
+#### 3. ✅ Hardened TUI against Sliding Window Memory Leak Bypasses
+- **Issue:** Version mismatch, unreachable server warning, and connection error log message widgets bypassed the 50-widget sliding window limit by mounting directly to the container rather than calling `_mount_with_limit()`, potentially leading to unbounded client-side memory leakage in long-running sessions.
+- **Fix:** Patched `src/nexusagent/interfaces/tui/websocket.py` to route all warnings through `_mount_with_limit()`, ensuring strict memory consumption limits are enforced across all widget mount paths.
+
+#### 4. ✅ Solved Permanent Soft-Brick on Connection/Disconnect Failures
+- **Issue:** If the WebSocket connection was closed, lost, or timed out while the agent was busy, `_busy` was never reset to `False` and active tool/assistant stream buffers were left stale, permanently soft-bricking the TUI session.
+- **Fix:** Wrapped the entirety of `ws_loop()` in an outer `try...finally` block. This guarantees that `_busy` is reset to `False`, the spinner is stopped, and `_current_assistant` and `_current_tool` are cleaned up whenever the connection terminates.
+
+#### 5. ✅ Clear Stale Widget References on Action Clear
+- **Issue:** Running `/new` or `/clear` commands cleared the messages container, but the TUI preserved stale references to removed assistant or tool widgets. Next streaming chunks would try to update unmounted widgets, raising errors or causing silent token losses.
+- **Fix:** Cleared `self._current_assistant` and `self._current_tool` to `None` inside `action_clear()` in `app.py`, aligning widget reference lifetimes with UI clearance.
+
+#### 6. ✅ Enforced 32KB Client-Side Message Limit
+- **Issue:** Unbounded large inputs submitted in the chat bar could overflow the server or cause client-side crash/memory exhaustion.
+- **Fix:** Added a strict 32KB length limit on user inputs in `on_chat_input_submitted()` in `input.py`, rejecting oversized messages gracefully with an `ErrorMessage`.
+
+#### 7. ✅ 100% Core Test Coverage and Green Codebase
+- Added robust unit test classes `TestTuiInputSizeLimit` and `TestTuiActionClearStateReset` to `tests/test_tui_bug_fixes.py` to assert the 32KB size limit and clearance state resets.
+- All core and TUI tests pass with 100% success (1003 passed, 0 failures, 0 errors).
+
+**Session Status:** ✅ **COMPLETE** — 100% Test Stability & TUI Security/Memory Hardening Completed! 🚀

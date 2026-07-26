@@ -5,11 +5,10 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../.
 
 import os
 import tempfile
-from pathlib import Path
 
 import pytest
 
-from nexusagent.tools.fs_base import set_workspace_root, _get_workspace_root
+from nexusagent.tools.fs_base import _get_workspace_root, set_workspace_root
 from nexusagent.tools.patch import apply_patch
 
 

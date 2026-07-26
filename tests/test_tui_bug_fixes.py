@@ -13,6 +13,7 @@ from __future__ import annotations
 import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 import websockets.exceptions
 
 from nexusagent.interfaces.tui.app import NexusApp
@@ -127,6 +128,54 @@ class TestWidgetStateResetOnDisconnect:
 
         assert app._current_assistant is None
         assert app._current_tool is None
+
+
+class TestTuiInputSizeLimit:
+    """Tests for the strict 32KB message size limit on TUI input."""
+
+    @pytest.mark.asyncio
+    async def test_input_size_limit_exceeded(self):
+        """Messages larger than 32KB must be rejected with an error and not queued/sent."""
+        from nexusagent.interfaces.tui.input import on_chat_input_submitted
+
+        app = MagicMock(spec=NexusApp)
+        app._busy = False
+        app.messages_container = MagicMock()
+        app._mount_message = MagicMock()
+        app._mount_with_limit = MagicMock()
+
+        event = MagicMock()
+        event.text = "A" * (32 * 1024 + 1)  # 32KB + 1 byte
+        event.input = MagicMock()
+
+        await on_chat_input_submitted(app, event)
+
+        # Should NOT set app._busy to True
+        assert app._busy is False
+        # Should call _mount_with_limit with an ErrorMessage
+        assert app._mount_with_limit.call_count == 1
+        called_widget = app._mount_with_limit.call_args[0][0]
+        from nexusagent.widgets.messages import ErrorMessage
+        assert isinstance(called_widget, ErrorMessage)
+        assert "exceeds client-side size limit of 32KB" in called_widget._message
+
+
+class TestTuiActionClearStateReset:
+    """action_clear must reset the current assistant and tool widgets to avoid state corruption."""
+
+    def test_action_clear_resets_current_widgets(self):
+        app = MagicMock(spec=NexusApp)
+        app._current_assistant = MagicMock()
+        app._current_tool = MagicMock()
+        app.messages_container = MagicMock()
+        app._show_greeting = MagicMock()
+
+        NexusApp.action_clear(app)
+
+        assert app._current_assistant is None
+        assert app._current_tool is None
+        assert app.messages_container.clear.call_count == 1
+        assert app._show_greeting.call_count == 1
 
     @patch("nexusagent.interfaces.tui.websocket.websockets.connect")
     @patch("nexusagent.interfaces.tui.websocket.settings")
