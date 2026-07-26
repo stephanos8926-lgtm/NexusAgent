@@ -1,9 +1,12 @@
-# src/nexusagent/memory/memory_item.py
-"""MemoryItem data model and hash-based embedding helper."""
+"""Memory item data model and deterministic hash embedding."""
+
+from __future__ import annotations
 
 import hashlib
 import math
 import struct
+import uuid
+from datetime import UTC, datetime
 
 from pydantic import BaseModel, Field
 
@@ -11,19 +14,12 @@ from nexusagent.memory.index import EMBED_DIM
 
 
 def _hash_embed(text: str) -> list[float]:
-    """Deterministic hash-based embedding function.
-
-    Produces a unit-normalised vector of dimension EMBED_DIM from the input text.
-    This is a placeholder — replace with a proper embedding model in production.
-    """
+    """Deterministic hash-based embedding placeholder."""
     vec = [0.0] * EMBED_DIM
-    # Fill dims in batches of 32 using SHA256
     for batch_idx, batch_start in enumerate(range(0, EMBED_DIM, 32)):
         h = hashlib.sha256(f"{text}|{batch_idx}".encode()).digest()
         for j in range(min(32, EMBED_DIM - batch_start)):
             vec[batch_start + j] = struct.unpack("b", bytes([h[j]]))[0] / 128.0
-
-    # Normalise to unit length
     norm = math.sqrt(sum(v * v for v in vec))
     if norm > 0:
         vec = [v / norm for v in vec]
@@ -31,18 +27,18 @@ def _hash_embed(text: str) -> list[float]:
 
 
 class MemoryItem(BaseModel):
-    """A single memory entry.
+    """A single memory entry."""
 
-    Attributes:
-        id: Unique identifier (UUID string).
-        content: The memory text content.
-        metadata: Arbitrary key-value metadata attached to the entry.
-        created_at: ISO-8601 timestamp of when the entry was created.
-        embedding: Optional embedding vector for similarity search.
-    """
-
-    id: str
-    content: str
+    id: str = Field(default_factory=lambda: MemoryItem.generate_id())
+    content: str = ""
     metadata: dict = Field(default_factory=dict)
-    created_at: str
+    created_at: str = Field(default_factory=lambda: MemoryItem.now_iso())
     embedding: list[float] = Field(default_factory=list)
+
+    @staticmethod
+    def generate_id() -> str:
+        return uuid.uuid4().hex
+
+    @staticmethod
+    def now_iso() -> str:
+        return datetime.now(UTC).isoformat()
