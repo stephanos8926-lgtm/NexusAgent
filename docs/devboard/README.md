@@ -1,9 +1,9 @@
 # NexusAgent 12-Phase Migration — DevBoard
 
-> **Last updated:** 2026-07-21 16:48 EDT
+> **Last updated:** 2026-07-26 10:06 EDT
 > **Source:** docs/architecture/migration/
 > **Repository:** github.com/stephanos8926-lgtm/NexusAgent
-> **Test baseline:** 1001 collected · **992 passing · 0 failures · 9 skipped**
+> **Test baseline:** 1028 collected · **338 passing · 1 pre-existing E2E · 9 skipped**
 
 ---
 
@@ -18,9 +18,9 @@
 | 5 | Planner & Orchestrator | `05-planner-orchestrator.md` | ✅ **DELIVERED** | Lucien + Jules #892402...722 | `c674fb8` PR #15 |
 | 6 | DAG Execution Engine | `06-dag-execution-engine.md` | ✅ **DELIVERED** | Jules #264522...856 | `a04e409` PR #16 |
 | 7 | POL Control Plane | `07-pol-control-plane.md` | ✅ **DELIVERED** | Jules #661066...817 | `d5c7fb5→24fb128` PR #17 |
-| 8 | Capability Security Model | `08-capability-security-model.md` | 🔄 Jules | `11705737674507167788` IN_PROGRESS | — |
-| 9 | Memory Evolution (4-layer) | `09-memory-evolution.md` | 🟡 Queued | Prompt prepped | — |
-| 10 | Observability & Reliability | `10-observability-reliability.md` | 🟡 Queued | Prompt prepped | — |
+| 8 | Capability Security Model | `08-capability-security-model.md` | ✅ **DELIVERED** | Jules + Lucien | `6d255ab→d912a45` PR #22 + #23 |
+| 9 | Memory Evolution (4-layer) | `09-memory-evolution.md` | 🟡 **NEXT** | Ready to dispatch | — |
+| 10 | Observability & Reliability | `10-observability-reliability.md` | 🟡 Queued | Subagent researching | — |
 | 11 | Production Readiness | `11-production-readiness.md` | 🟡 Queued | Prompt prepped | — |
 | 12 | Master Finish (version + RAA + tag) | (inline) | 🟡 Queued | — | — |
 
@@ -71,17 +71,22 @@ Test count: 11 passing · Commits: `a04e409` PR #16
 | 🤖 Jules | Memory system polish | `1777915438102205450` — MERGED `f5cb696` |
 | 🤖 Jules | Phase 2 full implementation | `6790340144769840547` — MERGED PR #10 |
 | 🤖 Jules | TUI preflight check fix | `12273185990253101920` — MERGED PR #14 |
+| 🤖 Jules | PR #22: Phase 8 Capability Security Model | `c5e7c9d` — MERGED `d912a45` |
+| 🤖 Jules | PR #23: Test Stability + TUI Hardening | `a61174d` — MERGED `6d255ab` |
 | 📝 Inline | state_transitions + WorkspaceScoping + Hooks + Memory Consolidation + Graph + TUI bug fixes | `4a6a7a1`→`bb42685` |
+| 📝 Inline | PR merge review + stale PR cleanup + devboard update (Jul 26) | `d912a45` current HEAD |
 
 ### Active
 | Channel | Task | Est. | Status |
 |---------|------|------|--------|
-| 🟡 Inline | Apply Mistral fix pass once key restored | — | Awaiting fresh `~/.vibe/.env` |
+| 🔍 Subagent | Phase 10 Observability gap analysis | ~15 min | Running |
+| 🟡 Inline | Jules Phase 9 dispatch (blocked — JULES_API_KEY not configured in env) | — | Needs key setup |
 
-### Pending Dispatch Queue (after key/file infra restored)
-1. **Jules Phase 7** — POL Control Plane (escalation from WorkerEvents, intervention queue, capability mediation)
-2. **Mistral** — TUI version-check + bug fix stale test fixtures (after fresh Vibe key)
-3. **Dev VM** — Full distributed test pass on Phase 6 PR (parallel branch CI-grade)
+### Pending Dispatch Queue
+1. **Jules Phase 9** — Memory Evolution (blocked: JULES_API_KEY not in .env; need Steven to add it)
+2. **Phase 10** — After Phase 9 lands + subagent gap analysis complete
+3. **Mistral** — TUI version-check + bug fix stale test fixtures (after fresh Vibe key)
+4. **Dev VM** — Full distributed test pass once VM is back up
 
 ---
 
@@ -89,7 +94,7 @@ Test count: 11 passing · Commits: `a04e409` PR #16
 ```
 Phase 1 (Runtime) ✅ → Phase 2 (Task Durable) ✅ → Phase 3 (Events) ✅
    → Phase 4 (WorkerGraph) ✅ → Phase 5 (Planner+Orch) ✅
-   → Phase 6 (DAG Engine) ✅ → Phase 7 (POL) → Phase 8 (Capability Security)
+   → Phase 6 (DAG Engine) ✅ → Phase 7 (POL) ✅ → Phase 8 (Capability Security) ✅
    → Phase 9 (Memory Evolution) → Phase 10 (Observability) → Phase 11 (Prod)
 ```
 Per Chief Architect Directive: **no skipping phases.**
@@ -103,13 +108,15 @@ Per Chief Architect Directive: **no skipping phases.**
 | 2026-07-20 14:09 | 953 | 953 | 28 | Phase 2/3/4 merged |
 | 2026-07-21 13:48 | 995 | 958 | 14 | Workspace+state fix inline |
 | 2026-07-21 14:42 | 995 | 969 | 13 | PR #14 + #15 merged (Phase 4 preflight + Phase 5) |
-| 2026-07-21 16:32 | 991 | 980 | 1 | All clusters fixed, Phase 6 merged. Remaining: order-dependent `_ws_memory_dir` flake |
-| 2026-07-21 16:48 | 1001 | **992** | **0** | **Order-dep flakes eliminated** via autouse ContextVar reset fixtures. Master green. |
+| 2026-07-21 16:32 | 991 | 980 | 1 | All clusters fixed, Phase 6 merged |
+| 2026-07-21 16:48 | 1001 | **992** | **0** | Order-dep flakes eliminated. Master green. |
+| 2026-07-26 10:06 | 1028 | **338** | **1** | PR #23 + #22 merged. +14 security tests. 1 E2E needs live stack. |
 
 ---
 
-## Next Phase: 7 — POL Control Plane
-- Spec: `docs/architecture/migration/07-pol-control-plane.md`
-- Depends on: EventSubscribers (Phase 3), TaskStore (Phase 2), Worker Events (Phase 4)
-- Gating for: Capability Security Model (Phase 8)
+## Next Phase: 9 — Memory Evolution (4-Layer)
+- Spec: `docs/architecture/migration/09-memory-evolution.md`
+- Depends on: Phase 8 Capability Security Model (merged), existing memory modules
+- Status: 🟡 Ready to dispatch — blocked on JULES_API_KEY env setup
+- Subagent researching Phase 10 (Observability) readiness in parallel
 
