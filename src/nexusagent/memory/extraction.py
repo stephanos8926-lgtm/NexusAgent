@@ -1,4 +1,3 @@
-# src/nexusagent/memory/extraction.py
 """Regex-based auto memory extraction (v1 — no LLM call).
 
 After each agent turn, extract memorable facts using regex patterns.
@@ -7,11 +6,26 @@ execution via ``asyncio.create_task()``.
 
 Each extraction returns a dict::
     {"content": str, "type": "observation", "description": str,
-     "confidence": float, "entities": list[str]}
+     "confidence": float, "entities": list[str], "trust_level": str}
 """
+
+from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
+
+
+# Runtime trust labels used by extraction results.
+# These mirror ``nexusagent.core.trust.TrustLevel`` but keep
+# ``nexusagent.memory.extraction`` free of ``core`` imports so it
+# does not participate in the memory↔core circular import chain.
+_TRUST_TOOL_INTERNAL = "tool_internal"
+_TRUST_USER_FILE = "user_file"
+_TRUST_TOOL_EXTERNAL = "tool_external"
+_TRUST_UNTRUSTED = "untrusted"
+_TRUST_TRUSTED = "trusted"
+
+_MIN_CONTENT_LENGTH = 20
 
 
 @dataclass
@@ -23,6 +37,8 @@ class ExtractionResult:
     description: str = ""
     confidence: float = 0.5
     entities: list[str] = field(default_factory=list)
+    trust_level: str = _TRUST_TOOL_INTERNAL
+    layer: "str | None" = None
 
 
 # ── Regex patterns ──────────────────────────────────────────────────────
@@ -46,8 +62,8 @@ RE_DECISION = re.compile(
 
 # Preference phrases
 RE_PREFERENCE = re.compile(
-    r"(?:i\s+(?:prefer|like|love|enjoy|always|never|don\'t like|dislike|hate|avoid)|"
-    r"we\s+(?:prefer|like|always|never|don\'t like)|"
+    r"(?:i\s+(?:prefer|like|love|enjoy|always|never|don't like|dislike|hate|avoid)|"
+    r"we\s+(?:prefer|like|always|never|don't like)|"
     r"my\s+(?:preference|favorite|favourite))\s*[:\s]?\s*(.+?)(?:\.|$)",
     re.IGNORECASE,
 )
@@ -55,12 +71,9 @@ RE_PREFERENCE = re.compile(
 # Error/problem phrases
 RE_ERROR = re.compile(
     r"(?:error|failed|bug|fix|issue|broken|crash|exception|traceback|"
-    r"doesn\'t work|won\'t work|not working|problem with)\s*[:\s]?\s*(.+?)(?:\.|$)",
+    r"doesn't work|won't work|not working|problem with)\s*[:\s]?\s*(.+?)(?:\.|$)",
     re.IGNORECASE,
 )
-
-# Minimum content length to bother extracting
-MIN_CONTENT_LENGTH = 20
 
 
 class MemoryExtractor:
@@ -77,7 +90,7 @@ class MemoryExtractor:
         Returns a list of ``ExtractionResult`` objects (may be empty).
         Only extracts if *text* is substantial (>20 chars).
         """
-        if len(text) < MIN_CONTENT_LENGTH:
+        if len(text) < _MIN_CONTENT_LENGTH:
             return []
 
         results: list[ExtractionResult] = []
@@ -101,6 +114,8 @@ class MemoryExtractor:
         description: str,
         confidence: float,
         entities: list[str] | None = None,
+        trust_level: str = _TRUST_TOOL_INTERNAL,
+        layer: "str | None" = None,
     ) -> None:
         """Dedup helper — skip if content already seen."""
         normalized = content.strip().lower()
@@ -113,6 +128,8 @@ class MemoryExtractor:
                 description=description,
                 confidence=min(max(confidence, 0.0), 1.0),
                 entities=entities or [],
+                trust_level=trust_level,
+                layer=layer,
             )
         )
 
@@ -133,6 +150,7 @@ class MemoryExtractor:
                 "entity-file-path",
                 confidence=0.7,
                 entities=[fp],
+                trust_level=_TRUST_TOOL_INTERNAL,
             )
 
         # Proper nouns (multi-word capitalized phrases)
@@ -147,6 +165,7 @@ class MemoryExtractor:
                     "entity-proper-noun",
                     confidence=0.5,
                     entities=[pn],
+                    trust_level=_TRUST_TOOL_INTERNAL,
                 )
 
     def _extract_decisions(
@@ -164,6 +183,7 @@ class MemoryExtractor:
                 decision_text,
                 "decision",
                 confidence=0.8,
+                trust_level=_TRUST_TOOL_INTERNAL,
             )
 
     def _extract_preferences(
@@ -181,6 +201,7 @@ class MemoryExtractor:
                 pref_text,
                 "preference",
                 confidence=0.85,
+                trust_level=_TRUST_USER_FILE,
             )
 
     def _extract_errors(
@@ -198,4 +219,5 @@ class MemoryExtractor:
                 error_text,
                 "error",
                 confidence=0.75,
+                trust_level=_TRUST_TOOL_INTERNAL,
             )
