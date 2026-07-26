@@ -4,17 +4,22 @@ This is the top-level memory interface for the hybrid memory system.
 Files are the source of truth; the SQLite index is rebuilt from them.
 """
 
+from __future__ import annotations
+
 import asyncio
 import fcntl
 import logging
 import shutil
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from nexusagent.memory.extraction import MemoryExtractor
 from nexusagent.memory.memory_files import FileMemory
 from nexusagent.memory.memory_index import HybridMemoryIndex
+
+if TYPE_CHECKING:
+    from nexusagent.memory.layer_manager import LayerMemoryManager
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +62,9 @@ class HybridMemoryManager:
         self._extractor = MemoryExtractor()
         self._turn_count: int = 0
 
+        # Phase 9: 4-layer memory evolution
+        self.layers: LayerMemoryManager | None = None
+
     def set_nats_memory_bus(self, nats_memory_bus: Any) -> None:
         """Set the NATS memory bus for publishing memory events.
 
@@ -69,6 +77,10 @@ class HybridMemoryManager:
     def initialize(self) -> None:
         """Initialize the file memory layer."""
         self.file_memory.initialize()
+        # Phase 9: initialize layered memory if not already done
+        if self.layers is None:
+            from nexusagent.memory.layer_manager import LayerMemoryManager
+            self.layers = LayerMemoryManager(self.workspace_dir)
 
     async def remember(
         self,
