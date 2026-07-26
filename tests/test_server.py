@@ -188,38 +188,44 @@ async def test_operator_key_rejected_from_admin_endpoints():
 async def test_operator_key_allowed_on_read_endpoints():
     """Operator keys should be allowed on read-only endpoints (status, result, list)."""
     import os
+    from unittest.mock import AsyncMock, patch
+
     os.environ["NEXUS_AUTH_OPERATOR_KEYS"] = "operator-key-456"
     try:
-        transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://test") as client:
-            # GET /tasks/{id}/status — operator allowed
-            response = await client.get(
-                "/tasks/some-id/status",
-                headers={"X-API-Key": "operator-key-456"},
-            )
-            assert response.status_code == 200, f"Expected 200, got {response.status_code}"
+        with patch("nexusagent.server.routes.sdk") as mock_sdk:
+            mock_sdk.get_task_status = AsyncMock(return_value="pending")
+            mock_sdk.get_result = AsyncMock(return_value={"task_id": "some-id", "result": "mocked"})
 
-            # GET /tasks/{id}/result — operator allowed
-            response = await client.get(
-                "/tasks/some-id/result",
-                headers={"X-API-Key": "operator-key-456"},
-            )
-            # 404 is fine — we're testing auth, not task existence
-            assert response.status_code in (200, 404), f"Expected 200/404, got {response.status_code}"
+            transport = ASGITransport(app=app)
+            async with AsyncClient(transport=transport, base_url="http://test") as client:
+                # GET /tasks/{id}/status — operator allowed
+                response = await client.get(
+                    "/tasks/some-id/status",
+                    headers={"X-API-Key": "operator-key-456"},
+                )
+                assert response.status_code == 200, f"Expected 200, got {response.status_code}"
 
-            # GET /tasks — operator allowed
-            response = await client.get(
-                "/tasks",
-                headers={"X-API-Key": "operator-key-456"},
-            )
-            assert response.status_code == 200, f"Expected 200, got {response.status_code}"
+                # GET /tasks/{id}/result — operator allowed
+                response = await client.get(
+                    "/tasks/some-id/result",
+                    headers={"X-API-Key": "operator-key-456"},
+                )
+                # 200 is fine — we're testing auth, and the mock succeeds
+                assert response.status_code in (200, 404), f"Expected 200/404, got {response.status_code}"
 
-            # GET /workers — operator allowed
-            response = await client.get(
-                "/workers",
-                headers={"X-API-Key": "operator-key-456"},
-            )
-            assert response.status_code == 200, f"Expected 200, got {response.status_code}"
+                # GET /tasks — operator allowed
+                response = await client.get(
+                    "/tasks",
+                    headers={"X-API-Key": "operator-key-456"},
+                )
+                assert response.status_code == 200, f"Expected 200, got {response.status_code}"
+
+                # GET /workers — operator allowed
+                response = await client.get(
+                    "/workers",
+                    headers={"X-API-Key": "operator-key-456"},
+                )
+                assert response.status_code == 200, f"Expected 200, got {response.status_code}"
     finally:
         del os.environ["NEXUS_AUTH_OPERATOR_KEYS"]
 

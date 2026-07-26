@@ -57,6 +57,7 @@ async def check_server_version(app) -> bool:
         Raises SystemExit if NEXUS_STRICT_VERSION=1 and versions mismatch.
     """
     import os
+
     from nexusagent.widgets.messages import AppMessage
 
     data = await app._fetch_server_version()
@@ -64,7 +65,8 @@ async def check_server_version(app) -> bool:
         logger.warning("Version check failed: server unreachable (will retry via WebSocket)")
         unreachable_msg = "⚠️  VERSION CHECK FAILED: Server is unreachable. Please make sure the server is running."
         if hasattr(app, "messages_container") and app.messages_container:
-            app.messages_container.mount(AppMessage(unreachable_msg))
+            from nexusagent.interfaces.tui.streaming import _mount_with_limit
+            _mount_with_limit(app, AppMessage(unreachable_msg))
         return False
 
     server_ver = data.get("version", "unknown")
@@ -82,7 +84,8 @@ async def check_server_version(app) -> bool:
 
         # Show warning as AppMessage in conversation log
         if hasattr(app, "messages_container") and app.messages_container:
-            app.messages_container.mount(AppMessage(mismatch_msg))
+            from nexusagent.interfaces.tui.streaming import _mount_with_limit
+            _mount_with_limit(app, AppMessage(mismatch_msg))
 
         # Show warning in TUI status bar
         if hasattr(app, "notify"):
@@ -123,103 +126,111 @@ async def ws_loop(app) -> None:
     Args:
         app: The NexusApp instance.
     """
-    api_key = settings.client.api_key
-    ws_url = f"ws://127.0.0.1:{settings.server.api_port}/sessions/{app.session_id}/ws"
-    # Pass working_dir as query param for workspace-scoped memory
-    working_dir = getattr(app, "working_dir", None) or str(pathlib.Path.cwd())
-    if working_dir != ".":
-        from urllib.parse import quote as _quote
+    try:
+        api_key = settings.client.api_key
+        ws_url = f"ws://127.0.0.1:{settings.server.api_port}/sessions/{app.session_id}/ws"
+        # Pass working_dir as query param for workspace-scoped memory
+        working_dir = getattr(app, "working_dir", None) or str(pathlib.Path.cwd())
+        if working_dir != ".":
+            from urllib.parse import quote as _quote
 
-        ws_url += f"?working_dir={_quote(working_dir, safe='')}"
-    extra_headers: dict[str, str] = {}
-    if api_key:
-        extra_headers["Authorization"] = f"Bearer {api_key}"
+            ws_url += f"?working_dir={_quote(working_dir, safe='')}"
+        extra_headers: dict[str, str] = {}
+        if api_key:
+            extra_headers["Authorization"] = f"Bearer {api_key}"
 
-    # Pre-connect version check (non-blocking on mismatch)
-    await app._check_server_version()
+        # Pre-connect version check (non-blocking on mismatch)
+        await app._check_server_version()
 
-    max_retries = 6
-    base_delay = 1.0  # seconds
+        max_retries = 6
+        base_delay = 1.0  # seconds
 
-    for attempt in range(max_retries):
-        try:
-            async with websockets.connect(
-                ws_url,
-                ping_interval=20,
-                ping_timeout=10,
-                additional_headers=extra_headers,
-            ) as ws:
-                app._ws = ws
-                app.status_bar.set_status("Connected")
-                app.status_bar.set_spinner(False)
+        for attempt in range(max_retries):
+            try:
+                async with websockets.connect(
+                    ws_url,
+                    ping_interval=20,
+                    ping_timeout=10,
+                    additional_headers=extra_headers,
+                ) as ws:
+                    app._ws = ws
+                    app.status_bar.set_status("Connected")
+                    app.status_bar.set_spinner(False)
 
-                async def send_messages():
-                    while True:
-                        msg = await app._input_queue.get()
-                        if msg is None:
-                            break
-                        try:
-                            await ws.send(json.dumps({"type": "user_input", "content": msg}))
-                        except Exception:
-                            break
+                    async def send_messages():
+                        while True:
+                            msg = await app._input_queue.get()
+                            if msg is None:
+                                break
+                            try:
+                                await ws.send(json.dumps({"type": "user_input", "content": msg}))
+                            except Exception:
+                                break
 
-                async def receive_events():
-                    from nexusagent.interfaces.tui.streaming import handle_event
+                    async def receive_events():
+                        from nexusagent.interfaces.tui.streaming import handle_event
 
-                    async for raw in ws:
-                        try:
-                            event = json.loads(raw)
-                        except json.JSONDecodeError:
-                            continue
-                        try:
-                            await handle_event(app, event)
-                        except Exception as exc:
-                            logger.warning("handle_event failed for %s: %s", event.get("type"), exc)
+                        async for raw in ws:
+                            try:
+                                event = json.loads(raw)
+                            except json.JSONDecodeError:
+                                continue
+                            try:
+                                await handle_event(app, event)
+                            except Exception as exc:
+                                logger.warning("handle_event failed for %s: %s", event.get("type"), exc)
 
-                await asyncio.gather(send_messages(), receive_events())
-                # Clean close — no retry needed
+                    await asyncio.gather(send_messages(), receive_events())
+                    # Clean close — no retry needed
+                    return
+
+            except ConnectionRefusedError:
+                delay = base_delay * (2**attempt)
+                remaining = max_retries - attempt - 1
+                if remaining == 0:
+                    app.status_bar.set_status("Connection refused")
+                    app._connection_error = f"Cannot connect to server at port {settings.server.api_port}. Is the server running?"
+                    return
+                app.status_bar.set_status(f"Reconnecting ({remaining} left)…")
+                await asyncio.sleep(delay)
+                continue
+
+            except websockets.exceptions.ConnectionClosedOK:
+                app.status_bar.set_status("Disconnected")
+                app._busy = False
+                app._current_assistant = None
+                app._current_tool = None
                 return
 
-        except ConnectionRefusedError:
-            delay = base_delay * (2**attempt)
-            remaining = max_retries - attempt - 1
-            if remaining == 0:
-                app.status_bar.set_status("Connection refused")
-                app._connection_error = f"Cannot connect to server at port {settings.server.api_port}. Is the server running?"
+            except websockets.exceptions.ConnectionClosedError as e:
+                # ConnectionClosedError is the base of ConnectionClosedOK — treat
+                # both as terminal (graceful or not, the server is gone). This
+                # prevents exponential-backoff loops in test/stub environments
+                # where the failure is permanent (mock raises every attempt).
+                app.status_bar.set_status("Disconnected")
+                app._busy = False
+                app._current_assistant = None
+                app._current_tool = None
+                app._connection_error = str(e)
                 return
-            app.status_bar.set_status(f"Reconnecting ({remaining} left)…")
-            await asyncio.sleep(delay)
-            continue
 
-        except websockets.exceptions.ConnectionClosedOK:
-            app.status_bar.set_status("Disconnected")
-            app._busy = False
-            app._current_assistant = None
-            app._current_tool = None
-            return
+            except Exception as e:
+                app.status_bar.set_status("Error")
+                app._busy = False
+                app._current_assistant = None
+                app._current_tool = None
+                _mount_error(app, f"Error: {e}")
+                return
 
-        except websockets.exceptions.ConnectionClosedError as e:
-            # ConnectionClosedError is the base of ConnectionClosedOK — treat
-            # both as terminal (graceful or not, the server is gone). This
-            # prevents exponential-backoff loops in test/stub environments
-            # where the failure is permanent (mock raises every attempt).
-            app.status_bar.set_status("Disconnected")
-            app._busy = False
-            app._current_assistant = None
-            app._current_tool = None
-            app._connection_error = str(e)
-            return
-
-        except Exception as e:
-            app.status_bar.set_status("Error")
-            app._busy = False
-            app._current_assistant = None
-            app._current_tool = None
-            _mount_error(app, f"Error: {e}")
-            return
-
-        finally:
-            app._ws = None
+            finally:
+                app._ws = None
+    finally:
+        app._ws = None
+        app._busy = False
+        if hasattr(app, "status_bar") and app.status_bar:
+            app.status_bar.set_spinner(False)
+        app._current_assistant = None
+        app._current_tool = None
 
 
 def _mount_error(app, message: str) -> None:

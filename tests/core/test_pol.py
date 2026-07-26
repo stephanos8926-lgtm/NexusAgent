@@ -1,11 +1,9 @@
 # tests/core/test_pol.py
 """Unit tests for the Platform Orchestration Layer (POL) control plane and PolicyEvaluator."""
 
-import os
 import pytest
-from unittest.mock import AsyncMock, MagicMock
 
-from nexusagent.core.pol import PolicyEvaluator, POLControlPlane, get_pol_control_plane
+from nexusagent.core.pol import POLControlPlane, PolicyEvaluator
 from nexusagent.core.task.task_state import Task, TaskState
 from nexusagent.core.task.task_store import TaskStore, set_task_store
 

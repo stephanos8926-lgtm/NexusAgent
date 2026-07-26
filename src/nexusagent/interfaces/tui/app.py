@@ -294,6 +294,8 @@ class NexusApp(App):
     def action_clear(self) -> None:
         """Clear all messages and show the welcome greeting."""
         self.messages_container.clear()
+        self._current_assistant = None
+        self._current_tool = None
         self._show_greeting()
 
     def action_quit(self) -> None:

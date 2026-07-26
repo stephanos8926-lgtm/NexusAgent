@@ -3,10 +3,10 @@
 import pytest
 
 from nexusagent.core.task.task_state import (
+    StateTransitionError,
     StateTransitionValidator,
     Task,
     TaskState,
-    StateTransitionError,
 )
 
 

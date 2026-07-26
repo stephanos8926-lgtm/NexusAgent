@@ -12,7 +12,7 @@ from nexusagent.interfaces.tui.streaming import (
     handle_slash_command,
     update_queue_status,
 )
-from nexusagent.widgets.messages import AppMessage, UserMessage
+from nexusagent.widgets.messages import AppMessage, ErrorMessage, UserMessage
 
 
 async def on_chat_input_submitted(app, event) -> None:
@@ -27,6 +27,12 @@ async def on_chat_input_submitted(app, event) -> None:
     """
     message = event.text.strip()
     if not message:
+        return
+
+    # Enforce strict client-side message size limit of 32KB
+    if len(message.encode("utf-8")) > 32 * 1024:
+        msg = ErrorMessage(message="Error: Message exceeds client-side size limit of 32KB.")
+        _mount_with_limit(app, msg)
         return
 
     if message.startswith("/"):

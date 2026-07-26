@@ -113,6 +113,8 @@ class TestMemoryHealthCommand:
 
     def test_health_shows_duplicates(self, tmp_workspace):
         """Health command should detect and report duplicates."""
+        import time
+
         # Write two identical files
         content = (
             "---\n"
@@ -125,10 +127,17 @@ class TestMemoryHealthCommand:
         )
         bank_dir = os.path.join(tmp_workspace, "bank")
         os.makedirs(bank_dir, exist_ok=True)
-        with open(os.path.join(bank_dir, "orig.md"), "w") as f:
+        orig_path = os.path.join(bank_dir, "orig.md")
+        copy_path = os.path.join(bank_dir, "copy.md")
+        with open(orig_path, "w") as f:
             f.write(content)
-        with open(os.path.join(bank_dir, "copy.md"), "w") as f:
+        with open(copy_path, "w") as f:
             f.write(content)
+
+        # Set modification times explicitly so orig.md is older (original) than copy.md
+        now = time.time()
+        os.utime(orig_path, (now - 10, now - 10))
+        os.utime(copy_path, (now, now))
 
         runner = CliRunner()
         result = runner.invoke(
