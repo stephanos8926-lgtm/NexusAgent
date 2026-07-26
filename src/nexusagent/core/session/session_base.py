@@ -115,6 +115,9 @@ class SessionBase:
         confidence: float | None = None,
         entities: list[str] | None = None,
         source_session_id: str | None = None,
+        authority: Any | None = None,
+        layer: Any | None = None,
+        source: str = "",
     ) -> str:
         """Store a memory entry."""
         return await self.hybrid_memory.remember(
@@ -124,12 +127,17 @@ class SessionBase:
             confidence=confidence,
             entities=entities,
             source_session_id=source_session_id or self.session_id,
+            authority=authority,
+            layer=layer,
+            source=source,
         )
 
     # ── Extraction ───────────────────────────────────────────────────────
 
     async def extract_and_store(self, user_message: str, response: str) -> int:
         """Run auto-extraction on a conversation turn and store results."""
+        from nexusagent.core.trust import TrustLevel
+
         combined = f"User: {user_message}\nAssistant: {response}"
 
         if self._llm_extractor is not None:
@@ -137,6 +145,21 @@ class SessionBase:
         else:
             extractor = MemoryExtractor()
             results = extractor.extract(combined)
+
+        # Trust-aware ingestion: extract TrustLevel of content
+        user_trust = TrustLevel.UNTRUSTED
+        if hasattr(user_message, "trust_level"):
+            user_trust = user_message.trust_level
+        elif isinstance(user_message, dict) and "trust_level" in user_message:
+            user_trust = TrustLevel(user_message["trust_level"])
+
+        response_trust = TrustLevel.TRUSTED
+        if hasattr(response, "trust_level"):
+            response_trust = response.trust_level
+        elif isinstance(response, dict) and "trust_level" in response:
+            response_trust = TrustLevel(response["trust_level"])
+
+        source_trust = TrustLevel(min(user_trust.value, response_trust.value))
 
         stored = 0
         for result in results:
@@ -147,6 +170,8 @@ class SessionBase:
                     description=result.description,
                     confidence=result.confidence,
                     entities=result.entities,
+                    authority=source_trust,
+                    source=self.session_id,
                 )
                 stored += 1
             except Exception as exc:

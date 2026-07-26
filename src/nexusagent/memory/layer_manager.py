@@ -42,6 +42,38 @@ class LayerMemoryManager:
             MemoryLayer.PROCEDURAL: 0.4,
         }
 
+    def _find_similar_item(self, text: str, layer: MemoryLayer) -> LayerMemoryItem | None:
+        """Find an existing memory item with similar or identical content in this layer."""
+        backend = self._backends[layer]
+        norm_text = text.strip().lower()
+        text_tokens = set(norm_text.split())
+        if not text_tokens:
+            return None
+
+        # Scan JSON files in the backend directory
+        for json_file in backend._dir.glob("*.json"):
+            if json_file.name == "index.json":
+                continue
+            try:
+                import json
+                payload = json.loads(json_file.read_text())
+                item_content = payload.get("item", {}).get("content", "").strip().lower()
+                if not item_content:
+                    continue
+                # 1. Exact match or substring match
+                if norm_text == item_content or norm_text in item_content or item_content in norm_text:
+                    return backend._from_payload(payload)
+                # 2. Token overlap similarity (Jaccard similarity >= 0.7)
+                item_tokens = set(item_content.split())
+                if item_tokens:
+                    intersection = text_tokens.intersection(item_tokens)
+                    union = text_tokens.union(item_tokens)
+                    if len(intersection) / len(union) >= 0.7:
+                        return backend._from_payload(payload)
+            except Exception:
+                continue
+        return None
+
     def remember(
         self,
         content: str,
@@ -57,6 +89,33 @@ class LayerMemoryManager:
     ) -> str | None:
         """Write a memory item to the requested layer."""
         from nexusagent.memory.memory_item import MemoryItem
+
+        # Confidence Scoring: Promote confidence on repeated observation
+        similar_item = self._find_similar_item(content, layer)
+        if similar_item is not None:
+            # Promote confidence by 0.15, capped at 1.0
+            similar_item.confidence = min(1.0, similar_item.confidence + 0.15)
+            backend = self._backends[layer]
+            item_id = backend.put(similar_item)
+
+            # If Episodic memory's confidence reaches 0.9+ and is from trusted authority, promote to Semantic!
+            if (
+                layer == MemoryLayer.EPISODIC
+                and similar_item.confidence >= 0.9
+                and similar_item.provenance.authority.value >= TrustLevel.TRUSTED.value
+            ):
+                # Promote to SEMANTIC layer
+                self.remember(
+                    content=similar_item.item.content,
+                    layer=MemoryLayer.SEMANTIC,
+                    source=similar_item.provenance.source,
+                    authority=similar_item.provenance.authority,
+                    confidence=similar_item.confidence,
+                    session_id=similar_item.provenance.session_id,
+                    tags=similar_item.tags,
+                    metadata=similar_item.metadata,
+                )
+            return item_id or None
 
         backend = self._backends[layer]
         item = MemoryItem(

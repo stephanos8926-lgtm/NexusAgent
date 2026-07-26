@@ -586,6 +586,9 @@ async def memory_write(
     entities: list[str] | None = None,
     workspace: str | None = None,
     dedup_threshold: float = 0.95,
+    authority: str | None = None,
+    layer: str | None = None,
+    source: str = "",
 ) -> str:
     """Write a memory entry."""
     rate_limit_msg = _memory_rate_limiter.check_write()
@@ -595,6 +598,8 @@ async def memory_write(
     import os
 
     from nexusagent.memory.memory import HybridMemoryManager
+    from nexusagent.core.trust import TrustLevel
+    from nexusagent.memory.layers import MemoryLayer
 
     ws = workspace or _get_memory_workspace()
     ws = os.path.expanduser(ws)
@@ -612,12 +617,25 @@ async def memory_write(
         except Exception:
             pass
 
+    auth_val = None
+    if authority:
+        try:
+            auth_val = TrustLevel[authority.upper()]
+        except KeyError:
+            try:
+                auth_val = TrustLevel(int(authority))
+            except ValueError:
+                pass
+
     filepath = await mgr.remember(
         content=content,
         type=type,
         description=description or content[:50],
         confidence=confidence,
         entities=entities,
+        authority=auth_val,
+        layer=MemoryLayer(layer.lower()) if layer else None,
+        source=source,
     )
     return f"Memory written to: {filepath}"
 
