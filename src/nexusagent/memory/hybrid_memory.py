@@ -145,6 +145,102 @@ class HybridMemoryManager:
 
         return filepath
 
+    async def ingest_extractions(
+        self,
+        results: list[Any],
+        source_session_id: str | None = None,
+    ) -> dict[str, int]:
+        """Ingest extracted memories into the 4-layer memory system.
+
+        Routes each extraction result to the appropriate memory layer
+        based on trust level and content type.  This is the trust-aware
+        ingestion path for Phase 9.
+
+        Returns a dict with counts: accepted, rejected, promoted.
+        """
+        if self.layers is None:
+            self.initialize()
+
+        accepted = 0
+        rejected = 0
+        promoted = 0
+
+        for result in results:
+            content = getattr(result, "content", "")
+            if not content.strip():
+                continue
+
+            trust_label = getattr(result, "trust_level", "tool_internal")
+            confidence = float(getattr(result, "confidence", 0.5))
+            entities = getattr(result, "entities", []) or []
+
+            layer = self._map_extraction_to_layer(result, trust_label, confidence)
+
+            if layer is None:
+                rejected += 1
+                continue
+
+            item_id = self.layers.remember(
+                content=content,
+                layer=layer,
+                source="extraction",
+                authority=self._trust_label_to_authority(trust_label),
+                confidence=confidence,
+                session_id=source_session_id or "",
+                tags=[getattr(result, "type", "observation")] + entities,
+                metadata={
+                    "description": getattr(result, "description", ""),
+                    "entities": entities,
+                },
+            )
+
+            if item_id is None:
+                rejected += 1
+            else:
+                accepted += 1
+                if layer == self.layers._backends and hasattr(self.layers, "evaluate_confidence"):
+                    layer_item = self.layers.get(layer, item_id)
+                    if layer_item and self.layers.evaluate_confidence(layer_item) == "promote":
+                        promoted += 1
+
+        return {"accepted": accepted, "rejected": rejected, "promoted": promoted}
+
+    @staticmethod
+    def _map_extraction_to_layer(result: Any, trust_label: str, confidence: float) -> Any:
+        """Map an extraction result to a memory layer."""
+        from nexusagent.memory.layers import MemoryLayer
+
+        extraction_type = getattr(result, "type", "observation")
+
+        if extraction_type == "preference":
+            return MemoryLayer.PROCEDURAL
+
+        if trust_label == "user_file":
+            if confidence >= 0.8:
+                return MemoryLayer.SEMANTIC
+            return MemoryLayer.EPISODIC
+
+        if trust_label == "tool_internal":
+            if confidence >= 0.7:
+                return MemoryLayer.EPISODIC
+            return MemoryLayer.WORKING
+
+        return MemoryLayer.WORKING
+
+    @staticmethod
+    def _trust_label_to_authority(trust_label: str) -> Any:
+        """Convert trust label string to TrustLevel enum."""
+        from nexusagent.core.trust import TrustLevel
+
+        mapping = {
+            "trusted": TrustLevel.TRUSTED,
+            "user_file": TrustLevel.USER_FILE,
+            "tool_internal": TrustLevel.TOOL_INTERNAL,
+            "tool_external": TrustLevel.TOOL_EXTERNAL,
+            "untrusted": TrustLevel.UNTRUSTED,
+        }
+        return mapping.get(trust_label, TrustLevel.UNTRUSTED)
+
     async def recall(
         self,
         query: str,
