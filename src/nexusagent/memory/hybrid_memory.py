@@ -57,6 +57,10 @@ class HybridMemoryManager:
         self._extractor = MemoryExtractor()
         self._turn_count: int = 0
 
+        # Initialize the 4-layer taxonomy manager
+        from nexusagent.memory.layer_manager import LayerMemoryManager
+        self.layer_manager = LayerMemoryManager(self.workspace_dir)
+
     def set_nats_memory_bus(self, nats_memory_bus: Any) -> None:
         """Set the NATS memory bus for publishing memory events.
 
@@ -83,11 +87,17 @@ class HybridMemoryManager:
         source_session_id: str | None = None,
         derived_from: list[str] | None = None,
         related: list[str] | None = None,
+        # Phase 9 extra parameter support
+        layer: Any = None,
+        authority: Any = None,
+        source: Any = None,
     ) -> str:
         """Write a memory entry and index it using the full async embedding chain.
 
         Returns the file path of the written entry.
         """
+        from nexusagent.core.trust import TrustLevel
+        from nexusagent.memory.layers import MemoryLayer
         from nexusagent.memory.memory_files import MemoryEntryType
 
         entry_type = MemoryEntryType(type) if isinstance(type, str) else type
@@ -116,6 +126,65 @@ class HybridMemoryManager:
         # Index the file that was just written — async with Gemini embeddings
         rel_path = str(filepath).replace(str(self.workspace_dir), "").lstrip("/")
         await self.index.async_index_file(rel_path)
+
+        # Store in the four-layer memory taxonomy
+        try:
+            # Map legacy type to Layer memory
+            if layer is None:
+                type_str = str(type).lower() if type else "observation"
+                if type_str in {"world", "fact", "semantic"}:
+                    mapped_layer = MemoryLayer.SEMANTIC
+                elif type_str in {"procedure", "skill", "procedural"}:
+                    mapped_layer = MemoryLayer.PROCEDURAL
+                elif type_str in {"working", "ephemeral"}:
+                    mapped_layer = MemoryLayer.WORKING
+                else:
+                    mapped_layer = MemoryLayer.EPISODIC
+            else:
+                mapped_layer = MemoryLayer(layer) if isinstance(layer, str) else layer
+
+            resolved_source = source or source_session_id or "system"
+
+            if authority is None:
+                src_str = str(resolved_source)
+                if src_str in {"system", "framework", "internal"}:
+                    resolved_authority = TrustLevel.TRUSTED
+                elif src_str.startswith("mcp:") or "external" in src_str:
+                    resolved_authority = TrustLevel.TOOL_EXTERNAL
+                elif src_str.startswith("tool:") or src_str.startswith("session:") or src_str:
+                    resolved_authority = TrustLevel.TOOL_INTERNAL
+                else:
+                    resolved_authority = TrustLevel.UNTRUSTED
+            else:
+                if isinstance(authority, TrustLevel):
+                    resolved_authority = authority
+                else:
+                    try:
+                        resolved_authority = TrustLevel(authority)
+                    except ValueError:
+                        resolved_authority = TrustLevel.UNTRUSTED
+
+            resolved_confidence = confidence if confidence is not None else 0.5
+
+            self.layer_manager.remember(
+                content=content,
+                layer=mapped_layer,
+                source=resolved_source,
+                authority=resolved_authority,
+                confidence=resolved_confidence,
+                session_id=source_session_id or "",
+                tags=entities or [],
+                metadata={
+                    "description": description,
+                    "ttl_hours": ttl_hours,
+                    "valid_from": valid_from,
+                    "valid_until": valid_until,
+                    "derived_from": derived_from,
+                    "related": related,
+                },
+            )
+        except Exception as exc:
+            logger.warning("Failed to store memory in 4-layer taxonomy: %s", exc)
 
         # Publish to NATS if enabled (fire-and-forget)
         if self._nats_memory_bus is not None:

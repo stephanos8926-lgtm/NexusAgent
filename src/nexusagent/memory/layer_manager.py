@@ -24,6 +24,17 @@ from nexusagent.memory.layers import (
 )
 
 
+def jaccard_similarity(str1: str, str2: str) -> float:
+    """Compute token-overlap Jaccard similarity between two strings."""
+    tokens1 = set(str1.lower().split())
+    tokens2 = set(str2.lower().split())
+    if not tokens1 or not tokens2:
+        return 0.0
+    intersection = tokens1.intersection(tokens2)
+    union = tokens1.union(tokens2)
+    return len(intersection) / len(union)
+
+
 class LayerMemoryManager:
     """Orchestrates four memory layer backends."""
 
@@ -59,6 +70,43 @@ class LayerMemoryManager:
         from nexusagent.memory.memory_item import MemoryItem
 
         backend = self._backends[layer]
+
+        # Confidence scoring detects similar/identical observations (via token-overlap Jaccard similarity)
+        existing_items = self.query("", layer=layer, limit=50)
+        similar_item: LayerMemoryItem | None = None
+        for ext in existing_items:
+            sim = jaccard_similarity(content, ext.item.content)
+            if sim >= 0.7:
+                similar_item = ext
+                break
+
+        if similar_item is not None:
+            # Repeated observations increment confidence by +0.15 (up to 1.0)
+            new_confidence = min(similar_item.confidence + 0.15, 1.0)
+            similar_item.confidence = new_confidence
+
+            # Re-verify and save back to backend
+            item_id = backend.put(similar_item)
+
+            # Auto-promotion of EPISODIC to SEMANTIC layer on confidence >= 0.9 and TRUSTED authority
+            if (
+                item_id
+                and similar_item.layer == MemoryLayer.EPISODIC
+                and similar_item.confidence >= 0.9
+                and similar_item.provenance.authority == TrustLevel.TRUSTED
+            ):
+                self.remember(
+                    content=similar_item.item.content,
+                    layer=MemoryLayer.SEMANTIC,
+                    source=similar_item.provenance.source,
+                    authority=similar_item.provenance.authority,
+                    confidence=similar_item.confidence,
+                    session_id=similar_item.provenance.session_id,
+                    tags=similar_item.tags,
+                    metadata=similar_item.metadata,
+                )
+            return item_id or None
+
         item = MemoryItem(
             id=MemoryItem.generate_id(),
             content=content,
@@ -79,6 +127,25 @@ class LayerMemoryManager:
             metadata=item.metadata,
         )
         item_id = backend.put(layer_item)
+
+        # Trigger initial auto-promotion check if created directly with high confidence and TRUSTED authority
+        if (
+            item_id
+            and layer == MemoryLayer.EPISODIC
+            and confidence >= 0.9
+            and authority == TrustLevel.TRUSTED
+        ):
+            self.remember(
+                content=content,
+                layer=MemoryLayer.SEMANTIC,
+                source=source,
+                authority=authority,
+                confidence=confidence,
+                session_id=session_id,
+                tags=tags,
+                metadata=metadata,
+            )
+
         return item_id or None
 
     def get(self, layer: MemoryLayer, item_id: str) -> LayerMemoryItem | None:

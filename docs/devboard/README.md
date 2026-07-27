@@ -19,8 +19,8 @@
 | 6 | DAG Execution Engine | `06-dag-execution-engine.md` | ✅ **DELIVERED** | Jules #264522...856 | `a04e409` PR #16 |
 | 7 | POL Control Plane | `07-pol-control-plane.md` | ✅ **DELIVERED** | Jules #661066...817 | `d5c7fb5→24fb128` PR #17 |
 | 8 | Capability Security Model | `08-capability-security-model.md` | ✅ **DELIVERED** | Jules + Lucien | `6d255ab→d912a45` PR #22 + #23 |
-| 9 | Memory Evolution (4-layer) | `09-memory-evolution.md` | 🟡 **NEXT** | Ready to dispatch | — |
-| 10 | Observability & Reliability | `10-observability-reliability.md` | 🟡 Queued | Subagent researching | — |
+| 9 | Memory Evolution (4-layer) | `09-memory-evolution.md` | ✅ **DELIVERED** | Jules | — |
+| 10 | Observability & Reliability | `10-observability-reliability.md` | 🟡 **NEXT** | Ready to dispatch | — |
 | 11 | Production Readiness | `11-production-readiness.md` | 🟡 Queued | Prompt prepped | — |
 | 12 | Master Finish (version + RAA + tag) | (inline) | 🟡 Queued | — | — |
 
@@ -114,9 +114,8 @@ Per Chief Architect Directive: **no skipping phases.**
 
 ---
 
-## Next Phase: 9 — Memory Evolution (4-Layer)
-- Spec: `docs/architecture/migration/09-memory-evolution.md`
-- Depends on: Phase 8 Capability Security Model (merged), existing memory modules
-- Status: 🟡 Ready to dispatch — blocked on JULES_API_KEY env setup
-- Subagent researching Phase 10 (Observability) readiness in parallel
+## Next Phase: 10 — Observability & Reliability
+- Spec: `docs/architecture/migration/10-observability-reliability.md`
+- Depends on: Phase 9 Memory Evolution (merged)
+- Status: 🟡 Ready to dispatch
 
