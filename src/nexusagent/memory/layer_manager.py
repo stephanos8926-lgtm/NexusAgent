@@ -24,6 +24,22 @@ from nexusagent.memory.layers import (
 )
 
 
+def jaccard_similarity(text1: str, text2: str) -> float:
+    """Compute token-overlap Jaccard similarity between text1 and text2."""
+    import re
+    def get_tokens(text: str) -> set[str]:
+        tokens = re.findall(r'\w+', text.lower())
+        return set(tokens)
+
+    set1 = get_tokens(text1)
+    set2 = get_tokens(text2)
+    if not set1 or not set2:
+        return 0.0
+    intersection = set1.intersection(set2)
+    union = set1.union(set2)
+    return len(intersection) / len(union)
+
+
 class LayerMemoryManager:
     """Orchestrates four memory layer backends."""
 
@@ -57,6 +73,51 @@ class LayerMemoryManager:
     ) -> str | None:
         """Write a memory item to the requested layer."""
         from nexusagent.memory.memory_item import MemoryItem
+
+        # Check for similar existing memories in the target layer via token-overlap Jaccard similarity
+        if layer == MemoryLayer.EPISODIC:
+            backend = self._backends[layer]
+            try:
+                for entry_file in backend._dir.glob("*.json"):
+                    if entry_file.name == "index.json":
+                        continue
+                    try:
+                        import json
+                        payload = json.loads(entry_file.read_text())
+                        existing_item = backend._from_payload(payload)
+                        if existing_item is not None:
+                            # Compute Jaccard similarity
+                            sim = jaccard_similarity(content, existing_item.item.content)
+                            if sim >= 0.8:
+                                # Found a highly similar/identical observation!
+                                new_confidence = min(existing_item.confidence + 0.15, 1.0)
+                                existing_item.confidence = round(new_confidence, 2)
+
+                                # Check for automatic promotion to SEMANTIC layer
+                                if (
+                                    existing_item.confidence >= 0.9
+                                    and existing_item.provenance.authority == TrustLevel.TRUSTED
+                                ):
+                                    # Promote to SEMANTIC layer
+                                    semantic_item = LayerMemoryItem(
+                                        item=existing_item.item,
+                                        layer=MemoryLayer.SEMANTIC,
+                                        provenance=existing_item.provenance,
+                                        confidence=existing_item.confidence,
+                                        min_confidence=0.6,
+                                        tags=existing_item.tags,
+                                        metadata=existing_item.metadata,
+                                    )
+                                    self._backends[MemoryLayer.SEMANTIC].put(semantic_item)
+
+                                # Save the updated episodic memory
+                                backend.put(existing_item)
+                                return existing_item.item.id
+                    except Exception:
+                        continue
+            except Exception as exc:
+                import logging
+                logging.getLogger(__name__).warning("Error checking similar episodic memories: %s", exc)
 
         backend = self._backends[layer]
         item = MemoryItem(

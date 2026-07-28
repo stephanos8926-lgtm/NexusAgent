@@ -43,6 +43,10 @@ class HybridMemoryManager:
         self.file_memory = FileMemory(str(self.workspace_dir))
         self.index = HybridMemoryIndex(str(self.workspace_dir))
 
+        # Phase 9: Initialize LayerMemoryManager
+        from nexusagent.memory.layer_manager import LayerMemoryManager
+        self.layer_manager = LayerMemoryManager(self.workspace_dir)
+
         # Parent memory support
         self.parent_memory_dir: Path | None = None
         self._parent_index: HybridMemoryIndex | None = None
@@ -90,7 +94,16 @@ class HybridMemoryManager:
         """
         from nexusagent.memory.memory_files import MemoryEntryType
 
-        entry_type = MemoryEntryType(type) if isinstance(type, str) else type
+        # Gracefully map modern 4-layer types to legacy MemoryEntryType for backwards compatibility
+        legacy_type_str = str(type).lower() if type else "observation"
+        if legacy_type_str in ("world", "fact", "semantic"):
+            entry_type = MemoryEntryType.WORLD
+        elif legacy_type_str in ("opinion",):
+            entry_type = MemoryEntryType.OPINION
+        elif legacy_type_str in ("experience",):
+            entry_type = MemoryEntryType.EXPERIENCE
+        else:
+            entry_type = MemoryEntryType.OBSERVATION
 
         # Auto-link to related memories if not explicitly provided
         if related is None:
@@ -130,6 +143,53 @@ class HybridMemoryManager:
                 )
             except Exception as exc:
                 logger.warning("Failed to publish memory to NATS: %s", exc)
+
+        # Phase 9: Layer routing to 4-layer taxonomy via LayerMemoryManager
+        try:
+            from nexusagent.memory.layers import MemoryLayer
+            from nexusagent.core.trust import TrustLevel
+
+            # Map type to MemoryLayer
+            type_str = str(type).lower() if type else ""
+            if type_str in ("world", "fact", "semantic"):
+                mapped_layer = MemoryLayer.SEMANTIC
+            elif type_str in ("procedure", "skill", "procedural"):
+                mapped_layer = MemoryLayer.PROCEDURAL
+            elif type_str in ("working", "ephemeral"):
+                mapped_layer = MemoryLayer.WORKING
+            else:
+                mapped_layer = MemoryLayer.EPISODIC
+
+            # Map system-internal sources to TrustLevel.TRUSTED
+            source_str = source_session_id or ""
+            if source_str.lower() in ("system", "framework", "internal"):
+                authority = TrustLevel.TRUSTED
+            else:
+                authority = TrustLevel.UNTRUSTED
+
+            # Determine confidence
+            conf_val = float(confidence) if confidence is not None else 0.5
+
+            # Route memory to LayerMemoryManager
+            self.layer_manager.remember(
+                content=content,
+                layer=mapped_layer,
+                source=source_str,
+                authority=authority,
+                confidence=conf_val,
+                session_id=source_str,
+                tags=entities or [],
+                metadata={
+                    "description": description,
+                    "ttl_hours": ttl_hours,
+                    "valid_from": valid_from,
+                    "valid_until": valid_until,
+                    "derived_from": derived_from or [],
+                    "related": related or [],
+                }
+            )
+        except Exception as exc:
+            logger.warning("Failed to route memory in Phase 9 LayerMemoryManager: %s", exc)
 
         return filepath
 
