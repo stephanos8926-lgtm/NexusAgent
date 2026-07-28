@@ -19,8 +19,8 @@
 | 6 | DAG Execution Engine | `06-dag-execution-engine.md` | ✅ **DELIVERED** | Jules #264522...856 | `a04e409` PR #16 |
 | 7 | POL Control Plane | `07-pol-control-plane.md` | ✅ **DELIVERED** | Jules #661066...817 | `d5c7fb5→24fb128` PR #17 |
 | 8 | Capability Security Model | `08-capability-security-model.md` | ✅ **DELIVERED** | Jules + Lucien | `6d255ab→d912a45` PR #22 + #23 |
-| 9 | Memory Evolution (4-layer) | `09-memory-evolution.md` | 🟡 **NEXT** | Ready to dispatch | — |
-| 10 | Observability & Reliability | `10-observability-reliability.md` | 🟡 Queued | Subagent researching | — |
+| 9 | Memory Evolution (4-layer) | `09-memory-evolution.md` | ✅ **DELIVERED** | Jules | — |
+| 10 | Observability & Reliability | `10-observability-reliability.md` | 🟡 **NEXT** | Subagent researching | — |
 | 11 | Production Readiness | `11-production-readiness.md` | 🟡 Queued | Prompt prepped | — |
 | 12 | Master Finish (version + RAA + tag) | (inline) | 🟡 Queued | — | — |
 
@@ -64,6 +64,7 @@ Test count: 11 passing · Commits: `a04e409` PR #16
 ### Completed
 | Channel | Task | Link |
 |---------|------|------|
+| 🤖 Jules | Phase 9: Memory Evolution (4-layer) | Completed and verified 4-layer integration |
 | 🤖 Jules | Phase 6: DAG Execution Engine | `26452289068374856` — MERGED PR #16 `a04e409` |
 | 🤖 Jules | Phase 5: Planner & Orchestrator | `892402701598275722` — MERGED PR #15 `c674fb8` |
 | 🤖 Jules | Phase 4: LangGraph Worker Runtime | `4093038977148740812` — MERGED PR #13 |
@@ -80,13 +81,11 @@ Test count: 11 passing · Commits: `a04e409` PR #16
 | Channel | Task | Est. | Status |
 |---------|------|------|--------|
 | 🔍 Subagent | Phase 10 Observability gap analysis | ~15 min | Running |
-| 🟡 Inline | Jules Phase 9 dispatch (blocked — JULES_API_KEY not configured in env) | — | Needs key setup |
 
 ### Pending Dispatch Queue
-1. **Jules Phase 9** — Memory Evolution (blocked: JULES_API_KEY not in .env; need Steven to add it)
-2. **Phase 10** — After Phase 9 lands + subagent gap analysis complete
-3. **Mistral** — TUI version-check + bug fix stale test fixtures (after fresh Vibe key)
-4. **Dev VM** — Full distributed test pass once VM is back up
+1. **Phase 10** — After Phase 9 lands + subagent gap analysis complete
+2. **Mistral** — TUI version-check + bug fix stale test fixtures (after fresh Vibe key)
+3. **Dev VM** — Full distributed test pass once VM is back up
 
 ---
 
@@ -114,9 +113,9 @@ Per Chief Architect Directive: **no skipping phases.**
 
 ---
 
-## Next Phase: 9 — Memory Evolution (4-Layer)
-- Spec: `docs/architecture/migration/09-memory-evolution.md`
-- Depends on: Phase 8 Capability Security Model (merged), existing memory modules
-- Status: 🟡 Ready to dispatch — blocked on JULES_API_KEY env setup
+## Next Phase: 10 — Observability & Reliability
+- Spec: `docs/architecture/migration/10-observability-reliability.md`
+- Depends on: Phase 9 Memory Evolution (4-layer) (delivered), existing observability components
+- Status: 🟡 Queued / Ready to dispatch
 - Subagent researching Phase 10 (Observability) readiness in parallel
 

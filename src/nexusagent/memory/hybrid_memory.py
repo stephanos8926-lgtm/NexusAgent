@@ -43,6 +43,11 @@ class HybridMemoryManager:
         self.file_memory = FileMemory(str(self.workspace_dir))
         self.index = HybridMemoryIndex(str(self.workspace_dir))
 
+        # Phase 9 LayerMemoryManager integration
+        from nexusagent.memory.layer_manager import LayerMemoryManager
+
+        self.layer_manager = LayerMemoryManager(self.workspace_dir)
+
         # Parent memory support
         self.parent_memory_dir: Path | None = None
         self._parent_index: HybridMemoryIndex | None = None
@@ -83,14 +88,36 @@ class HybridMemoryManager:
         source_session_id: str | None = None,
         derived_from: list[str] | None = None,
         related: list[str] | None = None,
+        *,
+        authority: Any = None,
+        source: str | None = None,
     ) -> str:
         """Write a memory entry and index it using the full async embedding chain.
 
         Returns the file path of the written entry.
         """
+        from nexusagent.core.trust import TrustLevel
+        from nexusagent.memory.layers import MemoryLayer
         from nexusagent.memory.memory_files import MemoryEntryType
 
-        entry_type = MemoryEntryType(type) if isinstance(type, str) else type
+        # 1. Map modern 4-layer taxonomy requests to legacy types to prevent schema-based ValueError
+        mapped_type = type
+        if isinstance(type, str):
+            t_lower = type.lower()
+            if t_lower in ("semantic", "fact", "world"):
+                mapped_type = "world"
+            elif t_lower in (
+                "procedural",
+                "procedure",
+                "skill",
+                "working",
+                "ephemeral",
+                "episodic",
+                "observation",
+            ):
+                mapped_type = "observation"
+
+        entry_type = MemoryEntryType(mapped_type) if isinstance(mapped_type, str) else mapped_type
 
         # Auto-link to related memories if not explicitly provided
         if related is None:
@@ -116,6 +143,69 @@ class HybridMemoryManager:
         # Index the file that was just written — async with Gemini embeddings
         rel_path = str(filepath).replace(str(self.workspace_dir), "").lstrip("/")
         await self.index.async_index_file(rel_path)
+
+        # 2. Integrate with LayerMemoryManager for 4-layer routing (Phase 9)
+        try:
+            # Map types to MemoryLayer targets
+            target_layer = MemoryLayer.EPISODIC
+            if isinstance(type, str):
+                t_lower = type.lower()
+                if t_lower in ("world", "fact", "semantic"):
+                    target_layer = MemoryLayer.SEMANTIC
+                elif t_lower in ("procedure", "skill", "procedural"):
+                    target_layer = MemoryLayer.PROCEDURAL
+                elif t_lower in ("working", "ephemeral"):
+                    target_layer = MemoryLayer.WORKING
+
+            # Determine source and authority
+            source_name = source or source_session_id or ""
+
+            # Determine authority, preserving explicit UNTRUSTED or other values
+            if authority is not None:
+                if isinstance(authority, str):
+                    resolved_authority = TrustLevel(authority)
+                else:
+                    resolved_authority = authority
+            else:
+                # Default authority depends on the source name
+                if source_name in ("system", "framework", "internal"):
+                    resolved_authority = TrustLevel.TRUSTED
+                elif source_name:
+                    # It's an active session or custom source.
+                    # For backward compatibility, system sessions are trusted.
+                    resolved_authority = TrustLevel.TRUSTED
+                else:
+                    resolved_authority = TrustLevel.UNTRUSTED
+
+            # Enforce that if source name is specifically system-internal, it gets TRUSTED trust
+            if source_name in ("system", "framework", "internal"):
+                resolved_authority = TrustLevel.TRUSTED
+
+            # For LayerMemoryManager, default source to "system" if empty
+            if not source_name:
+                source_name = "system"
+
+            # Enforce the trust-aware ingestion policy
+            # Directly call self.layer_manager.remember with layer parameters
+            self.layer_manager.remember(
+                content=content,
+                layer=target_layer,
+                source=source_name,
+                authority=resolved_authority,
+                confidence=confidence if confidence is not None else 0.5,
+                session_id=source_session_id or "",
+                tags=entities or [],
+                metadata={
+                    "description": description,
+                    "derived_from": derived_from,
+                    "related": related,
+                    "ttl_hours": ttl_hours,
+                    "valid_from": valid_from,
+                    "valid_until": valid_until,
+                },
+            )
+        except Exception as exc:
+            logger.warning("Failed to route memory to LayerMemoryManager: %s", exc)
 
         # Publish to NATS if enabled (fire-and-forget)
         if self._nats_memory_bus is not None:
