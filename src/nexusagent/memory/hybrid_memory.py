@@ -63,7 +63,9 @@ class HybridMemoryManager:
         self._turn_count: int = 0
 
         # Phase 9: 4-layer memory evolution
-        self.layers: LayerMemoryManager | None = None
+        from nexusagent.memory.layer_manager import LayerMemoryManager
+
+        self.layers = LayerMemoryManager(self.workspace_dir)
 
     def set_nats_memory_bus(self, nats_memory_bus: Any) -> None:
         """Set the NATS memory bus for publishing memory events.
@@ -95,12 +97,17 @@ class HybridMemoryManager:
         source_session_id: str | None = None,
         derived_from: list[str] | None = None,
         related: list[str] | None = None,
+        layer: Any | None = None,
+        authority: Any | None = None,
+        source: str = "",
     ) -> str:
         """Write a memory entry and index it using the full async embedding chain.
 
         Returns the file path of the written entry.
         """
         from nexusagent.memory.memory_files import MemoryEntryType
+        from nexusagent.memory.layers import MemoryLayer
+        from nexusagent.core.trust import TrustLevel
 
         entry_type = MemoryEntryType(type) if isinstance(type, str) else type
 
@@ -128,6 +135,39 @@ class HybridMemoryManager:
         # Index the file that was just written — async with Gemini embeddings
         rel_path = str(filepath).replace(str(self.workspace_dir), "").lstrip("/")
         await self.index.async_index_file(rel_path)
+
+        # Map to trust-aware layers
+        if authority is None:
+            # Determine default authority
+            if type == "world":
+                authority = TrustLevel.TRUSTED
+            else:
+                authority = TrustLevel.UNTRUSTED
+
+        if layer is None:
+            # Map type to default layer
+            if type == "world" and authority >= TrustLevel.TRUSTED:
+                layer = MemoryLayer.SEMANTIC
+            elif type == "experience":
+                layer = MemoryLayer.PROCEDURAL
+            else:
+                layer = MemoryLayer.EPISODIC
+
+        self.layers.remember(
+            content=content,
+            layer=layer,
+            source=source or source_session_id or "",
+            authority=authority,
+            confidence=confidence if confidence is not None else 0.5,
+            session_id=source_session_id or "",
+            tags=entities or [],
+            metadata={
+                "description": description,
+                "ttl_hours": ttl_hours,
+                "valid_from": valid_from,
+                "valid_until": valid_until,
+            }
+        )
 
         # Publish to NATS if enabled (fire-and-forget)
         if self._nats_memory_bus is not None:
@@ -247,6 +287,7 @@ class HybridMemoryManager:
         max_results: int = 6,
         valid_from: str | None = None,
         valid_until: str | None = None,
+        layer: Any | None = None,
     ) -> list[dict]:
         """Search memory using hybrid keyword + vector search.
 
@@ -260,7 +301,22 @@ class HybridMemoryManager:
             max_results: Maximum results to return.
             valid_from: Optional ISO datetime — filter memories with valid_from >= this date.
             valid_until: Optional ISO datetime — filter memories with valid_until <= this date.
+            layer: Optional specific memory layer to query from.
         """
+        # If specific layer is requested, query the layers backend directly
+        if layer is not None:
+            layer_results = self.layers.query(query, layer=layer, limit=max_results)
+            results = []
+            for item in layer_results:
+                results.append({
+                    "file": f".nexusagent/layers/{item.layer.value}/{item.item.id}.json",
+                    "content": item.item.content,
+                    "score": item.confidence,
+                    "vector_score": item.confidence,
+                    "keyword_score": item.confidence,
+                })
+            return results
+
         fetch_count = max_results * 3  # Fetch extra for filtering
         results = await self.index.search(query, max_results=fetch_count)
 
