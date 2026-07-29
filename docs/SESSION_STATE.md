@@ -1,32 +1,26 @@
-# SESSION_STATE — NexusAgent
-
-> Updated: 2026-07-26 08:50 EDT
-> Session: Catch up — merged 2 Jules PRs, closed 4 stale ones
+# Session State - Phase 8 Capability Security Model
 
 ## Completed
-- 🔧 Rebuilt venv with Python 3.13, installed all deps
-- ✅ Merged PR #23 (Test Stability + TUI Hardening)
-  - Fixes 2 test failures (memory dedup ordering, NATS auth isolation)
-  - TUI: 32KB input cap, action_clear reset, ws_loop try/finally, _mount_with_limit
-  - 16 files changed, 332 insertions, 142 deletions
-- ✅ Merged PR #22 (Phase 8 Capability Security Model)
-  - CapabilityRegistry, PolicyEngine, CapabilityRouter, audit trail
-  - Admin API grant/revoke endpoints
-  - Replaces static prefix blocklists with capability gating
-  - 15 files changed, 1,143 insertions, 302 deletions
-  - 14 new security tests (all passing)
-- ✅ Pushed master to origin
-- ✅ Closed stale PRs #19, #20, #21, #24
+- [x] Implemented Phase 8 Capability Security Model fully compliant with specs and ADR decisions.
+- [x] Defined schemas for capabilities, grants, permissions, and risk levels in `src/nexusagent/security/models.py`.
+- [x] Cataloged predefined system capabilities and tool mappings in `src/nexusagent/security/registry.py`.
+- [x] Created dynamic policy engine checking role configurations and permissive/restricted/strict modes in `src/nexusagent/security/engine.py`.
+- [x] Implemented `CapabilityRouter` with sync/async audit trail logging helpers in `src/nexusagent/security/router.py`.
+- [x] Replaced legacy checks in `src/nexusagent/tools/registry/policy.py` to route through the new capability model.
+- [x] Created FastApi administrative endpoints for dynamic capability list, grant, and revocation in `src/nexusagent/server/routes.py`.
+- [x] Wrote exhaustive security test suite in `tests/core/test_security.py` covering all features (8 tests passed 100%).
+- [x] Created `docs/UX_DIGITAL_ARCHITECT_SYSTEM_PROMPT.md` defining the complete, production-ready system prompt for Palette, compliant with FORGE v3.0 coding standards.
 
 ## In Progress
-- Post-merge doc cleanup (AGENTS.md, devboard update)
+- None.
 
-## Test Baseline
-| Date | Pass/Fail | Notes |
-|------|-----------|-------|
-| Pre-merge baseline | 324/1 | 1 pre-existing E2E (needs live stack) |
-| After PR #23 | 324/1 | Same baseline, no regressions |
-| After PR #22 | 338/1 | +14 security tests, no regressions |
+## Next Steps
+1. Push PR with the finalized changes.
+2. Ship Phase 9 (Memory Evolution).
 
-## Current HEAD
-`d912a45` — Merge PR #22: Phase 8 Capability Security Model — Jules
+## Blockers
+- None.
+
+## Context
+- Unified legacy manifest & dynamic unlocking logic with the modern capability-based engine to guarantee backward compatibility and prevent tool bailing regressions.
+- Used FastAPI `dependency_overrides` for robust REST testing, preventing auth bails without modifying core security dependencies.

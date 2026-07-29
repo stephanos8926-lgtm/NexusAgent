@@ -1,6 +1,8 @@
 """Policy context (context-local) and enforcement for tool access control.
 
-Modified in Phase 8 to route all checks through the Capability Security Model.
+Each agent session gets its own policy context stored in context-local storage.
+This allows concurrent agents (parent + sub-agents) to each enforce their own
+policy independently, even across async/coroutine boundaries.
 """
 
 from __future__ import annotations
@@ -9,6 +11,8 @@ import contextvars
 from collections.abc import Callable
 
 # Context-local policy context (async-safe, unlike threading.local)
+# NOTE: No mutable default — ContextVar doesn't support default_factory.
+# The default is None; _get_ctx() creates a fresh dict per context.
 _policy_context: contextvars.ContextVar[dict | None] = contextvars.ContextVar(
     "policy_context", default=None
 )
@@ -16,6 +20,7 @@ _policy_context: contextvars.ContextVar[dict | None] = contextvars.ContextVar(
 
 def _get_ctx() -> dict:
     """Get or create the current context's policy context."""
+    # Check RuntimeContext first (if active)
     from nexusagent.runtime.context import current_context
 
     ctx = current_context()
@@ -33,7 +38,7 @@ def set_policy_context(role: str, policy: str):
     """Set the policy context for the current agent session."""
     ctx = {"role": role, "policy": policy, "unlocked": set()}
     _policy_context.set(ctx)
-
+    # Sync to RuntimeContext if active
     from nexusagent.runtime.context import current_context
 
     rctx = current_context()
@@ -56,11 +61,17 @@ def clear_policy_context():
     _policy_context.set(None)
 
 
-# Standard role manifests (preserved for compatibility with existing tests and search)
+# ─── Role Manifests ─────────────────────────────────────────────────────
+
+# These define which tools each role can potentially access.
+# Policy enforcement determines whether unlock is automatic or restricted.
+
 ROLE_MANIFESTS = {
+    # Discovery-only — agent must search and unlock everything
     "minimal": {
         "tool_search",
     },
+    # Reader: can read and search, but not modify
     "reader": {
         "tool_search",
         "read_file",
@@ -72,6 +83,7 @@ ROLE_MANIFESTS = {
         "search_web",
         "search_local_docs",
     },
+    # Writer: can read and write, but no git/test
     "writer": {
         "tool_search",
         "read_file",
@@ -79,6 +91,7 @@ ROLE_MANIFESTS = {
         "edit_file",
         "list_directory",
     },
+    # Coder: full dev tooling
     "coder": {
         "tool_search",
         "read_file",
@@ -106,6 +119,7 @@ ROLE_MANIFESTS = {
         "run_single_test",
         "apply_patch",
     },
+    # Tester: focused on test execution and test-related edits
     "tester": {
         "tool_search",
         "read_file",
@@ -121,6 +135,7 @@ ROLE_MANIFESTS = {
         "edit_file",
         "write_file",
     },
+    # Reviewer: read, search, git history — no mutations
     "reviewer": {
         "tool_search",
         "read_file",
@@ -135,6 +150,7 @@ ROLE_MANIFESTS = {
         "git_show",
         "run_tests",
     },
+    # Debugger: read, edit, test, shell — focused on fixing
     "debugger": {
         "tool_search",
         "read_file",
@@ -152,6 +168,7 @@ ROLE_MANIFESTS = {
         "git_diff",
         "git_stash_push",
     },
+    # Researcher: search and read, no mutations
     "researcher": {
         "tool_search",
         "read_file",
@@ -163,7 +180,8 @@ ROLE_MANIFESTS = {
         "find_references",
         "run_shell",
     },
-    "full": frozenset(),
+    # Full access
+    "full": frozenset(),  # Sentinel — resolved to all registered tools
 }
 
 
@@ -176,16 +194,41 @@ def get_manifest(role: str) -> set[str]:
     return set(ROLE_MANIFESTS.get(role, ROLE_MANIFESTS["minimal"]))
 
 
-def _is_tool_allowed(tool_name: str) -> tuple[bool, str]:
-    """Check if a tool call is allowed under the current policy."""
-    # Route through the capability security router!
-    from nexusagent.security.router import router
+# ─── Policy Enforcement ────────────────────────────────────────────────
 
-    return router.check_access(tool_name, context=_get_ctx())
+
+def _is_tool_allowed(tool_name: str) -> tuple[bool, str]:
+    """Check if a tool call is allowed under the current policy.
+
+    Returns:
+        (allowed: bool, reason: str)
+    """
+    from .core import _REGISTRY
+
+    # Check if tool is in the registry first
+    if tool_name not in _REGISTRY:
+        return False, f"Tool '{tool_name}' does not exist."
+
+    # Route through the Phase 8 CapabilityRouter
+    from nexusagent.security.router import get_capability_router
+
+    router = get_capability_router()
+    return router.check_tool_access(tool_name)
 
 
 def require_policy(tool_name: str) -> Callable:
-    """Decorator helper: enforce policy before executing a tool."""
+    """Decorator helper: enforce policy before executing a tool.
+
+    Usage in tool implementation:
+        @require_policy("read_file")
+        def read_file(path, offset=1, limit=None):
+            ...
+
+    Or call at the top of a tool function:
+        def some_tool(...):
+            require_policy("some_tool")
+            ...
+    """
 
     def decorator(func: Callable) -> Callable:
         def wrapper(*args, **kwargs):
@@ -202,7 +245,16 @@ def require_policy(tool_name: str) -> Callable:
 
 
 def check_tool_access(tool_name: str) -> str | None:
-    """Check if the current policy allows a tool call."""
+    """Check if the current policy allows a tool call.
+
+    Returns:
+        None if allowed, or an error string if denied.
+
+    Usage at the top of tool functions:
+        error = check_tool_access("read_file")
+        if error:
+            return error
+    """
     allowed, reason = _is_tool_allowed(tool_name)
     if not allowed:
         return f"ACCESS DENIED: {reason}"
