@@ -117,6 +117,11 @@ class CapabilityRegistry:
         return self._tool_map.get(tool_name)
 
 
+def get_required_capability(tool_name: str) -> str | None:
+    """Module-level convenience: retrieve required capability for a tool."""
+    return get_capability_registry().get_required_capability(tool_name)
+
+
 # Global singleton pattern
 _registry_instance: CapabilityRegistry | None = None
 
