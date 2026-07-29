@@ -18,3 +18,8 @@
 - **Issue:** The `ToolCallMessage` widget displayed collapsible tool results but was not focusable by keyboard-only or screen-reader users, preventing them from expanding/collapsing outputs.
 - **Fix:** Configured `can_focus = True` on `ToolCallMessage`, added visual `:focus` styles using `$primary` border and `$boost` background, assigned a user-friendly tooltip, and handled Enter/Space keys to toggle collapse.
 - **Learning:** Accessibility must be baked into custom container elements from the start. Making interactive elements focusable with visual feedback and intuitive keystroke handlers ensures that all developers and users can navigate logs easily.
+
+## 2026-07-26 | [UX Improvement]
+- **Issue:** The TUI's git branch and working tree status was retrieved only once at startup, leading to outdated status bar information if the branch or repository files were modified while the TUI remained open.
+- **Fix:** Implemented a robust, cancellable async background task loop that uses `asyncio.to_thread` to check and refresh Git status and branch name asynchronously every 15 seconds without blocking the main UI main loop. Added lifecycle hooks in `action_quit` and `on_unmount` to safely cancel the task and clean up signal handlers.
+- **Learning:** Periodically and asynchronously polling environment status (such as Git branch and workspace dirty states) directly in the background keeps terminal UI status bars accurate and responsive while maintaining standard non-blocking UX principles.

@@ -361,6 +361,40 @@ class TestWidgetArchitecture:
         app.chat_input = MagicMock()
         return app
 
+    def test_nexus_app_git_refresh_loop(self):
+        """NexusApp should support Git refresh loop scheduling and cleanup."""
+        from unittest.mock import MagicMock, patch
+        app = self._make_app_with_widgets()
+        app._input_queue = MagicMock()
+
+        coro = None
+        def mock_create_task_fn(c):
+            nonlocal coro
+            coro = c
+            return MagicMock()
+
+        with patch("asyncio.create_task", side_effect=mock_create_task_fn) as mock_create_task:
+            app._refresh_git_branch()
+            mock_create_task.assert_called_once()
+            # Task should be assigned
+            app._git_refresh_task = MagicMock()
+
+            # test action_quit cancels it
+            app.exit = MagicMock()
+            app.action_quit()
+            app._git_refresh_task.cancel.assert_called_once()
+
+            # test on_unmount cancels it too
+            app._git_refresh_task.reset_mock()
+            app._restore_sigwinch = MagicMock()
+            app.on_unmount()
+            app._git_refresh_task.cancel.assert_called_once()
+            app._restore_sigwinch.assert_called_once()
+
+            # Close the coroutine to avoid unawaited coroutine warnings
+            if coro:
+                coro.close()
+
     def test_nexus_app_has_messages_container(self):
         """NexusApp should have messages_container attribute (set in on_mount)."""
         app = self._make_app_with_widgets()

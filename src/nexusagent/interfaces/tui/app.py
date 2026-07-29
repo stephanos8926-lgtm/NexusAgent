@@ -234,12 +234,22 @@ class NexusApp(App):
                 except Exception:
                     return "", None
 
-            branch, status = await asyncio.to_thread(_get_git_info)
-            if branch:
-                self.status_bar.set_branch(branch)
-                self.status_bar.set_git_status(status)
+            while True:
+                try:
+                    branch, status = await asyncio.to_thread(_get_git_info)
+                    if branch:
+                        self.status_bar.set_branch(branch)
+                        self.status_bar.set_git_status(status)
+                    else:
+                        self.status_bar.set_branch("")
+                        self.status_bar.set_git_status(None)
+                except asyncio.CancelledError:
+                    break
+                except Exception as exc:
+                    logger.debug(f"Git status background refresh error: {exc}")
+                await asyncio.sleep(15)
 
-        asyncio.create_task(_async_detect())
+        self._git_refresh_task = asyncio.create_task(_async_detect())
 
     # ── Greeting ──────────────────────────────────────────────────────
 
@@ -301,9 +311,17 @@ class NexusApp(App):
     def action_quit(self) -> None:
         """Quit the TUI application, canceling background tasks."""
         _ = asyncio.create_task(self._input_queue.put(None))
-        if hasattr(self, "_ws_task"):
+        if hasattr(self, "_ws_task") and self._ws_task:
             self._ws_task.cancel()
+        if hasattr(self, "_git_refresh_task") and self._git_refresh_task:
+            self._git_refresh_task.cancel()
         self.exit()
+
+    def on_unmount(self) -> None:
+        """Clean up background tasks on unmount."""
+        if hasattr(self, "_git_refresh_task") and self._git_refresh_task:
+            self._git_refresh_task.cancel()
+        self._restore_sigwinch()
 
     def action_interrupt(self) -> None:
         """Send an interrupt signal to the running agent."""
