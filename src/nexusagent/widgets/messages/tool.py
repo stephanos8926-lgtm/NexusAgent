@@ -10,6 +10,7 @@ from rich.console import Group
 from rich.syntax import Syntax
 from rich.text import Text
 from textual.content import Content
+from textual.events import Key as KeyEvent
 from textual.widgets import Static
 
 # Regex patterns for code detection (only used by this module)
@@ -66,6 +67,8 @@ class ToolCallMessage(Static):
     - _detect_syntax_hint() for language detection
     """
 
+    can_focus = True
+
     DEFAULT_CSS = """
     ToolCallMessage {
         height: auto;
@@ -78,6 +81,10 @@ class ToolCallMessage(Static):
     }
     ToolCallMessage:hover {
         border-left: wide $accent-light;
+    }
+    ToolCallMessage:focus {
+        border-left: wide $primary;
+        background: $boost;
     }
     """
 
@@ -132,6 +139,7 @@ class ToolCallMessage(Static):
         self._status = status
         self._collapsed = self._should_collapse(output)
         self.styles.border_left = ("wide", self._BORDER_COLORS.get(status, "yellow"))
+        self.tooltip = "Interactive tool output. Click or press Enter/Space to expand/collapse output."
 
     def _should_collapse(self, output: str) -> bool:
         """Determine if output should be collapsed by default."""
@@ -230,6 +238,14 @@ class ToolCallMessage(Static):
         # Schedule a layout refresh on the parent to reflow
         if self.parent is not None:
             self.parent.refresh()
+
+    def on_key(self, event: KeyEvent) -> None:
+        """Handle Enter or Spacebar keypress to toggle collapse."""
+        if event.key in ("enter", "space"):
+            if self._output:
+                self.toggle_collapse()
+                event.stop()
+                event.prevent_default()
 
     def on_click(self) -> None:
         """Click anywhere on the widget to toggle output collapse."""
