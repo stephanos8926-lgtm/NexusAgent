@@ -15,7 +15,6 @@ from typing import Any
 
 from nexusagent.core.trust import TrustLevel
 from nexusagent.memory.layers import (
-    ConfidenceAction,
     LayerMemoryItem,
     MemoryLayer,
     MemoryProvenance,

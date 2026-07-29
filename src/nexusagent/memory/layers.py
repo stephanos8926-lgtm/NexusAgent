@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from enum import Enum
+from enum import StrEnum
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 from nexusagent.core.trust import TrustLevel
@@ -26,7 +26,7 @@ if TYPE_CHECKING:
     from nexusagent.memory.memory_item import MemoryItem
 
 
-class MemoryLayer(str, Enum):
+class MemoryLayer(StrEnum):
     """Canonical memory layers."""
 
     WORKING = "working"
@@ -35,7 +35,7 @@ class MemoryLayer(str, Enum):
     PROCEDURAL = "procedural"
 
 
-class ConfidenceAction(str, Enum):
+class ConfidenceAction(StrEnum):
     """What to do when evaluating a memory's confidence."""
 
     ACCEPT = "accept"

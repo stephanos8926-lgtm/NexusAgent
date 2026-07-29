@@ -13,3 +13,8 @@
 - **Issue:** Agents possessed direct access to execution tools, making privilege verification opaque and raising serious UX security transparency concerns.
 - **Fix:** Integrated the complete Capability Security Model. Introduced the CapabilityRouter, PolicyEngine, and robust EventStore-backed sync/async audit logging. All tool request outcomes are dynamically gated, validated, and transparently auditable.
 - **Learning:** Mediating tool requests through user-understandable capability tiers (such as Low, Medium, High, and Critical) rather than bare system commands significantly simplifies security compliance auditing while providing intuitive, granular feedback directly into system event logs.
+
+## 2026-07-26 | Interactive Keyboard Accessibility in TUI Messages
+- **Issue:** The `ToolCallMessage` widget displayed collapsible tool results but was not focusable by keyboard-only or screen-reader users, preventing them from expanding/collapsing outputs.
+- **Fix:** Configured `can_focus = True` on `ToolCallMessage`, added visual `:focus` styles using `$primary` border and `$boost` background, assigned a user-friendly tooltip, and handled Enter/Space keys to toggle collapse.
+- **Learning:** Accessibility must be baked into custom container elements from the start. Making interactive elements focusable with visual feedback and intuitive keystroke handlers ensures that all developers and users can navigate logs easily.

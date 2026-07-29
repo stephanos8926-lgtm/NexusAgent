@@ -14,7 +14,6 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
-
 # Runtime trust labels used by extraction results.
 # These mirror ``nexusagent.core.trust.TrustLevel`` but keep
 # ``nexusagent.memory.extraction`` free of ``core`` imports so it
@@ -38,7 +37,7 @@ class ExtractionResult:
     confidence: float = 0.5
     entities: list[str] = field(default_factory=list)
     trust_level: str = _TRUST_TOOL_INTERNAL
-    layer: "str | None" = None
+    layer: str | None = None
 
 
 # ── Regex patterns ──────────────────────────────────────────────────────
@@ -115,7 +114,7 @@ class MemoryExtractor:
         confidence: float,
         entities: list[str] | None = None,
         trust_level: str = _TRUST_TOOL_INTERNAL,
-        layer: "str | None" = None,
+        layer: str | None = None,
     ) -> None:
         """Dedup helper — skip if content already seen."""
         normalized = content.strip().lower()

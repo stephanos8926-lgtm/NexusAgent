@@ -400,6 +400,61 @@ class TestToolCallMessage:
         hint = msg._detect_syntax_hint()
         assert hint == "rust"
 
+    def test_can_focus_true(self):
+        """ToolCallMessage class allows keyboard focus."""
+        msg = ToolCallMessage(tool="run", args="x=1")
+        assert msg.can_focus is True
+
+    def test_tooltip_configured(self):
+        """ToolCallMessage sets a helpful tooltip for screen readers."""
+        msg = ToolCallMessage(tool="run", args="x=1")
+        assert msg.tooltip == "Interactive tool output. Click or press Enter/Space to expand/collapse output."
+
+    def test_on_key_toggles_collapse(self):
+        """Enter and Space keys toggle collapse when output is present."""
+        from unittest.mock import MagicMock
+
+        from textual.events import Key as KeyEvent
+
+        msg = ToolCallMessage(tool="run", args="x=1", output="long\nmultiline\noutput\nhere\nto collapse")
+        # Starts collapsed because it has 4+ lines
+        assert msg._collapsed is True
+
+        # Mock the KeyEvent
+        enter_event = MagicMock(spec=KeyEvent)
+        enter_event.key = "enter"
+        msg.on_key(enter_event)
+
+        # Should be expanded now
+        assert msg._collapsed is False
+        enter_event.stop.assert_called_once()
+        enter_event.prevent_default.assert_called_once()
+
+        space_event = MagicMock(spec=KeyEvent)
+        space_event.key = "space"
+        msg.on_key(space_event)
+
+        # Should be collapsed again
+        assert msg._collapsed is True
+        space_event.stop.assert_called_once()
+        space_event.prevent_default.assert_called_once()
+
+    def test_on_key_no_op_for_empty_output(self):
+        """Enter and Space keys are no-op when output is empty."""
+        from unittest.mock import MagicMock
+
+        from textual.events import Key as KeyEvent
+
+        msg = ToolCallMessage(tool="run", args="x=1", output="")
+        assert msg._collapsed is False
+
+        enter_event = MagicMock(spec=KeyEvent)
+        enter_event.key = "enter"
+        msg.on_key(enter_event)
+
+        assert msg._collapsed is False
+        enter_event.stop.assert_not_called()
+
 
 # ---------------------------------------------------------------------------
 # AppMessage tests

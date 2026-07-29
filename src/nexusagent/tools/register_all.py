@@ -10,6 +10,7 @@ Import this module once at startup to populate the registry:
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import re
 
@@ -597,9 +598,9 @@ async def memory_write(
 
     import os
 
-    from nexusagent.memory.memory import HybridMemoryManager
     from nexusagent.core.trust import TrustLevel
     from nexusagent.memory.layers import MemoryLayer
+    from nexusagent.memory.memory import HybridMemoryManager
 
     ws = workspace or _get_memory_workspace()
     ws = os.path.expanduser(ws)
@@ -622,10 +623,8 @@ async def memory_write(
         try:
             auth_val = TrustLevel[authority.upper()]
         except KeyError:
-            try:
+            with contextlib.suppress(ValueError):
                 auth_val = TrustLevel(int(authority))
-            except ValueError:
-                pass
 
     filepath = await mgr.remember(
         content=content,
