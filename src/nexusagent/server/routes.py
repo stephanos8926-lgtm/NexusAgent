@@ -47,6 +47,18 @@ class ResolveInterventionRequest(BaseModel):
     )
 
 
+class GrantCapabilityRequest(BaseModel):
+    """Request body for dynamically granting a capability to an active session."""
+
+    capability: str = Field(..., description="The capability name to grant dynamically")
+
+
+class RevokeCapabilityRequest(BaseModel):
+    """Request body for dynamically revoking a capability from an active session."""
+
+    capability: str = Field(..., description="The capability name to revoke dynamically")
+
+
 def register_routes(app: FastAPI) -> None:
     """Register all REST API routes on the given FastAPI app."""
 
@@ -387,3 +399,57 @@ def register_routes(app: FastAPI) -> None:
         if resolved_intv is None:
             raise HTTPException(status_code=404, detail="Intervention not found")
         return resolved_intv
+
+    # ─── Dynamic Capability Security Model Endpoints ───────────────────
+
+    @app.get("/security/sessions/{session_id}/capabilities", dependencies=[Depends(verify_api_key)])
+    async def get_session_capabilities(session_id: str):
+        """Get the active/granted capabilities for a specific session (Operator/verify_api_key Auth)."""
+        from nexusagent.security.engine import get_policy_engine
+        from nexusagent.core.session import get_session_manager
+
+        sm = get_session_manager()
+        session = sm.get(session_id)
+        # Fallback parameters if session object is not instantiated yet but exists in DB
+        role = "full"
+        policy_mode = "permissive"
+        if session is not None and session.agent is not None:
+            role = getattr(session.agent, "role", "full")
+            policy_mode = getattr(session.agent, "policy", "permissive")
+
+        engine = get_policy_engine()
+        capabilities = engine.get_session_capabilities(session_id, role, policy_mode)
+        return {
+            "session_id": session_id,
+            "role": role,
+            "policy_mode": policy_mode,
+            "capabilities": capabilities,
+        }
+
+    @app.post("/security/sessions/{session_id}/capabilities/grant", status_code=200, dependencies=[Depends(require_admin)])
+    async def grant_session_capability(session_id: str, request: GrantCapabilityRequest):
+        """Dynamically grant a security capability to a session (Admin Auth)."""
+        from nexusagent.security.engine import get_policy_engine
+        from nexusagent.security.registry import get_capability_registry
+
+        registry = get_capability_registry()
+        if not registry.get_capability(request.capability):
+            raise HTTPException(status_code=400, detail=f"Invalid capability name: {request.capability}")
+
+        engine = get_policy_engine()
+        engine.grant_capability(session_id, request.capability)
+        return {"session_id": session_id, "capability": request.capability, "status": "granted"}
+
+    @app.post("/security/sessions/{session_id}/capabilities/revoke", status_code=200, dependencies=[Depends(require_admin)])
+    async def revoke_session_capability(session_id: str, request: RevokeCapabilityRequest):
+        """Dynamically revoke a security capability from a session (Admin Auth)."""
+        from nexusagent.security.engine import get_policy_engine
+        from nexusagent.security.registry import get_capability_registry
+
+        registry = get_capability_registry()
+        if not registry.get_capability(request.capability):
+            raise HTTPException(status_code=400, detail=f"Invalid capability name: {request.capability}")
+
+        engine = get_policy_engine()
+        engine.revoke_capability(session_id, request.capability)
+        return {"session_id": session_id, "capability": request.capability, "status": "revoked"}

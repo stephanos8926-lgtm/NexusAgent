@@ -1,61 +1,26 @@
-# SESSION_STATE — NexusAgent
-
-> Updated: 2026-07-21 16:35 EDT
-> Session: dev worktree heavy day — 3 merges + 11 inline test clusters fixed
+# Session State - Phase 8 Capability Security Model
 
 ## Completed
-- Merged PR #14 (TUI preflight + state_transitions fix)
-- Merged PR #15 (Phase 5 Planner & Orchestrator)
-- Merged PR #16 (Phase 6 DAG Execution Engine)
-- Inline test fixes (10 fixes touching 5 file clusters):
-  - `task_state.py`: error message format, drop parent/children aliases, drop __eq__/__hash__, allow same-state no-op
-  - `agent.py`: `_setup_workspace_context(".")` returns early
-  - `hooks/__init__.py`: drop BUDGET_ALERT enum value
-  - `hooks/builtins.py` (NEW): 5 built-in hook functions
-  - `consolidation.py`: sort glob() results for deterministic dedup
-  - `graph.py`: import tempfile, allow /tmp in db_path jail
-  - `interfaces/tui/websocket.py`: ConnectionClosedError terminal (mirror OK)
-  - `tests/tools/test_patch.py`: autouse `_tmp_workspace` fixture
+- [x] Implemented Phase 8 Capability Security Model fully compliant with specs and ADR decisions.
+- [x] Defined schemas for capabilities, grants, permissions, and risk levels in `src/nexusagent/security/models.py`.
+- [x] Cataloged predefined system capabilities and tool mappings in `src/nexusagent/security/registry.py`.
+- [x] Created dynamic policy engine checking role configurations and permissive/restricted/strict modes in `src/nexusagent/security/engine.py`.
+- [x] Implemented `CapabilityRouter` with sync/async audit trail logging helpers in `src/nexusagent/security/router.py`.
+- [x] Replaced legacy checks in `src/nexusagent/tools/registry/policy.py` to route through the new capability model.
+- [x] Created FastApi administrative endpoints for dynamic capability list, grant, and revocation in `src/nexusagent/server/routes.py`.
+- [x] Wrote exhaustive security test suite in `tests/core/test_security.py` covering all features (8 tests passed 100%).
+- [x] Created `docs/UX_DIGITAL_ARCHITECT_SYSTEM_PROMPT.md` defining the complete, production-ready system prompt for Palette, compliant with FORGE v3.0 coding standards.
 
 ## In Progress
-- 🔄 Jules Phase 7: POL Control Plane — session `661066892122530817`
-- 🔄 Dev VM audit subagent `deleg_bed63f1a` — phase verification
-- Mistral/Vibe CLI: API key dead — needs fresh key from `console.mistral.ai → Code → Vibe CLI`
+- None.
 
-## Next Steps (priority ordered)
-1. Wait for Jules Phase 7 PR → merge → run full test suite
-2. While waiting: queue Phase 8 (Capability Security) in pipeline
-3. Address dev VM audit results when subagent returns
-4. Fix `_ws_memory_dir` test pollution (1 order-dependent flake)
-5. Ship fresh Vibe key, delegate TUI version + bus tests to Mistral
+## Next Steps
+1. Push PR with the finalized changes.
+2. Ship Phase 9 (Memory Evolution).
 
-## Test Baseline Trend
-| Date | Pass/Fail | Notes |
-|------|-----------|-------|
-| Pre-fix baseline | 953/28 | Just-merged state |
-| After workspace+state fix | 958/14 | Earlier today |
-| After hooks+patch+state regression fix | 969/13 | Pre-PR #14/#15/#16 |
-| After Phase 5+6 merges | 980/1 | Full test run (1 order-dep flake) |
+## Blockers
+- None.
 
-## Active Branches on Remote
-None open. All PRs merged.
-
-## Local State
-- Working tree clean except `.nexusagent/memory` submodule content drift
-- Master at: `a04e409` (Phase 6 DAG engine merged)
-- Untracked: 0
-
-## Key Files Touched Today
-1. `src/nexusagent/core/task/task_state.py` (twice — alignment with PR #14 test API)
-2. `src/nexusagent/core/agent.py` (workspace scoping no-op)
-3. `src/nexusagent/hooks/__init__.py` + `hooks/builtins.py` (created)
-4. `src/nexusagent/memory/consolidation.py` (deterministic dedup)
-5. `src/nexusagent/core/graph.py` (db_jail loosens for tests)
-6. `src/nexusagent/interfaces/tui/websocket.py` (terminal on connection closed)
-7. `tests/tools/test_patch.py` (autouse workspace fixture)
-8. `docs/devboard/README.md` (Phase 6 marked delivered)
-
-## Delegation Queue Snapshot
-- **Jules active**: 1 (Phase 7 — POL Control Plane)
-- **Subagent active**: 1 (Dev VM audit)
-- **Pending key restore**: Mistral once fresh Vibe CLI API key obtained
+## Context
+- Unified legacy manifest & dynamic unlocking logic with the modern capability-based engine to guarantee backward compatibility and prevent tool bailing regressions.
+- Used FastAPI `dependency_overrides` for robust REST testing, preventing auth bails without modifying core security dependencies.

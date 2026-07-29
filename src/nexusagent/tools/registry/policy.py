@@ -205,48 +205,15 @@ def _is_tool_allowed(tool_name: str) -> tuple[bool, str]:
     """
     from .core import _REGISTRY
 
-    ctx = _get_ctx()
-    role = ctx["role"]
-    policy = ctx["policy"]
-    unlocked = ctx["unlocked"]
-
-    manifest = get_manifest(role)
-
-    # Tool not in registry at all
+    # Check if tool is in the registry first
     if tool_name not in _REGISTRY:
         return False, f"Tool '{tool_name}' does not exist."
 
-    # Tool not in this role's manifest
-    if tool_name not in manifest and policy in ("restricted", "strict"):
-        return False, (
-            f"Tool '{tool_name}' is not available for role '{role}' "
-            f"(policy: {policy}). Use tool_search() to see available tools."
-        )
+    # Route through the Phase 8 CapabilityRouter
+    from nexusagent.security.router import get_capability_router
 
-    # In permissive mode: auto-unlock on first call
-    if policy == "permissive":
-        unlocked.add(tool_name)
-        return True, ""
-
-    # In restricted mode: allow if in manifest, deny otherwise
-    if policy == "restricted":
-        if tool_name in manifest or tool_name in unlocked:
-            return True, ""
-        return False, (
-            f"Tool '{tool_name}' is not in your role manifest for '{role}'. "
-            f"Use tool_search() to find appropriate tools."
-        )
-
-    # In strict mode: only exact manifest, no unlocking
-    if policy == "strict":
-        if tool_name in manifest:
-            return True, ""
-        return False, (
-            f"Tool '{tool_name}' is not available in strict mode for role '{role}'. "
-            f"You are locked to your initial tool set."
-        )
-
-    return True, ""
+    router = get_capability_router()
+    return router.check_tool_access(tool_name)
 
 
 def require_policy(tool_name: str) -> Callable:
