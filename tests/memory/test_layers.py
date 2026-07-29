@@ -21,7 +21,7 @@ def tmp_workspace():
 
 
 def test_layer_manager_initializes(tmp_workspace):
-    manager = LayerMemoryManager(tmp_workspace)
+    LayerMemoryManager(tmp_workspace)
     for layer in MemoryLayer:
         assert (Path(tmp_workspace) / ".nexusagent" / "layers" / layer.value).exists()
 

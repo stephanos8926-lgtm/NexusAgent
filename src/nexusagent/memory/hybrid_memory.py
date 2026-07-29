@@ -19,7 +19,7 @@ from nexusagent.memory.memory_files import FileMemory
 from nexusagent.memory.memory_index import HybridMemoryIndex
 
 if TYPE_CHECKING:
-    from nexusagent.memory.layer_manager import LayerMemoryManager
+    pass
 
 logger = logging.getLogger(__name__)
 
@@ -105,9 +105,9 @@ class HybridMemoryManager:
 
         Returns the file path of the written entry.
         """
-        from nexusagent.memory.memory_files import MemoryEntryType
-        from nexusagent.memory.layers import MemoryLayer
         from nexusagent.core.trust import TrustLevel
+        from nexusagent.memory.layers import MemoryLayer
+        from nexusagent.memory.memory_files import MemoryEntryType
 
         entry_type = MemoryEntryType(type) if isinstance(type, str) else type
 
@@ -139,10 +139,7 @@ class HybridMemoryManager:
         # Map to trust-aware layers
         if authority is None:
             # Determine default authority
-            if type == "world":
-                authority = TrustLevel.TRUSTED
-            else:
-                authority = TrustLevel.UNTRUSTED
+            authority = TrustLevel.TRUSTED if type == "world" else TrustLevel.UNTRUSTED
 
         if layer is None:
             # Map type to default layer
@@ -227,7 +224,7 @@ class HybridMemoryManager:
                 authority=self._trust_label_to_authority(trust_label),
                 confidence=confidence,
                 session_id=source_session_id or "",
-                tags=[getattr(result, "type", "observation")] + entities,
+                tags=[getattr(result, "type", "observation"), *entities],
                 metadata={
                     "description": getattr(result, "description", ""),
                     "entities": entities,

@@ -1,6 +1,5 @@
 """Memory subsystem."""
 
-from nexusagent.memory.memory import HybridMemoryManager
 from nexusagent.memory.layer_manager import LayerMemoryManager
 from nexusagent.memory.layers import (
     ConfidenceAction,
@@ -8,12 +7,13 @@ from nexusagent.memory.layers import (
     MemoryLayer,
     MemoryProvenance,
 )
+from nexusagent.memory.memory import HybridMemoryManager
 
 __all__ = [
-    "HybridMemoryManager",
-    "LayerMemoryManager",
     "ConfidenceAction",
+    "HybridMemoryManager",
     "LayerMemoryItem",
+    "LayerMemoryManager",
     "MemoryLayer",
     "MemoryProvenance",
 ]
