@@ -170,7 +170,7 @@ def test_pol_websocket_connection():
     client = TestClient(app)
 
     # 1. Connecting without token/key should fail
-    with pytest.raises(Exception):
+    with pytest.raises(Exception):  # noqa: B017
         with client.websocket_connect("/ws/pol"):
             pass
 

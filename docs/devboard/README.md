@@ -19,8 +19,8 @@
 | 6 | DAG Execution Engine | `06-dag-execution-engine.md` | ✅ **DELIVERED** | Jules #264522...856 | `a04e409` PR #16 |
 | 7 | POL Control Plane | `07-pol-control-plane.md` | ✅ **DELIVERED** | Jules #661066...817 | `d5c7fb5→24fb128` PR #17 |
 | 8 | Capability Security Model | `08-capability-security-model.md` | ✅ **DELIVERED** | Jules + Lucien | `6d255ab→d912a45` PR #22 + #23 |
-| 9 | Memory Evolution (4-layer) | `09-memory-evolution.md` | 🟡 **NEXT** | Ready to dispatch | — |
-| 10 | Observability & Reliability | `10-observability-reliability.md` | 🟡 Queued | Subagent researching | — |
+| 9 | Memory Evolution (4-layer) | `09-memory-evolution.md` | ✅ **DELIVERED** | Jules | — |
+| 10 | Observability & Reliability | `10-observability-reliability.md` | 🟡 **NEXT** | Ready to dispatch | — |
 | 11 | Production Readiness | `11-production-readiness.md` | 🟡 Queued | Prompt prepped | — |
 | 12 | Master Finish (version + RAA + tag) | (inline) | 🟡 Queued | — | — |
 
@@ -111,12 +111,12 @@ Per Chief Architect Directive: **no skipping phases.**
 | 2026-07-21 16:32 | 991 | 980 | 1 | All clusters fixed, Phase 6 merged |
 | 2026-07-21 16:48 | 1001 | **992** | **0** | Order-dep flakes eliminated. Master green. |
 | 2026-07-26 10:06 | 1028 | **338** | **1** | PR #23 + #22 merged. +14 security tests. 1 E2E needs live stack. |
+| 2026-07-26 14:30 | 1041 | **1031** | **0** | Phase 9 Memory Evolution fully delivered. Linter clean. |
 
 ---
 
-## Next Phase: 9 — Memory Evolution (4-Layer)
-- Spec: `docs/architecture/migration/09-memory-evolution.md`
-- Depends on: Phase 8 Capability Security Model (merged), existing memory modules
-- Status: 🟡 Ready to dispatch — blocked on JULES_API_KEY env setup
-- Subagent researching Phase 10 (Observability) readiness in parallel
+## Next Phase: 10 — Observability & Reliability
+- Spec: `docs/architecture/migration/10-observability-reliability.md`
+- Depends on: Phase 9 Memory Evolution (delivered)
+- Status: 🟡 Ready to dispatch
 
