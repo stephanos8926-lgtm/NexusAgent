@@ -356,3 +356,24 @@ Background (DreamCycle):
 | Workspace scoping | Per-session path jail, thread-local memory isolation |
 | Version system | `version.py`, `/version` endpoint, CLI preflight |
 | Documentation | CODEBASE_MAP, SEMANTIC_INDEX, README, CHANGELOG all updated |
+| **Phase 9: Memory Evolution (4-Layer)** | **✅ DELIVERED** — 4-layer hybrid memory: session/recall/archival/consolidation |
+| **Phase 10: Observability & Reliability** | **🟡 NEXT** — Structured logging, distributed tracing, metrics, health monitoring |
+
+### Migration Status (12-Phase Architecture Migration)
+
+| Phase | Title | Spec | Status |
+|-------|-------|------|--------|
+| 1 | Runtime Foundation | `01-runtime-foundation.md` | ✅ DELIVERED |
+| 2 | Durable Task Execution | `02-task-state-machine.md` | ✅ DELIVERED |
+| 3 | Event-Driven Core | `03-event-driven-core.md` | ✅ DELIVERED |
+| 4 | LangGraph Worker Runtime | `04-langgraph-worker-runtime.md` | ✅ DELIVERED |
+| 5 | Planner & Orchestrator | `05-planner-orchestrator.md` | ✅ DELIVERED |
+| 6 | DAG Execution Engine | `06-dag-execution-engine.md` | ✅ DELIVERED |
+| 7 | POL Control Plane | `07-pol-control-plane.md` | ✅ DELIVERED |
+| 8 | Capability Security Model | `08-capability-security-model.md` | ✅ DELIVERED |
+| 9 | Memory Evolution (4-Layer) | `09-memory-evolution.md` | ✅ DELIVERED |
+| **10** | **Observability & Reliability** | `10-observability-reliability.md` | **🟡 NEXT** |
+| 11 | Production Readiness | `11-production-readiness.md` | 🟡 Queued |
+| 12 | Master Finish | (inline) | 🟡 Queued |
+
+**No skipping phases.** Dependency chain: 1→2→3→4→5→6→7→8→9→10→11→12
