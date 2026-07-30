@@ -36,6 +36,7 @@ class SystemEvent:
     - source: component identity (e.g., "worker-abc123", "task-xyz789")
     - type: event category (from EventType) and specific subtype
     - payload: type-specific data dictionary
+    - tracing: distributed tracing correlation identifiers (trace_id, task_id, etc.)
     """
 
     # Class-level configuration
@@ -46,12 +47,67 @@ class SystemEvent:
     source: str = ""
     type: str = ""  # Specific event type (e.g., "task.created")
     payload: dict[str, Any] = field(default_factory=dict)
+    tracing: dict[str, str | None] = field(default_factory=dict)
 
     def __post_init__(self):
-        """Validate and set default type from category."""
+        """Validate and set default type from category, and ingest tracing contextvars."""
         if not self.type:
             # Default type is category.value if not specified
             self.type = self.category.value
+
+        # Dynamically import context variables to avoid circular dependencies
+        try:
+            from nexusagent.core.observability.context import (
+                graph_id_var,
+                node_id_var,
+                request_id_var,
+                task_id_var,
+                trace_id_var,
+                worker_id_var,
+            )
+
+            # Ingest active context variables into the tracing dictionary
+            if not self.tracing:
+                self.tracing = {
+                    "trace_id": trace_id_var.get() or None,
+                    "request_id": request_id_var.get() or None,
+                    "task_id": task_id_var.get() or None,
+                    "graph_id": graph_id_var.get() or None,
+                    "node_id": node_id_var.get() or None,
+                    "worker_id": worker_id_var.get() or None,
+                }
+        except ImportError:
+            pass
+
+    @property
+    def trace_id(self) -> str | None:
+        """Distributed tracing correlation ID."""
+        return self.tracing.get("trace_id")
+
+    @property
+    def request_id(self) -> str | None:
+        """Originating request ID."""
+        return self.tracing.get("request_id")
+
+    @property
+    def task_id(self) -> str | None:
+        """Reference task ID."""
+        return self.tracing.get("task_id")
+
+    @property
+    def graph_id(self) -> str | None:
+        """DAG graph ID."""
+        return self.tracing.get("graph_id")
+
+    @property
+    def node_id(self) -> str | None:
+        """DAG node ID."""
+        return self.tracing.get("node_id")
+
+    @property
+    def worker_id(self) -> str | None:
+        """Worker identity."""
+        return self.tracing.get("worker_id")
 
     @property
     def nats_subject(self) -> str:
@@ -80,6 +136,7 @@ class SystemEvent:
             source=data.get("source", ""),
             type=data.get("type", ""),
             payload=data.get("payload", {}),
+            tracing=data.get("tracing", {}),
         )
 
     def to_json(self) -> str:
