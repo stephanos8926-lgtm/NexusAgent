@@ -17,6 +17,7 @@ import hashlib
 import logging
 import math
 import sqlite3
+import typing
 import uuid
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
@@ -63,12 +64,12 @@ class HybridMemoryIndex:
         self.db_path = self.workspace / ".memory" / "index.sqlite"
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self.embedder = EmbeddingProvider()
-        self._db_pool = None
+        self._db_pool: Any = None
         self._conn_lock = asyncio.Lock()
         self._init_db()
 
     @asynccontextmanager
-    async def _get_connection(self):
+    async def _get_connection(self) -> typing.AsyncIterator[typing.Any]:
         """Get or create the persistent aiosqlite connection (if available)."""
         if not AIOSQLITE_AVAILABLE:
             # Fallback: signal that we should use sync methods via run_in_executor
@@ -86,13 +87,13 @@ class HybridMemoryIndex:
                 await self._db_pool.enable_load_extension(False)
         yield self._db_pool
 
-    async def close(self):
+    async def close(self) -> None:
         """Close the persistent database connection."""
         if self._db_pool is not None:
             await self._db_pool.close()
             self._db_pool = None
 
-    def _init_db(self):
+    def _init_db(self) -> None:
         """Create the SQLite schema: chunks, chunks_fts, chunks_vec, file_meta."""
         conn = sqlite3.connect(str(self.db_path))
         try:
@@ -169,7 +170,7 @@ class HybridMemoryIndex:
         finally:
             conn.close()
 
-    def index_file(self, relative_path: str):
+    def index_file(self, relative_path: str) -> None:
         """Index a file: chunk it, embed chunks, store in DB."""
         filepath = self.workspace / relative_path
         if not filepath.exists():
@@ -272,7 +273,7 @@ class HybridMemoryIndex:
         finally:
             conn.close()
 
-    async def async_index_file(self, relative_path: str):
+    async def async_index_file(self, relative_path: str) -> None:
         """Index a file using the full async embedding chain (Gemini → local → hash).
 
         Same logic as index_file() but uses the async embedder.embed() call
@@ -401,7 +402,7 @@ class HybridMemoryIndex:
                 )
                 # Keep overlap
                 overlap_chars = 0
-                overlap_lines = []
+                overlap_lines: list[str] = []
                 for cl in reversed(current_chunk):
                     overlap_lines.insert(0, cl)
                     overlap_chars += len(cl) + 1
@@ -804,7 +805,7 @@ class HybridMemoryIndex:
         logger.info("Re-indexed file: %s", relative_path)
         return True
 
-    def rebuild(self):
+    def rebuild(self) -> None:
         """Rebuild the entire index from files."""
         conn = sqlite3.connect(str(self.db_path))
         try:

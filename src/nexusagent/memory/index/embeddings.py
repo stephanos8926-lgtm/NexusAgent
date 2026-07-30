@@ -58,13 +58,14 @@ _DB_POOL = _get_db_pool("default")
 class EmbeddingProvider:
     """Tiered embedding provider: Gemini → local → hash fallback."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the embedding provider.
 
         The local model is lazily loaded on first use to avoid
         importing heavy dependencies unless needed.
         """
-        self._local_model = None
+        import typing
+        self._local_model: typing.Any = None
 
     async def embed(self, text: str) -> list[float]:
         """Get embedding vector with fallback chain."""
@@ -135,10 +136,11 @@ class EmbeddingProvider:
             lambda: self._local_model.encode(text, normalize_embeddings=True),
         )
         # Pad to EMBED_DIM if needed (local model is 384 dim)
-        vec = vec.tolist()
-        if len(vec) < EMBED_DIM:
-            vec = vec + [0.0] * (EMBED_DIM - len(vec))
-        return vec
+        vec_list = vec.tolist()
+        if len(vec_list) < EMBED_DIM:
+            vec_list = vec_list + [0.0] * (EMBED_DIM - len(vec_list))
+        import typing
+        return typing.cast(list[float], vec_list)
 
     def _embed_hash(self, text: str) -> list[float]:
         """Fallback: deterministic hash-based embedding (low quality, always works)."""

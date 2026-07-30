@@ -99,7 +99,7 @@ class FileMemory:
         git_enabled = getattr(settings.agent, "memory_git_enabled", True)
         self._git = MemoryGitOps(self.workspace) if git_enabled else None
 
-    def initialize(self):
+    def initialize(self) -> None:
         """Create the memory directory structure if it doesn't exist."""
         self.memory_dir.mkdir(parents=True, exist_ok=True)
         self.bank_dir.mkdir(parents=True, exist_ok=True)
@@ -241,7 +241,7 @@ class FileMemory:
         score = 0.6 * length_score + 0.4 * confidence_score
         return round(score, 2)
 
-    def _add_index_entry(self, description: str, filename: str, entry_type: MemoryEntryType):
+    def _add_index_entry(self, description: str, filename: str, entry_type: MemoryEntryType) -> None:
         """Add a one-line pointer to MEMORY.md."""
         line = f"- [{entry_type.value[0].upper()}] {description} → bank/{filename}\n"
 
@@ -277,7 +277,7 @@ class FileMemory:
 
         self.index_file.write_text(content)
 
-    def _update_entity(self, entity: str, content: str, entry_type: MemoryEntryType):
+    def _update_entity(self, entity: str, content: str, entry_type: MemoryEntryType) -> None:
         """Update an entity page with a new mention."""
         entity_slug = re.sub(r"[^a-z0-9]+", "-", entity.lower())[:30].strip("-")
         entity_file = self.entities_dir / f"{entity_slug}.md"
@@ -303,7 +303,7 @@ class FileMemory:
                 f"# {entity}\n\n{entry}"
             )
 
-    def append_daily_log(self, content: str):
+    def append_daily_log(self, content: str) -> None:
         """Append to today's daily log."""
         today = datetime.now(UTC).strftime("%Y-%m-%d")
         log_file = self.memory_dir / f"{today}.md"
@@ -421,7 +421,7 @@ class FileMemory:
 
     def list_all_files(self) -> list[str]:
         """List all memory files (bank/ + memory/)."""
-        files = []
+        files: list[str] = []
         if self.bank_dir.exists():
             files.extend(str(f.relative_to(self.workspace)) for f in self.bank_dir.rglob("*.md"))
         if self.memory_dir.exists():
@@ -668,7 +668,7 @@ class FileMemory:
 
         return report
 
-    def _remove_index_entry(self, relative_path: str):
+    def _remove_index_entry(self, relative_path: str) -> None:
         """Remove pointer lines from MEMORY.md matching the given file path."""
         if not self.index_file.exists():
             return
