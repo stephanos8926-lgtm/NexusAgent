@@ -66,7 +66,7 @@ class LLMExtractor:
         min_confidence: float = 0.5,
     ):
         self._llm_call = llm_call
-        self._fallback = fallback_extractor or MemoryExtractor()
+        self._fallback: MemoryExtractor = fallback_extractor or MemoryExtractor()
         self._min_confidence = min_confidence
 
     async def extract(self, text: str) -> list[ExtractionResult]:
@@ -87,7 +87,8 @@ class LLMExtractor:
                 logger.warning("LLM extraction failed, falling back to regex: %s", exc)
 
         # Fallback to regex
-        return self._fallback.extract(text)
+        from typing import cast
+        return cast(list[ExtractionResult], self._fallback.extract(text))
 
     async def _extract_with_llm(self, text: str) -> list[ExtractionResult]:
         """Call LLM to extract facts from text."""

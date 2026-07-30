@@ -45,8 +45,8 @@ class HybridMemoryManager:
     ):
         self.workspace_dir = Path(workspace_dir)
         self.workspace_dir.mkdir(parents=True, exist_ok=True)
-        self.file_memory = FileMemory(str(self.workspace_dir))
-        self.index = HybridMemoryIndex(str(self.workspace_dir))
+        self.file_memory: FileMemory = FileMemory(str(self.workspace_dir))
+        self.index: HybridMemoryIndex = HybridMemoryIndex(str(self.workspace_dir))
 
         # Parent memory support
         self.parent_memory_dir: Path | None = None
@@ -180,7 +180,7 @@ class HybridMemoryManager:
             except Exception as exc:
                 logger.warning("Failed to publish memory to NATS: %s", exc)
 
-        return filepath
+        return str(filepath)
 
     async def ingest_extractions(
         self,
@@ -379,7 +379,7 @@ class HybridMemoryManager:
 
         return "\n".join(lines)
 
-    async def flush(self, session_summary: str):
+    async def flush(self, session_summary: str) -> None:
         """Persist a session summary to the daily log and re-index.
 
         Uses async embedding (Gemini → local → hash fallback) for the re-index
@@ -391,7 +391,7 @@ class HybridMemoryManager:
         rel_path = f"memory/{today}.md"
         await self.index.async_index_file(rel_path)
 
-    async def close(self):
+    async def close(self) -> None:
         """Close the memory manager and clean up resources.
 
         Closes the database connections in the underlying index
@@ -441,7 +441,7 @@ class HybridMemoryManager:
         self._parent_index = HybridMemoryIndex(str(resolved_path))
         logger.info("Configured parent memory inheritance from %s", resolved_path)
 
-    def promote_to_parent(self, filter_fn=None) -> int:
+    def promote_to_parent(self, filter_fn: Any = None) -> int:
         """Copy selected markdown memories from own bank/ to parent's bank/.
 
         Uses file-based locking for concurrency safety. After copying,
@@ -475,7 +475,7 @@ class HybridMemoryManager:
         own_bank: Path,
         parent_bank: Path,
         lock_path: Path,
-        filter_fn,
+        filter_fn: Any,
     ) -> int:
         """Acquire file lock and perform the actual promotion."""
         lock_path.parent.mkdir(parents=True, exist_ok=True)

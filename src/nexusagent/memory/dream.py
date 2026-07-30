@@ -73,7 +73,7 @@ class DreamLock:
             logger.warning("Failed to create dream lock: %s", e)
             return False
 
-    def release(self):
+    def release(self) -> None:
         """Release the lock."""
         try:
             self.lock_path.unlink(missing_ok=True)
@@ -134,7 +134,7 @@ class DreamCycle:
                 continue
         return insights
 
-    async def _store_refinement_results(self, results) -> None:
+    async def _store_refinement_results(self, results: list[Any]) -> None:
         """Store LLM refinement results as new insight memories."""
         for r in results:
             content = r.content
@@ -148,7 +148,7 @@ class DreamCycle:
 
     async def _write_insight(
         self, content: str, description: str, confidence: float, entities: list[str]
-    ):
+    ) -> None:
         """Write a synthesized insight as a new memory file."""
         from nexusagent.memory.memory_files import FileMemory, MemoryEntryType
 
@@ -308,7 +308,7 @@ class DreamCycle:
 
     # ── Phase 3: Consolidate ────────────────────────────────────────────
 
-    def consolidate(self, scan_report, patterns=None):
+    def consolidate(self, scan_report: dict[str, Any], patterns: dict[str, Any] | None = None) -> dict[str, Any]:
         """Synchronous wrapper for consolidate_async."""
         import asyncio
 
@@ -688,7 +688,7 @@ class DreamCycle:
     @staticmethod
     def _compute_health_score(report: dict[str, Any]) -> float:
         """Compute a 0.0-1.0 health score for the memory bank."""
-        total = report["total"]
+        total = int(report["total"])
         if total == 0:
             return 1.0
 
@@ -696,8 +696,8 @@ class DreamCycle:
         if issues == 0:
             return 1.0
 
-        penalty = min(issues / total, 1.0)
-        return round(1.0 - penalty, 2)
+        penalty = min(float(issues) / float(total), 1.0)
+        return float(round(1.0 - penalty, 2))
 
     @staticmethod
     def _parse_frontmatter(content: str) -> dict[str, Any]:
@@ -728,7 +728,7 @@ class DreamCycle:
         frontmatter = DreamCycle._parse_frontmatter(content)
         return frontmatter.get("quality_score")
 
-    def _remove_index_entry(self, relative_path: str):
+    def _remove_index_entry(self, relative_path: str) -> None:
         """Remove pointer lines from MEMORY.md matching the given file path."""
         if not self.index_file.exists():
             return

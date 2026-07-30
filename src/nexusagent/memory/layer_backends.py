@@ -46,7 +46,8 @@ class FileBackedLayer:
     def _load_index(self) -> dict[str, dict[str, Any]]:
         if self._index_path.exists():
             try:
-                return json.loads(self._index_path.read_text())
+                import typing
+                return typing.cast(dict[str, dict[str, Any]], json.loads(self._index_path.read_text()))
             except (json.JSONDecodeError, OSError):
                 return {}
         return {}
@@ -68,7 +69,7 @@ class FileBackedLayer:
             if not item.can_promote():
                 return ""
 
-        item_id = item.item.id
+        item_id = str(item.item.id)
         entry_file = self._dir / f"{item_id}.json"
         payload = {
             "item": item.item.model_dump(),

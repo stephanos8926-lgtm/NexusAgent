@@ -16,6 +16,7 @@ It is designed to be called BEFORE each model invocation.
 from __future__ import annotations
 
 import logging
+import typing
 from collections.abc import Awaitable, Callable
 
 logger = logging.getLogger(__name__)
@@ -166,7 +167,8 @@ class CompactionPipeline:
         else:
             asyncio.run(dag.compress(llm_call=llm_call))
 
-        return dag.to_messages()
+        import typing
+        return typing.cast(list[dict], dag.to_messages())
 
     # -- strategy 1: clear old tool results ----------------------------------
 
@@ -293,7 +295,7 @@ class CompactionPipeline:
 # ---------------------------------------------------------------------------
 
 
-async def pre_compaction_flush(session, summary: str) -> str:
+async def pre_compaction_flush(session: typing.Any, summary: str) -> str:
     """Flush session state to memory before compaction.
 
     Writes the summary to the daily log via the session's hybrid memory

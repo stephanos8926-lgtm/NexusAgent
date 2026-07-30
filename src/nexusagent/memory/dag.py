@@ -229,10 +229,10 @@ class SummaryDAG:
 
         # Fresh tail — always included as original messages
         for nid in self._fresh_tail_ids():
-            node = self._nodes.get(nid)
-            if not node:
+            tail_node = self._nodes.get(nid)
+            if not tail_node:
                 continue
-            msg = node.metadata.get("message")
+            msg = tail_node.metadata.get("message")
             if msg:
                 messages.append(msg)
 

@@ -174,9 +174,10 @@ Respond with ONLY the JSON array, no other text."""
             if isinstance(item, str):
                 results.append(RefinementResult(content=item, confidence=0.7))
             elif isinstance(item, dict):
+                content_val = item.get("content") or item.get("insight") or ""
                 results.append(
                     RefinementResult(
-                        content=item.get("content", item.get("insight", "")),
+                        content=str(content_val),
                         confidence=float(item.get("confidence", 0.7)),
                         source_count=int(item.get("source_count", 1)),
                         entities=item.get("entities", []) or [],
