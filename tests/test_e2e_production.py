@@ -14,8 +14,8 @@ from nexusagent.llm.models import ResultSchema, TaskStatus
 from nexusagent.server.sdk import sdk
 from nexusagent.server.server import app
 
-# Enable test mode to block real API calls
-os.environ["NEXUS_TEST_MODE"] = "1"
+# Test configuration (NEXUS_TEST_MODE disabled for E2E tests - they need real API calls)
+# os.environ["NEXUS_TEST_MODE"] = "1"
 
 # Test configuration
 TEST_DB_PATH = "/tmp/nexus_e2e_test.db"

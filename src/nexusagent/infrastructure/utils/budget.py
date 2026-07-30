@@ -494,17 +494,20 @@ class LLMBudgetGuard:
                 "calls": self._state.monthly.call_count,
                 "quota_exhausted": self._state.monthly.quota_exhausted,
             },
-            "cooldown_remaining_s": self._get_cooldown_remaining(),
         }
+
+    def is_budget_exceeded(self) -> bool:
+        """Check if budget is exceeded (for health checks)."""
+        return self.state in (BudgetState.EXCEEDED, BudgetState.QUOTA_EXHAUSTED)
 
     def _get_cooldown_remaining(self) -> float:
         """Get remaining cooldown seconds (0 if not in cooldown)."""
         now = time.time()
         for window in [self._state.daily, self._state.monthly]:
             if window.quota_exhausted and window.quota_exhausted_at:
-                elapsed = now - window.quota_exhausted_at
-                if elapsed < self.quota_cooldown_seconds:
-                    return self.quota_cooldown_seconds - elapsed
+                remaining = self.quota_cooldown_seconds - (now - window.quota_exhausted_at)
+                if remaining > 0:
+                    return remaining
         return 0.0
 
 
@@ -512,21 +515,8 @@ class LLMBudgetGuard:
 _guard_instance: LLMBudgetGuard | None = None
 
 
-def create_budget_guard_from_config(config: "ConfigSchema") -> LLMBudgetGuard:
-    """Create LLMBudgetGuard from config schema."""
-    global _guard_instance
-    _guard_instance = LLMBudgetGuard(
-        daily_budget_usd=config.budget.daily_budget_usd,
-        monthly_budget_usd=config.budget.monthly_budget_usd,
-        alert_thresholds=config.budget.alert_thresholds,
-        quota_cooldown_seconds=config.budget.quota_cooldown_seconds,
-        enabled=config.budget.enabled,
-    )
-    return _guard_instance
-
-
 def get_budget_guard() -> LLMBudgetGuard:
-    """Get or create the module-level LLMBudgetGuard singleton."""
+    """Get the global budget guard instance (creates if needed)."""
     global _guard_instance
     if _guard_instance is None:
         from nexusagent.infrastructure.config import settings
@@ -539,3 +529,14 @@ def set_budget_guard(instance: LLMBudgetGuard) -> None:
     """Override the module-level LLMBudgetGuard singleton (for testing)."""
     global _guard_instance
     _guard_instance = instance
+
+
+def create_budget_guard_from_config(settings) -> LLMBudgetGuard:
+    """Create a budget guard from the application settings."""
+    return LLMBudgetGuard(
+        daily_budget_usd=settings.llm_budget.daily_budget_usd if hasattr(settings, "llm_budget") else 10.0,
+        monthly_budget_usd=settings.llm_budget.monthly_budget_usd if hasattr(settings, "llm_budget") else 100.0,
+        alert_thresholds=settings.llm_budget.alert_thresholds if hasattr(settings, "llm_budget") else [0.5, 0.8, 0.95],
+        quota_cooldown_seconds=settings.llm_budget.quota_cooldown_seconds if hasattr(settings, "llm_budget") else 3600.0,
+        enabled=settings.llm_budget.enabled if hasattr(settings, "llm_budget") else True,
+    )

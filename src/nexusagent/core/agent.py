@@ -13,6 +13,7 @@ import threading
 from typing import Any
 
 from deepagents import create_deep_agent
+from nexusagent.infrastructure.utils.budget import BudgetExceededError
 
 # Lazy loading state — tools registered on first Agent.__init__()
 _tools_registered: bool = False
@@ -103,16 +104,14 @@ def _check_test_mode() -> None:
     test_mode_config = settings.test_mode.block_real_api
 
     if test_mode_env or test_mode_config:
-        from nexusagent.infrastructure.utils.budget import get_budget_guard
-
-        guard = get_budget_guard()
-        if guard.state.value in ("exceeded", "quota_exhausted"):
-            raise BudgetExceededError(
-                message="NEXUS_TEST_MODE: Budget exceeded or quota exhausted - refusing to call LLM",
-                budget_type="daily",
-                spent=0.0,
-                budget=0.0,
-            )
+        # In test mode, ALWAYS block real API calls
+        from nexusagent.infrastructure.utils.budget import BudgetExceededError
+        raise BudgetExceededError(
+            message="NEXUS_TEST_MODE: Blocking real API calls - use mocks instead",
+            budget_type="daily",
+            spent=0.0,
+            budget=0.0,
+        )
 
 
 # ─── MCP + Memory Index Tool Wiring ────────────────────────────────────
@@ -245,6 +244,9 @@ class Agent:
                 If None, uses settings.agent.primary_provider.
             capabilities: Explicitly injected capabilities to grant at spawn time.
         """
+        # Check test mode first — blocks real API calls if budget exceeded
+        _check_test_mode()
+
         from nexusagent.infrastructure.config import settings
         from nexusagent.tools.registry import set_policy_context
 

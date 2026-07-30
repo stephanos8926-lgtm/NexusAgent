@@ -14,3 +14,7 @@
 {"timestamp": "2026-07-30T00:15:32.059239+00:00", "action": "edit", "task_id": "2", "agent": "", "detail": "fields updated"}
 {"timestamp": "2026-07-30T00:15:53.372765+00:00", "action": "move", "task_id": "7", "agent": "", "detail": "done -> done"}
 {"timestamp": "2026-07-30T01:48:18.817894+00:00", "action": "edit", "task_id": "1", "agent": "lucien", "detail": "fields updated"}
+{"timestamp": "2026-07-30T01:48:56.776199+00:00", "action": "move", "task_id": "1", "agent": "lucien", "detail": "backlog -> backlog"}
+{"timestamp": "2026-07-30T01:49:09.849468+00:00", "action": "move", "task_id": "1", "agent": "lucien", "detail": "backlog -> in-progress"}
+{"timestamp": "2026-07-30T01:49:14.055850+00:00", "action": "move", "task_id": "1", "agent": "lucien", "detail": "in-progress -> done"}
+{"timestamp": "2026-07-30T01:50:03.309219+00:00", "action": "move", "task_id": "1", "agent": "", "detail": "done -> done"}
