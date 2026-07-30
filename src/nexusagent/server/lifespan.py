@@ -101,24 +101,37 @@ def _wire_runtime_health(app: fastapi.FastAPI) -> None:
 
     @app.get("/health")
     async def health() -> dict[str, Any]:
-        """Return server health, including Runtime subsystem status."""
+        """Return server health, including detailed subsystems status."""
         import time
-
+        from nexusagent.core.observability import get_system_health
         from nexusagent.server.server import _SERVER_START_TIME
 
         uptime = time.monotonic() - _SERVER_START_TIME
 
-        runtime_health = None
-        runtime = getattr(app.state, "runtime", None)
-        if runtime is not None:
-            runtime_health = runtime.health()
-            runtime_health.details["uptime_seconds"] = round(uptime, 1)
+        subsystems_health = get_system_health()
+
+        # Determine overall status based on subsystems
+        status = "ok"
+        if any(sub.failed for sub in subsystems_health.values()):
+            status = "failed"
+        elif any(sub.degraded for sub in subsystems_health.values()):
+            status = "degraded"
+
+        # Serialize HealthStatus objects to dictionaries for JSON
+        serialized_subsystems = {
+            name: {
+                "status": sub.status,
+                "message": sub.message,
+                "details": sub.details,
+            }
+            for name, sub in subsystems_health.items()
+        }
 
         return {
-            "status": "ok",
+            "status": status,
             "version": VERSION,
             "uptime_seconds": round(uptime, 1),
-            "runtime": runtime_health,
+            "subsystems": serialized_subsystems,
         }
 
 

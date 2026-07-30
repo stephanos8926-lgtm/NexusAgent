@@ -74,121 +74,140 @@ class WorkerPool:
         from nexusagent.core.task.recovery import RecoveryManager
         from nexusagent.core.task.task_state import Task, TaskState
         from nexusagent.core.task.task_store import get_task_store
+        from nexusagent.core.observability import trace_context, get_metrics
+
+        metrics = get_metrics()
+        start_time = time.time()
 
         async with self._semaphore:
-            handle._mark_running()
-            task = self._worker_tasks.get(handle.worker_id)
+            metrics.set_gauge("runtime.active_workers", len(self._active))
+            trace_id = handle.contract.metadata.get("trace_id") if handle.contract.metadata else None
 
-            # Emit worker started event
-            if task:
-                emit_event_sync(
-                    WorkerEvent.started(
-                        source="worker_pool",
-                        worker_id=handle.worker_id,
-                        task_id=task.id,
-                        description=task.objective,
+            with trace_context(
+                trace_id=trace_id,
+                task_id=handle.contract.task_id,
+                worker_id=handle.worker_id,
+                component="WorkerPool",
+            ):
+                logger.info("Starting worker execution context for worker %s", handle.worker_id)
+                handle._mark_running()
+                task = self._worker_tasks.get(handle.worker_id)
+
+                # Emit worker started event
+                if task:
+                    emit_event_sync(
+                        WorkerEvent.started(
+                            source="worker_pool",
+                            worker_id=handle.worker_id,
+                            task_id=task.id,
+                            description=task.objective,
+                        )
                     )
-                )
 
-            if task:
-                task.transition_to(TaskState.PLANNING)
-                await self._task_store.save_task(task)
-                task.transition_to(TaskState.EXECUTING)
-                await self._task_store.save_task(task)
-            try:
-                meta = dict(handle.contract.metadata)
-                meta.setdefault("agent_model", handle.model)
-                meta.setdefault("agent_provider", handle.provider)
-                # Pass working_dir and system_prompt from contract to task metadata
-                if handle.contract.working_dir and handle.contract.working_dir != ".":
-                    meta["working_dir"] = handle.contract.working_dir
-                if handle.contract.system_prompt:
-                    meta["system_prompt"] = handle.contract.system_prompt
-                task_schema = TaskSchema(
-                    id=handle.contract.task_id,
-                    description=handle.contract.description,
-                    priority=handle.contract.priority,
-                    metadata=meta,
-                )
-
-                # Step 1: Create or Load Durable Task and transition to PLANNING / EXECUTING
-                store = get_task_store()
-                durable_task = await store.load_task(task_schema.id)
-                if not durable_task:
-                    durable_task = Task(
-                        id=task_schema.id,
-                        objective=task_schema.description,
-                        owner="worker_pool",
-                        state=TaskState.CREATED,
-                    )
-                    await store.save_task(durable_task)
-
-                # Check if we should recover/resume (skip if already completed)
-                latest_cp = await store.load_latest_checkpoint(task_schema.id)
-                if latest_cp and durable_task.state not in {TaskState.COMPLETED}:
-                    # Task crashed/restarted; recover using RecoveryManager
-                    if durable_task.state != TaskState.FAILED:
-                        try:
-                            durable_task.transition_to(TaskState.FAILED)
-                            await store.save_task(durable_task)
-                        except ValueError:
-                            durable_task.state = TaskState.FAILED
-                            await store.save_task(durable_task)
-
-                    async def execute_task_fn(t, cp):
-                        # Ensure we resume with the last checkpoint in mind
-                        return await self._execute_bounded(task_schema, handle, cp)
-
-                    recovery_mgr = RecoveryManager(store)
-                    # We can use a fast mock handler or trigger the failed event
-                    async def on_failed_event(t_id, err_msg):
-                        logger.error(f"POL Escalate: Task {t_id} failed: {err_msg}")
-
-                    result = await recovery_mgr.recover_task(
-                        task_id=task_schema.id,
-                        execute_fn=execute_task_fn,
-                        on_failed_event=on_failed_event,
-                    )
-                else:
-                    # Clean/normal run
-                    durable_task.state = TaskState.CREATED
-                    await store.save_task(durable_task)
-
-                    durable_task.transition_to(TaskState.PLANNING)
-                    await store.save_task(durable_task)
-
-                    durable_task.transition_to(TaskState.EXECUTING)
-                    await store.save_task(durable_task)
-
-                    result = await self._execute_bounded(task_schema, handle)
-
-                    durable_task.transition_to(TaskState.VERIFYING)
-                    await store.save_task(durable_task)
-
-                    durable_task.transition_to(TaskState.COMPLETED)
-                    await store.save_task(durable_task)
-
-                if handle.is_cancelled():
-                    handle._mark_failed("Cancelled by user")
-                else:
-                    handle._mark_completed(result)
-            except Exception as e:
-                # Mark as FAILED in durable store
+                if task:
+                    task.transition_to(TaskState.PLANNING)
+                    await self._task_store.save_task(task)
+                    task.transition_to(TaskState.EXECUTING)
+                    await self._task_store.save_task(task)
                 try:
+                    meta = dict(handle.contract.metadata)
+                    meta.setdefault("agent_model", handle.model)
+                    meta.setdefault("agent_provider", handle.provider)
+                    # Pass working_dir and system_prompt from contract to task metadata
+                    if handle.contract.working_dir and handle.contract.working_dir != ".":
+                        meta["working_dir"] = handle.contract.working_dir
+                    if handle.contract.system_prompt:
+                        meta["system_prompt"] = handle.contract.system_prompt
+                    task_schema = TaskSchema(
+                        id=handle.contract.task_id,
+                        description=handle.contract.description,
+                        priority=handle.contract.priority,
+                        metadata=meta,
+                    )
+
+                    # Step 1: Create or Load Durable Task and transition to PLANNING / EXECUTING
+                    store = get_task_store()
                     durable_task = await store.load_task(task_schema.id)
-                    if durable_task and durable_task.state != TaskState.FAILED:
-                        try:
-                            durable_task.transition_to(TaskState.FAILED)
-                            await store.save_task(durable_task)
-                        except ValueError:
-                            # If direct transition is not valid, force it or handle accordingly
-                            durable_task.state = TaskState.FAILED
-                            await store.save_task(durable_task)
-                except Exception as store_err:
-                    logger.error(f"Failed to update task state to FAILED: {store_err}")
-                handle._mark_failed(str(e))
-            finally:
-                self._active.pop(handle.worker_id, None)
+                    if not durable_task:
+                        durable_task = Task(
+                            id=task_schema.id,
+                            objective=task_schema.description,
+                            owner="worker_pool",
+                            state=TaskState.CREATED,
+                        )
+                        await store.save_task(durable_task)
+
+                    # Check if we should recover/resume (skip if already completed)
+                    latest_cp = await store.load_latest_checkpoint(task_schema.id)
+                    if latest_cp and durable_task.state not in {TaskState.COMPLETED}:
+                        # Task crashed/restarted; recover using RecoveryManager
+                        if durable_task.state != TaskState.FAILED:
+                            try:
+                                durable_task.transition_to(TaskState.FAILED)
+                                await store.save_task(durable_task)
+                            except ValueError:
+                                durable_task.state = TaskState.FAILED
+                                await store.save_task(durable_task)
+
+                        async def execute_task_fn(t, cp):
+                            # Ensure we resume with the last checkpoint in mind
+                            return await self._execute_bounded(task_schema, handle, cp)
+
+                        recovery_mgr = RecoveryManager(store)
+                        async def on_failed_event(t_id, err_msg):
+                            logger.error("POL Escalate: Task %s failed: %s", t_id, err_msg)
+
+                        result = await recovery_mgr.recover_task(
+                            task_id=task_schema.id,
+                            execute_fn=execute_task_fn,
+                            on_failed_event=on_failed_event,
+                        )
+                    else:
+                        # Clean/normal run
+                        durable_task.state = TaskState.CREATED
+                        await store.save_task(durable_task)
+
+                        durable_task.transition_to(TaskState.PLANNING)
+                        await store.save_task(durable_task)
+
+                        durable_task.transition_to(TaskState.EXECUTING)
+                        await store.save_task(durable_task)
+
+                        result = await self._execute_bounded(task_schema, handle)
+
+                        durable_task.transition_to(TaskState.VERIFYING)
+                        await store.save_task(durable_task)
+
+                        durable_task.transition_to(TaskState.COMPLETED)
+                        await store.save_task(durable_task)
+
+                    if handle.is_cancelled():
+                        handle._mark_failed("Cancelled by user")
+                        metrics.increment("agent.tasks_failed", labels={"error_type": "Cancelled"})
+                    else:
+                        handle._mark_completed(result)
+                        metrics.increment("agent.tasks_completed")
+                except Exception as e:
+                    metrics.increment("agent.tasks_failed", labels={"error_type": e.__class__.__name__})
+                    # Mark as FAILED in durable store
+                    try:
+                        durable_task = await store.load_task(task_schema.id)
+                        if durable_task and durable_task.state != TaskState.FAILED:
+                            try:
+                                durable_task.transition_to(TaskState.FAILED)
+                                await store.save_task(durable_task)
+                            except ValueError:
+                                # If direct transition is not valid, force it or handle accordingly
+                                durable_task.state = TaskState.FAILED
+                                await store.save_task(durable_task)
+                    except Exception as store_err:
+                        logger.error("Failed to update task state to FAILED: %s", store_err)
+                    handle._mark_failed(str(e))
+                finally:
+                    elapsed = time.time() - start_time
+                    metrics.record_histogram("runtime.task_duration_seconds", elapsed, labels={"task_id": handle.contract.task_id})
+                    self._active.pop(handle.worker_id, None)
+                    metrics.set_gauge("runtime.active_workers", len(self._active))
 
     async def _execute_bounded(self, task, handle, checkpoint=None) -> str:
         """Execute with turn counting, wall time, and cancellation checks.
@@ -206,7 +225,7 @@ class WorkerPool:
         if checkpoint is None:
             checkpoint = await store.load_latest_checkpoint(contract.task_id)
         if checkpoint:
-            logger.info(f"Resuming task {contract.task_id} from checkpoint at node: {checkpoint.current_node}")
+            logger.info("Resuming task %s from checkpoint at node: %s", contract.task_id, checkpoint.current_node)
             # Restore state from checkpoint
             turn = len(checkpoint.completed_actions)
             last_result = checkpoint.tool_results[-1] if checkpoint.tool_results else None

@@ -11,6 +11,7 @@ import asyncio
 import logging
 from collections.abc import Callable
 from enum import Enum
+from typing import Any
 
 from nexusagent.core.task.task_state import StateTransitionError, Task, TaskState
 
@@ -33,14 +34,76 @@ class RecoveryManager:
 
     def __init__(
         self,
+        store: Any = None,
         max_retries: int = 3,
         base_delay: float = 2.0,
         on_escalate: Callable[[Task], None] | None = None,
     ) -> None:
+        self._store = store
         self._max_retries = max_retries
         self._base_delay = base_delay
         self._retry_counts: dict[str, int] = {}
         self._on_escalate = on_escalate
+
+    async def recover_task(
+        self,
+        task_id: str,
+        execute_fn: Callable[[Task, Any], Any],
+        on_failed_event: Callable[[str, str], Any] | None = None,
+    ) -> Any:
+        """Load and attempt recovery of a failed task by re-executing it with RETRY/ROLLBACK."""
+        if self._store is None:
+            raise ValueError("Store must be configured on RecoveryManager for recover_task")
+
+        task = await self._store.load_task(task_id)
+        if task is None:
+            raise KeyError(f"Task {task_id} not found in store")
+
+        checkpoint = await self._store.load_latest_checkpoint(task_id)
+        strategy = await self.attempt_recovery(task)
+
+        if strategy in (RecoveryStrategy.RETRY, RecoveryStrategy.ROLLBACK):
+            try:
+                # Execute the task resumption
+                result = await execute_fn(task, checkpoint)
+                self.reset_retry_count(task_id)
+
+                # Transition to completed
+                try:
+                    task.transition_to(TaskState.VERIFYING)
+                    task.transition_to(TaskState.COMPLETED)
+                except Exception:
+                    task.state = TaskState.COMPLETED
+                await self._store.save_task(task)
+                return result
+            except Exception as exc:
+                # Classify exception
+                from nexusagent.core.observability.failures import FailureClassifier, FailureType
+
+                failure_type = FailureClassifier.classify(exc)
+                logger.error(
+                    "Failure occurred during recovery execution of task %s (type: %s): %s",
+                    task_id,
+                    failure_type.value,
+                    exc,
+                )
+
+                if failure_type == FailureType.SECURITY:
+                    if on_failed_event:
+                        await on_failed_event(task_id, f"Security error: {exc}")
+                    raise
+                elif failure_type == FailureType.DETERMINISTIC:
+                    if on_failed_event:
+                        await on_failed_event(task_id, f"Deterministic error: {exc}")
+                    raise
+                else:
+                    # Transient errors can be retried further or raised
+                    raise
+        else:
+            # ESCALATE
+            if on_failed_event:
+                await on_failed_event(task_id, "Recovery escalated")
+            raise RuntimeError(f"Task {task_id} recovery escalated to permanent failure")
 
     async def attempt_recovery(self, task: Task) -> RecoveryStrategy:
         """Attempt to recover a failed task.
@@ -63,7 +126,7 @@ class RecoveryManager:
             return RecoveryStrategy.ESCALATE
 
         if strategy == RecoveryStrategy.RETRY:
-            delay = self._base_delay * (2 ** (self._retry_counts.get(task.id, 0)))
+            delay = self._base_delay * (2 ** (self._retry_counts.get(task.id, 0) - 1))
             await asyncio.sleep(delay)
             try:
                 task.transition_to(TaskState.EXECUTING)
