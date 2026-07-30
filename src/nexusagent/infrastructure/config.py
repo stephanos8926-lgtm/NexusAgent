@@ -291,6 +291,72 @@ class TestModeConfig(BaseModel):
     )
 
 
+class RWIEEmbeddingConfig(BaseModel):
+    """RW_InferenceEngine embedding provider configuration."""
+
+    base_url: str = Field(
+        default="http://100.122.246.112:8300",
+        description="RW_InferenceEngine base URL (infra VM:8300)",
+    )
+    timeout_secs: int = Field(
+        default=30, ge=1, description="Request timeout in seconds"
+    )
+    batch_size: int = Field(
+        default=32, ge=1, le=128, description="Batch size for embedding requests"
+    )
+
+
+class LocalEmbeddingConfig(BaseModel):
+    """Local sentence-transformers embedding provider configuration."""
+
+    model: str = Field(
+        default="all-MiniLM-L6-v2",
+        description="sentence-transformers model name",
+    )
+
+
+class EmbeddingConfig(BaseModel):
+    """Embedding provider configuration."""
+
+    provider: str = Field(
+        default="gemini",
+        description="Embedding provider: 'gemini' | 'local' | 'rw_ie' | 'hash'",
+    )
+    rw_ie: RWIEEmbeddingConfig = Field(default_factory=RWIEEmbeddingConfig)
+    local: LocalEmbeddingConfig = Field(default_factory=LocalEmbeddingConfig)
+    # Target dimensions for storage (pad/truncate if provider dims differ)
+    target_dims: int = Field(
+        default=3072,
+        ge=1,
+        description="Target embedding dimensions for storage (pad/truncate if needed)",
+    )
+
+
+class RerankConfig(BaseModel):
+    """Reranker configuration for hybrid search."""
+
+    enabled: bool = Field(
+        default=False,
+        description="Enable reranker in hybrid search",
+    )
+    provider: str = Field(
+        default="rw_ie",
+        description="Reranker provider: currently only 'rw_ie' supported",
+    )
+    top_k_before_rerank: int = Field(
+        default=50,
+        ge=1,
+        le=200,
+        description="Number of candidates to fetch before reranking",
+    )
+    top_k_after_rerank: int = Field(
+        default=10,
+        ge=1,
+        le=50,
+        description="Final number of results after reranking",
+    )
+
+
 class ConfigSchema(BaseModel):
     """Top-level configuration schema aggregating all sub-configurations."""
 
@@ -303,8 +369,10 @@ class ConfigSchema(BaseModel):
     budget: BudgetConfig = Field(default_factory=BudgetConfig)
     hooks: HooksConfig = Field(default_factory=HooksConfig)
     test_mode: TestModeConfig = Field(default_factory=TestModeConfig)
-    # Trust subsystem configuration
     trust: TrustConfig = Field(default_factory=TrustConfig)
+    budget: BudgetConfig = Field(default_factory=BudgetConfig)
+    embedding: EmbeddingConfig = Field(default_factory=EmbeddingConfig)
+    rerank: RerankConfig = Field(default_factory=RerankConfig)
     # MCP server configuration
     mcp_servers: list[dict[str, str]] = Field(
         default_factory=list,

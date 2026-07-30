@@ -1,29 +1,55 @@
+from flask import Flask, request, jsonify
+import uuid
 
-import threading
-import time
+app = Flask(__name__)
 
+users = {} # In-memory user store
 
-def task(name, duration):
-    print(f"Task {name}: Starting (duration={duration}s)")
-    time.sleep(duration)
-    print(f"Task {name}: Finished")
+@app.route('/users', methods=['POST'])
+def create_user():
+    data = request.get_json()
+    if not data or 'name' not in data or 'email' not in data:
+        return jsonify({"error": "Name and email are required"}), 400
+    
+    user_id = str(uuid.uuid4())
+    new_user = {
+        "id": user_id,
+        "name": data['name'],
+        "email": data['email']
+    }
+    users[user_id] = new_user
+    return jsonify(new_user), 201
 
-if __name__ == "__main__":
-    print("Main: Starting concurrent tasks")
+@app.route('/users', methods=['GET'])
+def get_all_users():
+    return jsonify(list(users.values())), 200
 
-    t1 = threading.Thread(target=task, args=("One", 2))
-    t2 = threading.Thread(target=task, args=("Two", 3))
-    t3 = threading.Thread(target=task, args=("Three", 1))
-    t4 = threading.Thread(target=task, args=("Four", 4))
+@app.route('/users/<string:user_id>', methods=['GET'])
+def get_user(user_id):
+    user = users.get(user_id)
+    if user:
+        return jsonify(user), 200
+    return jsonify({"error": "User not found"}), 404
 
-    t1.start()
-    t2.start()
-    t3.start()
-    t4.start()
+@app.route('/users/<string:user_id>', methods=['PUT'])
+def update_user(user_id):
+    user = users.get(user_id)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
 
-    t1.join()
-    t2.join()
-    t3.join()
-    t4.join()
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "No data provided for update"}), 400
 
-    print("Main: All tasks finished")
+    user.update(data)
+    return jsonify(user), 200
+
+@app.route('/users/<string:user_id>', methods=['DELETE'])
+def delete_user(user_id):
+    if user_id in users:
+        del users[user_id]
+        return '', 204
+    return jsonify({"error": "User not found"}), 404
+
+if __name__ == '__main__':
+    app.run(host='127.0.0.1', port=5002)

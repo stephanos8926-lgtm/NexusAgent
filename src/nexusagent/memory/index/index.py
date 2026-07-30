@@ -36,6 +36,7 @@ from .embeddings import (
     EmbeddingProvider,
     _blob_to_vec,
     _vec_to_blob,
+    create_chained_embedding_provider,
 )
 
 logger = logging.getLogger(__name__)
@@ -63,7 +64,7 @@ class HybridMemoryIndex:
         self.workspace = Path(workspace_dir)
         self.db_path = self.workspace / ".memory" / "index.sqlite"
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        self.embedder = EmbeddingProvider()
+        self.embedder = create_chained_embedding_provider()
         self._db_pool: Any = None
         self._conn_lock = asyncio.Lock()
         self._init_db()
@@ -110,6 +111,7 @@ class HybridMemoryIndex:
                     line_end INTEGER,
                     content TEXT NOT NULL,
                     embedding BLOB,
+                    embedding_dim INTEGER,
                     indexed_at TEXT NOT NULL
                 )
                 """
@@ -217,16 +219,21 @@ class HybridMemoryIndex:
                 chunk_id = f"{relative_path}:{i}:{uuid.uuid4().hex[:8]}"
 
                 # Get embedding — use hash fallback for sync context
+                vec = None
+                vec_blob = None
+                vec_dim = 0
                 try:
                     vec = self.embedder._embed_hash(chunk["content"])
                     vec_blob = _vec_to_blob(vec)
+                    vec_dim = len(vec)
                 except Exception as e:
                     logger.warning("Embedding failed for chunk: %s", e)
                     vec_blob = None
+                    vec_dim = 0
 
                 conn.execute(
-                    "INSERT INTO chunks (id, file_path, line_start, line_end, content, embedding, indexed_at) "
-                    "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    "INSERT INTO chunks (id, file_path, line_start, line_end, content, embedding, embedding_dim, indexed_at) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                     (
                         chunk_id,
                         relative_path,
@@ -234,6 +241,7 @@ class HybridMemoryIndex:
                         chunk["end"],
                         chunk["content"],
                         vec_blob,
+                        vec_dim,
                         now,
                     ),
                 )
@@ -324,16 +332,20 @@ class HybridMemoryIndex:
                 chunk_id = f"{relative_path}:{i}:{uuid.uuid4().hex[:8]}"
 
                 # Use the ASYNC embedding chain (Gemini → local → hash fallback)
+                vec = None
+                vec_blob = None
+                vec_dim = 0
                 try:
                     vec = await self.embedder.embed(chunk["content"])
                     vec_blob = _vec_to_blob(vec)
+                    vec_dim = len(vec)
                 except Exception as e:
                     logger.warning("Embedding failed for chunk: %s", e)
                     vec_blob = None
 
                 conn.execute(
-                    "INSERT INTO chunks (id, file_path, line_start, line_end, content, embedding, indexed_at) "
-                    "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    "INSERT INTO chunks (id, file_path, line_start, line_end, content, embedding, embedding_dim, indexed_at) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                     (
                         chunk_id,
                         relative_path,
@@ -341,6 +353,7 @@ class HybridMemoryIndex:
                         chunk["end"],
                         chunk["content"],
                         vec_blob,
+                        vec_dim,
                         now,
                     ),
                 )

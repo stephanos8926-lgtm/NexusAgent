@@ -86,6 +86,27 @@ budget:
     - 0.95
   quota_cooldown_seconds: 3600
 
+# ─── Embedding Provider ────────────────────────────────────────────────────
+# Provider: 'gemini' | 'local' | 'rw_ie' | 'hash'
+# RW_InferenceEngine runs on infra VM (100.122.246.112:8300)
+embedding:
+  provider: "gemini"
+  target_dims: 3072  # pad/truncate if provider dims differ
+  rw_ie:
+    base_url: "http://100.122.246.112:8300"
+    timeout_secs: 30
+    batch_size: 32
+  local:
+    model: "all-MiniLM-L6-v2"
+
+# ─── Reranker (Hybrid Search) ──────────────────────────────────────────────
+# Reranker uses RW_InferenceEngine cross-encoder to re-score vector+keyword candidates
+rerank:
+  enabled: false
+  provider: "rw_ie"  # only 'rw_ie' supported currently
+  top_k_before_rerank: 50
+  top_k_after_rerank: 10
+
 # ─── Test Mode Safety ──────────────────────────────────────────────────────
 test_mode:
   block_real_api: true

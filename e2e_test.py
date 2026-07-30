@@ -5,13 +5,13 @@ import time
 import os
 
 class TestUserAPI(unittest.TestCase):
-    BASE_URL = "http://127.0.0.1:5000"
+    BASE_URL = "http://127.0.0.1:5002"
     PROCESS = None
 
     @classmethod
     def setUpClass(cls):
         # Start the Flask API server
-        cls.PROCESS = subprocess.Popen(["python3", "main.py"])
+        cls.PROCESS = subprocess.Popen(["/home/sysop/Workspaces/NexusAgent/api_e2e_project/new_venv/bin/python3", "/home/sysop/Workspaces/NexusAgent/main.py"])
         time.sleep(2)  # Give the server time to start
 
     @classmethod
