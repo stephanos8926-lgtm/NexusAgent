@@ -224,7 +224,9 @@ async def _handle_tool_call_event(app, event: dict) -> None:
 
             call_id = event.get("call_id", "")
             app._auto_approve_task = (
-                __import__("asyncio").get_event_loop().create_task(send_approval(app, call_id, True))
+                __import__("asyncio")
+                .get_event_loop()
+                .create_task(send_approval(app, call_id, True))
             )
 
     app.status_bar.set_status(f"Running: {tool}")
@@ -253,9 +255,7 @@ async def _handle_tool_result_event(app, event: dict) -> None:
                 # Same failure as before — collapse to keep scrollback readable
                 app._failure_repeat_count += 1
                 app._current_tool._collapsed = True
-                app._current_tool.update_output(
-                    f"(same error ×{app._failure_repeat_count})"
-                )
+                app._current_tool.update_output(f"(same error ×{app._failure_repeat_count})")
                 app._current_tool.refresh()
             else:
                 app._last_failure_key = failure_key
@@ -399,7 +399,42 @@ async def handle_slash_command(app, cmd: str) -> bool:
         _mount_with_limit(app, msg)
         return True
     if command == "/theme":
-        cycle_theme(app)
+        if rest:
+            theme_choice = "-".join(rest).strip().lower()
+            normalized_choice = theme_choice.replace(" ", "-").replace("_", "-")
+            if normalized_choice in ALL_THEMES:
+                app._theme_name = normalized_choice
+                app.theme = normalized_choice
+                msg = AppMessage(
+                    f"Theme switched directly to: [bold primary]{normalized_choice}[/bold primary]"
+                )
+                _mount_with_limit(app, msg)
+            else:
+                msg = AppMessage(
+                    f"⚠ Theme '[bold error]{theme_choice}[/bold error]' not found.\n"
+                    f"Available themes: "
+                    + ", ".join(f"[bold primary]{t}[/bold primary]" for t in ALL_THEMES)
+                )
+                _mount_with_limit(app, msg)
+        else:
+            cycle_theme(app)
+        return True
+    if command == "/theme-preview":
+        from nexusagent.widgets.theme import THEME_REGISTRY
+
+        lines = ["[bold primary]Theme Color Previews[/bold primary]:", ""]
+        for name, c in THEME_REGISTRY.items():
+            swatch_accent = f"[{c.accent}]████ Accent[/{c.accent}]"
+            swatch_bg = f"[{c.bg}]████ BG[/{c.bg}]"
+            swatch_text = f"[{c.text}]████ Text[/{c.text}]"
+            active = " ➔ " if app._theme_name == name else "   "
+            lines.append(
+                f"{active}[bold]{name:<18}[/bold]:  {swatch_accent}   {swatch_bg}   {swatch_text}"
+            )
+        lines.append("")
+        lines.append("[text-muted]To switch theme: /theme <name> (or Ctrl+T to cycle)[/text-muted]")
+        msg = AppMessage("\n".join(lines))
+        _mount_with_limit(app, msg)
         return True
     if command in ("/auto", "/yolo"):
         app.action_toggle_auto_approve()
