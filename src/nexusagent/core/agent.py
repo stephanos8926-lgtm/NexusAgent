@@ -18,6 +18,9 @@ from deepagents import create_deep_agent
 _tools_registered: bool = False
 _tools_registered_lock = threading.RLock()
 
+# Role tools version for MCP tool loading
+_role_tools_version: int = 0
+
 # Prompt injection defense: pattern markers injected into tool output
 _UNTRUSTED_MARKER = "[TOOL OUTPUT - UNTRUSTED CONTENT BELOW]"
 _INSTRUCTION_PATTERNS = [
@@ -219,8 +222,9 @@ class Agent:
 
         return model_name
 
-    async def __init__(
-        self,
+    @classmethod
+    async def create(
+        cls,
         role: str = "full",
         policy: str = "permissive",
         model_override: str | None = None,
@@ -228,8 +232,8 @@ class Agent:
         capabilities: list[str] | None = None,
         *args: Any,
         **kwargs: Any,
-    ) -> None:
-        """Initialize the agent (async — awaits MCP tool loading).
+    ) -> "Agent":
+        """Async factory to create an Agent (awaits MCP tool loading).
 
         Args:
             role: Tool access role. One of: minimal, reader, writer, coder,
@@ -247,7 +251,7 @@ class Agent:
         # Ensure static tools are registered (thread-safe)
         _ensure_tools_registered()
 
-        model_name = self._resolve_model(model_override, provider_override)
+        model_name = cls._resolve_model(model_override, provider_override)
 
         # Set policy context for this agent (thread-local)
         set_policy_context(role, policy)
@@ -260,28 +264,30 @@ class Agent:
             for cap in capabilities:
                 ctx["unlocked"].add(cap)
 
-# Await MCP tool loading before capturing snapshot
+        # Await MCP tool loading before capturing snapshot
         await _ensure_mcp_tools_loaded()
 
         # Capture per-agent snapshot of current registry
         from nexusagent.tools.registry import registry
 
-        self._snapshot = registry.current
-        self._snapshot_version = registry.version
-        self._role = role
+        instance = cls.__new__(cls)
+        instance._snapshot = registry.current
+        instance._snapshot_version = registry.version
+        instance._role = role
+        instance._policy = policy
 
         # Build tools for this role from the frozen snapshot
         if role == "full":
-            self._tools = [info.func for info in self._snapshot.values()]
+            instance._tools = [info.func for info in instance._snapshot.values()]
         else:
             from nexusagent.tools.registry import get_manifest
 
             manifest = get_manifest(role)
-            self._tools = []
+            instance._tools = []
             for name in sorted(manifest):
-                info = self._snapshot.get(name)
+                info = instance._snapshot.get(name)
                 if info is not None:
-                    self._tools.append(info.func)
+                    instance._tools.append(info.func)
 
         # Build the chat model explicitly with a request timeout + retry
         # policy, rather than handing create_deep_agent a bare model string.
@@ -322,12 +328,11 @@ class Agent:
             )
             model = model_name
 
-        self._inner = create_deep_agent(
+        instance._inner = create_deep_agent(
             model=model,
-            tools=self._tools,
+            tools=instance._tools,
         )
-        self._role = role
-        self._policy = policy
+        return instance
 
     @property
     def role(self) -> str:
@@ -367,7 +372,7 @@ async def run_agent_task(state: dict) -> dict:
     _setup_workspace_context(working_dir)
 
     try:
-        agent = await Agent(
+        agent = await Agent.create(
             role=role,
             policy=policy,
             model_override=model_override,

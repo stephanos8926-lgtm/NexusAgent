@@ -1,0 +1,21 @@
+board:
+  name: DevBoard
+claim_timeout: 1h
+defaults:
+  priority: medium
+  status: backlog
+next_id: 9
+priorities:
+- low
+- medium
+- high
+- critical
+statuses:
+- backlog
+- in-progress
+- review
+- done
+version: 1
+wip_limits:
+  in-progress: 3
+  review: 2

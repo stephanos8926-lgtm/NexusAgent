@@ -80,7 +80,7 @@ async def session_websocket(
     session_repo = get_session_repo()
 
     # Create a real agent for this interactive session
-    agent = Agent(role="full", policy="permissive")
+    agent = await Agent(role="full", policy="permissive")
 
     # Resolve workspace-scoped memory directory from query param or config
     import os as _os
