@@ -186,17 +186,21 @@ async def test_invalid_task_failure():
         assert response.status_code == 404
 
 
-@pytest.mark.asyncio
+@ pytest.mark.asyncio
 async def test_multiple_concurrent_tasks():
     """Submits multiple tasks simultaneously to verify worker reliability.
+    
+    Note: Tasks are spaced by 1.5s to respect Gemini 60 RPM quota (free tier default).
+    Even on paid tier, RPM limits are separate from spend caps and must be requested.
     """
     tasks_count = 2
     task_ids = []
 
-    # Submit 2 tasks
+    # Submit 2 tasks with spacing to stay under 60 RPM
     for i in range(tasks_count):
         tid = await sdk.submit_task({"description": f"Concurrent task {i}", "priority": 1})
         task_ids.append(tid)
+        await asyncio.sleep(1.5)  # Space out requests to respect RPM limit
 
     # Wait for all to complete
     for tid in task_ids:
