@@ -24,7 +24,7 @@
 - **Fix:** Implemented a robust, cancellable async background task loop that uses `asyncio.to_thread` to check and refresh Git status and branch name asynchronously every 15 seconds without blocking the main UI main loop. Added lifecycle hooks in `action_quit` and `on_unmount` to safely cancel the task and clean up signal handlers.
 - **Learning:** Periodically and asynchronously polling environment status (such as Git branch and workspace dirty states) directly in the background keeps terminal UI status bars accurate and responsive while maintaining standard non-blocking UX principles.
 
-## 2026-07-26 | [UX Improvement]
-- **Issue:** Selecting specific themes or discovering available themes in the TUI required repetitive cycling (using Ctrl+T or parameter-less `/theme` command), which is slow and inaccessible for users with specific contrast requirements.
-- **Fix:** Updated `/theme` slash command to support direct theme switching (e.g. `/theme tokyo night` or `/theme catppuccin_mocha` handles spaces and underscores using hyphen normalization), falling back to listing available options on mismatch. Implemented the unhandled `/theme-preview` slash command to display a beautiful visual swatch grid showing Accent, Background, and Text color block previews for all 7 themes using dynamic hex values from `THEME_REGISTRY`, complete with an active theme indicator.
-- **Learning:** Giving users direct command access and visual color swatch previews significantly enhances usability, accessibility, and visual discoverability of user themes in terminal applications.
+## 2026-07-27 | [UX Improvement]
+- **Issue:** The TUI's context limit usage bar (`ContextWindowBar` and its rendering inside `StatusBar` in `src/nexusagent/widgets/status.py`) used hardcoded color hex constants (`#10B981`, `#EB8B46`, `#F7768E`) and simple text strings (`"green"`, `"yellow"`, `"red"`), ignoring active user theme tokens.
+- **Fix:** Refactored `ContextWindowBar` to accept an optional `theme_colors` parameter and updated `StatusBar._update_widgets()` to retrieve the active theme colors dynamically via `get_theme_colors(self.app.theme)`.
+- **Learning:** Unifying utility classes with active theme registries guarantees that all UI components remain perfectly compliant with custom/user-selected themes, preventing hardcoded visual inconsistency.

@@ -235,14 +235,15 @@ class StatusBar(Horizontal):
             try:
                 ctx_widget = self.query_one("#status-context", Static)
                 if self._context_limit > 0:
-                    pct = min(100, int(self._context_used / self._context_limit * 100))
-                    if pct >= 90:
-                        ctx_color = "red"
-                    elif pct >= 70:
-                        ctx_color = "yellow"
-                    else:
-                        ctx_color = "green"
-                    ctx_widget.update(f"[{ctx_color}]ctx {pct}%[/{ctx_color}]")
+                    from nexusagent.widgets.theme import get_theme_colors
+                    theme_name = getattr(self.app, "theme", "nexus-dark")
+                    theme_colors = get_theme_colors(theme_name)
+                    bar = ContextWindowBar(
+                        used=self._context_used,
+                        total=self._context_limit,
+                        theme_colors=theme_colors,
+                    )
+                    ctx_widget.update(f"[{bar.color}]ctx {bar.percentage}%[/{bar.color}]")
                 else:
                     ctx_widget.update("")
             except NoMatches:
@@ -433,15 +434,17 @@ class ContextWindowBar:
     WARN_COLOR = "#EB8B46"
     DANGER_COLOR = "#F7768E"
 
-    def __init__(self, used: int, total: int) -> None:
+    def __init__(self, used: int, total: int, theme_colors: Any | None = None) -> None:
         """Initialize the context window bar.
 
         Args:
             used: Number of context tokens used.
             total: Total context window size.
+            theme_colors: Optional ThemeColors object for dynamic color styling.
         """
         self.used = used
         self.total = total
+        self.theme_colors = theme_colors
 
     @property
     def percentage(self) -> int:
@@ -454,11 +457,20 @@ class ContextWindowBar:
     def color(self) -> str:
         """Color code based on usage level."""
         pct = self.percentage
+        if self.theme_colors:
+            safe = self.theme_colors.success
+            warn = self.theme_colors.warning
+            danger = self.theme_colors.error
+        else:
+            safe = self.SAFE_COLOR
+            warn = self.WARN_COLOR
+            danger = self.DANGER_COLOR
+
         if pct > 90:
-            return self.DANGER_COLOR
+            return danger
         elif pct >= 70:
-            return self.WARN_COLOR
-        return self.SAFE_COLOR
+            return warn
+        return safe
 
     def bar(self, width: int = 10) -> str:
         """Render a textual bar string showing usage."""
