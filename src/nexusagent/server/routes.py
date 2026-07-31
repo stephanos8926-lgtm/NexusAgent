@@ -202,6 +202,14 @@ def register_routes(app: FastAPI) -> None:
             "nats": "connected" if _bus.nc else "disconnected",
         }
 
+    # ─── Metrics ────────────────────────────────────────────────────────
+
+    @app.get("/metrics")
+    def get_metrics_endpoint():
+        """Retrieve a snapshot of system metrics."""
+        from nexusagent.core.observability.metrics import get_metrics
+        return get_metrics().get_snapshot()
+
     # ─── Task Listing ───────────────────────────────────────────────────
 
     @app.get("/tasks", dependencies=[Depends(verify_api_key)])

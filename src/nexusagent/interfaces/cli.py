@@ -122,7 +122,13 @@ def submit(task, skip_version_check):
 
     # Handle --check-server
     # (check_server is accessed via the parent context in click)
-    logging.basicConfig(level=settings.log_level, format="%(levelname)s: %(message)s")
+    from nexusagent.core.observability import setup_structured_logging
+    import os
+
+    if getattr(settings.logging, "structured", False) or os.getenv("NEXUS_STRUCTURED_LOGGING", "").lower() in ("true", "1", "yes"):
+        setup_structured_logging(settings.log_level)
+    else:
+        logging.basicConfig(level=settings.log_level, format="%(levelname)s: %(message)s")
     logger = logging.getLogger(__name__)
 
     async def run_client() -> None:

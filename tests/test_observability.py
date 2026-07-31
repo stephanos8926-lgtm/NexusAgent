@@ -259,3 +259,55 @@ def test_system_event_trace_integration():
         assert event.request_id == "event-req-xyz"
         assert event.task_id == "event-task-xyz"
         assert event.worker_id == "event-worker-xyz"
+
+
+def test_metrics_endpoint():
+    """Verify that the /metrics endpoint returns the metrics collector's snapshot."""
+    from fastapi.testclient import TestClient
+    from nexusagent.server.routes import register_routes
+    from fastapi import FastAPI
+    from nexusagent.core.observability.metrics import get_metrics
+
+    # Clear and populate some metrics
+    metrics = get_metrics()
+    metrics.clear()
+    metrics.increment("test.counter_one", value=12.0)
+    metrics.set_gauge("test.gauge_one", 42.0)
+
+    # Initialize small FastAPI app and register routes
+    app = FastAPI()
+    register_routes(app)
+
+    client = TestClient(app)
+    response = client.get("/metrics")
+    assert response.status_code == 200
+
+    data = response.json()
+    assert "counters" in data
+    assert "gauges" in data
+    assert "histograms" in data
+    assert data["counters"]["test.counter_one"] == 12.0
+    assert data["gauges"]["test.gauge_one"] == 42.0
+
+
+def test_structured_logging_integration_via_config():
+    """Verify logging configuration handles the new 'structured' flag and setup."""
+    from nexusagent.infrastructure.config import settings
+    from nexusagent.core.observability import setup_structured_logging, StructuredLoggingFormatter
+
+    # Backup original structured flag
+    orig_structured = settings.logging.structured
+    try:
+        settings.logging.structured = True
+        assert settings.logging.structured is True
+
+        # We can also call setup_structured_logging and check that StructuredLoggingFormatter is registered
+        setup_structured_logging("DEBUG")
+        root_logger = logging.getLogger()
+        assert len(root_logger.handlers) == 1
+        assert isinstance(root_logger.handlers[0].formatter, StructuredLoggingFormatter)
+    finally:
+        # Revert changes and restore basic config to root logger
+        settings.logging.structured = orig_structured
+        logging.getLogger().handlers.clear()
+        logging.basicConfig(level="INFO")

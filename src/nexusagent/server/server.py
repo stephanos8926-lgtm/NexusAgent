@@ -23,9 +23,14 @@ _PID_FILE = os.path.join(os.path.expanduser("~"), ".nexusagent", "server.pid")
 _SERVER_START_TIME = time.monotonic()
 
 # Setup logging
-logging.basicConfig(
-    level=settings.log_level, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
-)
+from nexusagent.core.observability import setup_structured_logging
+
+if getattr(settings.logging, "structured", False) or os.getenv("NEXUS_STRUCTURED_LOGGING", "").lower() in ("true", "1", "yes"):
+    setup_structured_logging(settings.log_level)
+else:
+    logging.basicConfig(
+        level=settings.log_level, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+    )
 logger = logging.getLogger(__name__)
 
 
