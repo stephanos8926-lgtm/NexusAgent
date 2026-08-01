@@ -18,7 +18,13 @@ from nexusagent.infrastructure.config import settings
 from nexusagent.runtime.runtime import Runtime
 from nexusagent.version import VERSION
 
+import os
+
 logger = logging.getLogger("nexusagent.server")
+
+if settings.logging.structured or os.environ.get("NEXUS_STRUCTURED_LOGGING", "").lower() in ("1", "true", "yes", "on"):
+    from nexusagent.core.observability import setup_structured_logging
+    setup_structured_logging(level=settings.logging.level)
 
 
 @asynccontextmanager

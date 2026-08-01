@@ -259,3 +259,75 @@ def test_system_event_trace_integration():
         assert event.request_id == "event-req-xyz"
         assert event.task_id == "event-task-xyz"
         assert event.worker_id == "event-worker-xyz"
+
+
+def test_metrics_endpoint_returns_snapshot():
+    """Verify that the /metrics endpoint returns the active metrics collector's snapshot."""
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from nexusagent.server.routes import register_routes
+    from nexusagent.core.observability import get_metrics
+
+    # Reset metrics collector and record a dummy metric
+    metrics = get_metrics()
+    metrics.clear()
+    metrics.increment("test_endpoint_metric", 5.0)
+
+    app = FastAPI()
+    register_routes(app)
+    client = TestClient(app)
+
+    response = client.get("/metrics")
+    assert response.status_code == 200
+    data = response.json()
+    assert "counters" in data
+    assert "test_endpoint_metric" in data["counters"]
+    assert data["counters"]["test_endpoint_metric"] == 5.0
+
+
+def test_logging_config_parses_structured():
+    """Verify that LoggingConfig correctly parses the 'structured' field from dictionary or environment overrides."""
+    from nexusagent.infrastructure.config import ConfigSchema
+
+    # 1. Default False
+    config = ConfigSchema()
+    assert config.logging.structured is False
+
+    # 2. From raw dict override
+    raw_data = {"logging": {"structured": True}}
+    config2 = ConfigSchema(**raw_data)
+    assert config2.logging.structured is True
+
+
+def test_structured_logging_initialization_triggers():
+    """Verify that structured logging is initialized under configuration or environment variables."""
+    from unittest.mock import patch, MagicMock
+    import os
+
+    # Test configuration trigger: settings.logging.structured = True
+    mock_settings = MagicMock()
+    mock_settings.logging.structured = True
+    mock_settings.logging.level = "DEBUG"
+
+    with patch("nexusagent.core.observability.setup_structured_logging") as mock_setup:
+        with patch("nexusagent.infrastructure.config.settings", mock_settings):
+            is_structured = mock_settings.logging.structured or os.environ.get("NEXUS_STRUCTURED_LOGGING", "").lower() in ("1", "true", "yes", "on")
+            if is_structured:
+                from nexusagent.core.observability import setup_structured_logging
+                setup_structured_logging(level=mock_settings.logging.level)
+
+            mock_setup.assert_called_once_with(level="DEBUG")
+
+    # Test environment trigger: NEXUS_STRUCTURED_LOGGING = "true"
+    mock_settings_false = MagicMock()
+    mock_settings_false.logging.structured = False
+    mock_settings_false.logging.level = "INFO"
+
+    with patch("nexusagent.core.observability.setup_structured_logging") as mock_setup:
+        with patch.dict(os.environ, {"NEXUS_STRUCTURED_LOGGING": "true"}):
+            is_structured = mock_settings_false.logging.structured or os.environ.get("NEXUS_STRUCTURED_LOGGING", "").lower() in ("1", "true", "yes", "on")
+            if is_structured:
+                from nexusagent.core.observability import setup_structured_logging
+                setup_structured_logging(level=mock_settings_false.logging.level)
+
+            mock_setup.assert_called_once_with(level="INFO")

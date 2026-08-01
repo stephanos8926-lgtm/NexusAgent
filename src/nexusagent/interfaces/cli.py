@@ -104,6 +104,13 @@ def main(ctx, check_server) -> None:
     ctx.ensure_object(dict)
     ctx.obj["check_server"] = check_server
 
+    # Set up global logging based on configuration and environment
+    import os
+    from nexusagent.infrastructure.config import settings
+    if settings.logging.structured or os.environ.get("NEXUS_STRUCTURED_LOGGING", "").lower() in ("1", "true", "yes", "on"):
+        from nexusagent.core.observability import setup_structured_logging
+        setup_structured_logging(level=settings.logging.level)
+
 
 @main.command()
 @click.argument("task")
@@ -122,7 +129,12 @@ def submit(task, skip_version_check):
 
     # Handle --check-server
     # (check_server is accessed via the parent context in click)
-    logging.basicConfig(level=settings.log_level, format="%(levelname)s: %(message)s")
+    import os
+    if settings.logging.structured or os.environ.get("NEXUS_STRUCTURED_LOGGING", "").lower() in ("1", "true", "yes", "on"):
+        from nexusagent.core.observability import setup_structured_logging
+        setup_structured_logging(level=settings.logging.level)
+    else:
+        logging.basicConfig(level=settings.log_level, format="%(levelname)s: %(message)s")
     logger = logging.getLogger(__name__)
 
     async def run_client() -> None:

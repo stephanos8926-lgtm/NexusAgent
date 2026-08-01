@@ -68,7 +68,7 @@ def register_routes(app: FastAPI) -> None:
     async def rate_limit_middleware(request, call_next):
         """Apply rate limiting to all API endpoints."""
         # Skip rate limiting for health/version endpoints
-        if request.url.path in ("/health", "/version") or request.url.path.startswith("/sessions/"):
+        if request.url.path in ("/health", "/version", "/metrics") or request.url.path.startswith("/sessions/"):
             return await call_next(request)
 
         # Identify client by API key header or fallback to client IP
@@ -187,6 +187,15 @@ def register_routes(app: FastAPI) -> None:
             "nats": "connected" if nats_connected else "disconnected",
             "jetstream": js_available,
         }
+
+    # ─── Metrics Check ──────────────────────────────────────────────────
+
+    @app.get("/metrics")
+    async def metrics_endpoint():
+        """Retrieve a snapshot of the active metrics collector."""
+        from nexusagent.core.observability import get_metrics
+
+        return get_metrics().get_snapshot()
 
     # ─── Version ────────────────────────────────────────────────────────
 
