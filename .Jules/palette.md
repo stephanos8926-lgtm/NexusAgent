@@ -28,3 +28,8 @@
 - **Issue:** The TUI's expand-all (`/expand`, `/e`) and collapse-all (`/collapse`, `/a`) slash commands were stubbed out as no-op placeholders returning `True` without performing any actual actions on the mounted tool call widgets.
 - **Fix:** Wired the `/expand`, `/e`, `/collapse`, and `/a` slash commands directly to the core TUI `NexusApp` actions `action_expand_all()` and `action_collapse_all()`, completely resolving the legacy TODO. Added a comprehensive suite of unit tests verifying correct integration and toggle-state propagation.
 - **Learning:** Slash commands and global keyboard hotkeys representing the same intent should always delegate to the exact same core action handler. Centralizing this invocation path prevents divergence in UX behavior and simplifies automated unit testing of visual interface state transitions.
+
+## 2026-08-02 | [UX Improvement]
+- **Issue:** TUI themes could only be cycled sequentially via keyboard and lacks a direct selection command or a visual grid preview, and the context window usage bar used static color constants instead of active theme design tokens.
+- **Fix:** Implemented direct theme selection in the `/theme` command with automatic string normalization, and a new `/theme-preview` slash command that displays a visual grid of registered themes with active indicators. Updated `ContextWindowBar` and `StatusBar` to dynamically map context bar colors using active theme design tokens (`success`, `warning`, `error` from `ThemeColors`).
+- **Learning:** Supporting direct, normalized selection parameters and visual theme preview grids adds massive user delight and clarity, while mapping colors to design tokens guarantees visual coherence across themes.
