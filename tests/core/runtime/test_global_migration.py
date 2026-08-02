@@ -10,24 +10,25 @@ import pytest
 from nexusagent.runtime.context import RuntimeContext, set_current_context
 
 
+@pytest.fixture(autouse=True)
+def _clear_contextvars():
+    """Reset shared ContextVars before each test to ensure clean state.
+
+    ContextVars are process-global and persist across tests, so tests that
+    check default None values must reset them explicitly.
+    """
+    from nexusagent.core.agent import _current_session, _ws_memory_dir
+    from nexusagent.tools.fs_base import _workspace_root_var
+    from nexusagent.tools.registry.policy import _policy_context
+
+    _current_session.set(None)
+    _ws_memory_dir.set(None)
+    _workspace_root_var.set(None)
+    _policy_context.set(None)
+
+
 class TestShimBackwardCompat:
     """All 7 global shims must fall back to module-level state when no RuntimeContext."""
-
-    @pytest.fixture(autouse=True)
-    def _clear_contextvars(self):
-        """Reset shared ContextVars before each test to ensure clean state.
-
-        ContextVars are process-global and persist across tests, so tests that
-        check default None values must reset them explicitly.
-        """
-        from nexusagent.core.agent import _current_session, _ws_memory_dir
-        from nexusagent.tools.fs_base import _workspace_root_var
-        from nexusagent.tools.registry.policy import _policy_context
-
-        _current_session.set(None)
-        _ws_memory_dir.set(None)
-        _workspace_root_var.set(None)
-        _policy_context.set(None)
 
     def test_current_session_var_no_context(self):
         """_current_session ContextVar works without RuntimeContext."""
@@ -78,6 +79,9 @@ class TestShimBackwardCompat:
     @patch("nexusagent.tools.register_all.register_all")
     def test_ensure_tools_registered_fallback(self, mock_register):
         """_ensure_tools_registered() works without RuntimeContext."""
+        import nexusagent.core.agent
+        nexusagent.core.agent._tools_registered = False
+
         from nexusagent.core.agent import _ensure_tools_registered
 
         _ensure_tools_registered()

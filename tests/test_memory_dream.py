@@ -21,10 +21,11 @@ import pytest
 def _reset_workspace_state():
     """Ensure each test starts from a clean workspace state."""
     from nexusagent.core.agent import _ws_memory_dir
-    from nexusagent.tools.fs_base import set_workspace_root
+    from nexusagent.tools.fs_base import _get_workspace_root, set_workspace_root
 
     token = _ws_memory_dir.set(None)
-    prev_root = set_workspace_root(".")
+    prev_root = _get_workspace_root()
+    set_workspace_root(".")
     try:
         yield
     finally:
