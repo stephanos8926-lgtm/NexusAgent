@@ -15,7 +15,7 @@
 - **Learning:** Mediating tool requests through user-understandable capability tiers (such as Low, Medium, High, and Critical) rather than bare system commands significantly simplifies security compliance auditing while providing intuitive, granular feedback directly into system event logs.
 
 ## 2026-07-26 | Interactive Keyboard Accessibility in TUI Messages
-- **Issue:** The `ToolCallMessage` widget displayed collapsible tool results but was not focusable by keyboard-only or screen-reader users, preventing them from expanding/collapsing outputs.
+- **Issue:** The `ToolCallMessage` widget displayed collapsible tool results but was not focusable by keyboard-only or screen-reader users, preventing them from expanding/collapse outputs.
 - **Fix:** Configured `can_focus = True` on `ToolCallMessage`, added visual `:focus` styles using `$primary` border and `$boost` background, assigned a user-friendly tooltip, and handled Enter/Space keys to toggle collapse.
 - **Learning:** Accessibility must be baked into custom container elements from the start. Making interactive elements focusable with visual feedback and intuitive keystroke handlers ensures that all developers and users can navigate logs easily.
 
@@ -24,7 +24,7 @@
 - **Fix:** Implemented a robust, cancellable async background task loop that uses `asyncio.to_thread` to check and refresh Git status and branch name asynchronously every 15 seconds without blocking the main UI main loop. Added lifecycle hooks in `action_quit` and `on_unmount` to safely cancel the task and clean up signal handlers.
 - **Learning:** Periodically and asynchronously polling environment status (such as Git branch and workspace dirty states) directly in the background keeps terminal UI status bars accurate and responsive while maintaining standard non-blocking UX principles.
 
-## 2026-07-27 | [UX Improvement]
-- **Issue:** The TUI's context limit usage bar (`ContextWindowBar` and its rendering inside `StatusBar` in `src/nexusagent/widgets/status.py`) used hardcoded color hex constants (`#10B981`, `#EB8B46`, `#F7768E`) and simple text strings (`"green"`, `"yellow"`, `"red"`), ignoring active user theme tokens.
-- **Fix:** Refactored `ContextWindowBar` to accept an optional `theme_colors` parameter and updated `StatusBar._update_widgets()` to retrieve the active theme colors dynamically via `get_theme_colors(self.app.theme)`.
-- **Learning:** Unifying utility classes with active theme registries guarantees that all UI components remain perfectly compliant with custom/user-selected themes, preventing hardcoded visual inconsistency.
+## 2026-07-30 | [UX Improvement]
+- **Issue:** The TUI's expand-all (`/expand`, `/e`) and collapse-all (`/collapse`, `/a`) slash commands were stubbed out as no-op placeholders returning `True` without performing any actual actions on the mounted tool call widgets.
+- **Fix:** Wired the `/expand`, `/e`, `/collapse`, and `/a` slash commands directly to the core TUI `NexusApp` actions `action_expand_all()` and `action_collapse_all()`, completely resolving the legacy TODO. Added a comprehensive suite of unit tests verifying correct integration and toggle-state propagation.
+- **Learning:** Slash commands and global keyboard hotkeys representing the same intent should always delegate to the exact same core action handler. Centralizing this invocation path prevents divergence in UX behavior and simplifies automated unit testing of visual interface state transitions.
