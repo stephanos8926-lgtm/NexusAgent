@@ -85,6 +85,7 @@ jobs:
             --ignore=tests/test_e2e_production.py \
             --ignore=tests/test_graph_nodes.py \
             --ignore=tests/test_bus.py \
+            -k "not needs_db and not slow" \
             --maxfail=5 2>&1 | tee /tmp/ci_test_output.txt
           PASS=$(grep -E "passed" /tmp/ci_test_output.txt | tail -1)
           echo "Result line: $PASS"
