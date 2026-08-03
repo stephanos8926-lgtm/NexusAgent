@@ -67,6 +67,11 @@ jobs:
           done
           echo "No deletions against migration deliverables."
 
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
       - name: Tests must remain green on master
         run: |
           python3 -m venv .venv
