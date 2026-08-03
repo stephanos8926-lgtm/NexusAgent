@@ -367,10 +367,12 @@ class TestWidgetArchitecture:
         app = self._make_app_with_widgets()
         app._input_queue = MagicMock()
 
+        import inspect
         coro = None
         def mock_create_task_fn(c):
             nonlocal coro
-            coro = c
+            if inspect.iscoroutine(c):
+                coro = c
             return MagicMock()
 
         with patch("asyncio.create_task", side_effect=mock_create_task_fn) as mock_create_task:
@@ -391,9 +393,23 @@ class TestWidgetArchitecture:
             app._git_refresh_task.cancel.assert_called_once()
             app._restore_sigwinch.assert_called_once()
 
-            # Close the coroutine to avoid unawaited coroutine warnings
+            # Close and clean up the coroutine to avoid unawaited coroutine warnings
             if coro:
                 coro.close()
+
+            # Clear references in closure and mock to release the coroutine object
+            mock_create_task.side_effect = None
+            mock_create_task.reset_mock()
+            mock_create_task.mock_calls.clear()
+            mock_create_task.call_args = None
+            mock_create_task.call_args_list.clear()
+            coro = None
+
+            import gc
+            import warnings
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", RuntimeWarning)
+                gc.collect()
 
     def test_nexus_app_has_messages_container(self):
         """NexusApp should have messages_container attribute (set in on_mount)."""
