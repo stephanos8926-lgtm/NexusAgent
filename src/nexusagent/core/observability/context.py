@@ -4,9 +4,9 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Generator
 from contextlib import contextmanager
 from contextvars import ContextVar
-from typing import Generator
 
 # Context variables for distributed tracing correlation identifiers
 request_id_var: ContextVar[str] = ContextVar("request_id", default="")
@@ -29,7 +29,7 @@ def trace_context(
     worker_id: str | None = None,
     component: str | None = None,
     event_type: str | None = None,
-) -> Generator[dict[str, str], None, None]:
+) -> Generator[dict[str, str]]:
     """Context manager to propagate tracing identifiers down the call stack.
 
     Generates a unique trace_id if none exists in the current context or arguments.

@@ -7,10 +7,10 @@ error handling across all LLM and embedding providers.
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 
-class UpstreamErrorCode(str, Enum):
+class UpstreamErrorCode(StrEnum):
     """Canonical error codes for upstream provider failures.
 
     These codes are provider-agnostic and map to specific error conditions

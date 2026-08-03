@@ -3,28 +3,28 @@
 
 from __future__ import annotations
 
+from .engine import PolicyEngine, get_policy_engine
 from .models import Capability, CapabilityGrant, Permission, RiskLevel
 from .registry import CapabilityRegistry, get_capability_registry, get_required_capability
-from .engine import PolicyEngine, get_policy_engine
 from .router import (
     CapabilityRouter,
     get_capability_router,
-    log_audit_event_sync,
     log_audit_event_async,
+    log_audit_event_sync,
 )
 
 __all__ = [
     "Capability",
     "CapabilityGrant",
-    "Permission",
-    "RiskLevel",
     "CapabilityRegistry",
-    "get_capability_registry",
-    "get_required_capability",
-    "PolicyEngine",
-    "get_policy_engine",
     "CapabilityRouter",
+    "Permission",
+    "PolicyEngine",
+    "RiskLevel",
+    "get_capability_registry",
     "get_capability_router",
-    "log_audit_event_sync",
+    "get_policy_engine",
+    "get_required_capability",
     "log_audit_event_async",
+    "log_audit_event_sync",
 ]

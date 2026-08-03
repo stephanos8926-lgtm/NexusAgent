@@ -103,6 +103,7 @@ def _wire_runtime_health(app: fastapi.FastAPI) -> None:
     async def health() -> dict[str, Any]:
         """Return server health, including detailed subsystems status."""
         import time
+
         from nexusagent.core.observability import get_system_health
         from nexusagent.server.server import _SERVER_START_TIME
 

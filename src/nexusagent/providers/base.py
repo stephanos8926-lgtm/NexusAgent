@@ -7,13 +7,11 @@ themselves via the factory at `registry.py`.
 
 from __future__ import annotations
 
-import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, Generic, Protocol, TypeVar
+from typing import Any, TypeVar
 
-from nexusagent.infrastructure.errors import UpstreamError, UpstreamErrorCode
-
+from nexusagent.infrastructure.errors import UpstreamError
 
 # ── Type Variables ─────────────────────────────────────────────────────────────
 
@@ -42,7 +40,7 @@ class ProviderMetadata:
 # ── Result Types ───────────────────────────────────────────────────────────────
 
 @dataclass
-class ProviderResult(Generic[T_Response]):
+class ProviderResult[T_Response]:
     """Result from a provider execution attempt."""
     provider: str
     model: str
@@ -140,7 +138,7 @@ class ProviderConfig:
 
 # ── Provider Factory ───────────────────────────────────────────────────────────
 
-class ProviderFactory(ABC, Generic[T_Response]):
+class ProviderFactory[T_Response](ABC):
     """Abstract factory for creating providers from config."""
 
     @abstractmethod

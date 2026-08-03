@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 
 from nexusagent.core.observability.context import (
     component_var,

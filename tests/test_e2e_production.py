@@ -189,7 +189,7 @@ async def test_invalid_task_failure():
 @ pytest.mark.asyncio
 async def test_multiple_concurrent_tasks():
     """Submits multiple tasks simultaneously to verify worker reliability.
-    
+
     Note: Tasks are spaced by 1.5s to respect Gemini 60 RPM quota (free tier default).
     Even on paid tier, RPM limits are separate from spend caps and must be requested.
     """

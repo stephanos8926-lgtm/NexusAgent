@@ -33,7 +33,6 @@ from .embeddings import (
     EMBED_DIM,
     KEYWORD_WEIGHT,
     VECTOR_WEIGHT,
-    EmbeddingProvider,
     _blob_to_vec,
     _vec_to_blob,
     create_chained_embedding_provider,

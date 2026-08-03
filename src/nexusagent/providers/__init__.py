@@ -11,9 +11,9 @@ from __future__ import annotations
 from nexusagent.infrastructure.errors import (
     UpstreamError,
     UpstreamErrorCode,
-    is_retryable,
     is_auth_related,
     is_budget_related,
+    is_retryable,
 )
 
 from .base import (
@@ -39,28 +39,28 @@ from .implementations import register_providers as register_embedding_providers
 from .llm_implementations import register_llm_providers
 
 __all__ = [
+    "BudgetGate",
+    "CircuitBreakerGate",
     "EmbeddingProvider",
+    "ErrorTypeGate",
+    "FallbackChain",
+    "FallbackContext",
+    "FallbackExhaustedError",
     "LLMProvider",
+    "LogicGate",
     "ProviderConfig",
     "ProviderMetadata",
     "ProviderRegistry",
     "ProviderResult",
     "RerankerProvider",
-    "get_provider_registry",
-    "BudgetGate",
-    "CircuitBreakerGate",
-    "ErrorTypeGate",
-    "FallbackChain",
-    "FallbackContext",
-    "FallbackExhaustedError",
-    "LogicGate",
     "UpstreamError",
     "UpstreamErrorCode",
-    "is_retryable",
+    "get_provider_registry",
     "is_auth_related",
     "is_budget_related",
-    "register_providers",
+    "is_retryable",
     "register_llm_providers",
+    "register_providers",
 ]
 
 # Auto-register built-in providers on import

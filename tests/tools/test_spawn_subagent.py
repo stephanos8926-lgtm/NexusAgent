@@ -3,7 +3,7 @@
 
 import pytest
 
-import nexusagent.tools.register_all  # noqa: F401 — triggers registration
+import nexusagent.tools.register_all
 from nexusagent.tools.registry import get_tool_info
 from nexusagent.tools.registry.core import registry
 

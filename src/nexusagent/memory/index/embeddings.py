@@ -5,7 +5,6 @@ Memory-specific constants and serialization remain here.
 """
 from __future__ import annotations
 
-import asyncio
 import logging
 import struct
 import threading
@@ -18,10 +17,6 @@ from nexusagent.providers import get_provider_registry
 # Re-export for backward compatibility
 from nexusagent.providers.implementations import (
     HashEmbeddingProvider,
-    LocalEmbeddingProvider,
-    RWIEEmbeddingProvider,
-    GeminiEmbeddingProvider,
-    OpenAICompatibleEmbeddingProvider,
 )
 
 logger = logging.getLogger(__name__)
@@ -57,24 +52,24 @@ _DB_POOL = _get_db_pool("default")
 
 class EmbeddingProvider(ABC):
     """Abstract base class for embedding providers (backward compat)."""
-    
+
     @property
     @abstractmethod
     def name(self) -> str:
         """Unique provider identifier."""
         pass
-    
+
     @property
     @abstractmethod
     def dims(self) -> int:
         """Native embedding dimension."""
         pass
-    
+
     @abstractmethod
     async def embed(self, text: str) -> list[float]:
         """Embed a single text."""
         pass
-    
+
     @abstractmethod
     async def embed_batch(self, texts: list[str]) -> list[list[float]]:
         """Embed a batch of texts."""
@@ -85,22 +80,22 @@ class EmbeddingProvider(ABC):
 
 def create_embedding_provider():
     """Create embedding provider based on config, using provider registry.
-    
+
     Returns an embedding provider instance or None if unavailable.
     Falls back to hash provider if configured provider fails.
     """
     from nexusagent.providers.implementations import HashEmbeddingProvider
-    
+
     # Get provider name from config
     provider_name = getattr(settings.embedding, "provider", "gemini").lower()
-    
+
     registry = get_provider_registry()
     provider_cls = registry.get_embedding(provider_name)
-    
+
     if provider_cls is None:
         logger.warning("Embedding provider '%s' not found, trying hash fallback", provider_name)
         return HashEmbeddingProvider()
-    
+
     # Create provider instance
     try:
         if provider_name == "gemini":
@@ -135,22 +130,22 @@ def create_embedding_provider():
 
 class ChainedEmbeddingProvider(EmbeddingProvider):
     """Chains multiple providers with fallback."""
-    
+
     def __init__(self, providers: list):
         self.providers = providers
         # Use first provider's dims as canonical
         self._primary_dims = providers[0].dims if providers else EMBED_DIM
         # Store hash provider for sync fallback
         self._hash_provider = HashEmbeddingProvider()
-    
+
     @property
     def name(self) -> str:
         return "chained:" + ",".join(p.name for p in self.providers)
-    
+
     @property
     def dims(self) -> int:
         return self._primary_dims
-    
+
     async def embed(self, text: str) -> list[float]:
         for provider in self.providers:
             try:
@@ -176,12 +171,12 @@ class ChainedEmbeddingProvider(EmbeddingProvider):
             except Exception as e:
                 logger.warning(f"{provider.name} batch embedding failed: {e}, trying next")
         raise RuntimeError("All embedding providers failed")
-    
+
     def _adjust_dim(self, vec: list[float]) -> list[float]:
         if len(vec) < self._primary_dims:
             return vec + [0.0] * (self._primary_dims - len(vec))
         return vec[:self._primary_dims]
-    
+
     def _embed_hash(self, text: str) -> list[float]:
         """Sync hash fallback for synchronous search methods."""
         return self._hash_provider._embed_hash(text)
@@ -190,17 +185,17 @@ class ChainedEmbeddingProvider(EmbeddingProvider):
 def create_chained_embedding_provider() -> EmbeddingProvider:
     """Create chained provider based on config, with fallback chain."""
     primary = create_embedding_provider()
-    
+
     # Build fallback chain: primary → local → hash
     fallbacks = []
-    
+
     if primary.name != "local":
         from nexusagent.providers.implementations import LocalEmbeddingProvider
         fallbacks.append(LocalEmbeddingProvider())
     if primary.name != "hash":
         fallbacks.append(HashEmbeddingProvider())
-    
-    return ChainedEmbeddingProvider([primary] + fallbacks)
+
+    return ChainedEmbeddingProvider([primary, *fallbacks])
 
 
 # ── Vector Serialization ──────────────────────────────────────────────────────
@@ -219,18 +214,17 @@ def _blob_to_vec(blob: bytes) -> list[float]:
 # ── Public API ─────────────────────────────────────────────────────────────────
 
 __all__ = [
-    "EMBED_DIM",
-    "CHUNK_SIZE",
-    "CHUNK_OVERLAP",
-    "VECTOR_WEIGHT",
-    "KEYWORD_WEIGHT",
     "CANDIDATE_MULTIPLIER",
+    "CHUNK_OVERLAP",
+    "CHUNK_SIZE",
+    "EMBED_DIM",
+    "KEYWORD_WEIGHT",
+    "VECTOR_WEIGHT",
     "_DB_POOL",
-    "EmbeddingProvider",
-    "create_embedding_provider",
-    "create_chained_embedding_provider",
     "ChainedEmbeddingProvider",
-    "_adjust_dim",
-    "_vec_to_blob",
+    "EmbeddingProvider",
     "_blob_to_vec",
+    "_vec_to_blob",
+    "create_chained_embedding_provider",
+    "create_embedding_provider",
 ]

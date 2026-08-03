@@ -3,24 +3,25 @@
 
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
+import os
+from io import StringIO
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from nexusagent.core.events import SystemEvent
 from nexusagent.core.observability import (
     ChaosTestFramework,
     FailureClassifier,
     FailureType,
     get_metrics,
     get_system_health,
-    setup_structured_logging,
     trace_context,
 )
-from nexusagent.core.events import SystemEvent, EventType
-from nexusagent.core.task.recovery import RecoveryManager, RecoveryStrategy
+from nexusagent.core.observability.logging import StructuredLoggingFormatter
+from nexusagent.core.task.recovery import RecoveryManager
 from nexusagent.core.task.task_state import Checkpoint, Task, TaskState
 
 
@@ -56,9 +57,6 @@ def test_trace_context_propagation():
 
 def test_structured_logging_format():
     """Verify that structured JSON formatter outputs correct fields."""
-    import logging
-    from io import StringIO
-    from nexusagent.core.observability.logging import StructuredLoggingFormatter
 
     stream = StringIO()
     handler = logging.StreamHandler(stream)
@@ -259,3 +257,87 @@ def test_system_event_trace_integration():
         assert event.request_id == "event-req-xyz"
         assert event.task_id == "event-task-xyz"
         assert event.worker_id == "event-worker-xyz"
+
+
+def test_metrics_endpoint():
+    """Verify that the FastAPI /metrics endpoint returns a valid snapshot of metrics."""
+    from contextlib import asynccontextmanager
+
+    from fastapi.testclient import TestClient
+
+    from nexusagent.core.observability import get_metrics
+    from nexusagent.server.server import app
+
+    metrics = get_metrics()
+    metrics.clear()
+    metrics.increment("test.counter.integration", 5.0)
+
+    # Override the app's lifespan to avoid real database/NATS initialization in tests
+    @asynccontextmanager
+    async def fake_lifespan(app_inst):
+        yield
+
+    original_lifespan = app.router.lifespan_context
+    app.router.lifespan_context = fake_lifespan
+
+    try:
+        with TestClient(app) as client:
+            response = client.get("/metrics")
+            assert response.status_code == 200
+            data = response.json()
+            assert "counters" in data
+            assert "gauges" in data
+            assert "histograms" in data
+            assert data["counters"].get("test.counter.integration") == 5.0
+    finally:
+        # Restore original lifespan context
+        app.router.lifespan_context = original_lifespan
+
+
+def test_structured_logging_config_and_env(monkeypatch):
+    """Verify structured logging is initialized dynamically via config and env vars."""
+    from nexusagent.infrastructure.config import settings
+
+    # 1. Test standard config setting
+    monkeypatch.setattr(settings.logging, "structured", True)
+
+    # Check server structured logging flag
+    structured_enabled = (
+        settings.logging.structured
+        or os.environ.get("NEXUS_STRUCTURED_LOGGING", "").lower() in ("1", "true", "yes", "on")
+    )
+    assert structured_enabled is True
+
+    # 2. Test environment variable override
+    monkeypatch.setattr(settings.logging, "structured", False)
+    monkeypatch.setenv("NEXUS_STRUCTURED_LOGGING", "true")
+    structured_enabled_env = (
+        settings.logging.structured
+        or os.environ.get("NEXUS_STRUCTURED_LOGGING", "").lower() in ("1", "true", "yes", "on")
+    )
+    assert structured_enabled_env is True
+
+
+def test_cli_logging_initialization(monkeypatch):
+    """Verify that _setup_cli_logging properly configures the logger based on settings."""
+    from nexusagent.infrastructure.config import settings
+    from nexusagent.interfaces.cli import _setup_cli_logging
+
+    # Setup mocks to verify whether setup_structured_logging or basicConfig gets called
+    mock_setup = MagicMock()
+    mock_basic = MagicMock()
+
+    monkeypatch.setattr("nexusagent.core.observability.setup_structured_logging", mock_setup)
+    monkeypatch.setattr("logging.basicConfig", mock_basic)
+
+    # Case A: Structured enabled
+    monkeypatch.setattr(settings.logging, "structured", True)
+    _setup_cli_logging()
+    mock_setup.assert_called_once_with(settings.log_level)
+
+    # Case B: Standard logging fallback
+    mock_setup.reset_mock()
+    monkeypatch.setattr(settings.logging, "structured", False)
+    monkeypatch.delenv("NEXUS_STRUCTURED_LOGGING", raising=False)
+    _setup_cli_logging()
+    assert mock_basic.called

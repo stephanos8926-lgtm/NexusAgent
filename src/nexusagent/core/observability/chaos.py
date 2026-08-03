@@ -5,9 +5,9 @@ from __future__ import annotations
 
 import logging
 
+from nexusagent.core.task.task_store import get_task_store
 from nexusagent.core.worker.pool import get_worker_pool
 from nexusagent.infrastructure.bus import get_bus
-from nexusagent.core.task.task_store import get_task_store
 
 logger = logging.getLogger(__name__)
 

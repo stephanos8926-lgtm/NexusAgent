@@ -7,8 +7,12 @@ import logging
 from typing import Any
 
 from nexusagent.core.events import PolicyEvent, emit_event, emit_event_sync
+
 from .engine import get_policy_engine
-from .registry import get_capability_registry, get_required_capability
+from .registry import (  # noqa: F401 (re-exported for test)
+    get_capability_registry,
+    get_required_capability,
+)
 
 logger = logging.getLogger(__name__)
 

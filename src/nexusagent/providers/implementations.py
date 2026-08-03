@@ -355,7 +355,7 @@ class OpenAICompatibleEmbeddingProvider(EmbeddingProvider):
 def register_providers():
     """Register all built-in providers with the global registry."""
     registry = get_provider_registry()
-    
+
     # Embedding providers
     registry.register_embedding("gemini", GeminiEmbeddingProvider)
     registry.register_embedding("rw_ie", RWIEEmbeddingProvider)

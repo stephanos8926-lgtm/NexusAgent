@@ -13,7 +13,6 @@ import threading
 from typing import Any
 
 from deepagents import create_deep_agent
-from nexusagent.infrastructure.utils.budget import BudgetExceededError
 
 # Lazy loading state — tools registered on first Agent.__init__()
 _tools_registered: bool = False

@@ -405,8 +405,8 @@ def register_routes(app: FastAPI) -> None:
     @app.get("/security/sessions/{session_id}/capabilities", dependencies=[Depends(verify_api_key)])
     async def get_session_capabilities(session_id: str):
         """Get the active/granted capabilities for a specific session (Operator/verify_api_key Auth)."""
-        from nexusagent.security.engine import get_policy_engine
         from nexusagent.core.session import get_session_manager
+        from nexusagent.security.engine import get_policy_engine
 
         sm = get_session_manager()
         session = sm.get(session_id)

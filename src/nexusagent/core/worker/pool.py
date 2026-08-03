@@ -71,10 +71,10 @@ class WorkerPool:
 
     async def _run_worker(self, handle: SubAgentHandle):
         """Run a worker to completion within its contract bounds."""
+        from nexusagent.core.observability import get_metrics, trace_context
         from nexusagent.core.task.recovery import RecoveryManager
         from nexusagent.core.task.task_state import Task, TaskState
         from nexusagent.core.task.task_store import get_task_store
-        from nexusagent.core.observability import trace_context, get_metrics
 
         metrics = get_metrics()
         start_time = time.time()

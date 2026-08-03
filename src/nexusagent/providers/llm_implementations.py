@@ -1,7 +1,6 @@
 """LLM provider implementations — OpenAI-compatible, Gemini, OpenRouter, etc."""
 from __future__ import annotations
 
-import asyncio
 import logging
 import os
 from pathlib import Path
@@ -170,10 +169,10 @@ class GeminiLLMProvider(LLMProvider):
     ) -> ProviderResult[dict[str, Any]]:
         # Lazy import to avoid circular dependency
         import google.generativeai as genai
-        
+
         try:
             genai.configure(api_key=self._api_key)
-            
+
             # Convert messages to Gemini format
             parts = []
             for msg in messages:
@@ -185,14 +184,14 @@ class GeminiLLMProvider(LLMProvider):
                     parts.append({"role": "model", "parts": [content]})
                 elif role == "system":
                     parts.append({"role": "user", "parts": [f"[SYSTEM]: {content}"]})
-            
+
             # Create chat model
             chat_model = genai.GenerativeModel(model_name=model or self._model)
             chat = chat_model.start_chat(history=parts[:-1] if len(parts) > 1 else [])
-            
+
             last_msg = parts[-1]["parts"][0] if parts else ""
             response = await chat.send_message_async(last_msg)
-            
+
             return ProviderResult(
                 provider="gemini",
                 model=model or self._model,

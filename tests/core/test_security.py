@@ -1,16 +1,24 @@
 # tests/core/test_security.py
 """Comprehensive unit tests for the Phase 8 Capability Security Model."""
 
-import pytest
-from unittest.mock import MagicMock, AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
-from nexusagent.security.models import RiskLevel, Permission, Capability
-from nexusagent.security.registry import get_capability_registry
+import pytest
+
+from nexusagent.core.events import PolicyEvent, set_emitter
 from nexusagent.security.engine import get_policy_engine
-from nexusagent.security.router import get_capability_router, log_audit_event_sync, log_audit_event_async
-from nexusagent.tools.registry.policy import _is_tool_allowed, set_policy_context, clear_policy_context
-from nexusagent.core.events import PolicyEvent, get_emitter, set_emitter
+from nexusagent.security.models import Capability, Permission, RiskLevel
+from nexusagent.security.registry import get_capability_registry
+from nexusagent.security.router import (
+    log_audit_event_async,
+    log_audit_event_sync,
+)
 from nexusagent.tools.register_all import register_all
+from nexusagent.tools.registry.policy import (
+    _is_tool_allowed,
+    clear_policy_context,
+    set_policy_context,
+)
 
 
 def test_capability_models():
@@ -230,8 +238,9 @@ def test_capability_router_tool_integration():
 async def test_api_endpoints_integration():
     """Test REST endpoints for managing dynamic capabilities in active sessions."""
     from fastapi.testclient import TestClient
+
+    from nexusagent.infrastructure.api_auth import require_admin, verify_api_key
     from nexusagent.server.server import app
-    from nexusagent.infrastructure.api_auth import verify_api_key, require_admin
 
     # Apply FastAPI dependency overrides to bypass authentication
     app.dependency_overrides[verify_api_key] = lambda: None

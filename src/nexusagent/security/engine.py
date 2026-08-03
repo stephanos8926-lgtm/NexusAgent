@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import logging
 import threading
+
 from .registry import get_capability_registry
 
 logger = logging.getLogger(__name__)

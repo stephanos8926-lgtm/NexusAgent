@@ -3,11 +3,12 @@
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
+
 from pydantic import BaseModel, Field
 
 
-class RiskLevel(str, Enum):
+class RiskLevel(StrEnum):
     """Risk levels representing the severity of a capability's potential impact."""
 
     LOW = "low"
@@ -16,7 +17,7 @@ class RiskLevel(str, Enum):
     CRITICAL = "critical"
 
 
-class Permission(str, Enum):
+class Permission(StrEnum):
     """Core privileges that can be mapped to capabilities."""
 
     READ = "read"

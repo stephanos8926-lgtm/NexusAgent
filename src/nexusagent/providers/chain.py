@@ -9,12 +9,10 @@ Supports:
 """
 from __future__ import annotations
 
-import asyncio
 import logging
 import time
-from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Any, Generic, Protocol, TypeVar
+from typing import Protocol, TypeVar
 
 from nexusagent.infrastructure.errors import (
     UpstreamError,
@@ -23,11 +21,8 @@ from nexusagent.infrastructure.errors import (
 )
 
 from .base import (
-    EmbeddingProvider,
-    LLMProvider,
     ProviderConfig,
     ProviderResult,
-    RerankerProvider,
     get_provider_registry,
 )
 
@@ -44,7 +39,7 @@ class LogicGate(Protocol):
     Return True to ALLOW the provider, False to SKIP it.
     """
 
-    def evaluate(self, context: "FallbackContext") -> bool: ...
+    def evaluate(self, context: FallbackContext) -> bool: ...
 
 
 # ── Fallback Context ───────────────────────────────────────────────────────────
@@ -81,7 +76,7 @@ class BudgetGate:
 
 class ErrorTypeGate:
     """Only allow provider when last error is of an allowed type.
-    
+
     This implements the pattern: "if Gemini returns QUOTA_EXCEEDED,
     skip it and try OpenRouter instead."
     """
@@ -96,9 +91,7 @@ class ErrorTypeGate:
             return True
         if self._blocked and context.last_error.code in self._blocked:
             return False
-        if self._allowed and context.last_error.code not in self._allowed:
-            return False
-        return True
+        return not (self._allowed and context.last_error.code not in self._allowed)
 
 
 class CircuitBreakerGate:
@@ -146,7 +139,7 @@ class ChainStats:
     history: list[ProviderResult] = field(default_factory=list)
 
 
-class FallbackChain(Generic[T_Response]):
+class FallbackChain[T_Response]:
     """Orchestrates an ordered list of providers with fallback logic.
 
     Usage:
@@ -194,7 +187,7 @@ class FallbackChain(Generic[T_Response]):
         """
         ctx = context or FallbackContext()
 
-        for i, config in enumerate(self._providers):
+        for _i, config in enumerate(self._providers):
             if not config.enabled:
                 continue
 
