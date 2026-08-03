@@ -80,6 +80,23 @@ async def preflight() -> bool:
     return True
 
 
+def _setup_cli_logging() -> None:
+    """Initialize standard or structured logging based on configuration."""
+    import os
+
+    from nexusagent.infrastructure.config import settings
+
+    structured_enabled = (
+        settings.logging.structured
+        or os.environ.get("NEXUS_STRUCTURED_LOGGING", "").lower() in ("1", "true", "yes", "on")
+    )
+    if structured_enabled:
+        from nexusagent.core.observability import setup_structured_logging
+        setup_structured_logging(settings.log_level)
+    else:
+        logging.basicConfig(level=settings.log_level, format="%(levelname)s: %(message)s")
+
+
 def get_version() -> str:
     """Get the installed nexusagent package version.
 
@@ -103,6 +120,7 @@ def main(ctx, check_server) -> None:
     """NexusAgent CLI Client."""
     ctx.ensure_object(dict)
     ctx.obj["check_server"] = check_server
+    _setup_cli_logging()
 
 
 @main.command()
@@ -116,13 +134,7 @@ def submit(task, skip_version_check):
     Example:
         nexus-client submit "Fix the auth bug in server.py"
     """
-    from nexusagent.infrastructure.config import (
-        settings,
-    )
-
-    # Handle --check-server
-    # (check_server is accessed via the parent context in click)
-    logging.basicConfig(level=settings.log_level, format="%(levelname)s: %(message)s")
+    _setup_cli_logging()
     logger = logging.getLogger(__name__)
 
     async def run_client() -> None:
