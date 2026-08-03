@@ -56,7 +56,7 @@ jobs:
             src/nexusagent/core/pol.py \
             src/nexusagent/core/pol_subscriber.py \
             ; do
-            DELDIFF=$(git diff --name-status "$BASE_SHA"..$HEAD_SHA" -- "$path" | grep '^D' || true)
+            DELDIFF=$(git diff --name-status "$BASE_SHA".."$HEAD_SHA" -- "$path" | grep '^D' || true)
             if [ -n "$DELDIFF" ]; then
               echo "::error file= $path::\
               This PR deletes a Phase-deliverable file. \
