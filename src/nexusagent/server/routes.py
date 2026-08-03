@@ -188,6 +188,14 @@ def register_routes(app: FastAPI) -> None:
             "jetstream": js_available,
         }
 
+    # ─── Metrics Check ──────────────────────────────────────────────────
+
+    @app.get("/metrics")
+    async def metrics_endpoint():
+        """Return a snapshot of active metrics from the MetricsCollector."""
+        from nexusagent.core.observability import get_metrics
+        return get_metrics().get_snapshot()
+
     # ─── Version ────────────────────────────────────────────────────────
 
     @app.get("/version")

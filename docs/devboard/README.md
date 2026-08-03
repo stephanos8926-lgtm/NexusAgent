@@ -20,8 +20,8 @@
 | 7 | POL Control Plane | `07-pol-control-plane.md` | ✅ **DELIVERED** | Jules #661066...817 | `d5c7fb5→24fb128` PR #17 |
 | 8 | Capability Security Model | `08-capability-security-model.md` | ✅ **DELIVERED** | Jules + Lucien | `6d255ab→d912a45` PR #22 + #23 |
 | 9 | Memory Evolution (4-layer) | `09-memory-evolution.md` | ✅ **DELIVERED** | Jules | — |
-| 10 | Observability & Reliability | `10-observability-reliability.md` | 🟡 **NEXT** | Ready to dispatch | — |
-| 11 | Production Readiness | `11-production-readiness.md` | 🟡 Queued | Prompt prepped | — |
+| 10 | Observability & Reliability | `10-observability-reliability.md` | ✅ **DELIVERED** | Jules | — |
+| 11 | Production Readiness | `11-production-readiness.md` | 🟡 **NEXT** | Ready to dispatch | — |
 | 12 | Master Finish (version + RAA + tag) | (inline) | 🟡 Queued | — | — |
 
 > **WARNING — PR #18 (closed):** "Improve TUI Client Robustness" was a destructive
@@ -115,8 +115,8 @@ Per Chief Architect Directive: **no skipping phases.**
 
 ---
 
-## Next Phase: 10 — Observability & Reliability
-- Spec: `docs/architecture/migration/10-observability-reliability.md`
-- Depends on: Phase 9 Memory Evolution (delivered)
+## Next Phase: 11 — Production Readiness
+- Spec: `docs/architecture/migration/11-production-readiness.md`
+- Depends on: Phase 10 Observability & Reliability (delivered)
 - Status: 🟡 Ready to dispatch
 

@@ -232,6 +232,7 @@ class LoggingConfig(BaseModel):
 
     level: str = Field(default="INFO")
     format: str = Field(default="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+    structured: bool = Field(default=False)
 
 
 class HooksConfig(BaseModel):
