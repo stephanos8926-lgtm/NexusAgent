@@ -5,8 +5,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
-from io import StringIO
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -20,7 +18,6 @@ from nexusagent.core.observability import (
     get_system_health,
     trace_context,
 )
-from nexusagent.core.observability.logging import StructuredLoggingFormatter
 from nexusagent.core.task.recovery import RecoveryManager
 from nexusagent.core.task.task_state import Checkpoint, Task, TaskState
 
@@ -57,6 +54,9 @@ def test_trace_context_propagation():
 
 def test_structured_logging_format():
     """Verify that structured JSON formatter outputs correct fields."""
+    from io import StringIO
+
+    from nexusagent.core.observability.logging import StructuredLoggingFormatter
 
     stream = StringIO()
     handler = logging.StreamHandler(stream)
@@ -302,6 +302,7 @@ def test_structured_logging_config_and_env(monkeypatch):
     monkeypatch.setattr(settings.logging, "structured", True)
 
     # Check server structured logging flag
+    import os
     structured_enabled = (
         settings.logging.structured
         or os.environ.get("NEXUS_STRUCTURED_LOGGING", "").lower() in ("1", "true", "yes", "on")
