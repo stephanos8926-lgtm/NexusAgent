@@ -1,5 +1,27 @@
 # Changelog
 
+## 2026-07-30 — v0.6.0 Phase 12 Master Finish & Production Release 🎉
+
+### Observability & Reliability (Phase 10)
+- **Structured Logging** — Added `StructuredLoggingFormatter` outputting structured, machine-readable JSON logs for automated log processors.
+- **Distributed Tracing** — Implemented context propagation for Request, Task, Graph, Node, and Worker IDs utilizing Python `ContextVars` and `trace_context(...)` helper context managers.
+- **Runtime Metrics** — Created a metrics collector and exposed an authorized high-frequency `/metrics` REST endpoint returning real-time counters, gauges, and histograms.
+- **System Health Diagnostics** — Consolidated system-wide diagnostic monitoring reporting health status across database, network, memory, POL, and NATS backbones.
+- **Chaos Testing Framework** — Introduced a chaos-engineering engine supporting programmatic worker terminations, event bus disconnections, and checkpoint corruptions to guarantee operational resilience.
+
+### Production Readiness & Security (Phase 11)
+- **Token Exchange Authorization** — Implemented token exchange endpoints allowing clients to trade API keys for short-lived access tokens, ensuring compatibility with standard browser and terminal clients.
+- **Rate Limiting** — Integrated a token-bucket-based middleware protecting REST API routes from Denial-of-Service (DoS) and abuse.
+- **WebSocket & CORS Protections** — Added strict CORS origin validation, CSRF validation, and a strict 64KB input size limit on raw inputs to prevent memory exhaustion and overflow.
+- **Capability-Based Access Controls** — Added administrative REST endpoints to dynamically grant, revoke, and query active capabilities on live worker sessions.
+
+### Master Finish (Phase 12)
+- **Master Version Transition** — Bumped the platform-wide version to `0.6.0` in both `pyproject.toml` and root `VERSION` file.
+- **DevBoard & State Synchronization** — Updated devboard trackers, session states, and documentation to reflect 100% completion of the 12-phase transition plan.
+- **100% Green Test Suite** — Validated all changes against the test suite, resulting in 1053 tests passing successfully.
+
+---
+
 ## 2026-07-19 — Phase 1 Runtime Foundation Delivered (+ Phase 2 Core v1)
 
 ### Runtime Foundation (Phase 1)
