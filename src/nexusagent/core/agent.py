@@ -426,8 +426,8 @@ async def run_agent_task(state: dict) -> dict:
             system_parts.append(custom_prompt)
         if state.get("_nexus_prompt"):
             system_parts.append(state["_nexus_prompt"])
-        if state.get("environment_context"):
-            system_parts.append(state["environment_context"])
+        if state.get("_environment_context"):
+            system_parts.append(state["_environment_context"])
 
         if system_parts:
             messages.append(SystemMessage(content="\n\n".join(system_parts)))

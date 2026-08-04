@@ -223,11 +223,7 @@ async def _handle_tool_call_event(app, event: dict) -> None:
             from nexusagent.interfaces.tui.websocket import send_approval
 
             call_id = event.get("call_id", "")
-            app._auto_approve_task = (
-                __import__("asyncio")
-                .get_event_loop()
-                .create_task(send_approval(app, call_id, True))
-            )
+            app._auto_approve_task = asyncio.create_task(send_approval(app, call_id, True))
 
     app.status_bar.set_status(f"Running: {tool}")
 
@@ -504,7 +500,7 @@ async def handle_slash_command(app, cmd: str) -> bool:
 
     msg = AppMessage(f"Unknown command: {command}. Type /help for available commands.")
     _mount_with_limit(app, msg)
-    return True
+    return False
 
 
 def cycle_theme(app) -> None:

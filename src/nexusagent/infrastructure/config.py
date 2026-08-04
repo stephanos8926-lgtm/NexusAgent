@@ -467,9 +467,10 @@ def load_config(config_file: str | None = None) -> ConfigSchema:
         else:
             logger.warning("Explicit config file not found at %s", explicit_path)
 
-    def override_from_env(prefix: str, data: dict, current_level: dict):
+    def override_from_env(prefix: str, data: dict, current_level: dict, exclude: set[str] | None = None):
+        exclude = exclude or set()
         for key, value in os.environ.items():
-            if key.startswith(prefix):
+            if key.startswith(prefix) and key not in exclude:
                 stripped = key[len(prefix) :]
                 if "__" in stripped:
                     parts = stripped.split("__")
@@ -517,16 +518,11 @@ def load_config(config_file: str | None = None) -> ConfigSchema:
     # Special handling for simple boolean env vars (NEXUS_TEST_MODE=1, etc.) BEFORE general NEXUS_ override
     test_mode_env = os.environ.get("NEXUS_TEST_MODE", "").lower() in ("1", "true", "yes", "on")
 
-    # Also load NEXUS_* env vars (existing pattern) - but filter out test_mode to handle separately
-    # We need to temporarily remove NEXUS_TEST_MODE from environ to prevent it from being processed
-    test_mode_value = os.environ.pop("NEXUS_TEST_MODE", None)
-
-    # Also load NEXUS_* env vars (existing pattern)
-    override_from_env("NEXUS_", raw_data, raw_data)
-
-    # Restore NEXUS_TEST_MODE
-    if test_mode_value is not None:
-        os.environ["NEXUS_TEST_MODE"] = test_mode_value
+    # Also load NEXUS_* env vars (existing pattern) — exclude NEXUS_TEST_MODE
+    # (handled separately above) to avoid mutating os.environ via pop/restore,
+    # which is racy in multi-threaded contexts.
+    _EXCLUDED_ENV_KEYS = {"NEXUS_TEST_MODE"}
+    override_from_env("NEXUS_", raw_data, raw_data, exclude=_EXCLUDED_ENV_KEYS)
 
     # Apply env overrides on top (deep merge)
     raw_data = _deep_merge(raw_data, env_overrides)
