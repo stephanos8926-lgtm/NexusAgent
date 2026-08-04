@@ -5,8 +5,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from src.nexusagent.tools.registry.core import register_tool, registry
-from src.nexusagent.tools.registry.types import ToolInfo
+from nexusagent.tools.registry.core import register_tool, registry
+from nexusagent.tools.registry.types import ToolInfo
 
 
 @pytest.fixture(autouse=True)
