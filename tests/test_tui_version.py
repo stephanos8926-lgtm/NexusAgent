@@ -11,7 +11,7 @@ import asyncio
 import contextlib
 import json
 import urllib.request
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -47,6 +47,7 @@ class TestTuiVersionCheck:
         app.messages_container = MagicMock()
         app.status_bar = MagicMock()
         app.chat_input = MagicMock()
+        app.notify = MagicMock()
         return app
 
     @pytest.mark.asyncio
@@ -76,7 +77,7 @@ class TestTuiVersionCheck:
     async def test_tui_shows_version_mismatch_warning(self):
         """When server version mismatches, show AppMessage warning (non-blocking)."""
         app = self._make_app()
-        app.messages_container = AsyncMock()
+        app.messages_container = MagicMock()
 
         fake_data = {"version": "5.0.0", "minClient": "5.0.0", "server": "nexus-server"}
 
@@ -166,6 +167,7 @@ class TestTuiWsLoopVersionIntegration:
         app.messages_container = MagicMock()
         app.status_bar = MagicMock()
         app.chat_input = MagicMock()
+        app.notify = MagicMock()
         return app
 
     @pytest.mark.asyncio
@@ -178,12 +180,25 @@ class TestTuiWsLoopVersionIntegration:
             call_order.append("version_check")
             return True
 
-        fake_ws = AsyncMock()
-        fake_ws.__aenter__ = AsyncMock(return_value=fake_ws)
-        fake_ws.__aexit__ = AsyncMock(return_value=False)
+        fake_ws = MagicMock()
         fake_ws.open = True
-        fake_ws.send = AsyncMock()
-        fake_ws.__aiter__ = AsyncMock(return_value=iter([]))
+
+        async def fake_aenter():
+            return fake_ws
+        fake_ws.__aenter__ = fake_aenter
+
+        async def fake_aexit(exc_type, exc_val, exc_tb):
+            return False
+        fake_ws.__aexit__ = fake_aexit
+
+        async def fake_send(msg):
+            pass
+        fake_ws.send = fake_send
+
+        async def fake_aiter():
+            for x in []:
+                yield x
+        fake_ws.__aiter__ = fake_aiter
 
         app._check_server_version = fake_check
 
