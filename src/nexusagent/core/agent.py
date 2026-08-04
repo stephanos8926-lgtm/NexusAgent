@@ -349,6 +349,10 @@ class Agent:
         """Invoke the inner deepagents agent with the given arguments."""
         return self._inner.invoke(*args, **kwargs)
 
+    async def ainvoke(self, *args: Any, **kwargs: Any) -> Any:
+        """Invoke the inner deepagents agent asynchronously."""
+        return await self._inner.ainvoke(*args, **kwargs)
+
     async def astream(self, *args: Any, **kwargs: Any) -> Any:
         """Stream tokens from the inner deepagents agent."""
         async for chunk in self._inner.astream(*args, **kwargs):
@@ -433,7 +437,7 @@ async def run_agent_task(state: dict) -> dict:
 
         # AgentState expects a dict with "messages" key
         agent_state = {"messages": messages}
-        result = agent(agent_state)
+        result = await agent.ainvoke(agent_state)
         return {"result": result, "success": True}
     except Exception as e:
         logger = logging.getLogger(__name__)
