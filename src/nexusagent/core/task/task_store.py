@@ -77,8 +77,19 @@ class TaskStore:
             return None
         return task.latest_checkpoint
 
-    async def delete_task(self, task_id: str) -> None:
-        """Remove a task and its checkpoints."""
+    async def delete_task(self, task_id: str, *, principal: str | None = None, action: str = "task.delete") -> None:
+        """Remove a task and its checkpoints.
+
+        Optional authz check:
+        - If ``self._authz`` is set, it must be callable as
+          ``allowed = self._authz(action, principal=principal)``.
+        - If it returns a falsy value, ``PermissionError`` is raised.
+        """
+        authorizer = getattr(self, "_authz", None)
+        if authorizer is not None:
+            allowed = authorizer(action, principal=principal)
+            if not allowed:
+                raise PermissionError(f"Not authorized to {action}")
         self._tasks.pop(task_id, None)
 
     async def close(self) -> None:

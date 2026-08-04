@@ -83,6 +83,36 @@ Respond with ONLY the JSON array, no other text."""
         self._min_observations = min_observations
         self._max_observations_per_batch = max_observations_per_batch
 
+    @staticmethod
+    def _sanitize_content(content: str) -> str:
+        """Sanitize memory content for safe inclusion in LLM prompts.
+
+        Applies defensive normalization only; it does not guarantee semantic
+        preservation for adversarial inputs, but it blocks obvious control
+        characters and instruction-manipulation framing.
+        """
+        if not isinstance(content, str):
+            return ""
+        # Remove control characters except newline/tab.
+        cleaned = "".join(ch for ch in content if ch.isprintable() or ch in "\n\t")
+        # Neutralize common instruction-injection framing.
+        lowered = cleaned.lower()
+        for phrase in (
+            "ignore previous instructions",
+            "ignore all previous instructions",
+            "ignore the above",
+            "disregard all prior",
+            "disregard previous instructions",
+            "new instructions:",
+            "system override:",
+            "you are now",
+            "act as if",
+        ):
+            if lowered.startswith(phrase):
+                cleaned = "[memory data] " + cleaned
+                break
+        return cleaned
+
     async def synthesize(
         self,
         observations: list[str],
@@ -368,30 +398,15 @@ Respond with ONLY the JSON array, no other text."""
         memories: list[tuple[int, dict[str, Any]]],
     ) -> dict[str, Any] | None:
         """Use LLM to check if memories about an entity contradict each other."""
-        system_prompt = """You are a contradiction detection agent. Given multiple memories about the same entity, determine if any contradict each other.
-
-A contradiction occurs when two memories make conflicting claims about the same thing (e.g., "User prefers pytest" vs "User prefers unittest").
-
-Output format (JSON):
-{
-  "has_contradiction": true/false,
-  "resolution": "Brief explanation of which memory is correct and why",
-  "keep": <index of memory to keep>,
-  "remove": [<indices of memories to mark as superseded>]
-}
-
-If no contradiction, output: {"has_contradiction": false}
-Respond with ONLY the JSON, no other text."""
-
         user_prompt = f"Entity: {entity}\n\nMemories:\n"
         for idx, (_i, mem) in enumerate(memories):
-            content = mem.get("content", "")
+            content = self._sanitize_content(mem.get("content", ""))
             confidence = mem.get("confidence", 0.5)
             user_prompt += f"[{idx}] (confidence: {confidence}) {content}\n"
 
         try:
             response = await self._llm_call(
-                system=system_prompt,
+                system=self.SYSTEM_PROMPT,
                 user=user_prompt,
                 max_tokens=500,
                 temperature=0.1,

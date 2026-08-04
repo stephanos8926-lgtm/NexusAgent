@@ -127,7 +127,11 @@ def register_routes(app: FastAPI) -> None:
                     break
                 except Exception as nats_exc:
                     nats_error = nats_exc
-                    logger.warning("NATS publish attempt %d failed: %s", attempt + 1, nats_exc)
+                    logger.warning(
+                        "NATS publish attempt %d failed: %s",
+                        attempt + 1,
+                        type(nats_exc).__name__,
+                    )
                     if attempt < 2:
                         import asyncio
 

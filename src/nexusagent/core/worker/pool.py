@@ -155,7 +155,7 @@ class WorkerPool:
 
                         recovery_mgr = RecoveryManager(store)
                         async def on_failed_event(t_id, err_msg):
-                            logger.error("POL Escalate: Task %s failed: %s", t_id, err_msg)
+                            logger.error("POL Escalate: Task %s failed", t_id)
 
                         result = await recovery_mgr.recover_task(
                             task_id=task_schema.id,

@@ -74,7 +74,7 @@ async def session_websocket(
     try:
         await verify_api_key(header_key)
     except HTTPException as e:
-        logger.warning(f"WS auth failed for key={header_key}: {e}")
+        logger.warning("WS auth failed for session=%s: %s", session_id, e)
         await websocket.close(code=4001, reason="Invalid or missing API key")
         return
 

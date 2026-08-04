@@ -572,15 +572,20 @@ class FileMemory:
         except Exception:
             return False
 
-    def delete_by_file(self, relative_path: str) -> bool:
+    def delete_by_file(self, relative_path: str, *, principal: str | None = None, action: str = "memory.delete") -> bool:
         """Delete a memory file and auto-commit.
 
-        Args:
-            relative_path: Relative path of the file (e.g. ``bank/foo.md``).
-
-        Returns:
-            True if the file was deleted, False if it didn't exist or deletion failed.
+        Optional authz check:
+        - If ``self._authz`` is set, it must be callable as
+          ``allowed = self._authz(action, principal=principal)``.
+        - If it returns a falsy value, ``PermissionError`` is raised.
         """
+        authorizer = getattr(self, "_authz", None)
+        if authorizer is not None:
+            allowed = authorizer(action, principal=principal)
+            if not allowed:
+                raise PermissionError(f"Not authorized to {action}")
+
         filepath = self.workspace / relative_path
         if not filepath.exists():
             return False
