@@ -123,6 +123,14 @@ class SystemEvent:
         data = asdict(self)
         # Convert datetime to ISO format string
         data["timestamp"] = self.timestamp.isoformat()
+
+        # Hardening: Sanitize potential secrets in payload and tracing
+        from nexusagent.infrastructure.utils.security import sanitize_secrets
+        if "payload" in data:
+            data["payload"] = sanitize_secrets(data["payload"])
+        if "tracing" in data:
+            data["tracing"] = sanitize_secrets(data["tracing"])
+
         return data
 
     @classmethod

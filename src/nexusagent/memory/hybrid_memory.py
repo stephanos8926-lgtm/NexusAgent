@@ -14,6 +14,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from nexusagent.infrastructure.utils.security import sanitize_secrets
 from nexusagent.memory.extraction import MemoryExtractor
 from nexusagent.memory.memory_files import FileMemory
 from nexusagent.memory.memory_index import HybridMemoryIndex
@@ -110,6 +111,10 @@ class HybridMemoryManager:
         from nexusagent.memory.memory_files import MemoryEntryType
 
         entry_type = MemoryEntryType(type) if isinstance(type, str) else type
+
+        # Hardening: Sanitize secrets from content and description
+        content = sanitize_secrets(content)
+        description = sanitize_secrets(description)
 
         # Auto-link to related memories if not explicitly provided
         if related is None:

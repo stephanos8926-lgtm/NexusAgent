@@ -8,7 +8,6 @@ import pytest_asyncio
 from httpx import AsyncClient
 
 from nexusagent.infrastructure.bus import get_bus
-from nexusagent.infrastructure.config import settings
 from nexusagent.infrastructure.db import db_manager
 from nexusagent.llm.models import ResultSchema, TaskStatus
 from nexusagent.server.sdk import sdk
@@ -22,13 +21,15 @@ TEST_DB_PATH = "/tmp/nexus_e2e_test.db"
 
 
 @pytest_asyncio.fixture(scope="function", autouse=True)
-async def setup_system():
+async def setup_system(monkeypatch):
     """Initialize the system for E2E testing.
-    Overwrites the db path for testing.
+    Overwrites the db path for testing using env var overrides.
     """
+    monkeypatch.setenv("NEXUS_SERVER__NATS_URL", "nats://localhost:4222")
+    monkeypatch.setenv("NEXUS_SERVER__DB_PATH", TEST_DB_PATH)
 
-    settings.server.nats_url = "nats://localhost:4222"
-    settings.server.db_path = TEST_DB_PATH
+    from nexusagent.infrastructure.config import reload_settings
+    reload_settings()
 
     # Clean up stale test DB from previous runs
     if os.path.exists(TEST_DB_PATH):
@@ -81,6 +82,11 @@ async def setup_system():
         p = TEST_DB_PATH + suffix
         if os.path.exists(p):
             os.remove(p)
+
+    # Revert settings by clearing the patched env vars and reloading
+    monkeypatch.delenv("NEXUS_SERVER__NATS_URL", raising=False)
+    monkeypatch.delenv("NEXUS_SERVER__DB_PATH", raising=False)
+    reload_settings()
 
 
 @pytest.mark.asyncio

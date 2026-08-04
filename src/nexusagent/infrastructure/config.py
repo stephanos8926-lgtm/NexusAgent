@@ -12,9 +12,19 @@ import os
 from pathlib import Path
 
 import yaml
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field, ValidationError, model_validator
 
 logger = logging.getLogger(__name__)
+
+class ImmutableBaseModel(BaseModel):
+    """Base class that enforces configuration immutability in production/normal operations,
+    while allowing monkeypatching and mocking during unit/integration tests (when NEXUS_TEST_MODE=1).
+    """
+    def __setattr__(self, name: str, value: Any) -> None:
+        if os.environ.get("NEXUS_TEST_MODE") != "1":
+            raise TypeError("Instance is frozen. Configuration is immutable after startup.")
+        super().__setattr__(name, value)
+
 
 
 def _load_dotenv() -> None:
@@ -57,7 +67,8 @@ def _load_dotenv() -> None:
 _load_dotenv()
 
 
-class ServerConfig(BaseModel):
+class ServerConfig(ImmutableBaseModel):
+
     """Server-side configuration for NATS, database, and API settings."""
 
     nats_url: str = Field(default="nats://localhost:4222")
@@ -80,7 +91,8 @@ class ServerConfig(BaseModel):
     )
 
 
-class ClientConfig(BaseModel):
+class ClientConfig(ImmutableBaseModel):
+
     """Client-side configuration for the TUI (theme, timeouts, retries)."""
 
     tui_theme: str = Field(default="textual-dark")
@@ -93,7 +105,8 @@ class ClientConfig(BaseModel):
     tui_responsive_enabled: bool = Field(default=True)
 
 
-class AuthConfig(BaseModel):
+class AuthConfig(ImmutableBaseModel):
+
     """Authentication configuration for master secret, keystore, and KDF parameters."""
 
     master_secret_path: str = Field(default="auth/.master.secret")
@@ -102,7 +115,8 @@ class AuthConfig(BaseModel):
     kdf_iterations: int = Field(default=100000, ge=1000)
 
 
-class AgentConfig(BaseModel):
+class AgentConfig(ImmutableBaseModel):
+
     """Agent runtime configuration (model, provider, compaction, images).
 
     Tool access is controlled via Agent role/policy (see nexusagent.tools.registry.policy),
@@ -208,7 +222,8 @@ class AgentConfig(BaseModel):
     )
 
 
-class PromptConfig(BaseModel):
+class PromptConfig(ImmutableBaseModel):
+
     """Configuration for the NEXUS.md prompt system."""
 
     # Path to the base prompt file (defaults to ~/.nexusagent/NEXUS.md)
@@ -227,7 +242,8 @@ class PromptConfig(BaseModel):
     session_summary_max_chars: int = Field(default=2000, ge=200)
 
 
-class LoggingConfig(BaseModel):
+class LoggingConfig(ImmutableBaseModel):
+
     """Logging configuration for level and format string."""
 
     level: str = Field(default="INFO")
@@ -235,14 +251,16 @@ class LoggingConfig(BaseModel):
     structured: bool = Field(default=False)
 
 
-class HooksConfig(BaseModel):
+class HooksConfig(ImmutableBaseModel):
+
     """Configuration for the hooks system."""
 
     hooks_enabled: bool = Field(default=True)
     hooks_dir: str = Field(default="~/.nexusagent/hooks")
 
 
-class TrustConfig(BaseModel):
+class TrustConfig(ImmutableBaseModel):
+
     """Configuration for the trust subsystem (anomaly scoring, trust levels)."""
 
     enabled: bool = True
@@ -256,7 +274,8 @@ class TrustConfig(BaseModel):
     density_weight: float = 0.15
 
 
-class BudgetConfig(BaseModel):
+class BudgetConfig(ImmutableBaseModel):
+
     """Budget guard configuration for LLM spend tracking."""
 
     daily_budget_usd: float = Field(
@@ -284,7 +303,8 @@ class BudgetConfig(BaseModel):
     )
 
 
-class TestModeConfig(BaseModel):
+class TestModeConfig(ImmutableBaseModel):
+
     """Test mode configuration to prevent accidental real API calls."""
 
     block_real_api: bool = Field(
@@ -292,7 +312,8 @@ class TestModeConfig(BaseModel):
     )
 
 
-class RWIEEmbeddingConfig(BaseModel):
+class RWIEEmbeddingConfig(ImmutableBaseModel):
+
     """RW_InferenceEngine embedding provider configuration."""
 
     base_url: str = Field(
@@ -307,7 +328,8 @@ class RWIEEmbeddingConfig(BaseModel):
     )
 
 
-class LocalEmbeddingConfig(BaseModel):
+class LocalEmbeddingConfig(ImmutableBaseModel):
+
     """Local sentence-transformers embedding provider configuration."""
 
     model: str = Field(
@@ -316,7 +338,8 @@ class LocalEmbeddingConfig(BaseModel):
     )
 
 
-class EmbeddingConfig(BaseModel):
+class EmbeddingConfig(ImmutableBaseModel):
+
     """Embedding provider configuration."""
 
     provider: str = Field(
@@ -333,7 +356,8 @@ class EmbeddingConfig(BaseModel):
     )
 
 
-class RerankConfig(BaseModel):
+class RerankConfig(ImmutableBaseModel):
+
     """Reranker configuration for hybrid search."""
 
     enabled: bool = Field(
@@ -358,7 +382,8 @@ class RerankConfig(BaseModel):
     )
 
 
-class ConfigSchema(BaseModel):
+class ConfigSchema(ImmutableBaseModel):
+
     """Top-level configuration schema aggregating all sub-configurations."""
 
     server: ServerConfig = Field(default_factory=ServerConfig)
@@ -381,6 +406,33 @@ class ConfigSchema(BaseModel):
     )
     # Back-compat: top-level log_level maps to logging.level
     log_level: str = Field(default="INFO")
+
+    @model_validator(mode="after")
+    def validate_config(self) -> "ConfigSchema":
+        # Check standard config constraints
+        if self.server.api_port < 1 or self.server.api_port > 65535:
+            raise ValueError(f"Invalid server API port: {self.server.api_port}")
+
+        # If TLS is enabled, and files are specified, ensure both exist/are valid
+        if self.server.tls_enabled:
+            if (self.server.tls_certfile and not self.server.tls_keyfile) or (self.server.tls_keyfile and not self.server.tls_certfile):
+                raise ValueError("Both tls_certfile and tls_keyfile must be specified if one of them is provided.")
+
+        # If running in production, enforce strict security defaults
+        env = os.environ.get("NEXUS_ENV", "").lower()
+        if env == "production":
+            # API key must not be empty in production
+            if not self.client.api_key:
+                raise ValueError("SECURITY ERROR: client.api_key must be configured and non-empty in production.")
+            # TLS must be enabled in production
+            if not self.server.tls_enabled:
+                raise ValueError("SECURITY ERROR: server.tls_enabled must be True in production.")
+            # Localhost NATS is typically insecure for production mesh deployment
+            if "localhost" in self.server.nats_url or "127.0.0.1" in self.server.nats_url:
+                raise ValueError("SECURITY ERROR: local NATS server (localhost) is not allowed in production mesh.")
+
+        return self
+
 
 
 def get_nexus_home() -> Path:
@@ -546,23 +598,30 @@ def load_config(config_file: str | None = None) -> ConfigSchema:
             "on",
         )
 
+    # Resolve server/auth paths BEFORE creating ConfigSchema: expand ~, then resolve relative against nexus home
+    nexus_home = get_nexus_home()
+
+    server_data = raw_data.setdefault("server", {})
+    db_path = server_data.get("db_path", "nexus.db")
+    db_path = str(Path(db_path).expanduser())
+    if not Path(db_path).is_absolute():
+        db_path = str(nexus_home / db_path)
+    server_data["db_path"] = db_path
+
+    auth_data = raw_data.setdefault("auth", {})
+    for attr, default_val in [
+        ("master_secret_path", "auth/.master.secret"),
+        ("keystore_path", "auth/keystore.json"),
+        ("salt_path", "auth/.master.salt"),
+    ]:
+        val = auth_data.get(attr, default_val)
+        val = str(Path(val).expanduser())
+        if not Path(val).is_absolute():
+            val = str(nexus_home / val)
+        auth_data[attr] = val
+
     try:
         config = ConfigSchema(**raw_data)
-
-        # Resolve server/auth paths: expand ~, then resolve relative against nexus home
-        nexus_home = get_nexus_home()
-        for attr in ("db_path",):
-            val = getattr(config.server, attr)
-            val = str(Path(val).expanduser())
-            if not Path(val).is_absolute():
-                val = str(nexus_home / val)
-            setattr(config.server, attr, val)
-        for attr in ("master_secret_path", "keystore_path", "salt_path"):
-            val = getattr(config.auth, attr)
-            val = str(Path(val).expanduser())
-            if not Path(val).is_absolute():
-                val = str(nexus_home / val)
-            setattr(config.auth, attr, val)
 
         # Ensure data subdirectories exist
         for path_str in (

@@ -1,5 +1,27 @@
 # Changelog
 
+## 2026-08-04 — Phases 10, 11, and 12 Delivered successfully (Version 0.6.0)
+
+### Observability & Reliability (Phase 10)
+- **Structured logging** — Standardized JSON/text logging across the codebase with trace contexts.
+- **Metrics collection** — Exposed live Prometheus-compatible `/metrics` endpoint with counts, durations, and LLM usage.
+- **Trace Context Propagation** — Trace, request, task, graph, node, and worker IDs propagated across async boundaries.
+- **Failure Classification** — Formal transient vs deterministic vs security classification for automated retries.
+- **Health monitoring** — Subsystem-level diagnostics returned via FastAPI `/health` route.
+- **Chaos testing** — Automated worker failures, event bus disconnects, and checkpoint corruption recovery.
+
+### Production Readiness & Sandboxing (Phase 11)
+- **Secrets Management** — Robust secrets scanner and sanitizer (`sanitize_secrets`) dynamically redacting sensitive credentials (such as Google/Gemini, OpenAI, OpenRouter, and HuggingFace API keys) from memory and event payloads.
+- **Configuration Immutability** — ConfigSchema and nested Pydantic models set to `frozen=True` to prevent runtime configuration pollution.
+- **Secure Defaults** — Custom `@model_validator(mode="after")` enforcing TLS enabled, non-empty API keys, and secure NATS setups under `production` mode.
+- **Argument-Level Shell Sandboxing** — Prohibits dangerous binaries (`sudo`, `su`, `chmod`, `chown`) and blocks command arguments referencing sensitive paths outside the workspace root (e.g., `/etc/shadow`, `/etc/passwd`, ssh keys, AWS credentials).
+- **Operations Test Suite** — Comprehensive test coverage under `tests/operations/test_production_readiness.py` validating all hardening controls.
+
+### Master Finish (Phase 12)
+- **Version Bump** — Upgraded system version to `0.6.0` in `pyproject.toml` and `VERSION`.
+- **Package Synchronization** — Re-installed the package in editable mode so metadata perfectly matches the new version.
+- **Operational Handoff Docs** — Rewrote `docs/SESSION_STATE.md` into a comprehensive operations manual and marked all 12 phases delivered across all devboard and status documents.
+
 ## 2026-07-19 — Phase 1 Runtime Foundation Delivered (+ Phase 2 Core v1)
 
 ### Runtime Foundation (Phase 1)

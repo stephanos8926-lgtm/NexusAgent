@@ -17,6 +17,47 @@ _SHELL_WORKSPACE_ROOT: Path | None = None
 
 MAX_OUTPUT_BYTES = 1024 * 1024  # 1MB output cap to prevent memory exhaustion
 
+# A list of dangerous system command patterns or binaries to blacklist
+DANGEROUS_COMMANDS = {
+    "rm", "chmod", "chown", "dd", "mkfs", "fdisk", "parted", "passwd",
+    "sudo", "su", "useradd", "userdel", "groupadd", "groupdel", "shutdown",
+    "reboot", "init", "systemctl", "service"
+}
+
+# Sensitive paths or file substrings that must never be accessed via shell tools
+SENSITIVE_PATH_SUBSTRINGS = {
+    "/etc/shadow", "/etc/passwd", "id_rsa", "id_dsa", "id_ecdsa", "id_ed25519",
+    ".aws/credentials", ".aws/config", ".gcp/", "service_account",
+    ".ssh/", ".bash_history", ".pgpass", ".git/config", ".env"
+}
+
+
+def _sandbox_check_command(cmd_args: list[str]) -> None:
+    """Audit command arguments for dangerous patterns, unauthorized commands,
+    and sensitive path accesses. Raises PermissionError if any violations are found.
+    """
+    if not cmd_args:
+        return
+
+    binary = Path(cmd_args[0]).name.lower()
+
+    # 1. Deny dangerous system commands
+    if binary in DANGEROUS_COMMANDS:
+        if binary in ("chmod", "chown", "sudo", "su", "dd", "mkfs", "fdisk", "parted", "passwd"):
+            raise PermissionError(f"Command '{binary}' is prohibited.")
+        if binary == "rm":
+            # For rm, ensure it only acts on targets inside workspace, and NEVER recursive on root or important dirs
+            for arg in cmd_args[1:]:
+                if arg.strip() in ("/", "/*", "/home", "/app", "/var", "/etc", "/usr", "~", "~/"):
+                    raise PermissionError("Recursive or root-level 'rm' is prohibited.")
+
+    # 2. Block access to sensitive paths in command arguments
+    for arg in cmd_args:
+        arg_lower = arg.lower()
+        for sensitive in SENSITIVE_PATH_SUBSTRINGS:
+            if sensitive in arg_lower:
+                raise PermissionError(f"Access to sensitive path/file '{sensitive}' is prohibited.")
+
 
 def set_shell_workspace_root(path: str) -> None:
     """Set the workspace root directory for shell command path jail."""
@@ -90,6 +131,11 @@ def run_shell(
     if not cmd_args:
         return "[ERROR] Empty command"
 
+    try:
+        _sandbox_check_command(cmd_args)
+    except PermissionError as e:
+        return f"[SANDBOX DENIAL] {e}"
+
     cmd_env = os.environ.copy()
     if env:
         # Sanitize env vars — only allow alphanumeric + underscore keys
@@ -149,6 +195,11 @@ def run_shell_streaming(
 
     if not cmd_args:
         return "[ERROR] Empty command"
+
+    try:
+        _sandbox_check_command(cmd_args)
+    except PermissionError as e:
+        return f"[SANDBOX DENIAL] {e}"
 
     cmd_env = os.environ.copy()
     if env:
