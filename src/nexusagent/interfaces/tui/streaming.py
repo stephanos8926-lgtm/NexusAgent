@@ -356,9 +356,11 @@ async def handle_slash_command(app, cmd: str) -> bool:
         app._show_greeting()
         return True
     if command in ("/expand", "/e"):
-        return True  # Widgets auto-expand
+        app.action_expand_all()
+        return True
     if command in ("/collapse", "/a"):
-        return True  # TODO: collapse all
+        app.action_collapse_all()
+        return True
     if command in ("/quit", "/q"):
         app.action_quit()
         return True
