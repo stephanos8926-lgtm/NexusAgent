@@ -1,8 +1,10 @@
 """API key authentication and authorization middleware for NexusAgent."""
 
 import hmac
+import json
 import logging
 import os
+import time
 
 from fastapi import HTTPException, Security, status
 from fastapi.security import APIKeyHeader
@@ -100,3 +102,52 @@ async def require_admin(api_key: str = Security(api_key_header)) -> str:
             detail="Admin access required",
         )
     return verified_key
+
+
+# ── Short-lived WebSocket tokens ──────────────────────────────────────────────
+
+# Default TTL for exchange tokens issued to browser WebSocket clients.
+_SHORT_TOKEN_TTL_SECONDS = 300
+
+
+def _get_fernet() -> "Fernet":
+    """Get the Fernet instance derived from the master secret.
+
+    Imported lazily so auth.py (which imports api_auth indirectly via
+    settings) does not create a circular import at module load time.
+    """
+    from nexusagent.infrastructure.auth import get_auth_manager
+
+    return get_auth_manager()._get_fernet()
+
+
+def create_short_lived_token(api_key: str, ttl_seconds: int = _SHORT_TOKEN_TTL_SECONDS) -> str:
+    """Create a short-lived, signed token for a verified API key.
+
+    The token is a Fernet-encrypted JSON payload containing the API key and
+    an absolute expiry timestamp. It is NOT the API key itself — the key is
+    only recoverable server-side (Fernet uses the master secret), so a leaked
+    token cannot be used to authenticate after it expires.
+    """
+    payload = json.dumps(
+        {"key": api_key, "exp": int(time.time()) + ttl_seconds}
+    ).encode()
+    return _get_fernet().encrypt(payload).decode()
+
+
+def resolve_short_lived_token(token: str) -> str | None:
+    """Resolve a short-lived token back to its API key.
+
+    Returns the embedded API key if the token is valid and unexpired,
+    otherwise None. Decryption failure (tampered/forged token) and expiry
+    both yield None — callers must treat None as authentication failure.
+    """
+    try:
+        raw = _get_fernet().decrypt(token.encode())
+        payload = json.loads(raw.decode())
+        if int(payload["exp"]) < int(time.time()):
+            return None  # expired
+        key = payload.get("key")
+        return key if isinstance(key, str) and key else None
+    except Exception:
+        return None

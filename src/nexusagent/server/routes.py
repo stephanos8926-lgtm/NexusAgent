@@ -190,7 +190,7 @@ def register_routes(app: FastAPI) -> None:
 
     # ─── Metrics Check ──────────────────────────────────────────────────
 
-    @app.get("/metrics")
+    @app.get("/metrics", dependencies=[Depends(verify_api_key)])
     async def metrics_endpoint():
         """Return a snapshot of active metrics from the MetricsCollector."""
         from nexusagent.core.observability import get_metrics
@@ -331,11 +331,15 @@ def register_routes(app: FastAPI) -> None:
         except HTTPException:
             raise HTTPException(status_code=401, detail="Invalid API key") from None
 
-        # Generate a short-lived token (the API key itself, marked as a token)
-        # In production, this would be a JWT or similar with expiry
-        # For now, we use the API key as the token — it's already verified
+        # Issue a real short-lived token: a Fernet-signed payload containing
+        # the verified API key and an absolute expiry. The token is NOT the
+        # API key itself — it cannot be used to authenticate after expiry,
+        # and a leaked token cannot be replayed indefinitely.
+        from nexusagent.infrastructure.api_auth import create_short_lived_token
+
+        token = create_short_lived_token(request.api_key)
         return TokenExchangeResponse(
-            token=request.api_key,
+            token=token,
             expires_in=300,
         )
 

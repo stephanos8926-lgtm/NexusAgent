@@ -371,7 +371,6 @@ class ConfigSchema(BaseModel):
     hooks: HooksConfig = Field(default_factory=HooksConfig)
     test_mode: TestModeConfig = Field(default_factory=TestModeConfig)
     trust: TrustConfig = Field(default_factory=TrustConfig)
-    budget: BudgetConfig = Field(default_factory=BudgetConfig)
     embedding: EmbeddingConfig = Field(default_factory=EmbeddingConfig)
     rerank: RerankConfig = Field(default_factory=RerankConfig)
     # MCP server configuration

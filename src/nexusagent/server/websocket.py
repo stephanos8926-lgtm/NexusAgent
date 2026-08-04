@@ -53,7 +53,20 @@ async def session_websocket(
     # Query-param token fallback for browser clients (less secure but necessary)
     token_param = websocket.query_params.get("token")
     if token_param and not header_key:
-        header_key = token_param
+        # The ?token= param may carry a short-lived exchange token (issued by
+        # POST /auth/token) rather than a raw API key. Resolve it to the
+        # embedded API key, checking signature and expiry. It may also be a
+        # raw API key passed directly (legacy), so fall through to verify.
+        try:
+            from nexusagent.infrastructure.api_auth import resolve_short_lived_token
+
+            resolved = resolve_short_lived_token(token_param)
+            if resolved is not None:
+                header_key = resolved
+        except Exception:
+            pass
+        if not header_key:
+            header_key = token_param
     if not header_key:
         await websocket.close(code=4001, reason="Missing API key — use Authorization: Bearer <key>")
         return
