@@ -15,6 +15,7 @@ from __future__ import annotations
 import asyncio
 import difflib
 import functools
+import inspect
 from collections.abc import Callable
 from threading import RLock
 from types import MappingProxyType
@@ -153,7 +154,7 @@ def register_tool(
     """
 
     def decorator(func: Callable) -> Callable:
-        if asyncio.iscoroutinefunction(func):
+        if inspect.iscoroutinefunction(func):
             # Wrap async functions to ensure the agent framework gets
             # the actual result, not the coroutine object. Also catch
             # exceptions and convert to an error string — LangGraph's

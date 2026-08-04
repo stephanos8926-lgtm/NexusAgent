@@ -65,8 +65,7 @@ class TestSessionMemoryInit:
     @pytest.mark.asyncio
     async def test_session_close_cleans_up_hybrid_memory(self, temp_memory_dir, session_id):
         session = _make_session(temp_memory_dir, session_id)
-        # close() is sync, not async — just verify it doesn't crash
-        session.hybrid_memory.close()
+        await session.hybrid_memory.close()
         assert True  # No crash = pass
 
 

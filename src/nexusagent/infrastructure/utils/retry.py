@@ -10,6 +10,7 @@ and optional retry callbacks.
 
 import asyncio
 import functools
+import inspect
 import logging
 import random
 import time
@@ -46,7 +47,7 @@ def retry_with_backoff(
     """
 
     def decorator(func: Callable[..., T]) -> Callable[..., T]:
-        if asyncio.iscoroutinefunction(func):
+        if inspect.iscoroutinefunction(func):
 
             @functools.wraps(func)
             async def async_wrapper(*args, **kwargs) -> T:
@@ -155,7 +156,7 @@ def retry_on_false(
     """
 
     def decorator(func: Callable[..., T]) -> Callable[..., T]:
-        if asyncio.iscoroutinefunction(func):
+        if inspect.iscoroutinefunction(func):
 
             @functools.wraps(func)
             async def async_wrapper(*args, **kwargs) -> T:
