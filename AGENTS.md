@@ -625,9 +625,9 @@ NexusAgent is undergoing a 12-phase architecture migration. **Phases 1-9 COMPLET
 | 7 | POL Control Plane | `07-pol-control-plane.md` | ✅ DELIVERED | Policy language, subscriber, capability enforcement |
 | 8 | Capability Security Model | `08-capability-security-model.md` | ✅ DELIVERED | Capability registry, role manifests, audit logging |
 | 9 | Memory Evolution (4-layer) | `09-memory-evolution.md` | ✅ DELIVERED | 4-layer hybrid memory: session/recall/archival/consolidation |
-| **10** | **Observability & Reliability** | `10-observability-reliability.md` | **🟡 NEXT — READY TO DISPATCH** | Structured logging, distributed tracing, metrics, health monitoring, failure classification, recovery workflows, chaos testing |
-| 11 | Production Readiness | `11-production-readiness.md` | 🟡 Queued | Hardening, deploy automation, runbooks |
-| 12 | Master Finish | (inline) | 🟡 Queued | Version bump, RAA, tag |
+| 10 | Observability & Reliability | `10-observability-reliability.md` | ✅ DELIVERED | Structured logging, distributed tracing, metrics, health monitoring, failure classification, recovery workflows, chaos testing |
+| 11 | Production Readiness | `11-production-readiness.md` | ✅ DELIVERED | Hardening, deploy automation, runbooks, CORS, authentication |
+| 12 | Master Finish | (inline) | ✅ DELIVERED | Version bump, devboard completion, tag |
 
 **Dependency chain (no skipping):**
 ```
