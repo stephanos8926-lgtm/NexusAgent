@@ -9,6 +9,7 @@ Enforces rules, manages system interventions, escalations, and overrides.
 from __future__ import annotations
 
 import asyncio
+import inspect
 import json
 import logging
 import os
@@ -285,7 +286,7 @@ class POLControlPlane:
         """Broadcast intervention state change to all web socket clients."""
         for callback in list(self._websocket_subscribers):
             try:
-                if asyncio.iscoroutinefunction(callback):
+                if inspect.iscoroutinefunction(callback):
                     await callback(intervention)
                 else:
                     callback(intervention)
