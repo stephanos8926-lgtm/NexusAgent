@@ -48,6 +48,7 @@ SLASH_COMMANDS: list[str] = sorted(
         "/undo",
         "/redo",
         "/copy",
+        "/c",
         "/quit",
     ]
 )

@@ -17,6 +17,8 @@ class UserMessage(Static):
     Includes a dim timestamp prefix.
     """
 
+    can_focus = True
+
     DEFAULT_CSS = """
     UserMessage {
         height: auto;
@@ -26,6 +28,10 @@ class UserMessage(Static):
         border-left: wide $primary;
         text-wrap: wrap;
         overflow-x: hidden;
+    }
+    UserMessage:focus {
+        background: $boost;
+        border-left: wide $primary;
     }
     """
 
@@ -38,6 +44,7 @@ class UserMessage(Static):
         """
         super().__init__(**kwargs)
         self._content = content
+        self.tooltip = f"User message: {content}"
 
     def render(self) -> Content:
         """Render the user message with a dim timestamp prefix.

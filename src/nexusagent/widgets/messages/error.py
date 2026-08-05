@@ -14,6 +14,8 @@ class ErrorMessage(Static):
     Uses $error color with icon and left-border accent for clear visual distinction.
     """
 
+    can_focus = True
+
     DEFAULT_CSS = """
     ErrorMessage {
         height: auto;
@@ -23,6 +25,10 @@ class ErrorMessage(Static):
         border-left: wide $error;
         text-wrap: wrap;
         overflow-x: hidden;
+    }
+    ErrorMessage:focus {
+        background: $boost;
+        border-left: wide $error;
     }
     """
 
@@ -35,6 +41,7 @@ class ErrorMessage(Static):
         """
         super().__init__(**kwargs)
         self._message = message
+        self.tooltip = f"System Error: {message}"
 
     def render(self) -> Content:
         """Render the error message with a ✗ prefix and error styling.

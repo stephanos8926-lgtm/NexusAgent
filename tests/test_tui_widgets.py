@@ -16,6 +16,8 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 from nexusagent.widgets.chat_input import (
     SLASH_COMMANDS,
     ChatInput,
@@ -743,3 +745,112 @@ class TestChatInputPlaceholder:
         """ChatInput accepts a custom placeholder."""
         widget = ChatInput(placeholder="Custom placeholder text")
         assert widget.placeholder == "Custom placeholder text"
+
+
+# ---------------------------------------------------------------------------
+# Message widgets accessibility tests
+# ---------------------------------------------------------------------------
+
+
+class TestMessageWidgetsAccessibility:
+    """Tests for message widgets' focusability and tooltips."""
+
+    def test_can_focus_property(self):
+        """Message widgets have can_focus set to True."""
+        assert AssistantMessage.can_focus is True
+        assert UserMessage.can_focus is True
+        assert ErrorMessage.can_focus is True
+        assert AppMessage.can_focus is True
+
+    def test_widgets_tooltips_assigned(self):
+        """Message widgets have appropriate screen-reader tooltips."""
+        assistant = AssistantMessage()
+        assert "Assistant response message" in assistant.tooltip
+
+        user = UserMessage("hello")
+        assert "User message: hello" in user.tooltip
+
+        err = ErrorMessage("missing file")
+        assert "System Error: missing file" in err.tooltip
+
+        app_msg = AppMessage("loading")
+        assert "System Notification: loading" in app_msg.tooltip
+
+
+# ---------------------------------------------------------------------------
+# Slash Copy Command tests
+# ---------------------------------------------------------------------------
+
+
+class TestTuiSlashCopyCommand:
+    """Tests for the /copy and /c TUI slash commands."""
+
+    @pytest.mark.asyncio
+    async def test_copy_command_no_assistant_messages(self):
+        """If there are no assistant messages, show a warning."""
+        from unittest.mock import MagicMock
+
+        from nexusagent.interfaces.tui.streaming import handle_slash_command
+
+        app = MagicMock()
+        # Mock messages_container to return no AssistantMessage children
+        app.messages_container.query.return_value = []
+
+        mounted_messages = []
+        def mock_mount(app_instance, msg):
+            mounted_messages.append(msg)
+
+        with patch("nexusagent.interfaces.tui.streaming._mount_with_limit", side_effect=mock_mount):
+            handled = await handle_slash_command(app, "/copy")
+            assert handled is True
+            assert len(mounted_messages) == 1
+            assert "No assistant messages to copy." in mounted_messages[0]._message
+
+    @pytest.mark.asyncio
+    async def test_copy_command_success(self):
+        """If assistant messages exist, call copy_to_clipboard with last message's content."""
+        from unittest.mock import MagicMock
+
+        from nexusagent.interfaces.tui.streaming import handle_slash_command
+
+        app = MagicMock()
+
+        last_msg = AssistantMessage()
+        last_msg._buffer = "Final assistant output text"
+        # Mock query of AssistantMessage to return our message
+        app.messages_container.query.return_value = [last_msg]
+
+        mounted_messages = []
+        def mock_mount(app_instance, msg):
+            mounted_messages.append(msg)
+
+        with patch("nexusagent.interfaces.tui.streaming._mount_with_limit", side_effect=mock_mount):
+            handled = await handle_slash_command(app, "/c")
+            assert handled is True
+            app.copy_to_clipboard.assert_called_once_with("Final assistant output text")
+            assert len(mounted_messages) == 1
+            assert "Copied last assistant response" in mounted_messages[0]._message
+
+    @pytest.mark.asyncio
+    async def test_copy_command_exception_handled(self):
+        """If copy_to_clipboard fails with an exception, handle it gracefully."""
+        from unittest.mock import MagicMock
+
+        from nexusagent.interfaces.tui.streaming import handle_slash_command
+
+        app = MagicMock()
+        app.copy_to_clipboard.side_effect = RuntimeError("Clipboard is unavailable")
+
+        last_msg = AssistantMessage()
+        last_msg._buffer = "Some text"
+        app.messages_container.query.return_value = [last_msg]
+
+        mounted_messages = []
+        def mock_mount(app_instance, msg):
+            mounted_messages.append(msg)
+
+        with patch("nexusagent.interfaces.tui.streaming._mount_with_limit", side_effect=mock_mount):
+            handled = await handle_slash_command(app, "/copy")
+            assert handled is True
+            assert len(mounted_messages) == 1
+            assert "Failed to copy to clipboard" in mounted_messages[0]._message

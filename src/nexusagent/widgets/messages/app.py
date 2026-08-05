@@ -14,6 +14,8 @@ class AppMessage(Static):
     Dim italic styling to de-emphasize vs user/assistant content.
     """
 
+    can_focus = True
+
     DEFAULT_CSS = """
     AppMessage {
         height: auto;
@@ -23,6 +25,9 @@ class AppMessage(Static):
         text-style: italic;
         text-wrap: wrap;
         overflow-x: hidden;
+    }
+    AppMessage:focus {
+        background: $boost;
     }
     """
 
@@ -35,6 +40,7 @@ class AppMessage(Static):
         """
         super().__init__(**kwargs)
         self._message = message
+        self.tooltip = f"System Notification: {message}"
 
     def render(self) -> Content:
         """Render the message with a muted ○ prefix.

@@ -19,6 +19,8 @@ class AssistantMessage(Vertical):
     lays out correctly (Static does not support child layout).
     """
 
+    can_focus = True
+
     DEFAULT_CSS = """
     AssistantMessage {
         height: auto;
@@ -27,6 +29,9 @@ class AssistantMessage(Vertical):
         background: transparent;
         text-wrap: wrap;
         overflow-x: hidden;
+    }
+    AssistantMessage:focus {
+        background: $boost;
     }
     AssistantMessage .assistant-ts {
         color: $text-dim;
@@ -51,6 +56,7 @@ class AssistantMessage(Vertical):
         self._finalized = False
         # Streaming buffer — plain Static that shows tokens as they arrive
         self._streaming_text = Static("", classes="assistant-stream")
+        self.tooltip = "Assistant response message. You can copy this with /copy."
 
     def _ensure_streaming_widget(self) -> None:
         """Mount the streaming buffer on first use (must be called after self is mounted)."""

@@ -19,6 +19,7 @@ from nexusagent.version import VERSION as CLIENT_VERSION
 # These are used in slash command handlers defined later in this file.
 from nexusagent.widgets.messages import (
     AppMessage,
+    AssistantMessage,
     ErrorMessage,
     ToolCallMessage,
     UserMessage,
@@ -442,8 +443,20 @@ async def handle_slash_command(app, cmd: str) -> bool:
             await app._ws.send(json.dumps({"type": "compact"}))
             app.status_bar.set_status("Compacting...")
         return True
-    if command == "/copy":
-        msg = AppMessage("Copy not available — use terminal selection")
+    if command in ("/copy", "/c"):
+        assistant_messages = list(app.messages_container.query(AssistantMessage))
+        if not assistant_messages:
+            msg = AppMessage("No assistant messages to copy.")
+            _mount_with_limit(app, msg)
+            return True
+
+        last_msg = assistant_messages[-1]
+        text_to_copy = last_msg._buffer
+        try:
+            app.copy_to_clipboard(text_to_copy)
+            msg = AppMessage("📋 [bold success]Copied last assistant response to clipboard![/bold success]")
+        except Exception as e:
+            msg = AppMessage(f"Failed to copy to clipboard: {e}")
         _mount_with_limit(app, msg)
         return True
     if command == "/sessions":
