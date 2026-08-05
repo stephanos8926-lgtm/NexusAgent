@@ -127,7 +127,7 @@ jobs:
           path: pip-audit.json
 
       - name: Secrets scanning (gitleaks)
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@v3
         with:
           args: detect --source=. --verbose --report-format=json --report-path=gitleaks.json
         continue-on-error: true
