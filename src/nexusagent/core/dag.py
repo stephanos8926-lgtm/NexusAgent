@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 # src/nexusagent/core/dag.py
 """Phase 6 — DAG Execution Engine Graph Model for NexusAgent.
 
@@ -26,12 +28,20 @@ class DAGNode(BaseModel):
     objective: str = Field(description="Description of the required work")
     dependencies: list[str] = Field(default_factory=list, description="List of dependent node_ids")
     worker_type: str | None = Field(default=None, description="Required worker capability class")
-    capabilities_required: list[str] | None = Field(default_factory=list, description="Required permissions")
+    capabilities_required: list[str] | None = Field(
+        default_factory=list, description="Required permissions"
+    )
     priority: int = Field(default=1, ge=1, le=5, description="Priority level of execution (1-5)")
-    timeout: float = Field(default=1800.0, ge=0.0, description="Maximum execution duration in seconds")
+    timeout: float = Field(
+        default=1800.0, ge=0.0, description="Maximum execution duration in seconds"
+    )
     retries: int = Field(default=3, ge=0, description="Number of retries allowed on failure")
-    verification_requirements: list[str] | None = Field(default_factory=list, description="Success verification criteria")
-    payload: dict[str, Any] = Field(default_factory=dict, description="Generic metadata or task contract fields")
+    verification_requirements: list[str] | None = Field(
+        default_factory=list, description="Success verification criteria"
+    )
+    payload: dict[str, Any] = Field(
+        default_factory=dict, description="Generic metadata or task contract fields"
+    )
 
     @property
     def id(self) -> str:
@@ -49,7 +59,9 @@ class DAGEdge(BaseModel):
 
     from_node_id: str = Field(description="The source node (must complete first)")
     to_node_id: str = Field(description="The destination node (depends on source)")
-    predicate: str | None = Field(default=None, description="Optional conditional execution predicate")
+    predicate: str | None = Field(
+        default=None, description="Optional conditional execution predicate"
+    )
 
 
 class DAG(BaseModel):
@@ -80,7 +92,9 @@ class DAG(BaseModel):
         for node in self.nodes:
             for dep_id in node.dependencies:
                 if dep_id not in node_ids:
-                    raise DAGValidationError(f"Node '{node.node_id}' references non-existent dependency: '{dep_id}'")
+                    raise DAGValidationError(
+                        f"Node '{node.node_id}' references non-existent dependency: '{dep_id}'"
+                    )
                 if dep_id == node.node_id:
                     raise DAGValidationError(f"Node '{node.node_id}' cannot depend on itself.")
                 unified_deps.add((node.node_id, dep_id))
@@ -88,9 +102,13 @@ class DAG(BaseModel):
         # Capture from explicit DAGEdges list
         for edge in self.edges:
             if edge.from_node_id not in node_ids:
-                raise DAGValidationError(f"Edge references non-existent source node: '{edge.from_node_id}'")
+                raise DAGValidationError(
+                    f"Edge references non-existent source node: '{edge.from_node_id}'"
+                )
             if edge.to_node_id not in node_ids:
-                raise DAGValidationError(f"Edge references non-existent destination node: '{edge.to_node_id}'")
+                raise DAGValidationError(
+                    f"Edge references non-existent destination node: '{edge.to_node_id}'"
+                )
             if edge.from_node_id == edge.to_node_id:
                 raise DAGValidationError(f"Self-loop is not allowed: '{edge.from_node_id}'")
             unified_deps.add((edge.to_node_id, edge.from_node_id))
@@ -137,16 +155,18 @@ class DAG(BaseModel):
 
         unreachable = node_ids - visited_nodes
         if unreachable:
-            raise DAGValidationError(
-                f"Orphaned/disconnected nodes detected: {unreachable}"
-            )
+            raise DAGValidationError(f"Orphaned/disconnected nodes detected: {unreachable}")
 
         # 4. Valid worker requirements & capabilities
         for node in self.nodes:
             if node.worker_type is not None and not isinstance(node.worker_type, str):
                 raise DAGValidationError(f"Node '{node.node_id}' has invalid worker_type format.")
-            if node.capabilities_required is not None and not isinstance(node.capabilities_required, list):
-                raise DAGValidationError(f"Node '{node.node_id}' has invalid capabilities_required format.")
+            if node.capabilities_required is not None and not isinstance(
+                node.capabilities_required, list
+            ):
+                raise DAGValidationError(
+                    f"Node '{node.node_id}' has invalid capabilities_required format."
+                )
 
     def topological_sort(self) -> list[str]:
         """Return a topological ordering of node IDs (parents execute before children)."""

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Git operations tool for NexusAgent.
 
 Provides git status, diff, log, branch, commit, and stash operations.

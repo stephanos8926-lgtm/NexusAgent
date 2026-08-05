@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 # src/nexusagent/security/__init__.py
 """Phase 8 Capability Security Model package."""
 

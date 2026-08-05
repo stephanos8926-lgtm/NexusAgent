@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Managed adapter for Session with lifecycle support.
 
 ManagedSession wraps an existing Session instance with observable lifecycle.

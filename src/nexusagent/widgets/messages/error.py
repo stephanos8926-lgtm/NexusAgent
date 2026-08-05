@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Error message widget — icon + border accent for clear visual distinction."""
 
 from __future__ import annotations

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Integration tests for TTL enforcement, expired item sweeping, and index exclusion."""
 
 import shutil

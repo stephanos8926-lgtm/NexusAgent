@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """TUI output formatting and markdown rendering utilities.
 
 Extracted from interfaces/tui.py to reduce the 1433L monolith.

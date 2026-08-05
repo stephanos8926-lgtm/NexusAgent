@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Summary DAG for hierarchical context compression.
 
 Provides a 3-level DAG structure for progressive conversation summarization:

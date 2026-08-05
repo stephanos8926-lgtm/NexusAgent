@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 # src/nexusagent/core/observability/metrics.py
 """Metrics collection for Runtime, Agent, LLM, and Tool categories."""
 
@@ -29,7 +31,9 @@ class MetricsCollector:
         self._histograms: dict[str, list[float]] = {}
         self._history: list[MetricValue] = []
 
-    def increment(self, name: str, value: float = 1.0, labels: dict[str, str] | None = None) -> None:
+    def increment(
+        self, name: str, value: float = 1.0, labels: dict[str, str] | None = None
+    ) -> None:
         """Increment a counter metric."""
         with self._lock:
             key = self._label_key(name, labels)
@@ -43,7 +47,9 @@ class MetricsCollector:
             self._gauges[key] = value
             self._history.append(MetricValue(name, value, labels or {}))
 
-    def record_histogram(self, name: str, value: float, labels: dict[str, str] | None = None) -> None:
+    def record_histogram(
+        self, name: str, value: float, labels: dict[str, str] | None = None
+    ) -> None:
         """Record a histogram / duration metric."""
         with self._lock:
             key = self._label_key(name, labels)

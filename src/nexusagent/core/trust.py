@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Trust infrastructure — trust levels, content wrapping, and anomaly scoring.
 
 Provides the building blocks for typed trust boundaries across the agent

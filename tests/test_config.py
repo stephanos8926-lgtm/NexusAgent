@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 import inspect
 
 from nexusagent.infrastructure.config import load_config
@@ -23,12 +25,13 @@ def test_load_config_success(tmp_path, monkeypatch):
 
 def test_llm_timeout_default():
     sig = inspect.signature(LLMProvider.generate)
-    assert 'timeout' in sig.parameters
-    assert sig.parameters['timeout'].default == 120.0
+    assert "timeout" in sig.parameters
+    assert sig.parameters["timeout"].default == 120.0
 
 
 def test_agent_memory_workspace_default():
     from nexusagent.infrastructure.config import AgentConfig
+
     cfg = AgentConfig()
     assert cfg.memory_workspace is None
 

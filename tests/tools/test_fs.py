@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 from pathlib import Path
 
 import pytest
@@ -16,6 +18,7 @@ from nexusagent.tools.fs_base import set_workspace_root
 @pytest.fixture
 def temp_workspace(tmp_path):
     from nexusagent.tools.fs import _WORKSPACE_ROOT as _old_workspace
+
     (tmp_path / "subdir").mkdir()
     (tmp_path / "subdir" / "file1.txt").write_text("hello")
     (tmp_path / "file2.txt").write_text("world")
@@ -28,6 +31,7 @@ def test_fs_tools():
     """Basic read/write test — uses CWD as workspace."""
     import os
     import tempfile
+
     with tempfile.NamedTemporaryFile(mode="w+", delete=False, dir=os.getcwd()) as tmp:
         tmp.write("hello")
         tmp_path = tmp.name

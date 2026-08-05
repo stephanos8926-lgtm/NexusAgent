@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Tests for agent event types in models.py."""
 
 import json

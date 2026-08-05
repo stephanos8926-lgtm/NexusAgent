@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Unit tests for capability audit trail logging."""
 
 from __future__ import annotations

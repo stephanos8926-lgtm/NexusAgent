@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Template include logic — @file chain resolution for prompts.
 
 Handles recursive @file injection with circular detection and size limits.

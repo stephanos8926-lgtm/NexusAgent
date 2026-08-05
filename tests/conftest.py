@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 from pathlib import Path
 
 # Load .env from project root so API keys are available for all tests
@@ -44,4 +46,3 @@ import nexusagent.infrastructure.auth as _auth_module
 _auth_module.set_auth_manager(_test_auth)
 
 # Initialize test database for server/session tests that need it
-

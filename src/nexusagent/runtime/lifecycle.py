@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Lifecycle state machine for runtime components.
 
 Provides a universal lifecycle model used by every managed component

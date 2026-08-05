@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Tests for TTL enforcement in FileMemory."""
 
 import shutil
@@ -150,9 +152,13 @@ def test_sweep_preserves_valid_entries(tmp_workspace):
     fm.initialize()
 
     # Write several entries: some expired, some not
-    fm.write_entry(content="Expired 1", entry_type=MemoryEntryType.WORLD, description="Expired 1", ttl_hours=0)
+    fm.write_entry(
+        content="Expired 1", entry_type=MemoryEntryType.WORLD, description="Expired 1", ttl_hours=0
+    )
     fm.write_entry(content="Valid 1", entry_type=MemoryEntryType.WORLD, description="Valid 1")
-    fm.write_entry(content="Expired 2", entry_type=MemoryEntryType.WORLD, description="Expired 2", ttl_hours=0)
+    fm.write_entry(
+        content="Expired 2", entry_type=MemoryEntryType.WORLD, description="Expired 2", ttl_hours=0
+    )
     fm.write_entry(content="Valid 2", entry_type=MemoryEntryType.WORLD, description="Valid 2")
 
     report = fm.sweep_expired()

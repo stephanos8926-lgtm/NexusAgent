@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Integration and unit tests for the LLMRefinement synthesis layer."""
 
 from unittest.mock import AsyncMock

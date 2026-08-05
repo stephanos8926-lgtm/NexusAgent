@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """NexusAgent Command Line Interface (CLI).
 
 Provides Click-based CLI commands for interacting with the NexusAgent service,
@@ -86,12 +88,12 @@ def _setup_cli_logging() -> None:
 
     from nexusagent.infrastructure.config import settings
 
-    structured_enabled = (
-        settings.logging.structured
-        or os.environ.get("NEXUS_STRUCTURED_LOGGING", "").lower() in ("1", "true", "yes", "on")
-    )
+    structured_enabled = settings.logging.structured or os.environ.get(
+        "NEXUS_STRUCTURED_LOGGING", ""
+    ).lower() in ("1", "true", "yes", "on")
     if structured_enabled:
         from nexusagent.core.observability import setup_structured_logging
+
         setup_structured_logging(settings.log_level)
     else:
         logging.basicConfig(level=settings.log_level, format="%(levelname)s: %(message)s")
@@ -637,6 +639,7 @@ def config_init():
         nexus config init
     """
     from nexusagent.infrastructure.config import create_user_config_from_template
+
     try:
         config_path = create_user_config_from_template()
         click.echo(f"User config created at: {config_path}")
@@ -661,6 +664,7 @@ def config_reset(force):
         nexus config reset --force
     """
     from nexusagent.infrastructure.config import get_project_root
+
     if not force:
         click.echo("Error: Use --force to confirm overwrite", err=True)
         raise SystemExit(1)
@@ -674,6 +678,7 @@ def config_reset(force):
         raise SystemExit(1)
 
     import shutil
+
     shutil.copy2(project_config, user_config)
     click.echo(f"User config reset to template: {user_config}")
 

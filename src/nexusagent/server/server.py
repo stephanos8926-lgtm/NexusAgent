@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 # src/nexusagent/server/server.py
 """FastAPI WebSocket server for the NexusAgent platform."""
 
@@ -23,12 +25,12 @@ _PID_FILE = os.path.join(os.path.expanduser("~"), ".nexusagent", "server.pid")
 _SERVER_START_TIME = time.monotonic()
 
 # Setup logging
-structured_enabled = (
-    settings.logging.structured
-    or os.environ.get("NEXUS_STRUCTURED_LOGGING", "").lower() in ("1", "true", "yes", "on")
-)
+structured_enabled = settings.logging.structured or os.environ.get(
+    "NEXUS_STRUCTURED_LOGGING", ""
+).lower() in ("1", "true", "yes", "on")
 if structured_enabled:
     from nexusagent.core.observability import setup_structured_logging
+
     setup_structured_logging(settings.log_level)
 else:
     logging.basicConfig(

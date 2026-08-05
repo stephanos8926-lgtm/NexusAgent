@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """
 MCP Budget Enforcement Hook Plugin.
 
@@ -73,6 +75,7 @@ async def pre_llm_call_budget_check(
     tool_tokens = 0
     if tools:
         import json
+
         tool_tokens = estimate_tokens(json.dumps(tools))
 
     total_estimated = input_tokens + tool_tokens + estimated_output
@@ -135,7 +138,9 @@ async def hook_pre_llm_call(hook_context: dict[str, Any]) -> dict[str, Any]:
             logger.warning(f"MCP Budget: {warning}")
 
         if result.get("emergency_compression"):
-            logger.critical(f"MCP Budget: EMERGENCY COMPRESSION TRIGGERED at {result['current_usage']}/{result['max_context']} tokens")
+            logger.critical(
+                f"MCP Budget: EMERGENCY COMPRESSION TRIGGERED at {result['current_usage']}/{result['max_context']} tokens"
+            )
 
         if not result["allowed"]:
             logger.error(f"MCP Budget: BLOCKED - {result['reason']}")

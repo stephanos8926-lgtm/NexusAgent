@@ -1,8 +1,11 @@
+# SPDX-License-Identifier: MIT
+
 """Embedding provider integration for memory index.
 
 Uses the new provider system from nexusagent.providers.
 Memory-specific constants and serialization remain here.
 """
+
 from __future__ import annotations
 
 import logging
@@ -50,6 +53,7 @@ _DB_POOL = _get_db_pool("default")
 
 # ── Embedding Provider Protocol ────────────────────────────────────────────────
 
+
 class EmbeddingProvider(ABC):
     """Abstract base class for embedding providers (backward compat)."""
 
@@ -78,6 +82,7 @@ class EmbeddingProvider(ABC):
 
 # ── Provider Factory ───────────────────────────────────────────────────────────
 
+
 def create_embedding_provider():
     """Create embedding provider based on config, using provider registry.
 
@@ -102,21 +107,37 @@ def create_embedding_provider():
             return provider_cls()
         elif provider_name == "rw_ie":
             rw_ie_config = getattr(settings.embedding, "rw_ie", None)
-            base_url = getattr(rw_ie_config, "base_url", "http://100.122.246.112:8300") if rw_ie_config else "http://100.122.246.112:8300"
+            base_url = (
+                getattr(rw_ie_config, "base_url", "http://100.122.246.112:8300")
+                if rw_ie_config
+                else "http://100.122.246.112:8300"
+            )
             timeout = getattr(rw_ie_config, "timeout_secs", 30) if rw_ie_config else 30
             batch_size = getattr(rw_ie_config, "batch_size", 32) if rw_ie_config else 32
             return provider_cls(base_url=base_url, timeout=timeout, batch_size=batch_size)
         elif provider_name == "local":
             local_config = getattr(settings.embedding, "local", None)
-            model_name = getattr(local_config, "model", "all-MiniLM-L6-v2") if local_config else "all-MiniLM-L6-v2"
+            model_name = (
+                getattr(local_config, "model", "all-MiniLM-L6-v2")
+                if local_config
+                else "all-MiniLM-L6-v2"
+            )
             return provider_cls(model_name=model_name)
         elif provider_name == "hash":
             return provider_cls()
         elif provider_name == "openai_compatible":
             openai_config = getattr(settings.embedding, "openai_compatible", None)
-            base_url = getattr(openai_config, "base_url", "https://api.openai.com/v1") if openai_config else "https://api.openai.com/v1"
+            base_url = (
+                getattr(openai_config, "base_url", "https://api.openai.com/v1")
+                if openai_config
+                else "https://api.openai.com/v1"
+            )
             api_key = getattr(openai_config, "api_key", None) if openai_config else None
-            model = getattr(openai_config, "model", "text-embedding-3-small") if openai_config else "text-embedding-3-small"
+            model = (
+                getattr(openai_config, "model", "text-embedding-3-small")
+                if openai_config
+                else "text-embedding-3-small"
+            )
             dims = getattr(openai_config, "dims", 1536) if openai_config else 1536
             return provider_cls(base_url=base_url, api_key=api_key, model=model, dims=dims)
         else:
@@ -127,6 +148,7 @@ def create_embedding_provider():
 
 
 # ── Fallback Chain ────────────────────────────────────────────────────────────
+
 
 class ChainedEmbeddingProvider(EmbeddingProvider):
     """Chains multiple providers with fallback."""
@@ -175,7 +197,7 @@ class ChainedEmbeddingProvider(EmbeddingProvider):
     def _adjust_dim(self, vec: list[float]) -> list[float]:
         if len(vec) < self._primary_dims:
             return vec + [0.0] * (self._primary_dims - len(vec))
-        return vec[:self._primary_dims]
+        return vec[: self._primary_dims]
 
     def _embed_hash(self, text: str) -> list[float]:
         """Sync hash fallback for synchronous search methods."""
@@ -191,6 +213,7 @@ def create_chained_embedding_provider() -> EmbeddingProvider:
 
     if primary.name != "local":
         from nexusagent.providers.implementations import LocalEmbeddingProvider
+
         fallbacks.append(LocalEmbeddingProvider())
     if primary.name != "hash":
         fallbacks.append(HashEmbeddingProvider())
@@ -199,6 +222,7 @@ def create_chained_embedding_provider() -> EmbeddingProvider:
 
 
 # ── Vector Serialization ──────────────────────────────────────────────────────
+
 
 def _vec_to_blob(vec: list[float]) -> bytes:
     """Pack a float32 vector into a BLOB for sqlite-vec storage."""

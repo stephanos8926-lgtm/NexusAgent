@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Base SystemEvent class and event types.
 
 Defines the fundamental event schema with required fields:

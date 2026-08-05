@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 # src/nexusagent/core/dag_engine.py
 """Phase 6 — DAG Execution Engine for NexusAgent.
 

@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
+
 """
 NexusAgent TUI End-to-End Test Suite
 
@@ -62,9 +64,7 @@ class E2ETester:
         try:
             # Use Bearer token in Authorization header (required by server)
             self.ws = await websockets.connect(
-                url,
-                additional_headers={"Authorization": f"Bearer {API_KEY}"},
-                open_timeout=10
+                url, additional_headers={"Authorization": f"Bearer {API_KEY}"}, open_timeout=10
             )
             log(f"✅ Connected (session: {self.session_id[:8]}...)", "PASS")
             return True
@@ -79,55 +79,54 @@ class E2ETester:
             log("Disconnected", "INFO")
 
     async def send_message(self, message: str, timeout: float = TIMEOUT):
-            """Send a message and collect all events."""
-            self.events = []
-            log(f"Sending: '{message[:50]}...'", "TEST")
+        """Send a message and collect all events."""
+        self.events = []
+        log(f"Sending: '{message[:50]}...'", "TEST")
 
-            try:
-                # Send message
-                await self.ws.send(json.dumps({"type": "user_input", "content": message}))
+        try:
+            # Send message
+            await self.ws.send(json.dumps({"type": "user_input", "content": message}))
 
-                # Collect events with timeout
-                import time
-                start = time.time()
-                while True:
-                    try:
-                        remaining = timeout - (time.time() - start)
-                        if remaining <= 0:
-                            log(f"⏱️ Timeout after {timeout}s", "WARN")
-                            break
+            # Collect events with timeout
+            import time
 
-                        event_raw = await asyncio.wait_for(self.ws.recv(), timeout=remaining)
-                        event = json.loads(event_raw)
-                        self.events.append(event)
-
-                        # Stop on response or error
-                        if event.get("type") in ("response", "error"):
-                            break
-                        # Stop on tool approval request (we'll handle it)
-                        if event.get("type") == "approval_request":
-                            break
-
-                    except TimeoutError:
-                        log("⏱️ No more events", "INFO")
+            start = time.time()
+            while True:
+                try:
+                    remaining = timeout - (time.time() - start)
+                    if remaining <= 0:
+                        log(f"⏱️ Timeout after {timeout}s", "WARN")
                         break
 
-                log(f"Received {len(self.events)} events", "INFO")
-                if self.events:
-                    log(f"Event types: {[e.get('type') for e in self.events]}", "INFO")
-                return self.events
+                    event_raw = await asyncio.wait_for(self.ws.recv(), timeout=remaining)
+                    event = json.loads(event_raw)
+                    self.events.append(event)
 
-            except Exception as e:
-                log(f"❌ Send failed: {e}", "FAIL")
-                return []
+                    # Stop on response or error
+                    if event.get("type") in ("response", "error"):
+                        break
+                    # Stop on tool approval request (we'll handle it)
+                    if event.get("type") == "approval_request":
+                        break
+
+                except TimeoutError:
+                    log("⏱️ No more events", "INFO")
+                    break
+
+            log(f"Received {len(self.events)} events", "INFO")
+            if self.events:
+                log(f"Event types: {[e.get('type') for e in self.events]}", "INFO")
+            return self.events
+
+        except Exception as e:
+            log(f"❌ Send failed: {e}", "FAIL")
+            return []
 
     async def approve_tool(self, call_id: str, approved: bool = True):
         """Send approval for a tool call."""
         log(f"{'Approving' if approved else 'Rejecting'} tool {call_id[:8]}...", "INFO")
         await self.ws.send(
-            json.dumps(
-                {"type": "approval_response", "call_id": call_id, "approved": approved}
-            )
+            json.dumps({"type": "approval_response", "call_id": call_id, "approved": approved})
         )
 
     def record_result(self, test_name: str, passed: bool, reason: str = ""):
@@ -172,9 +171,7 @@ class E2ETester:
         log("TEST 2: Thinking Events", "TEST")
         log("=" * 60)
 
-        events = await self.send_message(
-            "Explain quantum computing in 2 sentences."
-        )
+        events = await self.send_message("Explain quantum computing in 2 sentences.")
 
         has_thinking = any(e.get("type") == "thinking" for e in events)
         passed = has_thinking
@@ -193,32 +190,27 @@ class E2ETester:
 
         # Write file
         log("Writing test file...", "INFO")
-        events = await self.send_message(
-            f"Write this exact text to {test_file}: {test_content}"
-        )
+        events = await self.send_message(f"Write this exact text to {test_file}: {test_content}")
 
         # Look for tool call
         tool_calls = [e for e in events if e.get("type") == "tool_call"]
-        has_write = any(
-            e.get("tool") == "write_file" for e in tool_calls
-        )
+        has_write = any(e.get("tool") == "write_file" for e in tool_calls)
 
         if has_write:
             # Approve the tool
-            call_id = next(
-                e.get("call_id") for e in tool_calls if e.get("tool") == "write_file"
-            )
+            call_id = next(e.get("call_id") for e in tool_calls if e.get("tool") == "write_file")
             await self.approve_tool(call_id)
 
             # Wait for result
             await asyncio.sleep(2)
             result_events = await self.send_message("Did the file write succeed?")
             has_success = any(
-                "success" in str(e).lower() or test_content in str(e)
-                for e in result_events
+                "success" in str(e).lower() or test_content in str(e) for e in result_events
             )
             passed = has_success
-            self.record_result("File write", passed, "Write succeeded" if passed else "Write failed")
+            self.record_result(
+                "File write", passed, "Write succeeded" if passed else "Write failed"
+            )
         else:
             # Check if already auto-approved
             file_exists = Path(test_file).exists()
@@ -233,19 +225,21 @@ class E2ETester:
         log("Reading test file...", "INFO")
         events = await self.send_message(f"Read the file {test_file} and tell me what it says.")
 
-        has_read = any(e.get("type") == "tool_call" and e.get("tool") == "read_file" for e in events)
+        has_read = any(
+            e.get("type") == "tool_call" and e.get("tool") == "read_file" for e in events
+        )
         response = next((e.get("content", "") for e in events if e.get("type") == "response"), "")
         has_content = test_content in response
 
         if has_read:
-            call_id = next(
-                e.get("call_id") for e in events if e.get("tool") == "read_file"
-            )
+            call_id = next(e.get("call_id") for e in events if e.get("tool") == "read_file")
             await self.approve_tool(call_id)
             await asyncio.sleep(2)
 
         passed = has_content
-        self.record_result("File read", passed, f"Content: '{response[:50]}...'" if passed else "Content not found")
+        self.record_result(
+            "File read", passed, f"Content: '{response[:50]}...'" if passed else "Content not found"
+        )
 
     async def test_04_gemini_native_tools(self):
         """Test Gemini native tools (Google Search, Code Execution)."""
@@ -266,7 +260,7 @@ class E2ETester:
         self.record_result(
             "Google Search (real-time)",
             passed_4a,
-            f"Got price: '{response[:100]}...'" if passed_4a else "No price found"
+            f"Got price: '{response[:100]}...'" if passed_4a else "No price found",
         )
 
         # Test 4b: Code Execution (math calculation)
@@ -282,7 +276,7 @@ class E2ETester:
         self.record_result(
             "Code Execution (Python)",
             passed_4b,
-            f"Got answer: {response.strip()}" if passed_4b else "Wrong answer"
+            f"Got answer: {response.strip()}" if passed_4b else "Wrong answer",
         )
 
     async def test_05_memory_storage_recall(self):
@@ -306,9 +300,7 @@ class E2ETester:
         # Recall memory (new message to trigger recall)
         log("Recalling memory...", "INFO")
         await asyncio.sleep(2)  # Let extraction complete
-        events = await self.send_message(
-            f"What did I tell you to remember about {unique_phrase}?"
-        )
+        events = await self.send_message(f"What did I tell you to remember about {unique_phrase}?")
 
         response = next((e.get("content", "") for e in events if e.get("type") == "response"), "")
         has_recall = unique_phrase in response or "test memory" in response.lower()
@@ -316,7 +308,7 @@ class E2ETester:
         self.record_result(
             "Memory recall",
             passed,
-            f"Recalled: '{response[:100]}...'" if passed else "Memory not recalled"
+            f"Recalled: '{response[:100]}...'" if passed else "Memory not recalled",
         )
 
     async def test_06_approval_flow(self):
@@ -333,7 +325,11 @@ class E2ETester:
         approval_req = next((e for e in events if e.get("type") == "approval_request"), None)
         has_approval = approval_req is not None
         passed_1 = has_approval
-        self.record_result("Approval request", passed_1, "Got approval modal" if passed_1 else "No approval requested")
+        self.record_result(
+            "Approval request",
+            passed_1,
+            "Got approval modal" if passed_1 else "No approval requested",
+        )
 
         if has_approval:
             call_id = approval_req.get("call_id")
@@ -348,9 +344,15 @@ class E2ETester:
             result_events = await self.send_message("What was the output?")
             has_output = any("NexusAgent approval test" in str(e) for e in result_events)
             passed_2 = has_output
-            self.record_result("Approval execution", passed_2, "Command executed" if passed_2 else "No output")
+            self.record_result(
+                "Approval execution", passed_2, "Command executed" if passed_2 else "No output"
+            )
         else:
-            self.record_result("Approval execution", False, "Skipped (no approval request)",)
+            self.record_result(
+                "Approval execution",
+                False,
+                "Skipped (no approval request)",
+            )
 
     async def test_07_slash_commands(self):
         """Test slash commands."""
@@ -374,7 +376,9 @@ class E2ETester:
         log("Testing /status...", "INFO")
         events = await self.send_message("/status")
         has_status = any("ready" in str(e).lower() or "busy" in str(e).lower() for e in events)
-        self.record_result("/status command", has_status, "Status shown" if has_status else "No response")
+        self.record_result(
+            "/status command", has_status, "Status shown" if has_status else "No response"
+        )
 
     async def test_08_error_handling(self):
         """Test error handling (invalid input, failures)."""
@@ -435,7 +439,7 @@ class E2ETester:
         log(f"⚠️  Skipped: {self.test_results['skip']}", "WARN")
         log("=" * 60)
 
-        success = self.test_results['fail'] == 0
+        success = self.test_results["fail"] == 0
         if success:
             log("🎉 ALL TESTS PASSED!", "PASS")
         else:

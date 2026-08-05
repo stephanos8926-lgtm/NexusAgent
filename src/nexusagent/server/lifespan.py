@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Server lifespan adapter — wires Runtime into FastAPI lifecycle.
 
 Provides create_server_app() which wraps the existing create_app() with

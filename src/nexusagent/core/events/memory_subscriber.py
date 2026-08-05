@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 # src/nexusagent/core/events/memory_subscriber.py
 """Memory Subscriber for triggered memory extraction and consolidation."""
 

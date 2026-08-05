@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 # src/nexusagent/core/orchestrator.py
 """Phase 5 — Orchestrator for NexusAgent.
 

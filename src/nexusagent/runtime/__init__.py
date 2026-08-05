@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """NexusAgent Runtime — lifecycle, DI, and execution boundaries.
 
 The runtime package provides the foundation layer for all NexusAgent components:

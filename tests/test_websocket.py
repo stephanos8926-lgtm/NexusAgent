@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Tests for the WebSocket session endpoint."""
 
 from starlette.routing import WebSocketRoute

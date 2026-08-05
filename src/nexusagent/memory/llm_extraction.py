@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """LLM-powered memory extraction (v2 — replaces regex-based extraction).
 
 Uses LLM to extract structured facts from conversation context.
@@ -88,6 +90,7 @@ class LLMExtractor:
 
         # Fallback to regex
         from typing import cast
+
         return cast(list[ExtractionResult], self._fallback.extract(text))
 
     async def _extract_with_llm(self, text: str) -> list[ExtractionResult]:

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 import uuid
 from dataclasses import dataclass
 

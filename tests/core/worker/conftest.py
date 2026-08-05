@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Pytest fixtures for WorkerGraph tests."""
 
 from __future__ import annotations

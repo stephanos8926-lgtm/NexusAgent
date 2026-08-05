@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 # src/nexusagent/models.py
 """Data models for tasks, results, agent events, and memory scopes.
 

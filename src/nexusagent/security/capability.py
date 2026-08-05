@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Phase 8: Capability Security Model for NexusAgent.
 
 Defines the core Capability schema, RiskLevel enum, and CapabilityRegistry.

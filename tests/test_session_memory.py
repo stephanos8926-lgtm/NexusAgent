@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Tests for memory context injection into agent system prompt."""
 
 from __future__ import annotations
@@ -26,6 +28,7 @@ def mock_session():
             # Store the input for assertions
             agent._astream_input = input_data
             from langchain_core.messages import AIMessageChunk
+
             yield AIMessageChunk(content="test response")
 
         agent.astream = _astream
@@ -51,12 +54,14 @@ async def test_memory_context_in_system_prompt(mock_session):
     await mock_session.send("Fix the auth bug")
 
     # Agent should have been called with {"messages": [...]}
-    assert hasattr(mock_session.agent, '_astream_input'), "Agent astream was never called"
+    assert hasattr(mock_session.agent, "_astream_input"), "Agent astream was never called"
     state = mock_session.agent._astream_input
     assert "messages" in state, f"Expected 'messages' key in state, got: {list(state.keys())}"
     msgs = state["messages"]
     # Find a SystemMessage with memory context
-    memory_msgs = [m for m in msgs if isinstance(m, SystemMessage) and "Test memory context" in m.content]
+    memory_msgs = [
+        m for m in msgs if isinstance(m, SystemMessage) and "Test memory context" in m.content
+    ]
     assert len(memory_msgs) >= 1, (
         f"No SystemMessage with memory context found. Messages: {[type(m).__name__ for m in msgs]}"
     )
@@ -71,7 +76,7 @@ async def test_no_memory_context_when_empty(mock_session):
     await mock_session.send("Hello")
 
     # Should still work — agent gets called via astream
-    assert hasattr(mock_session.agent, '_astream_input'), "Agent astream was never called"
+    assert hasattr(mock_session.agent, "_astream_input"), "Agent astream was never called"
     state = mock_session.agent._astream_input
     msgs = state["messages"]
     # Only base SystemMessage + HumanMessage (no memory SystemMessage)

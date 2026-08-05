@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Provider abstraction — factory/abstract factory pattern for LLM providers.
 
 NexusAgent is provider-agnostic. All LLM, embedding, and reranker providers
@@ -22,26 +24,30 @@ T_Response = TypeVar("T_Response", covariant=True)
 
 # ── Provider Metadata ──────────────────────────────────────────────────────────
 
+
 @dataclass
 class ProviderMetadata:
     """Metadata about a provider implementation."""
-    name: str                             # Canonical identifier (e.g. "gemini", "openrouter", "rw_ie")
-    display_name: str                     # Human-readable name (e.g. "Google Gemini")
-    description: str                      # Short description
-    provider_type: str                    # "llm" | "embedding" | "reranker"
-    env_vars: tuple[str, ...] = ()        # Required env vars in priority order
-    base_url: str | None = None           # Default endpoint
-    models: tuple[str, ...] = ()          # Known models for this provider
-    default_model: str | None = None      # Default model if not specified
-    auth_type: str = "api_key"            # api_key | oauth | none
-    version: str = "1.0.0"                # Provider implementation version
+
+    name: str  # Canonical identifier (e.g. "gemini", "openrouter", "rw_ie")
+    display_name: str  # Human-readable name (e.g. "Google Gemini")
+    description: str  # Short description
+    provider_type: str  # "llm" | "embedding" | "reranker"
+    env_vars: tuple[str, ...] = ()  # Required env vars in priority order
+    base_url: str | None = None  # Default endpoint
+    models: tuple[str, ...] = ()  # Known models for this provider
+    default_model: str | None = None  # Default model if not specified
+    auth_type: str = "api_key"  # api_key | oauth | none
+    version: str = "1.0.0"  # Provider implementation version
 
 
 # ── Result Types ───────────────────────────────────────────────────────────────
 
+
 @dataclass
 class ProviderResult[T_Response]:
     """Result from a provider execution attempt."""
+
     provider: str
     model: str
     response: T_Response | None
@@ -58,13 +64,13 @@ class ProviderResult[T_Response]:
 
 # ── Abstract Provider Interfaces ──────────────────────────────────────────────
 
+
 class LLMProvider(ABC):
     """Abstract interface for LLM (chat completion) providers."""
 
     @property
     @abstractmethod
-    def metadata(self) -> ProviderMetadata:
-        ...
+    def metadata(self) -> ProviderMetadata: ...
 
     @abstractmethod
     async def chat(
@@ -74,8 +80,7 @@ class LLMProvider(ABC):
         temperature: float | None = None,
         max_tokens: int | None = None,
         **kwargs,
-    ) -> ProviderResult[dict[str, Any]]:
-        ...
+    ) -> ProviderResult[dict[str, Any]]: ...
 
 
 class EmbeddingProvider(ABC):
@@ -83,8 +88,7 @@ class EmbeddingProvider(ABC):
 
     @property
     @abstractmethod
-    def metadata(self) -> ProviderMetadata:
-        ...
+    def metadata(self) -> ProviderMetadata: ...
 
     @property
     @abstractmethod
@@ -93,12 +97,10 @@ class EmbeddingProvider(ABC):
         ...
 
     @abstractmethod
-    async def embed(self, text: str) -> ProviderResult[list[float]]:
-        ...
+    async def embed(self, text: str) -> ProviderResult[list[float]]: ...
 
     @abstractmethod
-    async def embed_batch(self, texts: list[str]) -> ProviderResult[list[list[float]]]:
-        ...
+    async def embed_batch(self, texts: list[str]) -> ProviderResult[list[list[float]]]: ...
 
 
 class RerankerProvider(ABC):
@@ -106,8 +108,7 @@ class RerankerProvider(ABC):
 
     @property
     @abstractmethod
-    def metadata(self) -> ProviderMetadata:
-        ...
+    def metadata(self) -> ProviderMetadata: ...
 
     @abstractmethod
     async def rerank(
@@ -115,15 +116,16 @@ class RerankerProvider(ABC):
         query: str,
         documents: list[str],
         top_k: int = 10,
-    ) -> ProviderResult[list[tuple[int, float]]]:
-        ...
+    ) -> ProviderResult[list[tuple[int, float]]]: ...
 
 
 # ── Provider Configuration ────────────────────────────────────────────────────
 
+
 @dataclass
 class ProviderConfig:
     """Configuration for a single provider in a fallback chain."""
+
     provider_type: str
     name: str
     model: str | None = None
@@ -138,15 +140,16 @@ class ProviderConfig:
 
 # ── Provider Factory ───────────────────────────────────────────────────────────
 
+
 class ProviderFactory[T_Response](ABC):
     """Abstract factory for creating providers from config."""
 
     @abstractmethod
-    def create(self, config: ProviderConfig) -> object:
-        ...
+    def create(self, config: ProviderConfig) -> object: ...
 
 
 # ── Simple Provider Registry ──────────────────────────────────────────────────
+
 
 class ProviderRegistry:
     """Simple registry of provider factories, keyed by provider type."""

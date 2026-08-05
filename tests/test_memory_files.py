@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Tests for the file-based memory layer."""
 
 import shutil
@@ -173,6 +175,7 @@ def test_write_entry_updates_quality_score_on_append(tmp_workspace):
 
     # Read initial frontmatter using the utility function
     from nexusagent.memory.memory_utils import parse_frontmatter
+
     content = topic_file.read_text()
     initial_fm = parse_frontmatter(content)
     initial_score = initial_fm.get("quality_score", 0)
@@ -191,7 +194,9 @@ def test_write_entry_updates_quality_score_on_append(tmp_workspace):
     updated_score = updated_fm.get("quality_score", 0)
 
     # Quality score should have increased due to longer content
-    assert updated_score >= initial_score, f"Quality score should increase or stay same: {initial_score} -> {updated_score}"
+    assert updated_score >= initial_score, (
+        f"Quality score should increase or stay same: {initial_score} -> {updated_score}"
+    )
 
 
 if __name__ == "__main__":

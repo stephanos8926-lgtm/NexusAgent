@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Integration tests for the ConsolidationEngine memory maintenance system."""
 
 import os
@@ -38,14 +40,7 @@ def _write_raw_memory(workspace, name, content):
 def test_consolidation_engine_scan_and_consolidate(workspace_dir, file_memory):
     """Verify that ConsolidationEngine correctly identifies issues and applies fixes."""
     # Write duplicates
-    raw = (
-        "---\n"
-        'name: "dup-test"\n'
-        "description: test\n"
-        "type: world\n"
-        "---\n\n"
-        "Identical body text\n"
-    )
+    raw = '---\nname: "dup-test"\ndescription: test\ntype: world\n---\n\nIdentical body text\n'
     _write_raw_memory(workspace_dir, "file1", raw)
     _write_raw_memory(workspace_dir, "file2", raw)
 

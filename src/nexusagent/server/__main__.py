@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 # src/nexusagent/server/__main__.py
 """Entry point for `python3 -m nexusagent.server`."""
 

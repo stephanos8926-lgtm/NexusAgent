@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Assistant message widget — uses Textual Markdown for rich rendering."""
 
 from __future__ import annotations

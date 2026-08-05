@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Code search tool for NexusAgent.
 
 Provides local code search using ripgrep (rg) with structured output.

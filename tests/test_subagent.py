@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 # tests/test_subagent.py
 """Tests for SubAgentHandle control interface."""
 

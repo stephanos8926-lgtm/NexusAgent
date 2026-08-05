@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Tests for ManagedSession and RuntimeSessionManager."""
 
 from __future__ import annotations

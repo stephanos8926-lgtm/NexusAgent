@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Hybrid memory search index — FTS5 + sqlite-vec with union merge."""
 
 from .embeddings import (

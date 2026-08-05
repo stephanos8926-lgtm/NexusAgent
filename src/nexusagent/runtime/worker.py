@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Managed adapter for workers with lifecycle support.
 
 ManagedWorker wraps SubAgentHandle with observable lifecycle.

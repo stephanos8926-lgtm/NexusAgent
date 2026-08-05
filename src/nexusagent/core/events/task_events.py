@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Task lifecycle events.
 
 Defines TaskEvent and its subtypes for task lifecycle tracking:

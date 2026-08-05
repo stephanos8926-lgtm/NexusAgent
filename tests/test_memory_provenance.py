@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Tests for provenance tracking in the memory system.
 
 Verifies that ``source_session_id`` and ``derived_from`` are correctly

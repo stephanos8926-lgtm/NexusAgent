@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 from threading import Thread
 from time import sleep
 from types import MappingProxyType

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Tests for the 7 global singleton backward-compat shims."""
 
 from __future__ import annotations
@@ -80,6 +82,7 @@ class TestShimBackwardCompat:
     def test_ensure_tools_registered_fallback(self, mock_register):
         """_ensure_tools_registered() works without RuntimeContext."""
         import nexusagent.core.agent
+
         nexusagent.core.agent._tools_registered = False
 
         from nexusagent.core.agent import _ensure_tools_registered

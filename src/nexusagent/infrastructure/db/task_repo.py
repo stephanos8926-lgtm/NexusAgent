@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Task repository — CRUD operations on the ``tasks`` and ``results`` tables."""
 
 from __future__ import annotations

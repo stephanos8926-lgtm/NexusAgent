@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 # tests/core/task/test_task_state.py
 """Tests for the Task state machine."""
 
@@ -36,9 +38,14 @@ class TestStateTransitionValidator:
             try:
                 StateTransitionValidator.validate(state, TaskState.FAILED)
             except StateTransitionError:
-                if state not in (TaskState.CREATED, TaskState.PLANNING,
-                                 TaskState.EXECUTING, TaskState.VERIFYING,
-                                 TaskState.FAILED, TaskState.RECOVERING):
+                if state not in (
+                    TaskState.CREATED,
+                    TaskState.PLANNING,
+                    TaskState.EXECUTING,
+                    TaskState.VERIFYING,
+                    TaskState.FAILED,
+                    TaskState.RECOVERING,
+                ):
                     pytest.fail(f"Unexpected failure for {state} → FAILED")
 
     def test_completed_is_terminal(self):

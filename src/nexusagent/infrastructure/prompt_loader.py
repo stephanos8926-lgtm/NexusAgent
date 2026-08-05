@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """NEXUS.md prompt file loader with @ chaining and circular detection.
 
 Resolution order:

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Tests for WorkerGraph structure and lifecycle."""
 
 from __future__ import annotations

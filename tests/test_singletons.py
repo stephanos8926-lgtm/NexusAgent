@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Tests for singleton injection patterns.
 
 Verifies that all global singletons support get_X/set_X injection

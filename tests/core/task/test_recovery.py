@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 # tests/core/task/test_recovery.py
 """Tests for the RecoveryManager."""
 

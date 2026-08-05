@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 # src/nexusagent/core/task/task_state.py
 """Task state machine — durable execution model for NexusAgent.
 

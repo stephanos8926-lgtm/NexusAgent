@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Providers package — provider abstraction, fallback chain, and implementations.
 
 Provider-agnostic architecture with:
@@ -6,6 +8,7 @@ Provider-agnostic architecture with:
 - FallbackChain with error routing, circuit breakers, and budget gates
 - Standardized UpstreamError taxonomy
 """
+
 from __future__ import annotations
 
 from nexusagent.infrastructure.errors import (

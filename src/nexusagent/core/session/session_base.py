@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Session base class — shared memory logic for both interactive sessions and workers.
 
 This module provides:

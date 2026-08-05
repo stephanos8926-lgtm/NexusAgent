@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Tool registry, policy enforcement, and discovery for NexusAgent.
 
 Architecture:

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Checkpoint dataclass and serialization/deserialization logic."""
 
 from __future__ import annotations

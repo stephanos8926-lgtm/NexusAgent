@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Code review tool  compat shim.
 
 This file re-exports from the code_review/ subpackage for backward compatibility.

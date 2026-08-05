@@ -13,6 +13,10 @@ concurrency:
 jobs:
   ci:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+      packages: read
     strategy:
       fail-fast: true
 
@@ -51,7 +55,277 @@ jobs:
           source .venv/bin/activate
           mypy src/nexusagent
 
+      - name: Type check with basedpyright
+        run: |
+          source .venv/bin/activate
+          basedpyright src/nexusagent
+
+      - name: Docstring coverage check
+        run: |
+          source .venv/bin/activate
+          interrogate src/nexusagent
+
+      - name: Docstring style check
+        run: |
+          source .venv/bin/activate
+          pydocstyle src/nexusagent
+
+      - name: ADR numbering check
+        run: |
+          source .venv/bin/activate
+          python3 .github/scripts/check-adr-numbering.py
+
       - name: Run tests
         run: |
           source .venv/bin/activate
           PYTHONPATH=src python3 -m pytest tests/ -q --tb=short -k "not e2e and not needs_db and not slow" --maxfail=5
+
+  security-scan:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Cache virtual environment
+        uses: actions/cache@v4
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-${{ hashFiles('pyproject.toml') }}
+          restore-keys: |
+            venv-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: |
+          python3 -m venv .venv
+          source .venv/bin/activate
+          pip install --upgrade pip
+          pip install -e ".[dev]"
+          pip install pip-audit gitleaks basedpyright interrogate pydocstyle
+
+      - name: Dependency vulnerability scan (pip-audit)
+        run: |
+          source .venv/bin/activate
+          pip-audit --format=json --output=pip-audit.json || true
+          cat pip-audit.json
+
+      - name: Upload pip-audit results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pip-audit-results
+          path: pip-audit.json
+
+      - name: Secrets scanning (gitleaks)
+        uses: gitleaks/gitleaks-action@v2
+        with:
+          args: detect --source=. --verbose --report-format=json --report-path=gitleaks.json
+        continue-on-error: true
+
+      - name: Upload gitleaks results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gitleaks-results
+          path: gitleaks.json
+
+  docker-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Lint Dockerfile with hadolint
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: Dockerfile
+          failure-threshold: error
+          ignore: DL3008
+
+  docker-build-scan:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: false
+          tags: nexusagent:test
+          load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Scan Docker image with Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: nexusagent:test
+          format: sarif
+          output: trivy-results.sarif
+          severity: HIGH,CRITICAL
+          exit-code: 1
+          ignore-unfixed: true
+
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-results.sarif
+          category: container
+
+  sbom:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Cache virtual environment
+        uses: actions/cache@v4
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-${{ hashFiles('pyproject.toml') }}
+          restore-keys: |
+            venv-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: |
+          python3 -m venv .venv
+          source .venv/bin/activate
+          pip install --upgrade pip
+          pip install -e ".[dev]"
+          pip install cyclonedx-bom
+
+      - name: Generate SBOM (CycloneDX)
+        run: |
+          source .venv/bin/activate
+          cyclonedx-py environment --output-format json --output-file sbom.json
+          cat sbom.json | jq '.metadata.tools[] |= select(.name != "cyclonedx-bom")' > sbom.json.tmp && mv sbom.json.tmp sbom.json
+
+      - name: Upload SBOM as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-cyclonedx
+          path: sbom.json
+          retention-days: 90
+
+      - name: Upload SBOM as package asset
+        uses: actions/upload-artifact@v4
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        with:
+          name: sbom-cyclonedx-release
+          path: sbom.json
+          retention-days: 365
+
+  migration-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      # Migration-deliverable paths must never be deleted by a PR.
+      # Phase 5: planner.py, orchestrator.py, events/pol_subscriber.py
+      # Phase 6: dag.py, dag_engine.py
+      # Phase 7: pol.py, pol_subscriber.py
+      - name: Verify migration deliverables exist
+        run: |
+          set -e
+          for path in \
+            src/nexusagent/core/planner.py \
+            src/nexusagent/core/orchestrator.py \
+            src/nexusagent/core/dag.py \
+            src/nexusagent/core/dag_engine.py \
+            src/nexusagent/core/pol.py \
+            src/nexusagent/core/pol_subscriber.py \
+            src/nexusagent/core/events/pol_subscriber.py \
+            docs/devboard/README.md \
+            docs/architecture/migration/00-master-transition-plan.md \
+            ; do
+            if [ ! -f "$path" ]; then
+              echo "::error file= $path::Migration-deliverable file deleted by this PR."
+              exit 1
+            fi
+          done
+          echo "All migration deliverables present."
+
+      # PR-only: ensure no committed deletion against the protected paths
+      - name: Check for deletions on protected paths (PR)
+        if: github.event_name == 'pull_request'
+        run: |
+          set -e
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+          echo "Comparing $BASE_SHA..$HEAD_SHA"
+          for path in \
+            src/nexusagent/core/planner.py \
+            src/nexusagent/core/orchestrator.py \
+            src/nexusagent/core/dag.py \
+            src/nexusagent/core/dag_engine.py \
+            src/nexusagent/core/pol.py \
+            src/nexusagent/core/pol_subscriber.py \
+            ; do
+            DELDIFF=$(git diff --name-status "$BASE_SHA".."$HEAD_SHA" -- "$path" | grep '^D' || true)
+            if [ -n "$DELDIFF" ]; then
+              echo "::error file= $path::\
+              This PR deletes a Phase-deliverable file. \
+              See docs/devboard/README.md → 'WARNING — PR #18 (closed)' for the rationale. \
+              Migration-deliverable files must not be deleted; refactor in-place instead."
+              exit 1
+            fi
+          done
+          echo "No deletions against migration deliverables."
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Tests must remain green on master
+        run: |
+          python3 -m venv .venv
+          source .venv/bin/activate
+          pip install --upgrade pip
+          pip install -e ".[dev]" pytest-timeout
+          # Migration contract: master baseline must remain at >= 1000 passing
+          PYTHONPATH=src python3 -m pytest tests/ \
+            --timeout=30 -q \
+            --ignore=tests/api_e2e_project \
+            --ignore=tests/test_e2e_production.py \
+            --ignore=tests/test_graph_nodes.py \
+            --ignore=tests/test_bus.py \
+            -k "not needs_db and not slow" \
+            --maxfail=5 2>&1 | tee /tmp/ci_test_output.txt
+          PASS=$(grep -E "passed" /tmp/ci_test_output.txt | tail -1)
+          echo "Result line: $PASS"
+          if echo "$PASS" | grep -qE "failed|error"; then
+            echo "::error::Master test baseline regressed. See /tmp/ci_test_output.txt"
+            exit 1
+          fi

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Compat shim  imports from registry/ subpackage.
 
 All existing ``from nexusagent.tools.registry import ...`` usage continues

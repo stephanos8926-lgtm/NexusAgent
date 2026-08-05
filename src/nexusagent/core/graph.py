@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 # src/nexusagent/graph.py
 """LangGraph Research Workflow — durable state machine for deep research.
 
@@ -226,13 +228,9 @@ async def create_research_graph(db_path: str | None = None) -> Any:
             Path(tempfile.gettempdir()).resolve(),
         ]
         if not any(
-            db_path_resolved == root
-            or root in db_path_resolved.parents
-            for root in safe_roots
+            db_path_resolved == root or root in db_path_resolved.parents for root in safe_roots
         ):
-            raise ValueError(
-                f"SECURITY: db_path '{db_path}' resolves outside workspace root"
-            )
+            raise ValueError(f"SECURITY: db_path '{db_path}' resolves outside workspace root")
 
     workflow = StateGraph(dict)
 

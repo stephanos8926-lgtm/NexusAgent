@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Database infrastructure — ORM models, manager, and repositories."""
 
 from .base import Base

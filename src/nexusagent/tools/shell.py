@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Shell execution tools for NexusAgent.
 
 Provides run_shell with timeout, working directory, environment control,

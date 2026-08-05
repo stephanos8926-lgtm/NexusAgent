@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """NexusAgent Terminal User Interface (TUI)  compat shim.
 
 This file is a backward-compatible re-export of the tui/ subpackage.

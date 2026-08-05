@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Phase 8: Capability Security Model for NexusAgent.
 
 Defines the PolicyEngine evaluating capability requests against current policy context.

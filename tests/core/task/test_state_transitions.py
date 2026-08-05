@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Tests for task state, task dataclass, and state transitions validation."""
 
 import pytest

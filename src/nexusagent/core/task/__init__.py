@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 # src/nexusagent/core/task/__init__.py
 """Task execution model — Phase 2 of the 12-phase migration.
 

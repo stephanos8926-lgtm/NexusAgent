@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """NexusAgent TUI — public re-exports for backward compatibility.
 
 This compat shim ensures all existing imports from tui.py continue to work:

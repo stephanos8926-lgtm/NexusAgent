@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """ToolInfo dataclass — metadata for a registered tool."""
 
 from __future__ import annotations

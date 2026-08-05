@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
+
 """Minimal connection test."""
+
 import asyncio
 
 import websockets
 
 API_KEY = "nexus-2638f25daba9af9c"
+
 
 async def test():
     print("🚀 Starting connection test...")
@@ -14,9 +18,7 @@ async def test():
 
     try:
         ws = await websockets.connect(
-            url,
-            additional_headers={"Authorization": f"Bearer {API_KEY}"},
-            open_timeout=5
+            url, additional_headers={"Authorization": f"Bearer {API_KEY}"}, open_timeout=5
         )
         print("✅ Connected!")
 
@@ -34,6 +36,7 @@ async def test():
     except Exception as e:
         print(f"❌ Test FAILED: {e}")
         return False
+
 
 if __name__ == "__main__":
     result = asyncio.run(test())

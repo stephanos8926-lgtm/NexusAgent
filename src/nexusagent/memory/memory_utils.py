@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Shared utilities for file-based memory operations.
 
 Extracted from memory_files.py to reduce module size and deduplicate
@@ -12,8 +14,8 @@ import yaml
 logger = logging.getLogger(__name__)
 
 __all__ = [
-    "parse_expiry",
     "is_expired",
+    "parse_expiry",
     "parse_frontmatter",
     "serialize_frontmatter",
     "strip_frontmatter",

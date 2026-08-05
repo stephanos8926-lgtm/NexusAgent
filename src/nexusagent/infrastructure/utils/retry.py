@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Retry decorators with exponential backoff.
 
 Provides two retry strategies:
@@ -29,7 +31,7 @@ def retry_with_backoff(
     jitter: bool = True,
     exceptions: tuple[type[BaseException], ...] = (Exception,),
     on_retry: Callable[[BaseException, int], None] | None = None,
-):
+) -> Callable[[Callable[..., T]], Callable[..., T]]:
     """Retry decorator with exponential backoff.
 
     Args:

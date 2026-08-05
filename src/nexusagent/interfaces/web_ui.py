@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 # src/nexusagent/interfaces/web_ui.py
 """Gradio-based web UI for the NexusAgent platform.
 

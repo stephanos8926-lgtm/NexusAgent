@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """SessionManager — lifecycle manager for Session instances.
 
 Caches active sessions and coordinates creation/idle/closed transitions.
@@ -298,14 +300,21 @@ class SessionManager:
         # Try to load existing task
         task = await self._task_store.load_task(session_id)
         if task is not None:
-            logger.info("Recovered existing task %s for session %s (state: %s)",
-                       task.id, session_id, task.state.value)
+            logger.info(
+                "Recovered existing task %s for session %s (state: %s)",
+                task.id,
+                session_id,
+                task.state.value,
+            )
             # Try to recover from checkpoint if task was in progress
             if task.state in (TaskState.EXECUTING, TaskState.PLANNING, TaskState.RECOVERING):
                 checkpoint = await self._task_store.load_latest_checkpoint(session_id)
                 if checkpoint:
-                    logger.info("Found checkpoint for task %s at node %s",
-                               session_id, checkpoint.current_node)
+                    logger.info(
+                        "Found checkpoint for task %s at node %s",
+                        session_id,
+                        checkpoint.current_node,
+                    )
             return task
 
         # Create new task for this session
@@ -344,9 +353,15 @@ class SessionManager:
         except Exception as exc:
             logger.warning("Failed to persist checkpoint for %s: %s", session_id, exc)
 
-    async def recover_session(self, session_id: str, working_dir: str, agent: Any,
-                              db_repo=None, memory_dir: str | None = None,
-                              parent_memory_dir: str | None = None) -> Session | None:
+    async def recover_session(
+        self,
+        session_id: str,
+        working_dir: str,
+        agent: Any,
+        db_repo=None,
+        memory_dir: str | None = None,
+        parent_memory_dir: str | None = None,
+    ) -> Session | None:
         """Recover a session from its persisted task and checkpoint.
 
         This method can be called on startup to restore a previous session
@@ -366,8 +381,11 @@ class SessionManager:
 
         checkpoint = task.latest_checkpoint
         if checkpoint:
-            logger.info("Recovering session %s from checkpoint at node %s",
-                       session_id, checkpoint.current_node)
+            logger.info(
+                "Recovering session %s from checkpoint at node %s",
+                session_id,
+                checkpoint.current_node,
+            )
         else:
             logger.info("Recovering session %s from start (no checkpoint)", session_id)
 

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 # src/nexusagent/server/websocket.py
 """WebSocket session handler for real-time interactive agent sessions."""
 
@@ -34,7 +36,7 @@ _WRAPPED_TIMEOUT = 300.0
 async def _recv_with_timeout(websocket: WebSocket, timeout: float = _WRAPPED_TIMEOUT):
     try:
         return await asyncio.wait_for(websocket.receive_text(), timeout=timeout)
-    except asyncio.TimeoutError:
+    except TimeoutError:
         return None
     except WebSocketDisconnect:
         return "__DISCONNECT__"
@@ -289,10 +291,6 @@ async def events_websocket(websocket: WebSocket) -> None:
     if header_key is None:
         return
 
-    import json
-
-    from nexusagent.infrastructure.bus import get_bus
-
     bus = get_bus()
     queue: asyncio.Queue = asyncio.Queue()
 
@@ -311,7 +309,7 @@ async def events_websocket(websocket: WebSocket) -> None:
             # Get event from queue and send over WebSocket
             event_data = await asyncio.wait_for(queue.get(), timeout=_WRAPPED_TIMEOUT)
             await websocket.send_json(event_data)
-    except asyncio.TimeoutError:
+    except TimeoutError:
         logger.info("Events WebSocket idle timeout")
     except WebSocketDisconnect:
         logger.info("Events WebSocket disconnected")
@@ -355,7 +353,7 @@ async def pol_websocket(websocket: WebSocket) -> None:
             # Get intervention update from queue and send over WebSocket
             intervention_data = await asyncio.wait_for(queue.get(), timeout=_WRAPPED_TIMEOUT)
             await websocket.send_json(intervention_data)
-    except asyncio.TimeoutError:
+    except TimeoutError:
         logger.info("POL WebSocket idle timeout")
     except WebSocketDisconnect:
         logger.info("POL WebSocket disconnected")

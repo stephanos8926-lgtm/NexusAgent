@@ -1,5 +1,6 @@
-"""Tests for version comparison and compatibility logic."""
+# SPDX-License-Identifier: MIT
 
+"""Tests for version comparison and compatibility logic."""
 
 
 class TestParseVersion:
@@ -8,22 +9,26 @@ class TestParseVersion:
     def test_parse_simple_version(self):
         """Standard semver string parses correctly."""
         from nexusagent.interfaces.cli import parse_version
+
         assert parse_version("0.1.0") == (0, 1, 0)
 
     def test_parse_version_with_pre_release(self):
         """Pre-release suffix is stripped."""
         from nexusagent.interfaces.cli import parse_version
+
         assert parse_version("0.1.0-dev") == (0, 1, 0)
         assert parse_version("1.2.3-rc1") == (1, 2, 3)
 
     def test_parse_version_with_build_metadata(self):
         """Build metadata is stripped."""
         from nexusagent.interfaces.cli import parse_version
+
         assert parse_version("0.1.0+build.123") == (0, 1, 0)
 
     def test_parse_version_double_digit(self):
         """Multi-digit components parse correctly."""
         from nexusagent.interfaces.cli import parse_version
+
         assert parse_version("12.34.56") == (12, 34, 56)
 
 
@@ -33,28 +38,33 @@ class TestIsCompatible:
     def test_same_version_compatible(self):
         """Identical versions are compatible."""
         from nexusagent.interfaces.cli import is_compatible
+
         assert is_compatible("0.1.0", "0.1.0") is True
 
     def test_patch_difference_compatible(self):
         """Different patch versions are compatible."""
         from nexusagent.interfaces.cli import is_compatible
+
         assert is_compatible("0.1.0", "0.1.5") is True
         assert is_compatible("0.1.5", "0.1.0") is True
 
     def test_client_newer_compatible(self):
         """Client with higher minor version is compatible (can degrade)."""
         from nexusagent.interfaces.cli import is_compatible
+
         assert is_compatible("0.1.0", "0.2.0") is True
 
     def test_major_mismatch_incompatible(self):
         """Different major versions are incompatible."""
         from nexusagent.interfaces.cli import is_compatible
+
         assert is_compatible("0.1.0", "1.0.0") is False
         assert is_compatible("1.0.0", "0.1.0") is False
 
     def test_pre_release_compatible(self):
         """Pre-release versions with same base are compatible."""
         from nexusagent.interfaces.cli import is_compatible
+
         assert is_compatible("0.1.0", "0.2.0-dev") is True
 
 

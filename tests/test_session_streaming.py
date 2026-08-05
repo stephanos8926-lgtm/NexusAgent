@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Tests for session streaming — verify astream() emits response_chunk events."""
 
 from __future__ import annotations

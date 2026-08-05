@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """File editor — surgical line-range file editing.
 
 Extracted from tools/fs.py to separate the complex edit_file logic

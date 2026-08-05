@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Context compaction pipeline for managing conversation history size.
 
 Applies graduated compaction strategies from cheapest to most expensive:
@@ -168,6 +170,7 @@ class CompactionPipeline:
             asyncio.run(dag.compress(llm_call=llm_call))
 
         import typing
+
         return typing.cast(list[dict], dag.to_messages())
 
     # -- strategy 1: clear old tool results ----------------------------------

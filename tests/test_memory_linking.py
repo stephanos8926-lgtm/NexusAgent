@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 # tests/test_memory_linking.py
 """Tests for memory linking (related field)."""
 
@@ -38,8 +40,12 @@ class TestFindRelated:
         """Memories with shared entities should be found."""
         from nexusagent.memory.memory_files import FileMemory
 
-        _write_memory(temp_workspace, "obs-001", "User prefers pytest", entities=["testing", "python"])
-        _write_memory(temp_workspace, "obs-002", "User uses pytest for testing", entities=["testing"])
+        _write_memory(
+            temp_workspace, "obs-001", "User prefers pytest", entities=["testing", "python"]
+        )
+        _write_memory(
+            temp_workspace, "obs-002", "User uses pytest for testing", entities=["testing"]
+        )
         _write_memory(temp_workspace, "obs-003", "Database uses PostgreSQL", entities=["database"])
 
         fm = FileMemory(temp_workspace)
@@ -136,6 +142,7 @@ class TestAutoLink:
         assert "related:" in content
         # The related field should reference the first memory file
         assert ".md" in content  # Should reference some .md file
+
     @pytest.mark.asyncio
     async def test_remember_with_explicit_related(self, temp_workspace):
         """Explicit related should override auto-linking."""

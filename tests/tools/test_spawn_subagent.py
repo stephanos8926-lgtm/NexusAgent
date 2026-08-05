@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 # tests/tools/test_spawn_subagent.py
 """Tests for the spawn_subagent tool registration."""
 
@@ -16,6 +18,7 @@ def ensure_registry_populated():
     with registry._lock:
         if not registry._pending:
             import importlib
+
             importlib.reload(nexusagent.tools.register_all)
     yield
 

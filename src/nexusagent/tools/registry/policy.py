@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Policy context (context-local) and enforcement for tool access control.
 
 Each agent session gets its own policy context stored in context-local storage.

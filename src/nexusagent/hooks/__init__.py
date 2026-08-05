@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 # src/nexusagent/hooks/__init__.py
 """Hooks system for NexusAgent.
 

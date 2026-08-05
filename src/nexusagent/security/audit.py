@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Phase 8: Capability Security Model for NexusAgent.
 
 Handles audit trail logging of capability grants and denials to the EventStore.

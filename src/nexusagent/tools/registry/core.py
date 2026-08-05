@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Core tool registry — registration, lookup, auto-correction.
 
 Architecture:
@@ -87,9 +89,7 @@ class ToolRegistry:
             self._snapshots[self._latest_version] = snapshot
             return self._latest_version
 
-    def get_snapshot(
-        self, version: int | None = None
-    ) -> MappingProxyType[str, ToolInfo] | None:
+    def get_snapshot(self, version: int | None = None) -> MappingProxyType[str, ToolInfo] | None:
         """Return a specific version, or ``None`` if it was pruned."""
         with self._lock:
             return self._snapshots.get(version if version is not None else self._latest_version)

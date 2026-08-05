@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Tests for the trust subsystem (TrustLevel, TrustedContent, AnomalyScorer)."""
 
 import pytest

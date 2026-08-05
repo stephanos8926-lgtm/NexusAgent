@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 # tests/test_memory_e2e.py
 """End-to-end tests for the NexusAgent memory system.
 
@@ -21,6 +23,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 # -- Fixtures --
+
 
 @pytest.fixture
 def temp_memory_dir():
@@ -54,8 +57,8 @@ def _make_session(temp_memory_dir, session_id):
 
 # -- Test 1: Session creates and initializes HybridMemoryManager --
 
-class TestSessionMemoryInit:
 
+class TestSessionMemoryInit:
     @pytest.mark.asyncio
     async def test_session_creates_hybrid_memory(self, temp_memory_dir, session_id):
         session = _make_session(temp_memory_dir, session_id)
@@ -72,8 +75,8 @@ class TestSessionMemoryInit:
 
 # -- Test 2: Auto-extraction stores observations after each turn --
 
-class TestAutoExtraction:
 
+class TestAutoExtraction:
     @pytest.mark.asyncio
     async def test_extraction_stores_observations(self, temp_memory_dir, session_id):
         session = _make_session(temp_memory_dir, session_id)
@@ -95,8 +98,8 @@ class TestAutoExtraction:
 
 # -- Test 3: Recall injects relevant memories into prompts --
 
-class TestMemoryRecall:
 
+class TestMemoryRecall:
     @pytest.mark.asyncio
     async def test_recall_returns_relevant_memories(self, temp_memory_dir, session_id):
         session = _make_session(temp_memory_dir, session_id)
@@ -136,8 +139,8 @@ class TestMemoryRecall:
 
 # -- Test 4: Dream cycle consolidates memories --
 
-class TestDreamCycle:
 
+class TestDreamCycle:
     @pytest.mark.asyncio
     async def test_dream_cycle_runs_successfully(self, temp_memory_dir):
         bank_dir = Path(temp_memory_dir) / "bank"
@@ -181,8 +184,8 @@ class TestDreamCycle:
 
 # -- Test 5: TTL enforcement prunes expired entries --
 
-class TestTTL:
 
+class TestTTL:
     def test_expired_entry_excluded_from_index(self, temp_memory_dir):
         from nexusagent.memory.memory_files import FileMemory, MemoryEntryType
 
@@ -243,8 +246,8 @@ class TestTTL:
 
 # -- Test 6: Git-backed memory commits changes --
 
-class TestGitBackedMemory:
 
+class TestGitBackedMemory:
     def test_git_init_on_first_write(self, temp_memory_dir):
         from nexusagent.memory.memory_files import FileMemory
 
@@ -278,8 +281,8 @@ class TestGitBackedMemory:
 
 # -- Test 7: Rate limiting prevents flooding --
 
-class TestRateLimiting:
 
+class TestRateLimiting:
     def test_write_rate_limiter_allows_normal_usage(self):
         from nexusagent.memory.rate_limiter import MemoryRateLimiter
 
@@ -313,8 +316,8 @@ class TestRateLimiting:
 
 # -- Test 8: End-to-end pipeline (the big one) --
 
-class TestE2EPipeline:
 
+class TestE2EPipeline:
     @pytest.mark.asyncio
     async def test_full_pipeline(self, temp_memory_dir, session_id):
         session = _make_session(temp_memory_dir, session_id)

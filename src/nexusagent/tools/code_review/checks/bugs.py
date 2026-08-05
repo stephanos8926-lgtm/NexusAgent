@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Bug pattern checks for code review."""
 
 from __future__ import annotations

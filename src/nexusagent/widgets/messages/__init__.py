@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Message widget classes for NexusAgent TUI.
 
 Each message type is a separate Textual widget with its own CSS styling.

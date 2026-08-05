@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Event-driven core for NexusAgent.
 
 Provides SystemEvent base class and typed subclasses for each event category:

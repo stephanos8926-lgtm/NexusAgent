@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 # tests/test_memory_extraction.py
 """Tests for regex-based auto memory extraction."""
 
@@ -70,7 +72,9 @@ class TestMemoryExtractor:
         )
         results = extractor.extract(text)
         # Should have at least some file path results
-        file_results = [r for r in results if "file" in r.description.lower() or "Referenced" in r.content]
+        file_results = [
+            r for r in results if "file" in r.description.lower() or "Referenced" in r.content
+        ]
         assert len(file_results) >= 2
 
     def test_results_have_required_fields(self, extractor):
@@ -88,10 +92,7 @@ class TestMemoryExtractor:
 
     def test_deduplication(self, extractor):
         """Same content should not be extracted twice."""
-        text = (
-            "I prefer Python. I prefer Python. "
-            "I really prefer Python for everything."
-        )
+        text = "I prefer Python. I prefer Python. I really prefer Python for everything."
         results = extractor.extract(text)
         # Should deduplicate — only one preference result
         pref_results = [r for r in results if "prefer" in r.content.lower()]
@@ -99,10 +100,7 @@ class TestMemoryExtractor:
 
     def test_confidence_scores(self, extractor):
         """Different extraction types should have appropriate confidence scores."""
-        text = (
-            "I prefer pytest. We decided to use Docker. "
-            "There was a bug in the system."
-        )
+        text = "I prefer pytest. We decided to use Docker. There was a bug in the system."
         results = extractor.extract(text)
         for r in results:
             if "prefer" in r.content.lower():

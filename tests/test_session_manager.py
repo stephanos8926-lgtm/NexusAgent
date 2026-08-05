@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Tests for SessionManager — focused on TOCTOU race safety."""
 
 from __future__ import annotations

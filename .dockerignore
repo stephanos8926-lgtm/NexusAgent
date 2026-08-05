@@ -1,0 +1,140 @@
+# .dockerignore
+# Version control
+.git
+.gitignore
+
+# Dependencies (will be installed fresh)
+node_modules
+vendor
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+
+# Build artifacts
+dist
+build
+target
+*.egg-info
+*.egg
+
+# Development files
+.env
+.env.*
+*.md
+LICENSE
+README.md
+CHANGELOG.md
+CONTRIBUTING.md
+CODE_OF_CONDUCT.md
+SECURITY.md
+SUPPORT.md
+
+# Docker
+docker-compose*.yml
+Dockerfile
+Dockerfile.*
+.dockerignore
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Tests (not needed in production image)
+tests
+test
+__tests__
+*.test.py
+*.spec.py
+coverage
+.nyc_output
+.nox
+.tox
+.pytest_cache
+.mypy_cache
+.ruff_cache
+
+# CI/CD
+.github
+.gitlab-ci.yml
+*.yml
+*.yaml
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Python specific
+*.pyc
+*.pyo
+*.pyd
+__pycache__
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.coverage
+coverage.xml
+htmlcov/
+.venv
+venv
+env/
+*.egg-info
+*.egg
+dist/
+build/
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*~
+
+# Documentation (not needed in production)
+docs/
+*.md
+
+# Configuration files not needed at runtime
+config/nexusagent.yaml
+Makefile
+mkdocs.yml
+uv.lock
+uv.lock.bak
+
+# Test files
+tests/
+test_*.py
+*_test.py
+conftest.py
+
+# Local development
+.ast-tools/
+.llxprt/
+.kilo/
+.Jules/
+.gemini/
+.nexusagent/
+.secure/
+.reports/
+data/
+*.db
+*.sqlite
+*.sqlite3
+
+# Deployment files
+docker-compose*.yml
+*.service
+*.sh
+*.bat
+*.ps1

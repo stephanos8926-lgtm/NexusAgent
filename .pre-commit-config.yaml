@@ -23,7 +23,7 @@ repos:
       - id: forbid-debug
 
   - repo: https://github.com/charliermarsh/ruff-pre-commit
-    rev: v0.4.2
+    rev: v0.6.0
     hooks:
       - id: ruff
         args: [--fix, --exit-non-zero-on-fix]
@@ -35,4 +35,12 @@ repos:
       - id: mypy
         additional_dependencies: [types-all]
 
-  # Optionally, you can add other hooks like bandit, safety, etc.
+  - repo: local
+    hooks:
+      - id: execute-before-fixed
+        name: Enforce "execute before claiming fixed" policy
+        entry: python .pre-commit/execute-before-fixed.py
+        language: system
+        types: [text]
+        stages: [commit]
+        always_run: false

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Git-backed memory operations — auto-commit after memory writes.
 
 Provides :class:`MemoryGitOps` which wraps ``git init`` / ``git add`` / ``git commit``

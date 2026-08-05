@@ -1,13 +1,13 @@
+# SPDX-License-Identifier: MIT
+
 """Tests for WebSocket timeout and bounded loop behavior."""
 
-import asyncio
 import logging
-from unittest.mock import AsyncMock
 
 import pytest
+from fastapi import WebSocketDisconnect
 
 from nexusagent.server.websocket import _WRAPPED_TIMEOUT, _recv_with_timeout
-from fastapi import WebSocketDisconnect
 
 
 class FakeWebSocket:
@@ -20,7 +20,7 @@ class FakeWebSocket:
 
     async def receive_text(self):
         if not self._responses:
-            raise asyncio.TimeoutError()
+            raise TimeoutError()
         return self._responses.pop(0)
 
     async def send_json(self, payload):
@@ -74,7 +74,7 @@ async def test_recv_with_timeout_distinguishes_disconnect_from_error(caplog):
     # WebSocketDisconnect -> __DISCONNECT__
     result = await _recv_with_timeout(DisconnectWS(), timeout=0.05)
     assert result == "__DISCONNECT__"
-    
+
     # Other errors -> __DISCONNECT__ but logged
     with caplog.at_level(logging.ERROR):
         result = await _recv_with_timeout(ErrorWS(), timeout=0.05)

@@ -1,5 +1,10 @@
 # Changelog
 
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/2.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
 ## 2026-07-30 — v0.6.0 Phase 12 Master Finish & Production Release 🎉
 
 ### Observability & Reliability (Phase 10)

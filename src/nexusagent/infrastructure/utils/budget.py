@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """LLM Budget Guard — hard spend caps with immediate circuit breaker.
 
 Provides budget-aware LLM call protection:
@@ -177,15 +179,9 @@ class LLMBudgetGuard:
                         window.quota_exhausted = False
                         window.quota_exhausted_at = None
 
-        if (
-            self.daily_budget_usd > 0
-            and self._state.daily.spent_usd >= self.daily_budget_usd
-        ):
+        if self.daily_budget_usd > 0 and self._state.daily.spent_usd >= self.daily_budget_usd:
             return BudgetState.EXCEEDED
-        if (
-            self.monthly_budget_usd > 0
-            and self._state.monthly.spent_usd >= self.monthly_budget_usd
-        ):
+        if self.monthly_budget_usd > 0 and self._state.monthly.spent_usd >= self.monthly_budget_usd:
             return BudgetState.EXCEEDED
 
         # Check thresholds
@@ -405,9 +401,7 @@ class LLMBudgetGuard:
                 f"{input_tokens}+{output_tokens} tokens"
             )
 
-    def _alert(
-        self, window_type: str, threshold: float, spent: float, budget: float
-    ) -> None:
+    def _alert(self, window_type: str, threshold: float, spent: float, budget: float) -> None:
         """Send budget threshold alert."""
         pct = int(threshold * 100)
         msg = (
@@ -419,8 +413,10 @@ class LLMBudgetGuard:
         # Fire hook for webhook/alerting integration
         try:
             from nexusagent.hooks import HookEvent, get_hook_manager
+
             hook_manager = get_hook_manager()
             import asyncio
+
             # Run hook as fire-and-forget
             asyncio.create_task(
                 hook_manager.run_hooks(
@@ -433,7 +429,7 @@ class LLMBudgetGuard:
                         "budget": budget,
                         "percentage": int(threshold * 100),
                         "message": msg,
-                    }
+                    },
                 )
             )
         except Exception as e:
@@ -461,8 +457,7 @@ class LLMBudgetGuard:
                 window.quota_exhausted = True
                 window.quota_exhausted_at = now
                 logger.critical(
-                    f"🔴 QUOTA EXHAUSTED: {name} budget. "
-                    f"Cooldown: {self.quota_cooldown_seconds}s"
+                    f"🔴 QUOTA EXHAUSTED: {name} budget. Cooldown: {self.quota_cooldown_seconds}s"
                 )
 
             self._save_state()
@@ -534,9 +529,17 @@ def set_budget_guard(instance: LLMBudgetGuard) -> None:
 def create_budget_guard_from_config(settings) -> LLMBudgetGuard:
     """Create a budget guard from the application settings."""
     return LLMBudgetGuard(
-        daily_budget_usd=settings.llm_budget.daily_budget_usd if hasattr(settings, "llm_budget") else 10.0,
-        monthly_budget_usd=settings.llm_budget.monthly_budget_usd if hasattr(settings, "llm_budget") else 100.0,
-        alert_thresholds=settings.llm_budget.alert_thresholds if hasattr(settings, "llm_budget") else [0.5, 0.8, 0.95],
-        quota_cooldown_seconds=settings.llm_budget.quota_cooldown_seconds if hasattr(settings, "llm_budget") else 3600.0,
+        daily_budget_usd=settings.llm_budget.daily_budget_usd
+        if hasattr(settings, "llm_budget")
+        else 10.0,
+        monthly_budget_usd=settings.llm_budget.monthly_budget_usd
+        if hasattr(settings, "llm_budget")
+        else 100.0,
+        alert_thresholds=settings.llm_budget.alert_thresholds
+        if hasattr(settings, "llm_budget")
+        else [0.5, 0.8, 0.95],
+        quota_cooldown_seconds=settings.llm_budget.quota_cooldown_seconds
+        if hasattr(settings, "llm_budget")
+        else 3600.0,
         enabled=settings.llm_budget.enabled if hasattr(settings, "llm_budget") else True,
     )

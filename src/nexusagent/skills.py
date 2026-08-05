@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Skills system for NexusAgent.
 
 Loads skills from ~/.nexusagent/skills/ directory. Each skill is a directory

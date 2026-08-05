@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Compat shim  imports from messages/ subpackage.
 
 All existing ``from nexusagent.widgets.messages import ...`` usage continues

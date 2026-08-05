@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 # src/nexusagent/security/registry.py
 """Registry of defined capabilities and tool-to-capability mappings."""
 
@@ -65,7 +67,6 @@ TOOL_CAPABILITY_MAP = {
     "memory_index_search": "filesystem.read",
     "memory_list": "filesystem.read",
     "memory_health": "filesystem.read",
-
     # File & Memory Writing/Mutating Tools
     "write_file": "filesystem.write",
     "write_multiple_files": "filesystem.write",
@@ -78,20 +79,16 @@ TOOL_CAPABILITY_MAP = {
     "memory_prune": "filesystem.write",
     "memory_consolidate": "filesystem.write",
     "memory_dream": "filesystem.write",
-
     # Test Execution Tools
     "run_tests": "execute.tests",
     "run_single_test": "execute.tests",
-
     # Git Committing & Branching Tools
     "git_commit": "git.commit",
     "git_checkout_branch": "git.commit",
     "git_stash_push": "git.commit",
     "git_stash_pop": "git.commit",
-
     # Web & API Access Tools
     "search_web": "network.access",
-
     # Shell Execution Tools
     "run_shell": "shell.execute",
     "run_shell_streaming": "shell.execute",

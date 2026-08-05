@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Tests for checkpoint dataclass serialization and deserialization."""
 
 from nexusagent.core.task.checkpoint import Checkpoint

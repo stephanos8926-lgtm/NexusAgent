@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 # src/nexusagent/memory/memory.py
 """Memory system compatibility shim.
 

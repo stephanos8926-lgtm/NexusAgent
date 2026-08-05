@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 # src/nexusagent/core/planner.py
 """Phase 5 — Planner for NexusAgent.
 

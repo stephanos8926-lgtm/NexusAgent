@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Main code review orchestrator."""
 
 from __future__ import annotations

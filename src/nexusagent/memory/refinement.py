@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """LLM-based memory refinement layer.
 
 Periodically synthesizes raw observations into higher-level insights using LLM.

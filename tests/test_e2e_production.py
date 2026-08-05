@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 import asyncio
 import logging
 import os
@@ -50,11 +52,16 @@ async def setup_system():
     # Debugging: Verify database file permissions
     if os.path.exists(TEST_DB_PATH):
         import stat
+
         file_stat = os.stat(TEST_DB_PATH)
-        print(f"DEBUG: DB file {TEST_DB_PATH} exists. Permissions: {stat.filemode(file_stat.st_mode)}")
+        print(
+            f"DEBUG: DB file {TEST_DB_PATH} exists. Permissions: {stat.filemode(file_stat.st_mode)}"
+        )
         # Ensure it's writable by the current user
         if not (file_stat.st_mode & stat.S_IWUSR):
-            print(f"ERROR: DB file {TEST_DB_PATH} is not writable by owner. Attempting to change permissions.")
+            print(
+                f"ERROR: DB file {TEST_DB_PATH} is not writable by owner. Attempting to change permissions."
+            )
             os.chmod(TEST_DB_PATH, file_stat.st_mode | stat.S_IWUSR)
             file_stat = os.stat(TEST_DB_PATH)
             print(f"DEBUG: New permissions: {stat.filemode(file_stat.st_mode)}")
@@ -85,8 +92,7 @@ async def setup_system():
 
 @pytest.mark.asyncio
 async def test_sdk_end_to_end_flow():
-    """Tests the full flow: SDK Submit -> Worker Processing -> SDK Get Status/Result
-    """
+    """Tests the full flow: SDK Submit -> Worker Processing -> SDK Get Status/Result"""
     # 1. Submit a task via SDK
     task_data = {
         "description": "Verify E2E system connectivity",
@@ -140,8 +146,7 @@ AUTH_HEADERS = {"X-API-Key": "test-key"}
 
 @pytest.mark.asyncio
 async def test_api_end_to_end_flow():
-    """Tests the full flow: API POST /tasks -> API GET /status -> API GET /result
-    """
+    """Tests the full flow: API POST /tasks -> API GET /status -> API GET /result"""
     async with AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as ac:
         # 1. Submit task via API
         response = await ac.post(
@@ -186,7 +191,7 @@ async def test_invalid_task_failure():
         assert response.status_code == 404
 
 
-@ pytest.mark.asyncio
+@pytest.mark.asyncio
 async def test_multiple_concurrent_tasks():
     """Submits multiple tasks simultaneously to verify worker reliability.
 

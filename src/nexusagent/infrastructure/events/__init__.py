@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 # src/nexusagent/infrastructure/events/__init__.py
 """Event store infrastructure for NexusAgent."""
 

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Tests for nexusagent.session — Session and SessionManager."""
 
 from __future__ import annotations
@@ -35,6 +37,7 @@ def mock_agent():
     async def _astream(input_data, stream_mode=None, **kwargs):
         # Simulate streaming: yield a single AIMessageChunk with text content
         from langchain_core.messages import AIMessageChunk
+
         yield AIMessageChunk(content="Hello from agent")
 
     agent.astream = _astream
@@ -237,6 +240,7 @@ async def test_session_memory_injection(db_and_repo, mock_memory):
     async def capture_agent_stream(input_data, stream_mode=None, **kwargs):
         captured["state"] = input_data
         from langchain_core.messages import AIMessageChunk
+
         yield AIMessageChunk(content="captured")
 
     mock_agent = MagicMock()
@@ -245,9 +249,13 @@ async def test_session_memory_injection(db_and_repo, mock_memory):
     # Hybrid memory that returns context
     class FakeHybridMemory:
         async def get_memory_context(self, query, max_results=5):
-            return "## Relevant Memories\n\nSource: bank/test.md (score: 0.95)\nTest memory content\n"
+            return (
+                "## Relevant Memories\n\nSource: bank/test.md (score: 0.95)\nTest memory content\n"
+            )
+
         async def flush(self, summary=""):
             pass
+
         async def remember(self, content, metadata=None):
             pass
 
@@ -290,6 +298,7 @@ async def test_session_memory_injection_empty(db_and_repo, mock_memory):
     async def capture_agent_stream(input_data, stream_mode=None, **kwargs):
         captured["state"] = input_data
         from langchain_core.messages import AIMessageChunk
+
         yield AIMessageChunk(content="ok")
 
     mock_agent = MagicMock()
@@ -298,8 +307,10 @@ async def test_session_memory_injection_empty(db_and_repo, mock_memory):
     class FakeHybridMemory:
         def get_memory_context(self, query, max_results=5):
             return ""  # No memories
+
         async def flush(self, summary=""):
             pass
+
         async def remember(self, content, metadata=None):
             pass
 
@@ -332,6 +343,7 @@ async def test_session_compaction_triggers_on_long_context(db_and_repo, mock_mem
     async def capture_agent_stream(input_data, stream_mode=None, **kwargs):
         captured["state"] = input_data
         from langchain_core.messages import AIMessageChunk
+
         yield AIMessageChunk(content="compacted")
 
     mock_agent = MagicMock()
@@ -343,8 +355,10 @@ async def test_session_compaction_triggers_on_long_context(db_and_repo, mock_mem
             # Return enough content to exceed 75% of 200k token window
             # 200k * 0.75 = 150k tokens * 4 chars = 600k chars
             return "X" * 700_000
+
         async def flush(self, summary=""):
             pass
+
         async def remember(self, content, metadata=None):
             pass
 

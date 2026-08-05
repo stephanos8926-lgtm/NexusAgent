@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """NATS-backed task execution worker and worker pool.
 
 Provides:

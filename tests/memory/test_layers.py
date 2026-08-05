@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Tests for the Phase 9 4-layer memory system."""
 
 from __future__ import annotations
@@ -69,15 +71,22 @@ def test_query_returns_results(tmp_workspace):
 
 def test_confidence_evaluation(tmp_workspace):
     manager = LayerMemoryManager(tmp_workspace)
-    item = manager._backends[MemoryLayer.SEMANTIC]._from_payload({
-        "item": {"id": "x", "content": "test", "created_at": "2026-01-01T00:00:00+00:00"},
-        "layer": MemoryLayer.SEMANTIC.value,
-        "provenance": {"source": "", "authority": TrustLevel.TRUSTED.value, "timestamp": "2026-01-01T00:00:00+00:00", "session_id": ""},
-        "confidence": 0.9,
-        "min_confidence": 0.6,
-        "tags": [],
-        "metadata": {},
-    })
+    item = manager._backends[MemoryLayer.SEMANTIC]._from_payload(
+        {
+            "item": {"id": "x", "content": "test", "created_at": "2026-01-01T00:00:00+00:00"},
+            "layer": MemoryLayer.SEMANTIC.value,
+            "provenance": {
+                "source": "",
+                "authority": TrustLevel.TRUSTED.value,
+                "timestamp": "2026-01-01T00:00:00+00:00",
+                "session_id": "",
+            },
+            "confidence": 0.9,
+            "min_confidence": 0.6,
+            "tags": [],
+            "metadata": {},
+        }
+    )
     assert item is not None
     action = manager.evaluate_confidence(item)
     assert action == ConfidenceAction.PROMOTE

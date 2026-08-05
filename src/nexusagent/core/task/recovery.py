@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 # src/nexusagent/core/task/recovery.py
 """Recovery logic for failed tasks.
 

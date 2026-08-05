@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Dream cycle engine — 4-phase memory consolidation daemon.
 
 Runs periodic background consolidation:
@@ -308,7 +310,9 @@ class DreamCycle:
 
     # ── Phase 3: Consolidate ────────────────────────────────────────────
 
-    def consolidate(self, scan_report: dict[str, Any], patterns: dict[str, Any] | None = None) -> dict[str, Any]:
+    def consolidate(
+        self, scan_report: dict[str, Any], patterns: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         """Synchronous wrapper for consolidate_async."""
         import asyncio
 

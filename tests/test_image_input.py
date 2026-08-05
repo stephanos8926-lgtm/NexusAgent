@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Tests for image input support — ImageAttachment, encode_image_to_content, and session integration."""
 
 import base64
@@ -232,10 +234,12 @@ class TestBuildUserMessage:
         try:
             content_blocks.append(encode_image_to_content(str(tmp_path / "missing.png")))
         except FileNotFoundError:
-            content_blocks.append({
-                "type": "text",
-                "text": "[Image could not be loaded: missing.png]",
-            })
+            content_blocks.append(
+                {
+                    "type": "text",
+                    "text": "[Image could not be loaded: missing.png]",
+                }
+            )
 
         msg = HumanMessage(content=content_blocks)
         assert len(msg.content) == 2

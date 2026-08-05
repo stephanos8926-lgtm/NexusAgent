@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 # src/nexusagent/core/pol_subscriber.py
 """POL Subscriber for detecting failures and coordinating interventions."""
 

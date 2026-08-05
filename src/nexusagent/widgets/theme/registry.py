@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Theme registry and CSS variable generation for NexusAgent TUI."""
 
 import logging

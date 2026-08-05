@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Semantic color definitions and theme registry for NexusAgent TUI.
 
 Inspired by Linear (dark-mode-first, near-black canvas, single accent color)

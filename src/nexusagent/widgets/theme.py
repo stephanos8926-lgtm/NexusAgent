@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Semantic color definitions for NexusAgent TUI.
 
 This module is a compatibility shim. The actual implementations live in:

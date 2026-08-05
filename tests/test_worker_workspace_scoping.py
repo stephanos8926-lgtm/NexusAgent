@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Tests for worker workspace scoping (P6-P9)."""
 
 import shutil
@@ -40,8 +42,7 @@ def test_task_schema_working_dir_default_none():
 def test_task_contract_has_system_prompt():
     """TaskContract accepts system_prompt field."""
     contract = TaskContract(
-        task_id="t1", title="test", description="test",
-        system_prompt="Custom prompt"
+        task_id="t1", title="test", description="test", system_prompt="Custom prompt"
     )
     assert contract.system_prompt == "Custom prompt"
 
@@ -60,6 +61,7 @@ def test_spawn_subagent_tool_has_system_prompt_param():
     import inspect
 
     from nexusagent.tools.register_all import spawn_subagent
+
     sig = inspect.signature(spawn_subagent)
     assert "system_prompt" in sig.parameters
     assert sig.parameters["system_prompt"].default is None
@@ -77,7 +79,9 @@ def test_worker_pool_passes_working_dir_to_metadata():
     async def _test():
         pool = WorkerPool(max_workers=1)
         contract = TaskContract(
-            task_id="test-1", title="test", description="test task",
+            task_id="test-1",
+            title="test",
+            description="test task",
             working_dir="/project",
         )
         handle = MagicMock()
@@ -120,6 +124,7 @@ def test_setup_workspace_context_sets_path_jail():
         assert str(root) == str(Path(tmp).resolve())
         # Reset
         from nexusagent.tools.fs_base import set_workspace_root
+
         set_workspace_root(".")
 
 
@@ -197,7 +202,9 @@ def test_task_contract_memory_scope_default():
 def test_task_contract_memory_scope_can_be_set():
     """TaskContract.memory_scope can be set to scoped or shared."""
     contract = TaskContract(
-        task_id="t1", title="test", description="test",
+        task_id="t1",
+        title="test",
+        description="test",
         memory_scope=MemoryScope.SCOPED,
     )
     assert contract.memory_scope == MemoryScope.SCOPED

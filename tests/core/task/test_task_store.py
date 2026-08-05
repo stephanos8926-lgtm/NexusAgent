@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 # tests/core/task/test_task_store.py
 """Tests for the Task persistence layer."""
 

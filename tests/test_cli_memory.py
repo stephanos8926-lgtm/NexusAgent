@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Tests for the 'nexus memory health' and 'nexus memory stats' CLI commands.
 
 Tests cover:
@@ -30,26 +32,39 @@ def tmp_workspace():
     subprocess.run(["git", "init"], cwd=d, capture_output=True, timeout=10)
     subprocess.run(
         ["git", "config", "user.email", "test@test.com"],
-        cwd=d, capture_output=True, timeout=10,
+        cwd=d,
+        capture_output=True,
+        timeout=10,
     )
     subprocess.run(
         ["git", "config", "user.name", "Test"],
-        cwd=d, capture_output=True, timeout=10,
+        cwd=d,
+        capture_output=True,
+        timeout=10,
     )
     # Create initial commit
     Path(d, ".gitkeep").touch()
     subprocess.run(["git", "add", "-A"], cwd=d, capture_output=True, timeout=10)
     subprocess.run(
         ["git", "commit", "-m", "init"],
-        cwd=d, capture_output=True, timeout=10,
+        cwd=d,
+        capture_output=True,
+        timeout=10,
     )
     yield d
     shutil.rmtree(d)
 
 
-def _write_memory(workspace, name="test-entry", content="Test content",
-                  entry_type="world", description="Test desc",
-                  entities=None, confidence=None, quality_score=None):
+def _write_memory(
+    workspace,
+    name="test-entry",
+    content="Test content",
+    entry_type="world",
+    description="Test desc",
+    entities=None,
+    confidence=None,
+    quality_score=None,
+):
     """Helper to write a test memory entry with YAML frontmatter."""
     bank_dir = os.path.join(workspace, "bank")
     os.makedirs(bank_dir, exist_ok=True)
@@ -90,9 +105,7 @@ class TestMemoryHealthCommand:
     def test_health_empty_workspace(self, tmp_workspace):
         """Health command on empty workspace should show zero counts."""
         runner = CliRunner()
-        result = runner.invoke(
-            main, ["memory", "health", "--workspace", tmp_workspace]
-        )
+        result = runner.invoke(main, ["memory", "health", "--workspace", tmp_workspace])
         assert result.exit_code == 0
         assert "MEMORY HEALTH REPORT" in result.output
         assert "Total Memories:   0" in result.output
@@ -104,9 +117,7 @@ class TestMemoryHealthCommand:
         _write_memory(tmp_workspace, name="m2", content="Second memory")
 
         runner = CliRunner()
-        result = runner.invoke(
-            main, ["memory", "health", "--workspace", tmp_workspace]
-        )
+        result = runner.invoke(main, ["memory", "health", "--workspace", tmp_workspace])
         assert result.exit_code == 0
         assert "Total Memories:   2" in result.output
         assert "Duplicates:        0" in result.output
@@ -140,9 +151,7 @@ class TestMemoryHealthCommand:
         os.utime(copy_path, (now, now))
 
         runner = CliRunner()
-        result = runner.invoke(
-            main, ["memory", "health", "--workspace", tmp_workspace]
-        )
+        result = runner.invoke(main, ["memory", "health", "--workspace", tmp_workspace])
         assert result.exit_code == 0
         assert "Duplicates:        1" in result.output
         assert "copy.md" in result.output
@@ -155,9 +164,7 @@ class TestMemoryHealthCommand:
         _write_memory(tmp_workspace, name="o1", entry_type="opinion", content="Opinion")
 
         runner = CliRunner()
-        result = runner.invoke(
-            main, ["memory", "health", "--workspace", tmp_workspace]
-        )
+        result = runner.invoke(main, ["memory", "health", "--workspace", tmp_workspace])
         assert result.exit_code == 0
         assert "Type Distribution" in result.output
         assert "world" in result.output
@@ -166,18 +173,20 @@ class TestMemoryHealthCommand:
     def test_health_shows_entities(self, tmp_workspace):
         """Health command should display top entities."""
         _write_memory(
-            tmp_workspace, name="e1", content="First",
+            tmp_workspace,
+            name="e1",
+            content="First",
             entities=["auth", "jwt"],
         )
         _write_memory(
-            tmp_workspace, name="e2", content="Second",
+            tmp_workspace,
+            name="e2",
+            content="Second",
             entities=["auth", "oauth"],
         )
 
         runner = CliRunner()
-        result = runner.invoke(
-            main, ["memory", "health", "--workspace", tmp_workspace]
-        )
+        result = runner.invoke(main, ["memory", "health", "--workspace", tmp_workspace])
         assert result.exit_code == 0
         assert "Top Entities" in result.output
         assert "auth" in result.output
@@ -185,9 +194,7 @@ class TestMemoryHealthCommand:
     def test_health_invalid_workspace(self):
         """Health command should error on invalid workspace path."""
         runner = CliRunner()
-        result = runner.invoke(
-            main, ["memory", "health", "--workspace", "/nonexistent/path/xyz"]
-        )
+        result = runner.invoke(main, ["memory", "health", "--workspace", "/nonexistent/path/xyz"])
         assert result.exit_code != 0
 
     def test_health_default_workspace(self):
@@ -213,9 +220,7 @@ class TestMemoryStatsCommand:
     def test_stats_empty_workspace(self, tmp_workspace):
         """Stats command on empty workspace should show zero counts."""
         runner = CliRunner()
-        result = runner.invoke(
-            main, ["memory", "stats", "--workspace", tmp_workspace]
-        )
+        result = runner.invoke(main, ["memory", "stats", "--workspace", tmp_workspace])
         assert result.exit_code == 0
         assert "MEMORY STATISTICS" in result.output
         assert "Total Memory Files:  0" in result.output
@@ -228,9 +233,7 @@ class TestMemoryStatsCommand:
         _write_memory(tmp_workspace, name="o1", entry_type="opinion", content="Opinion")
 
         runner = CliRunner()
-        result = runner.invoke(
-            main, ["memory", "stats", "--workspace", tmp_workspace]
-        )
+        result = runner.invoke(main, ["memory", "stats", "--workspace", tmp_workspace])
         assert result.exit_code == 0
         assert "Memory Count by Type" in result.output
         assert "world" in result.output
@@ -243,9 +246,7 @@ class TestMemoryStatsCommand:
         _write_memory(tmp_workspace, name="c2", content="B", confidence=0.6)
 
         runner = CliRunner()
-        result = runner.invoke(
-            main, ["memory", "stats", "--workspace", tmp_workspace]
-        )
+        result = runner.invoke(main, ["memory", "stats", "--workspace", tmp_workspace])
         assert result.exit_code == 0
         assert "Average Confidence:" in result.output
         assert "0.70" in result.output
@@ -253,9 +254,7 @@ class TestMemoryStatsCommand:
     def test_stats_shows_git_commits(self, tmp_workspace):
         """Stats command should show git commit count."""
         runner = CliRunner()
-        result = runner.invoke(
-            main, ["memory", "stats", "--workspace", tmp_workspace]
-        )
+        result = runner.invoke(main, ["memory", "stats", "--workspace", tmp_workspace])
         assert result.exit_code == 0
         assert "Git History" in result.output
         assert "Memory Repo Commits:" in result.output
@@ -272,9 +271,7 @@ class TestMemoryStatsCommand:
                 f.write("---\nname: test\ndescription: t\ntype: world\n---\n\nTest\n")
 
             runner = CliRunner()
-            result = runner.invoke(
-                main, ["memory", "stats", "--workspace", d]
-            )
+            result = runner.invoke(main, ["memory", "stats", "--workspace", d])
             assert result.exit_code == 0
             assert "Memory Repo Commits: N/A (no .git directory)" in result.output
         finally:
@@ -283,9 +280,7 @@ class TestMemoryStatsCommand:
     def test_stats_invalid_workspace(self):
         """Stats command should error on invalid workspace path."""
         runner = CliRunner()
-        result = runner.invoke(
-            main, ["memory", "stats", "--workspace", "/nonexistent/path/xyz"]
-        )
+        result = runner.invoke(main, ["memory", "stats", "--workspace", "/nonexistent/path/xyz"])
         assert result.exit_code != 0
 
 

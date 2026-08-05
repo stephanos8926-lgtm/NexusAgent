@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Worker lifecycle events.
 
 Defines WorkerEvent and its subtypes for worker lifecycle tracking:

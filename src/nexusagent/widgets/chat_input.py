@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Chat input widget for NexusAgent TUI.
 
 Multiline input with:

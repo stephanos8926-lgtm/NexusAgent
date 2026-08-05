@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Todo management tools for NexusAgent.
 
 Enables the agent to read and write task lists/todos from/to a JSON file.

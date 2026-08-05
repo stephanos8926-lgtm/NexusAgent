@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 # src/nexusagent/core/pol.py
 """Phase 7: POL Control Plane for NexusAgent.
 

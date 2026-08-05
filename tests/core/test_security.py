@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 # tests/core/test_security.py
 """Comprehensive unit tests for the Phase 8 Capability Security Model."""
 
@@ -64,16 +66,29 @@ def test_policy_engine_role_evaluation():
 
     # 1. Minimal role gets only read access
     allowed, _ = engine.evaluate_capability(
-        session_id="sess-1", role="minimal", policy_mode="restricted", capability_name="filesystem.read"
+        session_id="sess-1",
+        role="minimal",
+        policy_mode="restricted",
+        capability_name="filesystem.read",
     )
     assert allowed
     allowed, _ = engine.evaluate_capability(
-        session_id="sess-1", role="minimal", policy_mode="restricted", capability_name="filesystem.write"
+        session_id="sess-1",
+        role="minimal",
+        policy_mode="restricted",
+        capability_name="filesystem.write",
     )
     assert not allowed
 
     # 2. Coder role gets full capabilities
-    for cap in ["filesystem.read", "filesystem.write", "execute.tests", "git.commit", "network.access", "shell.execute"]:
+    for cap in [
+        "filesystem.read",
+        "filesystem.write",
+        "execute.tests",
+        "git.commit",
+        "network.access",
+        "shell.execute",
+    ]:
         allowed, _ = engine.evaluate_capability(
             session_id="sess-1", role="coder", policy_mode="restricted", capability_name=cap
         )
@@ -98,13 +113,19 @@ def test_policy_engine_policy_modes():
 
     # Permissive: Allows everything
     allowed, _ = engine.evaluate_capability(
-        session_id="sess-2", role="minimal", policy_mode="permissive", capability_name="shell.execute"
+        session_id="sess-2",
+        role="minimal",
+        policy_mode="permissive",
+        capability_name="shell.execute",
     )
     assert allowed
 
     # Restricted: Only allows base grants or administrative overrides
     allowed, _ = engine.evaluate_capability(
-        session_id="sess-2", role="minimal", policy_mode="restricted", capability_name="shell.execute"
+        session_id="sess-2",
+        role="minimal",
+        policy_mode="restricted",
+        capability_name="shell.execute",
     )
     assert not allowed
 
@@ -126,7 +147,10 @@ def test_dynamic_administrative_overrides():
 
     # Base role "minimal" has filesystem.read but no filesystem.write
     allowed, _ = engine.evaluate_capability(
-        session_id=session_id, role="minimal", policy_mode="restricted", capability_name="filesystem.write"
+        session_id=session_id,
+        role="minimal",
+        policy_mode="restricted",
+        capability_name="filesystem.write",
     )
     assert not allowed
 
@@ -134,7 +158,10 @@ def test_dynamic_administrative_overrides():
     engine.grant_capability(session_id, "filesystem.write")
 
     allowed, _ = engine.evaluate_capability(
-        session_id=session_id, role="minimal", policy_mode="restricted", capability_name="filesystem.write"
+        session_id=session_id,
+        role="minimal",
+        policy_mode="restricted",
+        capability_name="filesystem.write",
     )
     assert allowed
 
@@ -142,14 +169,20 @@ def test_dynamic_administrative_overrides():
     engine.revoke_capability(session_id, "filesystem.write")
 
     allowed, _ = engine.evaluate_capability(
-        session_id=session_id, role="minimal", policy_mode="restricted", capability_name="filesystem.write"
+        session_id=session_id,
+        role="minimal",
+        policy_mode="restricted",
+        capability_name="filesystem.write",
     )
     assert not allowed
 
     # Strict policy mode ignores overrides
     engine.grant_capability(session_id, "filesystem.write")
     allowed, _ = engine.evaluate_capability(
-        session_id=session_id, role="minimal", policy_mode="strict", capability_name="filesystem.write"
+        session_id=session_id,
+        role="minimal",
+        policy_mode="strict",
+        capability_name="filesystem.write",
     )
     assert not allowed
 

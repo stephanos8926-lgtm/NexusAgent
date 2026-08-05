@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Session repository — CRUD operations on the ``sessions`` and ``messages`` tables."""
 
 from __future__ import annotations

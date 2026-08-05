@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Tests for NexusAgent TUI widgets.
 
 Covers:
@@ -408,7 +410,10 @@ class TestToolCallMessage:
     def test_tooltip_configured(self):
         """ToolCallMessage sets a helpful tooltip for screen readers."""
         msg = ToolCallMessage(tool="run", args="x=1")
-        assert msg.tooltip == "Interactive tool output. Click or press Enter/Space to expand/collapse output."
+        assert (
+            msg.tooltip
+            == "Interactive tool output. Click or press Enter/Space to expand/collapse output."
+        )
 
     def test_on_key_toggles_collapse(self):
         """Enter and Space keys toggle collapse when output is present."""
@@ -416,7 +421,9 @@ class TestToolCallMessage:
 
         from textual.events import Key as KeyEvent
 
-        msg = ToolCallMessage(tool="run", args="x=1", output="long\nmultiline\noutput\nhere\nto collapse")
+        msg = ToolCallMessage(
+            tool="run", args="x=1", output="long\nmultiline\noutput\nhere\nto collapse"
+        )
         # Starts collapsed because it has 4+ lines
         assert msg._collapsed is True
 

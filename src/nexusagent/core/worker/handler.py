@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Task handler — shared agent execution and research workflow.
 
 Provides the shared execution entry point used by both NexusWorker and WorkerPool,
@@ -7,6 +9,7 @@ plus circuit breaker protection and the research/code routing logic.
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 from nexusagent.core.agent import run_agent_task
 from nexusagent.infrastructure.db import get_task_repo
@@ -40,10 +43,8 @@ async def _run_agent_task(task: TaskSchema) -> str:
     """
     task_desc = task.description.lower()
     metadata = task.metadata if hasattr(task, "metadata") else {}
-
     # Extract working_dir from task metadata or task.working_dir field
     working_dir = metadata.get("working_dir") or getattr(task, "working_dir", None) or "."
-
     # Route: research tasks → LangGraph workflow, everything else → Agent
     is_research = metadata.get("mode") == "research" or any(
         kw in task_desc for kw in ["research", "investigate", "analyze", "deep dive", "report on"]
@@ -53,7 +54,7 @@ async def _run_agent_task(task: TaskSchema) -> str:
         if is_research:
             return await _run_research_workflow(task, working_dir)
         else:
-            state = {
+            state: dict[str, Any] = {
                 "task": task.description,
                 "id": task.id,
                 "working_dir": working_dir,
@@ -76,8 +77,8 @@ async def _run_agent_task(task: TaskSchema) -> str:
                     if memory_ctx:
                         # Prepend memory context to task description
                         state["task"] = f"{memory_ctx}\n\n---\n\nTask: {task.description}"
-                    # Store base for post-turn extraction
-                    state["_session_base"] = base
+                        # Store base for post-turn extraction
+                        state["_session_base"] = base
                 except Exception as exc:
                     logger.debug("SessionBase setup failed (non-fatal): %s", exc)
 
@@ -95,7 +96,7 @@ async def _run_agent_task(task: TaskSchema) -> str:
                 except Exception as exc:
                     logger.debug("SessionBase post-turn failed (non-fatal): %s", exc)
 
-            return result.get("result", "No result returned from agent.")
+            return str(result.get("result", "No result returned from agent."))
 
 
 async def _run_research_workflow(task: TaskSchema, working_dir: str = ".") -> str:
@@ -121,7 +122,7 @@ async def _run_research_workflow(task: TaskSchema, working_dir: str = ".") -> st
     error = result.get("error")
 
     if synthesis:
-        return synthesis
+        return str(synthesis)
     if error:
         return f"Research workflow error: {error}"
     return "Research workflow completed but produced no output."

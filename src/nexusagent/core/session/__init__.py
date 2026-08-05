@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Session manager for interactive WebSocket sessions.
 
 Provides:

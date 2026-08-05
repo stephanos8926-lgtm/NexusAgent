@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Code review tool for NexusAgent.
 
 Provides static analysis and heuristic-based code review without requiring

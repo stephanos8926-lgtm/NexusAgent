@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """LLM-powered coding agent with policy-aware tool access.
 
 Provides the ``Agent`` class that wraps a deepagents agent with configurable
@@ -94,6 +96,7 @@ def sanitize_tool_output(text: str) -> str:
 
 # ─── NEXUS_TEST_MODE — blocks real API calls ─────────────────────────────
 
+
 def _check_test_mode() -> None:
     """Raise error if running in test mode without mocks."""
     from nexusagent.infrastructure.config import settings
@@ -105,6 +108,7 @@ def _check_test_mode() -> None:
     if test_mode_env or test_mode_config:
         # In test mode, ALWAYS block real API calls
         from nexusagent.infrastructure.utils.budget import BudgetExceededError
+
         raise BudgetExceededError(
             message="NEXUS_TEST_MODE: Blocking real API calls - use mocks instead",
             budget_type="daily",
@@ -259,6 +263,7 @@ class Agent:
 
         if capabilities:
             from nexusagent.tools.registry.policy import _get_ctx
+
             ctx = _get_ctx()
             if "unlocked" not in ctx:
                 ctx["unlocked"] = set()

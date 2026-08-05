@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Single source of truth for NexusAgent version.
 
 This module reads the version from pyproject.toml at runtime via importlib.metadata.

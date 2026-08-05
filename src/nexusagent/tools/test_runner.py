@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Test runner tool for NexusAgent.
 
 Auto-detects test framework from repository structure and runs tests

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Performance checks for code review."""
 
 from __future__ import annotations

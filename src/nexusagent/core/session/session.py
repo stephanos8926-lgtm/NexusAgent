@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Session — a single interactive conversation between user and agent.
 
 Extends SessionBase (shared memory logic) with:
@@ -208,7 +210,9 @@ class Session(SessionBase):
 
         # Inject hybrid memory context
         try:
-            hybrid_context = await self.hybrid_memory.get_memory_context(user_message, max_results=5)
+            hybrid_context = await self.hybrid_memory.get_memory_context(
+                user_message, max_results=5
+            )
             if hybrid_context:
                 messages.append(SystemMessage(content=hybrid_context))
         except Exception as exc:
@@ -533,7 +537,9 @@ class Session(SessionBase):
                 self._seen_tool_results.add(call_id)
                 self._pending_tool_messages.append(token)
                 output_text = str(token.content) if token.content else ""
-                is_error = output_text.startswith("Error:") or getattr(token, "status", None) == "error"
+                is_error = (
+                    output_text.startswith("Error:") or getattr(token, "status", None) == "error"
+                )
                 self._enqueue(
                     {
                         "type": "tool_result",

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Tests for HybridMemoryManager and memory tools (Task 3)."""
 
 import os

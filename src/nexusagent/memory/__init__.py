@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Memory subsystem."""
 
 from nexusagent.memory.layer_manager import LayerMemoryManager

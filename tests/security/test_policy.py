@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Unit tests for PolicyEngine and role-based capability evaluation."""
 
 from __future__ import annotations

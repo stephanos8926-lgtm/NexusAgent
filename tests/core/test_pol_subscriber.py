@@ -1,6 +1,7 @@
+# SPDX-License-Identifier: MIT
+
 # tests/core/test_pol_subscriber.py
 """Tests for POLSubscriber event routing and automatic intervention triggers."""
-
 
 import pytest
 
@@ -22,7 +23,7 @@ async def test_pol_subscriber_event_routing(tmp_path):
     e_fail = SystemEvent(
         source="worker_a",
         type="worker.failed",
-        payload={"task_id": "task-xyz", "error": "OutOfMemory error occurred"}
+        payload={"task_id": "task-xyz", "error": "OutOfMemory error occurred"},
     )
     await subscriber.handle_event(e_fail)
 
@@ -38,7 +39,7 @@ async def test_pol_subscriber_event_routing(tmp_path):
     e_denied = SystemEvent(
         source="policy",
         type="tool.denied",
-        payload={"task_id": "task-xyz", "reason": "No shell commands outside workspace"}
+        payload={"task_id": "task-xyz", "reason": "No shell commands outside workspace"},
     )
     await subscriber.handle_event(e_denied)
 

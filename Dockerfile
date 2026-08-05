@@ -1,28 +1,52 @@
-FROM python:3.13-slim
+# Multi-stage Dockerfile for NexusAgent
+# Stage 1: Builder - install build dependencies and compile native extensions
+FROM python:3.13-slim@sha256:4b5c8d7f1a2b3e6d8c9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c AS builder
 
 WORKDIR /app
 
-# Install build deps for native extensions (sqlite-vec, etc.)
+# Install build dependencies for native extensions (sqlite-vec, etc.)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc \
-    libsqlite3-dev \
+    gcc=4:13.2.0-1 \
+    libsqlite3-dev=3.45.1-1 \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy everything first so pip install -e . can find src/
+# Copy dependency files first for better Docker layer caching
 COPY pyproject.toml .
-COPY src/ src/
-COPY config/ config/
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -e .
 
-# Create data directory for SQLite DB
-RUN mkdir -p /data
+# Copy application code
+COPY src/ src/
+COPY config/ config/
 
+# Stage 2: Runtime - minimal production image
+FROM python:3.13-slim@sha256:4b5c8d7f1a2b3e6d8c9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c AS runtime
+
+WORKDIR /app
+
+# Create non-root user and group
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+
+# Copy Python dependencies from builder stage
+COPY --from=builder /usr/local/lib/python3.13/site-packages /usr/local/lib/python3.13/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
+
+# Copy application code
+COPY --chown=appuser:appgroup src/ src/
+COPY --chown=appuser:appgroup config/ config/
+
+# Create data directory for SQLite DB with proper ownership
+RUN mkdir -p /data && chown -R appuser:appgroup /data
+
+# Set environment variables
 ENV NEXUS_SERVER__DB_PATH=/data/nexus.db
 ENV NEXUS_SERVER__NATS_URL=nats://host.docker.internal:4222
 ENV NEXUS_SERVER__API_PORT=8000
 ENV NEXUS_LOG_LEVEL=INFO
+
+# Switch to non-root user
+USER appuser
 
 EXPOSE 8000
 

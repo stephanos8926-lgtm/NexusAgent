@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """App message widget — dim italic styling for system messages."""
 
 from __future__ import annotations

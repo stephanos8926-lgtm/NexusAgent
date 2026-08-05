@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """LLM cost estimation and tracking utilities.
 
 Provides token-to-cost conversion for major providers and cost tracking hooks.

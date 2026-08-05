@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Tests for TUI bug fixes: _busy reset on disconnect, stale widget cleanup.
 
 Covers:
@@ -156,6 +158,7 @@ class TestTuiInputSizeLimit:
         assert app._mount_with_limit.call_count == 1
         called_widget = app._mount_with_limit.call_args[0][0]
         from nexusagent.widgets.messages import ErrorMessage
+
         assert isinstance(called_widget, ErrorMessage)
         assert "exceeds client-side size limit of 32KB" in called_widget._message
 
@@ -201,9 +204,7 @@ class TestTuiActionClearStateReset:
         """Generic Exception resets _current_assistant and _current_tool."""
         mock_settings.client.api_key = None
         mock_settings.server.api_port = 8080
-        mock_connect.return_value.__aenter__ = AsyncMock(
-            side_effect=RuntimeError("boom")
-        )
+        mock_connect.return_value.__aenter__ = AsyncMock(side_effect=RuntimeError("boom"))
         mock_connect.return_value.__aexit__ = AsyncMock(return_value=False)
 
         app = make_app()

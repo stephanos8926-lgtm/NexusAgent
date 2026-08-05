@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 # src/nexusagent/security/router.py
 """CapabilityRouter checks required capabilities for tools and emits audit trail events."""
 
@@ -133,6 +135,7 @@ class CapabilityRouter:
         else:
             # Fallback to local thread/context storage
             from nexusagent.core.agent import _current_session
+
             local_session = _current_session.get()
             if local_session:
                 session_id = getattr(local_session, "session_id", None)
@@ -175,7 +178,10 @@ class CapabilityRouter:
 
         if not allowed:
             # Return legacy-compatible error output structure
-            return False, f"ACCESS DENIED: Capability '{capability_name}' (risk: {risk_label}) is required but denied: {reason}"
+            return (
+                False,
+                f"ACCESS DENIED: Capability '{capability_name}' (risk: {risk_label}) is required but denied: {reason}",
+            )
 
         return True, ""
 

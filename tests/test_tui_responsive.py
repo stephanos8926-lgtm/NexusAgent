@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Tests for responsive design, SIGWINCH handling, and accessibility features.
 
 Covers:
@@ -256,6 +258,7 @@ class TestSigwinchHandler:
 
         with patch("nexusagent.interfaces.tui_widgets._get_terminal_size", return_value=(160, 24)):
             from nexusagent.interfaces.tui import _sigwinch_handler
+
             _sigwinch_handler(app)
             assert app._breakpoint == Breakpoint.WIDE
 
@@ -269,6 +272,7 @@ class TestSigwinchHandler:
 
         with patch("nexusagent.interfaces.tui_widgets._get_terminal_size", return_value=(160, 24)):
             from nexusagent.interfaces.tui import _sigwinch_handler
+
             _sigwinch_handler(app)
             first_bp = app._breakpoint
 
@@ -287,6 +291,7 @@ class TestSigwinchHandler:
         with patch("nexusagent.interfaces.tui_widgets._get_terminal_size", return_value=(50, 24)):
             with patch.object(app, "notify") as mock_notify:
                 from nexusagent.interfaces.tui import _sigwinch_handler
+
                 _sigwinch_handler(app)
                 assert app._breakpoint == Breakpoint.TOO_SMALL
                 mock_notify.assert_called_once()
@@ -298,8 +303,11 @@ class TestSigwinchHandler:
         app = NexusApp(session_id="test")
         app._resize_state = {}
 
-        with patch("nexusagent.interfaces.tui_widgets._get_terminal_size", side_effect=OSError("test")):
+        with patch(
+            "nexusagent.interfaces.tui_widgets._get_terminal_size", side_effect=OSError("test")
+        ):
             from nexusagent.interfaces.tui import _sigwinch_handler
+
             # Should not raise
             _sigwinch_handler(app)
 
@@ -329,6 +337,7 @@ class TestSigwinchHandler:
         app._resize_state = {}
 
         from unittest.mock import patch
+
         with patch("nexusagent.interfaces.tui_widgets._get_terminal_size", return_value=(100, 24)):
             app._check_sigwinch()
             assert app._sigwinch_pending is False
@@ -340,6 +349,7 @@ class TestSigwinchHandler:
         app._resize_state = {}
 
         from unittest.mock import patch
+
         with patch.object(app, "notify") as mock_notify:
             app._check_sigwinch()
             mock_notify.assert_not_called()
@@ -364,11 +374,14 @@ class TestWidgetArchitecture:
     def test_nexus_app_git_refresh_loop(self):
         """NexusApp should support Git refresh loop scheduling and cleanup."""
         from unittest.mock import MagicMock, patch
+
         app = self._make_app_with_widgets()
         app._input_queue = MagicMock()
 
         import inspect
+
         coro = None
+
         def mock_create_task_fn(c):
             nonlocal coro
             if inspect.iscoroutine(c):
@@ -407,6 +420,7 @@ class TestWidgetArchitecture:
 
             import gc
             import warnings
+
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore", RuntimeWarning)
                 gc.collect()
@@ -454,11 +468,13 @@ class TestWidgetArchitecture:
     def test_theme_registry(self):
         """register_themes should be callable."""
         from nexusagent.widgets.theme import register_themes
+
         assert callable(register_themes)
 
     def test_get_css_variable_defaults(self):
         """get_css_variable_defaults should return a dict."""
         from nexusagent.widgets.theme import get_css_variable_defaults
+
         defaults = get_css_variable_defaults()
         assert isinstance(defaults, dict)
         assert len(defaults) > 0

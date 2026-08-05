@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Chat input handling for the TUI.
 
 Handles:

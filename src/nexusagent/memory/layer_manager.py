@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """4-layer memory manager for Phase 9.
 
 Wraps the existing ``HybridMemoryManager`` with a trust-aware layer router.
@@ -56,12 +58,17 @@ class LayerMemoryManager:
                 continue
             try:
                 import json
+
                 payload = json.loads(json_file.read_text())
                 item_content = payload.get("item", {}).get("content", "").strip().lower()
                 if not item_content:
                     continue
                 # 1. Exact match or substring match
-                if norm_text == item_content or norm_text in item_content or item_content in norm_text:
+                if (
+                    norm_text == item_content
+                    or norm_text in item_content
+                    or item_content in norm_text
+                ):
                     return backend._from_payload(payload)
                 # 2. Token overlap similarity (Jaccard similarity >= 0.7)
                 item_tokens = set(item_content.split())
@@ -133,7 +140,9 @@ class LayerMemoryManager:
             layer=layer,
             provenance=provenance,
             confidence=confidence,
-            min_confidence=min_confidence if min_confidence is not None else self._min_confidence[layer],
+            min_confidence=min_confidence
+            if min_confidence is not None
+            else self._min_confidence[layer],
             tags=tags or [],
             metadata=item.metadata,
         )
@@ -144,7 +153,9 @@ class LayerMemoryManager:
         backend = self._backends[layer]
         return backend.get(item_id)
 
-    def query(self, text: str, *, layer: MemoryLayer | None = None, limit: int = 10) -> list[LayerMemoryItem]:
+    def query(
+        self, text: str, *, layer: MemoryLayer | None = None, limit: int = 10
+    ) -> list[LayerMemoryItem]:
         results: list[LayerMemoryItem] = []
         layers = [layer] if layer else list(self._backends)
         for mem_layer in layers:

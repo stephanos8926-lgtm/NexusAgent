@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 # src/nexusagent/security/engine.py
 """Policy engine evaluating capability grants/revocations and role mappings."""
 
@@ -80,7 +82,9 @@ class PolicyEngine:
             if session_id not in _active_grants:
                 _active_grants[session_id] = {}
             _active_grants[session_id][capability_name] = True
-            logger.info(f"Dynamically granted capability '{capability_name}' to session '{session_id}'")
+            logger.info(
+                f"Dynamically granted capability '{capability_name}' to session '{session_id}'"
+            )
 
     def revoke_capability(self, session_id: str, capability_name: str) -> None:
         """Dynamically revoke a specific capability from a session."""
@@ -88,9 +92,13 @@ class PolicyEngine:
             if session_id not in _active_grants:
                 _active_grants[session_id] = {}
             _active_grants[session_id][capability_name] = False
-            logger.info(f"Dynamically revoked capability '{capability_name}' from session '{session_id}'")
+            logger.info(
+                f"Dynamically revoked capability '{capability_name}' from session '{session_id}'"
+            )
 
-    def get_session_capabilities(self, session_id: str | None, role: str, policy_mode: str) -> list[str]:
+    def get_session_capabilities(
+        self, session_id: str | None, role: str, policy_mode: str
+    ) -> list[str]:
         """List all capabilities currently active/granted to a session."""
         base_grants = set(self.role_grants.get(role, self.role_grants["minimal"]))
         if role == "full":
@@ -146,7 +154,10 @@ class PolicyEngine:
             if policy_mode == "strict":
                 if capability_name in base_grants:
                     return True, f"Allowed by base role '{role}' in strict mode"
-                return False, f"Capability '{capability_name}' is not allowed for role '{role}' in strict mode"
+                return (
+                    False,
+                    f"Capability '{capability_name}' is not allowed for role '{role}' in strict mode",
+                )
 
             if session_id:
                 with _active_grants_lock:
@@ -159,7 +170,10 @@ class PolicyEngine:
             if capability_name in base_grants:
                 return True, f"Allowed by base role '{role}' in restricted mode"
 
-            return False, f"Capability '{capability_name}' is not granted to role '{role}' in restricted mode"
+            return (
+                False,
+                f"Capability '{capability_name}' is not granted to role '{role}' in restricted mode",
+            )
 
         # 1. Permissive policy mode: all registered capabilities/tools allowed by default (adds to unlocked)
         if policy_mode == "permissive":

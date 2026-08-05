@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Comprehensive unit tests for the DeepResearchOrchestrator.
 
 Covers parsing, plan generation, refinement, search/fetch placeholders,
@@ -24,6 +26,7 @@ from nexusagent.core.orchestration import (
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 class MockResponse:
     """Mimics LLMResponse with a .content attribute."""
@@ -59,6 +62,7 @@ def _make_orchestrator() -> DeepResearchOrchestrator:
 # ---------------------------------------------------------------------------
 # 1. _parse_plan_response with valid JSON
 # ---------------------------------------------------------------------------
+
 
 class TestParsePlanResponse:
     def test_valid_json(self):
@@ -152,6 +156,7 @@ class TestParsePlanResponse:
 # 5 & 6. _refine_plan
 # ---------------------------------------------------------------------------
 
+
 class TestRefinePlan:
     @pytest.mark.asyncio
     async def test_refine_plan_success(self):
@@ -221,6 +226,7 @@ class TestRefinePlan:
 # 8. run_deep_research full pipeline (mock all LLM calls)
 # ---------------------------------------------------------------------------
 
+
 class TestRunDeepResearch:
     @pytest.mark.asyncio
     async def test_full_pipeline(self):
@@ -249,13 +255,16 @@ class TestRunDeepResearch:
             return MockResponse("{}")
 
         # Patch llm.generate and search_web (used by _search)
-        with patch(
-            "nexusagent.core.orchestration.llm.generate",
-            new_callable=AsyncMock,
-            side_effect=mock_generate,
-        ), patch(
-            "nexusagent.tools.research.search_web",
-            return_value="Mock search results about the topic",
+        with (
+            patch(
+                "nexusagent.core.orchestration.llm.generate",
+                new_callable=AsyncMock,
+                side_effect=mock_generate,
+            ),
+            patch(
+                "nexusagent.tools.research.search_web",
+                return_value="Mock search results about the topic",
+            ),
         ):
             result = await orch.run_deep_research(
                 "climate change impacts", template_type="professional"
@@ -290,17 +299,18 @@ class TestRunDeepResearch:
                 return MockResponse(report_content)
             return MockResponse("{}")
 
-        with patch(
-            "nexusagent.core.orchestration.llm.generate",
-            new_callable=AsyncMock,
-            side_effect=mock_generate,
-        ), patch(
-            "nexusagent.tools.research.search_web",
-            return_value="Some results",
+        with (
+            patch(
+                "nexusagent.core.orchestration.llm.generate",
+                new_callable=AsyncMock,
+                side_effect=mock_generate,
+            ),
+            patch(
+                "nexusagent.tools.research.search_web",
+                return_value="Some results",
+            ),
         ):
-            result = await orch.run_deep_research(
-                "emerging biotech trends", template_type="basic"
-            )
+            result = await orch.run_deep_research("emerging biotech trends", template_type="basic")
 
         assert result == report_content
 
@@ -308,6 +318,7 @@ class TestRunDeepResearch:
 # ---------------------------------------------------------------------------
 # 9. _search returns SearchResult list
 # ---------------------------------------------------------------------------
+
 
 class TestSearchAndFetch:
     @pytest.mark.asyncio
@@ -359,6 +370,7 @@ class TestSearchAndFetch:
 # ---------------------------------------------------------------------------
 # 11. _synthesize_report with template
 # ---------------------------------------------------------------------------
+
 
 class TestSynthesizeReport:
     @pytest.mark.asyncio
@@ -541,6 +553,7 @@ class TestSynthesizeReport:
 # ---------------------------------------------------------------------------
 # Edge cases
 # ---------------------------------------------------------------------------
+
 
 class TestEdgeCases:
     def test_parse_plan_response_with_surrounding_text(self):

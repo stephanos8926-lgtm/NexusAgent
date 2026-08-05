@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Authentication and API key management.
 
 Provides ``AuthManager`` for Fernet-encrypted API key storage with PBKDF2

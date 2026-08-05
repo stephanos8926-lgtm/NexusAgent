@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Rate limiting for NexusAgent API endpoints.
 
 Implements a token bucket rate limiter shared across all requests.

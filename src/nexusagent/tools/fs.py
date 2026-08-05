@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """File system tools for NexusAgent.
 
 Provides read, write, edit, and directory listing with safety constraints:

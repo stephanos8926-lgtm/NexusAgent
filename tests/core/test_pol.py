@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 # tests/core/test_pol.py
 """Unit tests for the Platform Orchestration Layer (POL) control plane and PolicyEvaluator."""
 
@@ -17,7 +19,9 @@ def test_policy_evaluator_execution():
     assert allowed
 
     # Path escape attempts are blocked
-    allowed, msg = evaluator.evaluate_execution("cat ../../etc/passwd", current_dir="/app/workspace")
+    allowed, msg = evaluator.evaluate_execution(
+        "cat ../../etc/passwd", current_dir="/app/workspace"
+    )
     assert not allowed
     assert "navigate outside workspace root" in msg
 
@@ -87,7 +91,7 @@ async def test_pol_control_plane_interventions(tmp_path):
         task_id="task-123",
         reason="unauthorized_file_access",
         guidance="Request admin approval",
-        priority="high"
+        priority="high",
     )
     assert intv["task_id"] == "task-123"
     assert intv["status"] == "pending"

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 # tests/core/events/test_event_store.py
 """Comprehensive tests for the EventStore, Subscribers, and APIs."""
 

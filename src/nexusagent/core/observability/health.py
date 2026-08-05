@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 # src/nexusagent/core/observability/health.py
 """Subsystem health monitoring and status aggregation."""
 
@@ -58,9 +60,13 @@ def check_memory_system_health() -> HealthStatus:
         # Check that workspace is writeable/accessible
         if os.path.exists(workspace):
             return HealthStatus(healthy=True, message="Memory System OK", details=details)
-        return HealthStatus(healthy=True, message="Memory System OK (workspace pending creation)", details=details)
+        return HealthStatus(
+            healthy=True, message="Memory System OK (workspace pending creation)", details=details
+        )
     except Exception as exc:
-        return HealthStatus(healthy=False, message=f"Memory System access failed: {exc}", details=details)
+        return HealthStatus(
+            healthy=False, message=f"Memory System access failed: {exc}", details=details
+        )
 
 
 def check_pol_health() -> HealthStatus:

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 # src/nexusagent/core/observability/context.py
 """Tracing context and context variables for request, task, and execution correlation."""
 

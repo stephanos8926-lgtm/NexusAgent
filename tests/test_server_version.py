@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Tests for server /version endpoint and version constant."""
 
 import pytest
@@ -9,6 +11,7 @@ class TestVersionConstant:
     def test_version_file_exists(self):
         """VERSION file must exist at project root."""
         from pathlib import Path
+
         version_file = Path(__file__).resolve().parent.parent / "VERSION"
         assert version_file.exists(), f"VERSION file not found at {version_file}"
 
@@ -16,6 +19,7 @@ class TestVersionConstant:
         """VERSION file must match pyproject.toml version."""
         from importlib.metadata import version as pkg_version
         from pathlib import Path
+
         version_file = Path(__file__).resolve().parent.parent / "VERSION"
         file_ver = version_file.read_text().strip()
         pkg_ver = pkg_version("nexusagent")
@@ -24,6 +28,7 @@ class TestVersionConstant:
     def test_version_module_exists(self):
         """src.nexusagent.version module must exist with VERSION constant."""
         from nexusagent.version import VERSION
+
         assert isinstance(VERSION, str)
         assert len(VERSION) > 0
 
@@ -32,6 +37,7 @@ class TestVersionConstant:
         from importlib.metadata import version as pkg_version
 
         from nexusagent.version import VERSION
+
         assert pkg_version("nexusagent") == VERSION
 
 
@@ -45,6 +51,7 @@ class TestServerVersionEndpoint:
 
         # Import after version module is created to avoid import errors
         from nexusagent.server.server import app
+
         return TestClient(app)
 
     def test_version_endpoint_exists(self, client):
@@ -64,6 +71,7 @@ class TestServerVersionEndpoint:
     def test_version_matches_module(self, client):
         """Response version must match version.VERSION."""
         from nexusagent.version import VERSION
+
         response = client.get("/version")
         data = response.json()
         assert data["version"] == VERSION
@@ -77,6 +85,7 @@ class TestServerHealthEnhancement:
         from fastapi.testclient import TestClient
 
         from nexusagent.server.server import app
+
         return TestClient(app)
 
     def test_health_includes_version(self, client):

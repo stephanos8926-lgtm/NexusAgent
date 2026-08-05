@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Database manager — async engine + session factory.
 
 Resolves the DB URL from ``settings.server.db_path`` at creation time.

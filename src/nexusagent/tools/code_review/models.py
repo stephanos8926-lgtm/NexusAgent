@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Code review data models."""
 
 from __future__ import annotations

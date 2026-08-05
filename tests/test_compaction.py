@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Tests for the context compaction pipeline."""
 
 from unittest.mock import AsyncMock, MagicMock

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Color palette definitions and theme data for NexusAgent TUI."""
 
 from dataclasses import dataclass

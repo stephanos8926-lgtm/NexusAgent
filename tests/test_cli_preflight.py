@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Tests for CLI preflight version checking."""
 
 from unittest.mock import AsyncMock, patch

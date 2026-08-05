@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 # tests/core/test_dag.py
 """Unit tests for Phase 6 DAG structures, validation, and topological sorting."""
 

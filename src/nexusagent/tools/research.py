@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Research and web fetching tools for NexusAgent.
 
 Provides web search (Exa/Tavily), local documentation search (ctx7),

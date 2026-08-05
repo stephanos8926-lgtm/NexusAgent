@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Regex-based auto memory extraction (v1 — no LLM call).
 
 After each agent turn, extract memorable facts using regex patterns.

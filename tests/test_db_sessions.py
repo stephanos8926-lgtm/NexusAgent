@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 import os
 import tempfile
 
@@ -101,17 +103,13 @@ async def test_find_sessions_by_working_dir(session_repo: SessionRepository):
     assert results_bar[0]["id"] == sid3
 
     # Exclude should filter out the given session ID
-    results_excl = await session_repo.find_sessions_by_working_dir(
-        "/project/foo", exclude=sid4
-    )
+    results_excl = await session_repo.find_sessions_by_working_dir("/project/foo", exclude=sid4)
     ids_excl = [r["id"] for r in results_excl]
     assert sid4 not in ids_excl
     assert len(results_excl) == 2
 
     # Limit should cap results
-    results_limited = await session_repo.find_sessions_by_working_dir(
-        "/project/foo", limit=2
-    )
+    results_limited = await session_repo.find_sessions_by_working_dir("/project/foo", limit=2)
     assert len(results_limited) == 2
 
     # Non-matching directory returns empty list

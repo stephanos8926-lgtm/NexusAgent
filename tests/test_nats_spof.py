@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Tests for NATS SPOF elimination — Kanban t_3a205302.
 
 Verifies health tracking, reconnect caps, and graceful degradation.

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 # src/nexusagent/core/events/subscribers.py
 """Base Subscriber Framework for NexusAgent event-driven core."""
 

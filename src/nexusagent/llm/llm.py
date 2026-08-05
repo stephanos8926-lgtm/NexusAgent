@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 # src/nexusagent/llm.py
 """Multi-provider LLM bridge with retry and circuit-breaker support.
 
@@ -64,10 +66,14 @@ class LLMProvider:
 
         # OpenRouter Setup (OpenAI compatible)
         self.openrouter_key = os.environ.get("OPENROUTER_API_KEY")
-        self.openrouter_client = AsyncOpenAI(
-            api_key=self.openrouter_key,
-            base_url=os.environ.get("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"),
-        ) if self.openrouter_key else None
+        self.openrouter_client = (
+            AsyncOpenAI(
+                api_key=self.openrouter_key,
+                base_url=os.environ.get("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"),
+            )
+            if self.openrouter_key
+            else None
+        )
 
     def get_active_model(self) -> tuple[str, str]:
         """Returns (provider, model_id) based on current settings."""
@@ -118,7 +124,7 @@ class LLMProvider:
         system_prompt: str | None = None,
         timeout: float = 120.0,
         previous_interaction_id: str | None = None,
-        **kwargs
+        **kwargs,
     ) -> LLMResponse:
         """Generate a response from the active LLM provider.
 
@@ -140,16 +146,16 @@ class LLMProvider:
 
         if provider == "gemini":
             return await self._call_gemini(
-                prompt, system_prompt, model_id,
+                prompt,
+                system_prompt,
+                model_id,
                 timeout=timeout,
                 previous_interaction_id=previous_interaction_id,
-                **kwargs
+                **kwargs,
             )
         elif provider == "openrouter":
             return await self._call_openrouter(
-                prompt, system_prompt, model_id,
-                timeout=timeout,
-                **kwargs
+                prompt, system_prompt, model_id, timeout=timeout, **kwargs
             )
         else:
             raise ValueError(f"Unsupported provider: {provider}")
@@ -214,14 +220,16 @@ class LLMProvider:
 
             # Collect tool call metadata for logging/debugging
             tool_calls = []
-            if hasattr(interaction, 'steps') and interaction.steps:
+            if hasattr(interaction, "steps") and interaction.steps:
                 for step in interaction.steps:
-                    if hasattr(step, 'type') and step.type == 'function_call':
-                        tool_calls.append({
-                            'name': step.name,
-                            'arguments': step.arguments if hasattr(step, 'arguments') else {},
-                            'id': step.id if hasattr(step, 'id') else '',
-                        })
+                    if hasattr(step, "type") and step.type == "function_call":
+                        tool_calls.append(
+                            {
+                                "name": step.name,
+                                "arguments": step.arguments if hasattr(step, "arguments") else {},
+                                "id": step.id if hasattr(step, "id") else "",
+                            }
+                        )
 
             logger.info(f"Gemini response: {len(content)} chars, {len(tool_calls)} tool calls")
 
@@ -230,7 +238,7 @@ class LLMProvider:
                 model_used=model_id,
                 provider="gemini",
                 tool_calls=tool_calls if tool_calls else None,
-                interaction_id=interaction.id if hasattr(interaction, 'id') else None,
+                interaction_id=interaction.id if hasattr(interaction, "id") else None,
             )
 
         except TimeoutError:
@@ -266,10 +274,7 @@ class LLMProvider:
             messages.append({"role": "user", "content": prompt})
 
             response = await self.openrouter_client.chat.completions.create(
-                model=model_id,
-                messages=messages,
-                timeout=timeout,
-                **kwargs
+                model=model_id, messages=messages, timeout=timeout, **kwargs
             )
             return LLMResponse(
                 content=response.choices[0].message.content or "",

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Tests for dream cycle integration — auto-trigger and manual trigger.
 
 Tests cover:
@@ -64,10 +66,17 @@ def _write_raw_memory(workspace, name, content):
     return filepath
 
 
-def _write_memory(workspace, name="test-entry", content="Test content",
-                  entry_type="world", description="Test desc",
-                  entities=None, confidence=None, quality_score=None,
-                  created=None):
+def _write_memory(
+    workspace,
+    name="test-entry",
+    content="Test content",
+    entry_type="world",
+    description="Test desc",
+    entities=None,
+    confidence=None,
+    quality_score=None,
+    created=None,
+):
     """Helper to write a test memory entry with YAML frontmatter."""
     bank_dir = os.path.join(workspace, "bank")
     os.makedirs(bank_dir, exist_ok=True)
@@ -155,8 +164,7 @@ class TestDreamCycleScan:
 
     def test_scan_finds_low_quality(self, tmp_workspace):
         """Scan should detect entries with quality_score < 0.2."""
-        _write_memory(tmp_workspace, name="lq", content="Bad entry",
-                       quality_score=0.1)
+        _write_memory(tmp_workspace, name="lq", content="Bad entry", quality_score=0.1)
 
         cycle = DreamCycle(tmp_workspace)
         report = cycle.scan()
@@ -198,10 +206,8 @@ class TestDreamCyclePatterns:
 
     def test_find_patterns_entity_frequency(self, tmp_workspace):
         """Patterns should count entity mentions across files."""
-        _write_memory(tmp_workspace, name="e1", content="First",
-                       entities=["auth", "jwt"])
-        _write_memory(tmp_workspace, name="e2", content="Second",
-                       entities=["auth", "oauth"])
+        _write_memory(tmp_workspace, name="e1", content="First", entities=["auth", "jwt"])
+        _write_memory(tmp_workspace, name="e2", content="Second", entities=["auth", "oauth"])
 
         cycle = DreamCycle(tmp_workspace)
         patterns = cycle.find_patterns()
@@ -286,8 +292,7 @@ class TestDreamCycleConsolidate:
 
     def test_consolidate_removes_low_quality(self, tmp_workspace):
         """Consolidate should remove low-quality entries."""
-        _write_memory(tmp_workspace, name="bad", content="Low quality",
-                       quality_score=0.05)
+        _write_memory(tmp_workspace, name="bad", content="Low quality", quality_score=0.05)
 
         cycle = DreamCycle(tmp_workspace)
         scan_report = cycle.scan()
@@ -367,10 +372,18 @@ class TestDreamCycleFull:
     @pytest.mark.asyncio
     async def test_full_cycle_extracts_patterns(self, tmp_workspace):
         """Full cycle should extract patterns from memory files."""
-        _write_memory(tmp_workspace, name="p1", content="- Auth uses JWT\n- Tokens expire hourly",
-                       entities=["auth"])
-        _write_memory(tmp_workspace, name="p2", content="- Auth requires OAuth\n- JWT is preferred",
-                       entities=["auth", "jwt"])
+        _write_memory(
+            tmp_workspace,
+            name="p1",
+            content="- Auth uses JWT\n- Tokens expire hourly",
+            entities=["auth"],
+        )
+        _write_memory(
+            tmp_workspace,
+            name="p2",
+            content="- Auth requires OAuth\n- JWT is preferred",
+            entities=["auth", "jwt"],
+        )
 
         cycle = DreamCycle(tmp_workspace)
         report = await cycle.run(dry_run=False)
@@ -433,13 +446,15 @@ class TestSessionDreamCycleTrigger:
             # Mock DreamCycle to track calls
             with patch("nexusagent.core.session.session.DreamCycle") as mock_dream_cycle:
                 mock_cycle = MagicMock()
-                mock_cycle.run = AsyncMock(return_value={
-                    "duplicates_removed": 0,
-                    "stale_pruned": 0,
-                    "patterns_extracted": 0,
-                    "health_before": 1.0,
-                    "health_after": 1.0,
-                })
+                mock_cycle.run = AsyncMock(
+                    return_value={
+                        "duplicates_removed": 0,
+                        "stale_pruned": 0,
+                        "patterns_extracted": 0,
+                        "health_before": 1.0,
+                        "health_after": 1.0,
+                    }
+                )
                 mock_dream_cycle.return_value = mock_cycle
 
                 # Send 3 messages — dream cycle should trigger on 3rd
@@ -547,12 +562,14 @@ class TestDreamCycleConfig:
     def test_dream_cycle_interval_default(self):
         """dream_cycle_interval should default to 20."""
         from nexusagent.infrastructure.config import AgentConfig
+
         config = AgentConfig()
         assert config.dream_cycle_interval == 20
 
     def test_dream_cycle_interval_custom(self):
         """dream_cycle_interval should accept custom values."""
         from nexusagent.infrastructure.config import AgentConfig
+
         config = AgentConfig(dream_cycle_interval=50)
         assert config.dream_cycle_interval == 50
 
@@ -568,6 +585,7 @@ def _create_mock_session():
 
     async def _astream(input_data, stream_mode=None, **kwargs):
         from langchain_core.messages import AIMessageChunk
+
         yield AIMessageChunk(content="response")
 
     agent.astream = _astream

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Tests for agent compatibility, specifically asynchronous execution of tools via ainvoke."""
 
 from __future__ import annotations

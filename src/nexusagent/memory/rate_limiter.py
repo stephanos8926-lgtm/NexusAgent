@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Token-bucket rate limiter for memory tools.
 
 Prevents buggy loops from flooding the DB with low-value observations.

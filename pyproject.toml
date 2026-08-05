@@ -17,6 +17,7 @@ dependencies = [
     "pytest-asyncio",
     "ruff",
     "mypy",
+    "basedpyright",
     "pydantic",
     "google-generativeai",
     "google-genai>=2.3.0",
@@ -28,6 +29,23 @@ dependencies = [
     "sqlalchemy[asyncio]",
     "aiosqlite",
     "sqlite-vec",
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.16.0",
+    "mypy>=1.10.0",
+    "basedpyright>=1.0.0",
+    "interrogate>=1.5.0",
+    "pydocstyle>=6.3.0",
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-cov>=5.0.0",
+    "pytest-timeout>=2.2.0",
+    "pip-audit>=2.7.0",
+    "gitleaks>=8.19.0",
+    "cyclonedx-bom>=6.0.0",
+    "pre-commit>=3.7.0",
 ]
 
 [build-system]
@@ -89,6 +107,31 @@ warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
 ignore_missing_imports = true
+
+[tool.basedpyright]
+pythonVersion = "3.13"
+typeCheckingMode = "standard"
+reportMissingTypeStubs = false
+reportUnknownMemberType = false
+reportUnknownArgumentType = false
+reportUnknownVariableType = false
+
+[tool.interrogate]
+ignore-init-method = true
+ignore-init-module = true
+ignore-magic = true
+ignore-module = true
+ignore-nested-functions = true
+ignore-private = true
+ignore-property-decorator = true
+ignore-semiprivate = true
+fail-under = 80
+
+[tool.pydocstyle]
+convention = "google"
+add-ignore = ["D100", "D101", "D102", "D103", "D104", "D105", "D107"]
+match = "(?!test_).*\\.py"
+match-dir = "src"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

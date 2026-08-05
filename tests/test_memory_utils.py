@@ -1,10 +1,12 @@
+# SPDX-License-Identifier: MIT
+
 """Tests for memory_utils module."""
 
 import pytest
 
 from nexusagent.memory.memory_utils import (
-    parse_expiry,
     is_expired,
+    parse_expiry,
     parse_frontmatter,
     serialize_frontmatter,
     strip_frontmatter,
@@ -14,9 +16,15 @@ from nexusagent.memory.memory_utils import (
 def test_memory_utils_exports_all_public_functions():
     """memory_utils should define __all__ with all public functions."""
     import nexusagent.memory.memory_utils as mu
-    assert hasattr(mu, '__all__')
-    expected = {'parse_expiry', 'is_expired', 'parse_frontmatter', 
-                'serialize_frontmatter', 'strip_frontmatter'}
+
+    assert hasattr(mu, "__all__")
+    expected = {
+        "parse_expiry",
+        "is_expired",
+        "parse_frontmatter",
+        "serialize_frontmatter",
+        "strip_frontmatter",
+    }
     assert set(mu.__all__) == expected
 
 
@@ -59,6 +67,7 @@ def test_parse_expiry_missing():
 def test_is_expired_past():
     """is_expired should return True for past expires_at."""
     from datetime import UTC, datetime, timedelta
+
     past = datetime.now(UTC) - timedelta(hours=1)
     fm = {"expires_at": past.isoformat()}
     assert is_expired(fm) is True
@@ -67,6 +76,7 @@ def test_is_expired_past():
 def test_is_expired_future():
     """is_expired should return False for future expires_at."""
     from datetime import UTC, datetime, timedelta
+
     future = datetime.now(UTC) + timedelta(hours=1)
     fm = {"expires_at": future.isoformat()}
     assert is_expired(fm) is False

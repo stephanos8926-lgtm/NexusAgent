@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Integration tests verifying memory extraction runs and stores results after agent turns."""
 
 import shutil
@@ -25,6 +27,7 @@ async def test_session_extract_and_store_integration(temp_dir):
 
     async def _astream(input_data, stream_mode=None, **kwargs):
         from langchain_core.messages import AIMessageChunk
+
         yield AIMessageChunk(content="I decided to use PostgreSQL because of scalability.")
 
     agent.astream = _astream

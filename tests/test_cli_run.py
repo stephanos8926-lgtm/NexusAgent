@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 # tests/test_cli_run.py
 """Tests for the 'nexus run' CLI command."""
 

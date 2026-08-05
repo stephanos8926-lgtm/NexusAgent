@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Tests for NATSJSONEncoder and put_result size handling."""
 
 import json

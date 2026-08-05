@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Tests for memory self-management tools (Phase 1).
 
 Tests memory_delete, memory_update, memory_list, and memory_prune tools.
@@ -21,9 +23,15 @@ def tmp_workspace():
     shutil.rmtree(d)
 
 
-def _write_test_memory(workspace, name="test-entry", content="Test content",
-                       entry_type="world", description="Test desc",
-                       entities=None, confidence=None):
+def _write_test_memory(
+    workspace,
+    name="test-entry",
+    content="Test content",
+    entry_type="world",
+    description="Test desc",
+    entities=None,
+    confidence=None,
+):
     """Helper to write a test memory entry and return its relative path."""
     fm = FileMemory(workspace)
     fm.initialize()
@@ -215,8 +223,9 @@ def test_memory_list_limit(tmp_workspace):
     from nexusagent.tools.register_all import memory_list
 
     for i in range(5):
-        _write_test_memory(tmp_workspace, name=f"entry{i}", content=f"Entry {i}",
-                           description=f"Unique desc {i}")
+        _write_test_memory(
+            tmp_workspace, name=f"entry{i}", content=f"Entry {i}", description=f"Unique desc {i}"
+        )
 
     result = memory_list(limit=3, workspace=tmp_workspace)
     # Should show at most 3

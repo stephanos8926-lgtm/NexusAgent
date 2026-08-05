@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """NexusAgent TUI widgets package.
 
 Contains reusable UI components:

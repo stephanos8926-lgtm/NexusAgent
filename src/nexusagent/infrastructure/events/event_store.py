@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 # src/nexusagent/infrastructure/events/event_store.py
 """Append-only Event Store with query and replay capabilities."""
 

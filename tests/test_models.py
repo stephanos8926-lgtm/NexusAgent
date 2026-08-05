@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Tests for TaskContract and MemoryScope models."""
 
 from nexusagent.llm.models import MemoryScope, TaskContract

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Fallback chain orchestrator — tries providers in order until one succeeds.
 
 Supports:
@@ -7,6 +9,7 @@ Supports:
 - Circuit breaker per-provider
 - Logic gates for user-defined routing logic
 """
+
 from __future__ import annotations
 
 import logging
@@ -33,6 +36,7 @@ T_Response = TypeVar("T_Response")
 
 # ── Logic Gate Protocol ────────────────────────────────────────────────────────
 
+
 class LogicGate(Protocol):
     """A gate that can block or allow a provider from being tried.
 
@@ -44,9 +48,11 @@ class LogicGate(Protocol):
 
 # ── Fallback Context ───────────────────────────────────────────────────────────
 
+
 @dataclass
 class FallbackContext:
     """Mutable context passed through fallback chain execution."""
+
     attempt: int = 0
     last_error: UpstreamError | None = None
     cumulative_cost: float = 0.0
@@ -60,6 +66,7 @@ class FallbackContext:
 
 # ── Built-in Logic Gates ───────────────────────────────────────────────────────
 
+
 class BudgetGate:
     """Reject a provider if cumulative cost exceeds per-request limit."""
 
@@ -68,8 +75,11 @@ class BudgetGate:
 
     def evaluate(self, context: FallbackContext) -> bool:
         if context.cumulative_cost >= self._max:
-            logger.warning("BudgetGate: cumulative cost %.4f exceeds max %.4f",
-                           context.cumulative_cost, self._max)
+            logger.warning(
+                "BudgetGate: cumulative cost %.4f exceeds max %.4f",
+                context.cumulative_cost,
+                self._max,
+            )
             return False
         return True
 
@@ -81,8 +91,11 @@ class ErrorTypeGate:
     skip it and try OpenRouter instead."
     """
 
-    def __init__(self, allowed_codes: list[UpstreamErrorCode] | None = None,
-                 blocked_codes: list[UpstreamErrorCode] | None = None):
+    def __init__(
+        self,
+        allowed_codes: list[UpstreamErrorCode] | None = None,
+        blocked_codes: list[UpstreamErrorCode] | None = None,
+    ):
         self._allowed = set(allowed_codes) if allowed_codes else None
         self._blocked = set(blocked_codes) if blocked_codes else None
 
@@ -97,8 +110,7 @@ class ErrorTypeGate:
 class CircuitBreakerGate:
     """Open circuit after N consecutive failures within cooldown window."""
 
-    def __init__(self, name: str, failure_threshold: int = 3,
-                 cooldown_secs: float = 60.0):
+    def __init__(self, name: str, failure_threshold: int = 3, cooldown_secs: float = 60.0):
         self.name = name
         self._threshold = failure_threshold
         self._cooldown = cooldown_secs
@@ -110,8 +122,7 @@ class CircuitBreakerGate:
         self._failures = [t for t in self._failures if now - t < self._cooldown]
         if len(self._failures) >= self._threshold:
             remaining = self._cooldown - (now - self._failures[0])
-            logger.warning("CircuitBreaker[%s]: open for %.1f more seconds",
-                           self.name, remaining)
+            logger.warning("CircuitBreaker[%s]: open for %.1f more seconds", self.name, remaining)
             return False
         return True
 
@@ -124,6 +135,7 @@ class CircuitBreakerGate:
 
 # ── Fallback Chain ─────────────────────────────────────────────────────────────
 
+
 class FallbackExhaustedError(Exception):
     """Raised when all providers in the chain have been exhausted."""
 
@@ -131,6 +143,7 @@ class FallbackExhaustedError(Exception):
 @dataclass
 class ChainStats:
     """Statistics about a fallback chain execution."""
+
     total_attempts: int = 0
     successful_provider: str | None = None
     last_error: UpstreamError | None = None
@@ -211,8 +224,9 @@ class FallbackChain[T_Response]:
                 logger.warning("Provider type '%s' not registered, skipping", config.provider_type)
                 continue
 
-            logger.info("Chain: trying %s (attempt %d/%d)",
-                        config.name, ctx.attempt + 1, self._max_attempts)
+            logger.info(
+                "Chain: trying %s (attempt %d/%d)", config.name, ctx.attempt + 1, self._max_attempts
+            )
             ctx.attempt += 1
 
             try:
@@ -247,12 +261,10 @@ class FallbackChain[T_Response]:
                     raise
 
                 # Retry next provider
-                logger.warning("Chain: %s failed with %s, trying next",
-                               config.name, e.code.value)
+                logger.warning("Chain: %s failed with %s, trying next", config.name, e.code.value)
 
             except Exception as e:
-                logger.error("Chain: %s failed with unexpected error: %s",
-                             config.name, e)
+                logger.error("Chain: %s failed with unexpected error: %s", config.name, e)
                 ctx.last_error = UpstreamError(
                     code=UpstreamErrorCode.UNKNOWN,
                     message=str(e),
@@ -270,12 +282,9 @@ class FallbackChain[T_Response]:
         last_err = ctx.last_error
         if last_err:
             raise FallbackExhaustedError(
-                f"All providers exhausted after {ctx.attempt} attempts. "
-                f"Last error: {last_err}"
+                f"All providers exhausted after {ctx.attempt} attempts. Last error: {last_err}"
             )
-        raise FallbackExhaustedError(
-            f"All providers exhausted after {ctx.attempt} attempts"
-        )
+        raise FallbackExhaustedError(f"All providers exhausted after {ctx.attempt} attempts")
 
     def _resolve_provider(self, config: ProviderConfig, provider_type: str):
         """Resolve a provider from the registry."""

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Memory layer taxonomy and backend protocol for Phase 9 Memory Evolution.
 
 Four-layer architecture:

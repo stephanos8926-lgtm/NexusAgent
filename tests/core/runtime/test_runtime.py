@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Tests for the Runtime kernel."""
 
 from __future__ import annotations
@@ -27,9 +29,7 @@ class TestRuntime:
     @patch("nexusagent.infrastructure.db.get_db_manager")
     @patch("nexusagent.infrastructure.bus.get_bus")
     @patch("nexusagent.tools.register_all.register_all")
-    async def test_initialize_transitions(
-        self, mock_register, mock_get_bus, mock_get_db
-    ):
+    async def test_initialize_transitions(self, mock_register, mock_get_bus, mock_get_db):
         """initialize() transitions CREATED → INITIALIZING → RUNNING."""
         mock_db = MagicMock()
         mock_db.init_db = AsyncMock()
@@ -54,9 +54,7 @@ class TestRuntime:
     @patch("nexusagent.infrastructure.db.get_db_manager")
     @patch("nexusagent.infrastructure.bus.get_bus")
     @patch("nexusagent.tools.register_all.register_all")
-    async def test_shutdown_transitions(
-        self, mock_register, mock_get_bus, mock_get_db
-    ):
+    async def test_shutdown_transitions(self, mock_register, mock_get_bus, mock_get_db):
         """shutdown() transitions from RUNNING → TERMINATED."""
         mock_db = MagicMock()
         mock_db.init_db = AsyncMock()
@@ -78,9 +76,7 @@ class TestRuntime:
     @patch("nexusagent.infrastructure.db.get_db_manager")
     @patch("nexusagent.infrastructure.bus.get_bus")
     @patch("nexusagent.tools.register_all.register_all")
-    async def test_context_available_during_runtime(
-        self, mock_register, mock_get_bus, mock_get_db
-    ):
+    async def test_context_available_during_runtime(self, mock_register, mock_get_bus, mock_get_db):
         """RuntimeContext is accessible during runtime."""
         mock_db = MagicMock()
         mock_db.init_db = AsyncMock()
@@ -100,9 +96,7 @@ class TestRuntime:
     @patch("nexusagent.infrastructure.db.get_db_manager")
     @patch("nexusagent.infrastructure.bus.get_bus")
     @patch("nexusagent.tools.register_all.register_all")
-    async def test_health_during_runtime(
-        self, mock_register, mock_get_bus, mock_get_db
-    ):
+    async def test_health_during_runtime(self, mock_register, mock_get_bus, mock_get_db):
         """health() returns healthy=True when runtime is RUNNING."""
         mock_db = MagicMock()
         mock_db.init_db = AsyncMock()
@@ -122,9 +116,7 @@ class TestRuntime:
     @patch("nexusagent.infrastructure.db.get_db_manager")
     @patch("nexusagent.infrastructure.bus.get_bus")
     @patch("nexusagent.tools.register_all.register_all")
-    async def test_shutdown_error_isolation(
-        self, mock_register, mock_get_bus, mock_get_db
-    ):
+    async def test_shutdown_error_isolation(self, mock_register, mock_get_bus, mock_get_db):
         """Shutdown continues even if one step fails."""
         mock_db = MagicMock()
         mock_db.init_db = AsyncMock()
@@ -146,9 +138,7 @@ class TestRuntime:
     @patch("nexusagent.infrastructure.db.get_db_manager")
     @patch("nexusagent.infrastructure.bus.get_bus")
     @patch("nexusagent.tools.register_all.register_all")
-    async def test_current_context_var(
-        self, mock_register, mock_get_bus, mock_get_db
-    ):
+    async def test_current_context_var(self, mock_register, mock_get_bus, mock_get_db):
         """current_context() returns Runtime's context after initialize."""
         mock_db = MagicMock()
         mock_db.init_db = AsyncMock()

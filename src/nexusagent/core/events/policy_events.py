@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Policy enforcement events.
 
 Defines PolicyEvent for tracking policy-related actions:

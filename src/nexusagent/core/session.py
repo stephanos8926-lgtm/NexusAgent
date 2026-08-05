@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Session manager  compat shim.
 
 Re-exports from the session/ subpackage for backward compatibility.

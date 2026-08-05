@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """WorkerPool — manages a pool of isolated worker executions.
 
 Provides concurrency-limited spawning of sub-agent workers with turn counting,
@@ -10,6 +12,7 @@ import asyncio
 import logging
 import time
 import uuid
+from typing import TYPE_CHECKING, Any
 
 from nexusagent.core.events import WorkerEvent, emit_event_sync
 from nexusagent.core.subagent import SubAgentHandle
@@ -18,17 +21,20 @@ from nexusagent.core.task.task_store import get_task_store
 from nexusagent.core.worker.handler import _run_agent_task
 from nexusagent.llm.models import TaskSchema
 
+if TYPE_CHECKING:
+    from nexusagent.core.task import Task
+
 logger = logging.getLogger(__name__)
 
 
 class ExecutionError(Exception):
     """Structured execution error for WorkerPool."""
-    
+
     def __init__(self, message: str, error_type: str, original_exception: Exception | None = None):
         super().__init__(message)
         self.error_type = error_type  # "aborted", "escalated", "max_turns", "timeout", "cancelled"
         self.original_exception = original_exception
-    
+
     def __str__(self) -> str:
         if self.original_exception:
             return f"{self.error_type}: {self.args[0]} (caused by {type(self.original_exception).__name__}: {self.original_exception})"
@@ -46,9 +52,10 @@ class WorkerPool:
         """
         self.max_workers = max_workers
         self._active: dict[str, SubAgentHandle] = {}
-        self._tasks: set[asyncio.Task] = set()
+        self._tasks: set[asyncio.Task[Any]] = set()
         self._semaphore = asyncio.Semaphore(max_workers)
         from nexusagent.core.task.task_store import get_task_store
+
         self._task_store = get_task_store()
         self._worker_tasks: dict[str, Task] = {}
 
@@ -95,7 +102,9 @@ class WorkerPool:
 
         async with self._semaphore:
             metrics.set_gauge("runtime.active_workers", len(self._active))
-            trace_id = handle.contract.metadata.get("trace_id") if handle.contract.metadata else None
+            trace_id = (
+                handle.contract.metadata.get("trace_id") if handle.contract.metadata else None
+            )
 
             with trace_context(
                 trace_id=trace_id,
@@ -167,6 +176,7 @@ class WorkerPool:
                             return await self._execute_bounded(task_schema, handle, cp)
 
                         recovery_mgr = RecoveryManager(store)
+
                         async def on_failed_event(t_id, err_msg):
                             logger.error("POL Escalate: Task %s failed", t_id)
 
@@ -209,7 +219,9 @@ class WorkerPool:
                         handle._mark_failed(str(e))
                         metrics.increment("agent.tasks_failed", labels={"error_type": e.error_type})
                 except Exception as e:
-                    metrics.increment("agent.tasks_failed", labels={"error_type": e.__class__.__name__})
+                    metrics.increment(
+                        "agent.tasks_failed", labels={"error_type": e.__class__.__name__}
+                    )
                     # Mark as FAILED in durable store
                     try:
                         durable_task = await store.load_task(task_schema.id)
@@ -226,7 +238,11 @@ class WorkerPool:
                     handle._mark_failed(str(e))
                 finally:
                     elapsed = time.time() - start_time
-                    metrics.record_histogram("runtime.task_duration_seconds", elapsed, labels={"task_id": handle.contract.task_id})
+                    metrics.record_histogram(
+                        "runtime.task_duration_seconds",
+                        elapsed,
+                        labels={"task_id": handle.contract.task_id},
+                    )
                     self._active.pop(handle.worker_id, None)
                     metrics.set_gauge("runtime.active_workers", len(self._active))
 
@@ -246,7 +262,11 @@ class WorkerPool:
         if checkpoint is None:
             checkpoint = await store.load_latest_checkpoint(contract.task_id)
         if checkpoint:
-            logger.info("Resuming task %s from checkpoint at node: %s", contract.task_id, checkpoint.current_node)
+            logger.info(
+                "Resuming task %s from checkpoint at node: %s",
+                contract.task_id,
+                checkpoint.current_node,
+            )
             # Restore state from checkpoint
             turn = len(checkpoint.completed_actions)
             last_result = checkpoint.tool_results[-1] if checkpoint.tool_results else None
@@ -261,10 +281,12 @@ class WorkerPool:
                 # Save checkpoint BEFORE tool call (or turn execution here)
                 cp = Checkpoint(
                     current_node=checkpoint.current_node if checkpoint else f"node-{turn}",
-                    completed_actions=(checkpoint.completed_actions if checkpoint else []) + [f"action-{turn}"],
+                    completed_actions=(checkpoint.completed_actions if checkpoint else [])
+                    + [f"action-{turn}"],
                     files_changed=checkpoint.files_changed if checkpoint else [],
-                    tool_results=(checkpoint.tool_results if checkpoint else []) + [{"turn": turn, "output": last_result}],
-                    next_action=f"action-{turn+1}",
+                    tool_results=(checkpoint.tool_results if checkpoint else [])
+                    + [{"turn": turn, "output": last_result}],
+                    next_action=f"action-{turn + 1}",
                 )
                 await store.save_checkpoint(task.id, cp)
                 checkpoint = cp

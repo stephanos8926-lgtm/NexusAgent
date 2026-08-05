@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Policy-aware tool search with fuzzy matching and use-case discovery."""
 
 from __future__ import annotations

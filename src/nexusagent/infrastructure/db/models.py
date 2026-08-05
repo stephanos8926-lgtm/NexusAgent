@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """ORM model definitions for NexusAgent.
 
 All models inherit from ``Base`` (imported from .base).

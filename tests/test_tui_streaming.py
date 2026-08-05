@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Tests for the conversational TUI."""
 
 from __future__ import annotations

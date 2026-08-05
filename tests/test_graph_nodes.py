@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Unit tests for the LangGraph research workflow node functions.
 
 Covers: plan_node, refine_node, execute_node, synthesize_node
@@ -27,6 +29,7 @@ from nexusagent.core.orchestration import (
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 class MockResponse:
     """Mimics LLMResponse with a .content attribute."""
@@ -60,6 +63,7 @@ def _make_search_results(count: int = 2) -> list[SearchResult]:
 # 1 & 2. plan_node
 # ---------------------------------------------------------------------------
 
+
 class TestPlanNode:
     @pytest.mark.asyncio
     @patch.object(DeepResearchOrchestrator, "_generate_plan", new_callable=AsyncMock)
@@ -92,6 +96,7 @@ class TestPlanNode:
 # ---------------------------------------------------------------------------
 # 3, 4, 5. refine_node
 # ---------------------------------------------------------------------------
+
 
 class TestRefineNode:
     @pytest.mark.asyncio
@@ -140,6 +145,7 @@ class TestRefineNode:
 # ---------------------------------------------------------------------------
 # 6, 7, 8. execute_node
 # ---------------------------------------------------------------------------
+
 
 class TestExecuteNode:
     @pytest.mark.asyncio
@@ -201,6 +207,7 @@ class TestExecuteNode:
 # ---------------------------------------------------------------------------
 # 9, 10. synthesize_node
 # ---------------------------------------------------------------------------
+
 
 class TestSynthesizeNode:
     @pytest.mark.asyncio

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Circuit breaker pattern for protecting against cascading failures.
 
 Provides a stateful circuit breaker with three states:
@@ -221,7 +223,9 @@ class CircuitBreaker:
                             guard = get_budget_guard()
                             asyncio.create_task(guard.record_quota_exhausted())
                         except Exception as e:
-                            logger.warning(f"Failed to notify budget guard of quota exhaustion: {e}")
+                            logger.warning(
+                                f"Failed to notify budget guard of quota exhaustion: {e}"
+                            )
 
                 return False
 

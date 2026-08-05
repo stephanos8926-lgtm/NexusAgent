@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Pydantic configuration schema for NexusAgent.
 
 Provides ``ConfigSchema`` and its sub-models (``ServerConfig``, ``ClientConfig``,
@@ -299,9 +301,7 @@ class RWIEEmbeddingConfig(BaseModel):
         default="http://100.122.246.112:8300",
         description="RW_InferenceEngine base URL (infra VM:8300)",
     )
-    timeout_secs: int = Field(
-        default=30, ge=1, description="Request timeout in seconds"
-    )
+    timeout_secs: int = Field(default=30, ge=1, description="Request timeout in seconds")
     batch_size: int = Field(
         default=32, ge=1, le=128, description="Batch size for embedding requests"
     )
@@ -467,7 +467,9 @@ def load_config(config_file: str | None = None) -> ConfigSchema:
         else:
             logger.warning("Explicit config file not found at %s", explicit_path)
 
-    def override_from_env(prefix: str, data: dict, current_level: dict, exclude: set[str] | None = None):
+    def override_from_env(
+        prefix: str, data: dict, current_level: dict, exclude: set[str] | None = None
+    ):
         exclude = exclude or set()
         for key, value in os.environ.items():
             if key.startswith(prefix) and key not in exclude:

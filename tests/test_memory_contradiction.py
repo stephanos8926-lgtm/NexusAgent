@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 # tests/test_memory_contradiction.py
 """Tests for contradiction detection in the memory system."""
 
@@ -19,6 +21,7 @@ def temp_workspace():
 def _write_memory(workspace, name, content, entities=None, confidence=0.5):
     """Write a memory file with frontmatter."""
     import yaml
+
     bank_dir = Path(workspace) / "bank"
     bank_dir.mkdir(parents=True, exist_ok=True)
     frontmatter = {
@@ -40,7 +43,9 @@ class TestContradictionDetection:
         """Single memory should never have contradictions."""
         from nexusagent.memory.refinement import LLMRefinement
 
-        _write_memory(temp_workspace, "obs-001", "User prefers pytest", entities=["testing"], confidence=0.8)
+        _write_memory(
+            temp_workspace, "obs-001", "User prefers pytest", entities=["testing"], confidence=0.8
+        )
 
         refinement = LLMRefinement(llm_call=None)
         memories = [{"content": "User prefers pytest", "entities": ["testing"], "confidence": 0.8}]
@@ -52,8 +57,12 @@ class TestContradictionDetection:
         """Heuristic should flag memories with large confidence gaps for same entity."""
         from nexusagent.memory.refinement import LLMRefinement
 
-        _write_memory(temp_workspace, "obs-001", "User prefers pytest", entities=["testing"], confidence=0.9)
-        _write_memory(temp_workspace, "obs-002", "User prefers unittest", entities=["testing"], confidence=0.3)
+        _write_memory(
+            temp_workspace, "obs-001", "User prefers pytest", entities=["testing"], confidence=0.9
+        )
+        _write_memory(
+            temp_workspace, "obs-002", "User prefers unittest", entities=["testing"], confidence=0.3
+        )
 
         refinement = LLMRefinement(llm_call=None)
         memories = [
@@ -69,8 +78,16 @@ class TestContradictionDetection:
         """Memories about different entities should not conflict."""
         from nexusagent.memory.refinement import LLMRefinement
 
-        _write_memory(temp_workspace, "obs-001", "User prefers pytest", entities=["testing"], confidence=0.8)
-        _write_memory(temp_workspace, "obs-002", "User prefers PostgreSQL", entities=["database"], confidence=0.8)
+        _write_memory(
+            temp_workspace, "obs-001", "User prefers pytest", entities=["testing"], confidence=0.8
+        )
+        _write_memory(
+            temp_workspace,
+            "obs-002",
+            "User prefers PostgreSQL",
+            entities=["database"],
+            confidence=0.8,
+        )
 
         refinement = LLMRefinement(llm_call=None)
         memories = [
@@ -85,8 +102,12 @@ class TestContradictionDetection:
         """Memories with similar confidence should not be flagged by heuristic."""
         from nexusagent.memory.refinement import LLMRefinement
 
-        _write_memory(temp_workspace, "obs-001", "User prefers pytest", entities=["testing"], confidence=0.7)
-        _write_memory(temp_workspace, "obs-002", "User prefers unittest", entities=["testing"], confidence=0.6)
+        _write_memory(
+            temp_workspace, "obs-001", "User prefers pytest", entities=["testing"], confidence=0.7
+        )
+        _write_memory(
+            temp_workspace, "obs-002", "User prefers unittest", entities=["testing"], confidence=0.6
+        )
 
         refinement = LLMRefinement(llm_call=None)
         memories = [
@@ -103,8 +124,12 @@ class TestContradictionDetection:
         """LLM should detect obvious contradictions."""
         from nexusagent.memory.refinement import LLMRefinement
 
-        _write_memory(temp_workspace, "obs-001", "User prefers pytest", entities=["testing"], confidence=0.9)
-        _write_memory(temp_workspace, "obs-002", "User prefers unittest", entities=["testing"], confidence=0.3)
+        _write_memory(
+            temp_workspace, "obs-001", "User prefers pytest", entities=["testing"], confidence=0.9
+        )
+        _write_memory(
+            temp_workspace, "obs-002", "User prefers unittest", entities=["testing"], confidence=0.3
+        )
 
         # Mock LLM that detects contradiction
         async def mock_llm_call(system, user, **kwargs):
@@ -125,8 +150,16 @@ class TestContradictionDetection:
         """LLM should return no contradiction for compatible memories."""
         from nexusagent.memory.refinement import LLMRefinement
 
-        _write_memory(temp_workspace, "obs-001", "User prefers pytest", entities=["testing"], confidence=0.8)
-        _write_memory(temp_workspace, "obs-002", "User uses type hints", entities=["coding-style"], confidence=0.8)
+        _write_memory(
+            temp_workspace, "obs-001", "User prefers pytest", entities=["testing"], confidence=0.8
+        )
+        _write_memory(
+            temp_workspace,
+            "obs-002",
+            "User uses type hints",
+            entities=["coding-style"],
+            confidence=0.8,
+        )
 
         # Mock LLM that finds no contradiction
         async def mock_llm_call(system, user, **kwargs):
@@ -150,9 +183,19 @@ class TestDreamCycleContradiction:
         """Dream cycle should resolve contradictions during consolidation."""
         from nexusagent.memory.dream import DreamCycle
 
-        _write_memory(temp_workspace, "obs-001", "User prefers pytest", entities=["testing"], confidence=0.9)
-        _write_memory(temp_workspace, "obs-002", "User prefers unittest", entities=["testing"], confidence=0.3)
-        _write_memory(temp_workspace, "obs-003", "User uses type hints", entities=["coding-style"], confidence=0.8)
+        _write_memory(
+            temp_workspace, "obs-001", "User prefers pytest", entities=["testing"], confidence=0.9
+        )
+        _write_memory(
+            temp_workspace, "obs-002", "User prefers unittest", entities=["testing"], confidence=0.3
+        )
+        _write_memory(
+            temp_workspace,
+            "obs-003",
+            "User uses type hints",
+            entities=["coding-style"],
+            confidence=0.8,
+        )
 
         cycle = DreamCycle(temp_workspace, llm_refinement=True)
         report = await cycle.run(dry_run=False)
@@ -166,8 +209,12 @@ class TestDreamCycleContradiction:
         """Dry run should not actually remove contradicted memories."""
         from nexusagent.memory.dream import DreamCycle
 
-        _write_memory(temp_workspace, "obs-001", "User prefers pytest", entities=["testing"], confidence=0.9)
-        _write_memory(temp_workspace, "obs-002", "User prefers unittest", entities=["testing"], confidence=0.3)
+        _write_memory(
+            temp_workspace, "obs-001", "User prefers pytest", entities=["testing"], confidence=0.9
+        )
+        _write_memory(
+            temp_workspace, "obs-002", "User prefers unittest", entities=["testing"], confidence=0.3
+        )
 
         cycle = DreamCycle(temp_workspace, llm_refinement=False)
         report = await cycle.run(dry_run=True)

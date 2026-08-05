@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Tool registration — registers all tools in the global registry.
 
 Registration has two paths:
@@ -282,7 +284,10 @@ def _validate_tool_name(tool_name: str) -> tuple[bool, str]:
         # Check if this capability is allowed in the current context
         allowed, reason = router.check_access(tool_name)
         if not allowed:
-            return False, f"tool name '{tool_name}' requires capability '{cap}' which is denied: {reason}"
+            return (
+                False,
+                f"tool name '{tool_name}' requires capability '{cap}' which is denied: {reason}",
+            )
 
     return True, ""
 

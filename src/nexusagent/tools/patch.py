@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """File patching tool for NexusAgent.
 
 Applies unified diff patches to files using the patch-ng library.

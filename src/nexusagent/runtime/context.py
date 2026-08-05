@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Dependency injection container for the NexusAgent runtime.
 
 RuntimeContext is the explicit container through which all shared dependencies
@@ -18,8 +20,8 @@ if TYPE_CHECKING:
 
 # ContextVar-based accessor — fallback for during the transition period.
 # Components should receive RuntimeContext explicitly whenever possible.
-_runtime_context_var: contextvars.ContextVar[RuntimeContext | None] = (
-    contextvars.ContextVar("runtime_context", default=None)
+_runtime_context_var: contextvars.ContextVar[RuntimeContext | None] = contextvars.ContextVar(
+    "runtime_context", default=None
 )
 
 

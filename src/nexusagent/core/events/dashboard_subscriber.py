@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 # src/nexusagent/core/events/dashboard_subscriber.py
 """Dashboard Subscriber for real-time visualization streams."""
 

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 # tests/test_hooks.py
 """Tests for the NexusAgent hooks system."""
 
@@ -93,6 +95,7 @@ class TestHookManager:
     def test_register_hook(self, manager):
         def callback(ctx):
             return None
+
         manager.register_hook(HookEvent.SESSION_INIT, callback, name="init")
         assert len(manager.get_hooks(HookEvent.SESSION_INIT)) == 1
 

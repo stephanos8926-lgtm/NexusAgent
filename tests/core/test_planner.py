@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 # tests/core/test_planner.py
 """Unit and integration tests for the Phase 5 Planner system."""
 

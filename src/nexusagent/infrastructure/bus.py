@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """NATS JetStream message bus for task distribution and result storage.
 
 Provides ``AgentBus`` (a NATS client wrapper with JetStream KV, automatic

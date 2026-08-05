@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """API key authentication and authorization middleware for NexusAgent."""
 
 import hmac
@@ -129,9 +131,7 @@ def create_short_lived_token(api_key: str, ttl_seconds: int = _SHORT_TOKEN_TTL_S
     only recoverable server-side (Fernet uses the master secret), so a leaked
     token cannot be used to authenticate after it expires.
     """
-    payload = json.dumps(
-        {"key": api_key, "exp": int(time.time()) + ttl_seconds}
-    ).encode()
+    payload = json.dumps({"key": api_key, "exp": int(time.time()) + ttl_seconds}).encode()
     return _get_fernet().encrypt(payload).decode()
 
 

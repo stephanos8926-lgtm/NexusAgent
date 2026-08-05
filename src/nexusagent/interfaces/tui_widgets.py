@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """TUI widgets, modals, and responsive layout utilities.
 
 Extracted from interfaces/tui.py to reduce the 1433L monolith.
@@ -315,13 +317,10 @@ class ErrorModal(ModalScreen[None]):
             with Horizontal(id="error-buttons"):
                 yield Button("OK", id="ok", variant="primary")
 
-
     def __init__(self, error_message: str) -> None:
         """Initialize the error modal with the message to display."""
         super().__init__()
         self.error_message = error_message
-
-
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         """Dismiss the error dialog when OK is pressed."""
@@ -330,6 +329,7 @@ class ErrorModal(ModalScreen[None]):
 # ═══════════════════════════════════════════════════════════════════════════
 # ThreadsModal — interactive session switcher
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 class ThreadsModal(ModalScreen[str | None]):
     """Modal dialog for browsing and switching between previous sessions."""
@@ -405,6 +405,7 @@ class ThreadsModal(ModalScreen[str | None]):
 # ═══════════════════════════════════════════════════════════════════════════
 # ModelModal — interactive model switcher
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 class ModelModal(ModalScreen[tuple[str, str] | None]):
     """Modal dialog for switching active LLM models mid-session."""

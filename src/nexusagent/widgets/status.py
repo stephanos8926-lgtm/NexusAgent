@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Status bar widget for NexusAgent TUI.
 
 Single-line status bar docked at bottom of screen.
@@ -236,6 +238,7 @@ class StatusBar(Horizontal):
                 ctx_widget = self.query_one("#status-context", Static)
                 if self._context_limit > 0:
                     from nexusagent.widgets.theme import get_theme_colors
+
                     theme_name = getattr(self.app, "theme", "nexus-dark")
                     theme_colors = get_theme_colors(theme_name)
                     bar = ContextWindowBar(

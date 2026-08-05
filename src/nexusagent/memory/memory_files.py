@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """File-based memory layer — canonical source of truth.
 
 Memory layout:
@@ -191,7 +193,9 @@ class FileMemory:
             if len(existing_parts) >= 3:
                 # Update frontmatter with recalculated quality_score
                 existing_frontmatter = yaml.safe_load(existing_parts[1]) or {}
-                existing_frontmatter["quality_score"] = self._compute_quality_score(content, confidence)
+                existing_frontmatter["quality_score"] = self._compute_quality_score(
+                    content, confidence
+                )
                 existing_body = existing_parts[2]
                 # Append new content to body
                 updated_body = existing_body + f"\n---\n\n{content}\n"
@@ -232,7 +236,9 @@ class FileMemory:
         score = 0.6 * length_score + 0.4 * confidence_score
         return round(score, 2)
 
-    def _add_index_entry(self, description: str, filename: str, entry_type: MemoryEntryType) -> None:
+    def _add_index_entry(
+        self, description: str, filename: str, entry_type: MemoryEntryType
+    ) -> None:
         """Add a one-line pointer to MEMORY.md."""
         line = f"- [{entry_type.value[0].upper()}] {description} → bank/{filename}\n"
 
@@ -287,9 +293,7 @@ class FileMemory:
                 "type": "entity",
                 "created": datetime.now(UTC).isoformat(),
             }
-            entity_file.write_text(
-                serialize_frontmatter(frontmatter, f"# {entity}\n\n{entry}")
-            )
+            entity_file.write_text(serialize_frontmatter(frontmatter, f"# {entity}\n\n{entry}"))
 
     def append_daily_log(self, content: str) -> None:
         """Append to today's daily log."""
@@ -401,10 +405,35 @@ class FileMemory:
             return []
 
         content_words = set(content.lower().split()) - {
-            "the", "a", "an", "is", "are", "was", "were",
-            "in", "on", "at", "to", "for", "of", "and", "or", "but",
-            "with", "by", "from", "as", "it", "this", "that",
-            "i", "we", "you", "he", "she", "they",
+            "the",
+            "a",
+            "an",
+            "is",
+            "are",
+            "was",
+            "were",
+            "in",
+            "on",
+            "at",
+            "to",
+            "for",
+            "of",
+            "and",
+            "or",
+            "but",
+            "with",
+            "by",
+            "from",
+            "as",
+            "it",
+            "this",
+            "that",
+            "i",
+            "we",
+            "you",
+            "he",
+            "she",
+            "they",
         }
 
         scores: list[tuple[float, str]] = []
@@ -422,9 +451,29 @@ class FileMemory:
                 body = strip_frontmatter(file_content)
                 if body:
                     file_words = set(body.lower().split()) - {
-                        "the", "a", "an", "is", "are", "was", "were",
-                        "in", "on", "at", "to", "for", "of", "and", "or", "but",
-                        "with", "by", "from", "as", "it", "this", "that",
+                        "the",
+                        "a",
+                        "an",
+                        "is",
+                        "are",
+                        "was",
+                        "were",
+                        "in",
+                        "on",
+                        "at",
+                        "to",
+                        "for",
+                        "of",
+                        "and",
+                        "or",
+                        "but",
+                        "with",
+                        "by",
+                        "from",
+                        "as",
+                        "it",
+                        "this",
+                        "that",
                     }
                     overlap = len(content_words & file_words)
                     score += overlap * 0.5
@@ -461,7 +510,9 @@ class FileMemory:
         except Exception:
             return False
 
-    def delete_by_file(self, relative_path: str, *, principal: str | None = None, action: str = "memory.delete") -> bool:
+    def delete_by_file(
+        self, relative_path: str, *, principal: str | None = None, action: str = "memory.delete"
+    ) -> bool:
         """Delete a memory file and auto-commit."""
         authorizer = getattr(self, "_authz", None)
         if authorizer is not None:

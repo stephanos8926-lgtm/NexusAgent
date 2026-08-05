@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Tests for Phase 2: workspace-scoped memory."""
 
 import shutil
@@ -209,8 +211,14 @@ def test_memory_write_with_workspace_param(tmp_workspace):
 
     from nexusagent.tools.register_all import memory_write
 
-    result = asyncio.run(memory_write("workspace-scoped memory test", type="world",
-                          description="workspace test", workspace=tmp_workspace))
+    result = asyncio.run(
+        memory_write(
+            "workspace-scoped memory test",
+            type="world",
+            description="workspace test",
+            workspace=tmp_workspace,
+        )
+    )
     assert "Memory written to" in result
     assert tmp_workspace in result
 
@@ -225,7 +233,8 @@ def test_memory_write_without_workspace_uses_default():
 
     from nexusagent.tools.register_all import memory_write
 
-    result = asyncio.run(memory_write("global memory test", type="world",
-                          description="global test"))
+    result = asyncio.run(
+        memory_write("global memory test", type="world", description="global test")
+    )
     assert isinstance(result, str)
     assert "Memory written to" in result

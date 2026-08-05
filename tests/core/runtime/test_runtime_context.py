@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Tests for the RuntimeContext DI container."""
 
 from __future__ import annotations

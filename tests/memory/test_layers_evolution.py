@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Unit tests verifying Phase 8 Memory Evolution requirements.
 
 Specifically verifies:

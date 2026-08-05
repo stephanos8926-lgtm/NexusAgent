@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Compat shim  imports from memory/index/ subpackage.
 
 All existing ``from nexusagent.memory.memory_index import ...`` usage

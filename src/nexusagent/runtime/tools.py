@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """ToolManager — wraps tool registration with lifecycle awareness.
 
 Provides explicit lifecycle for tool registration, wrapping the existing

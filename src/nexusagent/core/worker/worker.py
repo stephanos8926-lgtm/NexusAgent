@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """NexusWorker — NATS-backed task execution worker.
 
 Subscribes to task queues, executes agent tasks with circuit-breaker protection,
@@ -10,8 +12,9 @@ import asyncio
 import json
 import logging
 import time
+from collections.abc import Callable
 from datetime import UTC, datetime
-from typing import Any, Callable
+from typing import Any
 
 from sqlalchemy import select
 
@@ -60,7 +63,7 @@ class NexusWorker:
         """
         self.bus = bus or get_bus()
         self._budget_guard = create_budget_guard_from_config(settings)
-        self._health_task: asyncio.Task | None = None
+        self._health_task: asyncio.Task[None] | None = None
         self._healthy: bool = True
         self._degraded: bool = False
         self._running: bool = False
@@ -177,10 +180,14 @@ class NexusWorker:
                             consecutive_reconnect_failures = 0  # Reset on success
                         except Exception as exc:
                             consecutive_reconnect_failures += 1
-                            if consecutive_reconnect_failures >= max_reconnect_failures_before_error:
+                            if (
+                                consecutive_reconnect_failures
+                                >= max_reconnect_failures_before_error
+                            ):
                                 logger.error(
                                     "NATS reconnect failed after %d consecutive attempts: %s",
-                                    consecutive_reconnect_failures, exc
+                                    consecutive_reconnect_failures,
+                                    exc,
                                 )
                             else:
                                 logger.warning("NATS reconnect failed: %s", exc)
@@ -220,15 +227,15 @@ class NexusWorker:
         except Exception as e:
             logger.error("Failed to persist result for task %s: %s", task_id, e)
 
-    @retry_with_backoff(max_attempts=2, base_delay=0.5, max_delay=5.0)
-    async def _execute_agent_logic(self, task: TaskSchema) -> Any:
+    @retry_with_backoff(max_attempts=2, base_delay=0.5, max_delay=5.0)  # type: ignore[untyped-decorator]
+    async def _execute_agent_logic(self, task: TaskSchema) -> str:
         """Wraps the agent call with circuit breaker protection.
         Routes research tasks to the LangGraph workflow,
         coding tasks to the deepagents Agent.
         """
-        return await _run_agent_task(task)
+        return str(await _run_agent_task(task))
 
-    async def _heartbeat(self, task_id: str, stop_event: asyncio.Event):
+    async def _heartbeat(self, task_id: str, stop_event: asyncio.Event) -> None:
         """Periodically bump task updated_at so the reaper doesn't eat it."""
         while not stop_event.is_set():
             try:
@@ -255,7 +262,8 @@ class NexusWorker:
                 return
 
             if getattr(self, "_cancel_authorizer", None) is not None:
-                allowed = self._cancel_authorizer(cancel_id)
+                # _cancel_authorizer is Callable at this point, verified by getattr
+                allowed = self._cancel_authorizer(cancel_id)  # type: ignore[misc]
                 if not allowed:
                     logger.warning("Worker rejected unauthorized cancel for task %s", cancel_id)
                     return

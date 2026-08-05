@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Tool execution events.
 
 Defines ToolEvent and its subtypes for tool execution tracking:

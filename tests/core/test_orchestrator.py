@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 # tests/core/test_orchestrator.py
 """Unit and integration tests for the Phase 5 Orchestrator system."""
 

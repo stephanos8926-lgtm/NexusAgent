@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Integration tests: Runtime + existing NexusAgent system integration.
 
 Validates that the Runtime kernel integrates correctly with:
@@ -673,9 +675,7 @@ class TestRuntimeFullLifecycleIntegration:
         mock_session.send = AsyncMock()
 
         # Wire up session manager
-        with patch(
-            "nexusagent.core.session.manager.get_session_manager"
-        ) as mock_get_sm:
+        with patch("nexusagent.core.session.manager.get_session_manager") as mock_get_sm:
             mock_sm = MagicMock()
             mock_sm.get_or_create = AsyncMock(return_value=mock_session)
             mock_get_sm.return_value = mock_sm

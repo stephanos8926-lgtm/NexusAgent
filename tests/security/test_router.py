@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Unit and integration tests for CapabilityRouter."""
 
 from __future__ import annotations

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Utility functions for NexusAgent framework.
 
 This module is a compatibility shim. The actual implementations live in:

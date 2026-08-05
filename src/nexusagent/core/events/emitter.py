@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Event emitter for publishing system events to NATS.
 
 Provides a centralized way to emit events to NATS subjects with automatic

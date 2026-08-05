@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 # src/nexusagent/core/observability/failures.py
 """Failure classification logic for resilient execution and automated recovery."""
 

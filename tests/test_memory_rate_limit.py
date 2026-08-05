@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Tests for memory tool rate limiting."""
 
 import os

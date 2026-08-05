@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Tests for the hybrid memory search index."""
 
 import shutil

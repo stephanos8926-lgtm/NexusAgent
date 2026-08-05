@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Runtime kernel — lifecycle, coordination, and DI container ownership.
 
 The Runtime is the root of the component hierarchy. It owns initialization
@@ -132,9 +134,7 @@ class Runtime(LifecycleMixin):
         # Step 5: Clear context
         set_current_context(None)
         self._state = LifecycleState.TERMINATED
-        logger.info(
-            "Runtime shut down (was %s).", previous_state.value
-        )
+        logger.info("Runtime shut down (was %s).", previous_state.value)
 
     def health(self) -> HealthStatus:
         """Return a health snapshot of the Runtime and its subsystems."""
@@ -153,10 +153,7 @@ class Runtime(LifecycleMixin):
             "worker_started": self._worker_started,
         }
 
-        degraded = (
-            not self._nats_connected
-            or not self._db_initialized
-        )
+        degraded = not self._nats_connected or not self._db_initialized
 
         return HealthStatus(
             healthy=self._state == LifecycleState.RUNNING and not degraded,

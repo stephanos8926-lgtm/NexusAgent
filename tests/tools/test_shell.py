@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 from nexusagent.tools.shell import run_shell
 
 

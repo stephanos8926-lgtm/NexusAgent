@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Core agent runtime."""
 
 from nexusagent.core.session import Session, SessionManager

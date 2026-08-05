@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Concrete memory layer backends for Phase 9.
 
 Each backend stores memories in its own subdirectory under
@@ -47,7 +49,10 @@ class FileBackedLayer:
         if self._index_path.exists():
             try:
                 import typing
-                return typing.cast(dict[str, dict[str, Any]], json.loads(self._index_path.read_text()))
+
+                return typing.cast(
+                    dict[str, dict[str, Any]], json.loads(self._index_path.read_text())
+                )
             except (json.JSONDecodeError, OSError):
                 return {}
         return {}
@@ -155,6 +160,7 @@ class FileBackedLayer:
         try:
             item_data = payload.get("item", {})
             from nexusagent.memory.memory_item import MemoryItem  # local import avoids cycles
+
             item = MemoryItem(**item_data)
             provenance = MemoryProvenance.from_dict(payload.get("provenance", {}))
             return LayerMemoryItem(

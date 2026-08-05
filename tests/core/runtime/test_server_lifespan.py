@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Tests for the server lifespan adapter."""
 
 from __future__ import annotations

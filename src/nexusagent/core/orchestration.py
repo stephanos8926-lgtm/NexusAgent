@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 # src/nexusagent/orchestration.py
 """Deep Research Orchestrator — multi-phase research workflow.
 

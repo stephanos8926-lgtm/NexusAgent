@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Event handling and slash commands for the TUI.
 
 Handles:

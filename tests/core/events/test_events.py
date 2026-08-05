@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Tests for the event system - SystemEvent base and typed subclasses."""
 
 from __future__ import annotations
@@ -184,6 +186,7 @@ class TestEventEmitter:
         """Test async event emission."""
         emitter = EventEmitter()
         from nexusagent.core.events import EventType, TaskEvent
+
         event = TaskEvent(
             source="test",
             type="created",
@@ -195,12 +198,15 @@ class TestEventEmitter:
             await emitter.emit(event)
         except Exception as e:
             # NATS not connected is expected in tests
-            assert "nats" in str(e).lower() or "bus" in str(e).lower() or "connect" in str(e).lower()
+            assert (
+                "nats" in str(e).lower() or "bus" in str(e).lower() or "connect" in str(e).lower()
+            )
 
     def test_emit_event_sync(self):
         """Test synchronous event emission."""
         emitter = EventEmitter()
         from nexusagent.core.events import EventType, TaskEvent
+
         event = TaskEvent(
             source="test",
             type="created",
@@ -226,6 +232,7 @@ class TestEventIntegration:
             captured.append(event)
 
         import nexusagent.core.events as events_module
+
         events_module.get_emitter().emit_sync = capture_emit
 
         try:

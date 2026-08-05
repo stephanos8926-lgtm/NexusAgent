@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Registered concrete provider implementations.
 
 All providers register themselves into the global ProviderRegistry.
@@ -7,6 +9,7 @@ Providers are organized:
 - Embeddings: Gemini, RW_IE, Local, Hash, OpenAI-compatible
 - LLM: OpenAI-compatible, Gemini, OpenRouter (in llm_implementations.py)
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -31,6 +34,7 @@ logger = logging.getLogger(__name__)
 # Embedding Providers
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 class GeminiEmbeddingProvider(EmbeddingProvider):
     """Gemini embedding API (gemini-embedding-001, 3072-dim)."""
 
@@ -42,9 +46,11 @@ class GeminiEmbeddingProvider(EmbeddingProvider):
     @property
     def metadata(self) -> ProviderMetadata:
         return ProviderMetadata(
-            name="gemini", display_name="Google Gemini",
+            name="gemini",
+            display_name="Google Gemini",
             description="Gemini embedding API (gemini-embedding-001, 3072-dim)",
-            provider_type="embedding", env_vars=("GEMINI_API_KEY",),
+            provider_type="embedding",
+            env_vars=("GEMINI_API_KEY",),
             base_url="https://generativelanguage.googleapis.com",
             default_model="gemini-embedding-001",
         )
@@ -60,7 +66,11 @@ class GeminiEmbeddingProvider(EmbeddingProvider):
         key = os.environ.get("GEMINI_API_KEY")
         if key:
             return key
-        key = getattr(__import__("nexusagent.infrastructure.config", fromlist=["settings"]).settings, "gemini_api_key", None)
+        key = getattr(
+            __import__("nexusagent.infrastructure.config", fromlist=["settings"]).settings,
+            "gemini_api_key",
+            None,
+        )
         if key:
             return key
         for env_path in [Path.home() / ".nexusagent" / ".env"]:
@@ -69,20 +79,26 @@ class GeminiEmbeddingProvider(EmbeddingProvider):
                     line = line.strip()
                     if line.startswith("GEMINI_API_KEY="):
                         return line.split("=", 1)[1].strip().strip('"').strip("'")
-        raise UpstreamError(code=UpstreamErrorCode.INVALID_API_KEY,
-                            message="No Gemini API key configured",
-                            provider="gemini", model="gemini-embedding-001")
+        raise UpstreamError(
+            code=UpstreamErrorCode.INVALID_API_KEY,
+            message="No Gemini API key configured",
+            provider="gemini",
+            model="gemini-embedding-001",
+        )
 
     async def embed(self, text: str) -> ProviderResult[list[float]]:
         try:
             import google.generativeai as genai
+
             genai.configure(api_key=self._api_key)
             result = genai.embed_content(
                 model="models/gemini-embedding-001",
-                content=text, task_type="RETRIEVAL_QUERY",
+                content=text,
+                task_type="RETRIEVAL_QUERY",
             )
-            return ProviderResult(provider="gemini", model="gemini-embedding-001",
-                                  response=result["embedding"])
+            return ProviderResult(
+                provider="gemini", model="gemini-embedding-001", response=result["embedding"]
+            )
         except Exception as e:
             err_str = str(e).lower()
             if "429" in err_str or "quota" in err_str or "resource_exhausted" in err_str:
@@ -92,9 +108,16 @@ class GeminiEmbeddingProvider(EmbeddingProvider):
             else:
                 code = UpstreamErrorCode.UNKNOWN
             return ProviderResult(
-                provider="gemini", model="gemini-embedding-001", response=None,
-                error=UpstreamError(code=code, message=str(e), provider="gemini",
-                                    model="gemini-embedding-001", raw_error=e),
+                provider="gemini",
+                model="gemini-embedding-001",
+                response=None,
+                error=UpstreamError(
+                    code=code,
+                    message=str(e),
+                    provider="gemini",
+                    model="gemini-embedding-001",
+                    raw_error=e,
+                ),
             )
 
     async def embed_batch(self, texts: list[str]) -> ProviderResult[list[list[float]]]:
@@ -102,8 +125,12 @@ class GeminiEmbeddingProvider(EmbeddingProvider):
         embeddings = [r.response for r in results if r.response]
         errors = [r.error for r in results if r.error]
         if errors:
-            return ProviderResult(provider="gemini", model="gemini-embedding-001",
-                                  response=embeddings or None, error=errors[0])
+            return ProviderResult(
+                provider="gemini",
+                model="gemini-embedding-001",
+                response=embeddings or None,
+                error=errors[0],
+            )
         return ProviderResult(provider="gemini", model="gemini-embedding-001", response=embeddings)
 
 
@@ -118,17 +145,20 @@ class RWIEEmbeddingProvider(EmbeddingProvider):
     @property
     def metadata(self) -> ProviderMetadata:
         return ProviderMetadata(
-            name="rw_ie", display_name="RW Inference Engine",
+            name="rw_ie",
+            display_name="RW Inference Engine",
             description="Self-hosted ONNX embedding (BERT, 384-dim)",
-            provider_type="embedding", base_url="http://100.122.246.112:8300",
+            provider_type="embedding",
+            base_url="http://100.122.246.112:8300",
         )
 
     @property
     def dims(self) -> int:
         return 384
 
-    def __init__(self, base_url: str = "http://100.122.246.112:8300",
-                 timeout: int = 30, batch_size: int = 32):
+    def __init__(
+        self, base_url: str = "http://100.122.246.112:8300", timeout: int = 30, batch_size: int = 32
+    ):
         self._base_url = base_url.rstrip("/")
         self._timeout = timeout
         self._batch_size = batch_size
@@ -137,7 +167,8 @@ class RWIEEmbeddingProvider(EmbeddingProvider):
     async def _get_client(self) -> httpx.AsyncClient:
         if self._client is None or self._client.is_closed:
             self._client = httpx.AsyncClient(
-                base_url=self._base_url, timeout=httpx.Timeout(self._timeout),
+                base_url=self._base_url,
+                timeout=httpx.Timeout(self._timeout),
                 limits=httpx.Limits(max_connections=10, max_keepalive_connections=5),
             )
         return self._client
@@ -148,13 +179,21 @@ class RWIEEmbeddingProvider(EmbeddingProvider):
             resp = await client.post("/embed", json={"texts": [text]})
             resp.raise_for_status()
             data = resp.json()
-            return ProviderResult(provider="rw_ie", model="bert-embedding",
-                                  response=data["embeddings"][0])
+            return ProviderResult(
+                provider="rw_ie", model="bert-embedding", response=data["embeddings"][0]
+            )
         except Exception as e:
             return ProviderResult(
-                provider="rw_ie", model="bert-embedding", response=None,
-                error=UpstreamError(code=UpstreamErrorCode.UNKNOWN, message=str(e),
-                                    provider="rw_ie", model="bert-embedding", raw_error=e),
+                provider="rw_ie",
+                model="bert-embedding",
+                response=None,
+                error=UpstreamError(
+                    code=UpstreamErrorCode.UNKNOWN,
+                    message=str(e),
+                    provider="rw_ie",
+                    model="bert-embedding",
+                    raw_error=e,
+                ),
             )
 
     async def embed_batch(self, texts: list[str]) -> ProviderResult[list[list[float]]]:
@@ -163,13 +202,21 @@ class RWIEEmbeddingProvider(EmbeddingProvider):
             resp = await client.post("/embed", json={"texts": texts})
             resp.raise_for_status()
             data = resp.json()
-            return ProviderResult(provider="rw_ie", model="bert-embedding",
-                                  response=data["embeddings"])
+            return ProviderResult(
+                provider="rw_ie", model="bert-embedding", response=data["embeddings"]
+            )
         except Exception as e:
             return ProviderResult(
-                provider="rw_ie", model="bert-embedding", response=None,
-                error=UpstreamError(code=UpstreamErrorCode.UNKNOWN, message=str(e),
-                                    provider="rw_ie", model="bert-embedding", raw_error=e),
+                provider="rw_ie",
+                model="bert-embedding",
+                response=None,
+                error=UpstreamError(
+                    code=UpstreamErrorCode.UNKNOWN,
+                    message=str(e),
+                    provider="rw_ie",
+                    model="bert-embedding",
+                    raw_error=e,
+                ),
             )
 
     async def close(self):
@@ -190,7 +237,8 @@ class LocalEmbeddingProvider(EmbeddingProvider):
     @property
     def metadata(self) -> ProviderMetadata:
         return ProviderMetadata(
-            name="local", display_name="Local (sentence-transformers)",
+            name="local",
+            display_name="Local (sentence-transformers)",
             description="Local sentence-transformers (all-MiniLM-L6-v2, 384-dim)",
             provider_type="embedding",
         )
@@ -207,6 +255,7 @@ class LocalEmbeddingProvider(EmbeddingProvider):
         try:
             if self._model is None:
                 from sentence_transformers import SentenceTransformer
+
                 self._model = SentenceTransformer(self._model_name)
             loop = asyncio.get_running_loop()
             vec = await loop.run_in_executor(
@@ -215,13 +264,21 @@ class LocalEmbeddingProvider(EmbeddingProvider):
             vec_list = vec.tolist()
             if len(vec_list) < self.EMBED_DIM:
                 vec_list = vec_list + [0.0] * (self.EMBED_DIM - len(vec_list))
-            return ProviderResult(provider="local", model=self._model_name,
-                                  response=vec_list[:self.EMBED_DIM])
+            return ProviderResult(
+                provider="local", model=self._model_name, response=vec_list[: self.EMBED_DIM]
+            )
         except Exception as e:
             return ProviderResult(
-                provider="local", model=self._model_name, response=None,
-                error=UpstreamError(code=UpstreamErrorCode.UNKNOWN, message=str(e),
-                                    provider="local", model=self._model_name, raw_error=e),
+                provider="local",
+                model=self._model_name,
+                response=None,
+                error=UpstreamError(
+                    code=UpstreamErrorCode.UNKNOWN,
+                    message=str(e),
+                    provider="local",
+                    model=self._model_name,
+                    raw_error=e,
+                ),
             )
 
     async def embed_batch(self, texts: list[str]) -> ProviderResult[list[list[float]]]:
@@ -229,8 +286,12 @@ class LocalEmbeddingProvider(EmbeddingProvider):
         embeddings = [r.response for r in results if r.response]
         errors = [r.error for r in results if r.error]
         if errors:
-            return ProviderResult(provider="local", model=self._model_name,
-                                  response=embeddings or None, error=errors[0])
+            return ProviderResult(
+                provider="local",
+                model=self._model_name,
+                response=embeddings or None,
+                error=errors[0],
+            )
         return ProviderResult(provider="local", model=self._model_name, response=embeddings)
 
 
@@ -247,7 +308,8 @@ class HashEmbeddingProvider(EmbeddingProvider):
     @property
     def metadata(self) -> ProviderMetadata:
         return ProviderMetadata(
-            name="hash", display_name="Hash Fallback",
+            name="hash",
+            display_name="Hash Fallback",
             description="Deterministic hash-based embedding (low quality, always works)",
             provider_type="embedding",
         )
@@ -260,8 +322,9 @@ class HashEmbeddingProvider(EmbeddingProvider):
         return ProviderResult(provider="hash", model="sha256", response=self._embed_hash(text))
 
     async def embed_batch(self, texts: list[str]) -> ProviderResult[list[list[float]]]:
-        return ProviderResult(provider="hash", model="sha256",
-                              response=[self._embed_hash(t) for t in texts])
+        return ProviderResult(
+            provider="hash", model="sha256", response=[self._embed_hash(t) for t in texts]
+        )
 
     def _embed_hash(self, text: str) -> list[float]:
         vec = [0.0] * self.EMBED_DIM
@@ -281,9 +344,14 @@ class OpenAICompatibleEmbeddingProvider(EmbeddingProvider):
         """Backward compat: provider identifier."""
         return "openai_compatible"
 
-    def __init__(self, base_url: str = "https://api.openai.com/v1",
-                 api_key: str | None = None, model: str = "text-embedding-3-small",
-                 dims: int = 1536, timeout: int = 30):
+    def __init__(
+        self,
+        base_url: str = "https://api.openai.com/v1",
+        api_key: str | None = None,
+        model: str = "text-embedding-3-small",
+        dims: int = 1536,
+        timeout: int = 30,
+    ):
         self._base_url = base_url.rstrip("/")
         self._api_key = api_key or os.environ.get("OPENAI_API_KEY")
         self._model = model
@@ -294,9 +362,11 @@ class OpenAICompatibleEmbeddingProvider(EmbeddingProvider):
     @property
     def metadata(self) -> ProviderMetadata:
         return ProviderMetadata(
-            name="openai_compatible", display_name="OpenAI-compatible",
+            name="openai_compatible",
+            display_name="OpenAI-compatible",
             description=f"OpenAI-compatible embedding endpoint ({self._base_url})",
-            provider_type="embedding", base_url=self._base_url,
+            provider_type="embedding",
+            base_url=self._base_url,
         )
 
     @property
@@ -307,7 +377,8 @@ class OpenAICompatibleEmbeddingProvider(EmbeddingProvider):
         if self._client is None or self._client.is_closed:
             headers = {"Authorization": f"Bearer {self._api_key}"} if self._api_key else {}
             self._client = httpx.AsyncClient(
-                base_url=self._base_url, timeout=httpx.Timeout(self._timeout),
+                base_url=self._base_url,
+                timeout=httpx.Timeout(self._timeout),
                 headers=headers,
                 limits=httpx.Limits(max_connections=10, max_keepalive_connections=5),
             )
@@ -319,13 +390,23 @@ class OpenAICompatibleEmbeddingProvider(EmbeddingProvider):
             resp = await client.post("/embeddings", json={"model": self._model, "input": [text]})
             resp.raise_for_status()
             data = resp.json()
-            return ProviderResult(provider="openai_compatible", model=self._model,
-                                  response=data["data"][0]["embedding"])
+            return ProviderResult(
+                provider="openai_compatible",
+                model=self._model,
+                response=data["data"][0]["embedding"],
+            )
         except Exception as e:
             return ProviderResult(
-                provider="openai_compatible", model=self._model, response=None,
-                error=UpstreamError(code=UpstreamErrorCode.UNKNOWN, message=str(e),
-                                    provider="openai_compatible", model=self._model, raw_error=e),
+                provider="openai_compatible",
+                model=self._model,
+                response=None,
+                error=UpstreamError(
+                    code=UpstreamErrorCode.UNKNOWN,
+                    message=str(e),
+                    provider="openai_compatible",
+                    model=self._model,
+                    raw_error=e,
+                ),
             )
 
     async def embed_batch(self, texts: list[str]) -> ProviderResult[list[list[float]]]:
@@ -334,13 +415,23 @@ class OpenAICompatibleEmbeddingProvider(EmbeddingProvider):
             resp = await client.post("/embeddings", json={"model": self._model, "input": texts})
             resp.raise_for_status()
             data = resp.json()
-            return ProviderResult(provider="openai_compatible", model=self._model,
-                                  response=[d["embedding"] for d in data["data"]])
+            return ProviderResult(
+                provider="openai_compatible",
+                model=self._model,
+                response=[d["embedding"] for d in data["data"]],
+            )
         except Exception as e:
             return ProviderResult(
-                provider="openai_compatible", model=self._model, response=None,
-                error=UpstreamError(code=UpstreamErrorCode.UNKNOWN, message=str(e),
-                                    provider="openai_compatible", model=self._model, raw_error=e),
+                provider="openai_compatible",
+                model=self._model,
+                response=None,
+                error=UpstreamError(
+                    code=UpstreamErrorCode.UNKNOWN,
+                    message=str(e),
+                    provider="openai_compatible",
+                    model=self._model,
+                    raw_error=e,
+                ),
             )
 
     async def close(self):
@@ -351,6 +442,7 @@ class OpenAICompatibleEmbeddingProvider(EmbeddingProvider):
 # ═══════════════════════════════════════════════════════════════════════════════
 # Registration
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 def register_providers():
     """Register all built-in providers with the global registry."""

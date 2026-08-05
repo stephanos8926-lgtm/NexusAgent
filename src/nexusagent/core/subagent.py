@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 # src/nexusagent/subagent.py
 """SubAgentHandle — control interface for spawned worker agents."""
 

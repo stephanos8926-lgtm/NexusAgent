@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 # src/nexusagent/server/routes.py
 """REST API routes for the NexusAgent platform."""
 
@@ -198,6 +200,7 @@ def register_routes(app: FastAPI) -> None:
     async def metrics_endpoint():
         """Return a snapshot of active metrics from the MetricsCollector."""
         from nexusagent.core.observability import get_metrics
+
         return get_metrics().get_snapshot()
 
     # ─── Version ────────────────────────────────────────────────────────
@@ -442,7 +445,11 @@ def register_routes(app: FastAPI) -> None:
             "capabilities": capabilities,
         }
 
-    @app.post("/security/sessions/{session_id}/capabilities/grant", status_code=200, dependencies=[Depends(require_admin)])
+    @app.post(
+        "/security/sessions/{session_id}/capabilities/grant",
+        status_code=200,
+        dependencies=[Depends(require_admin)],
+    )
     async def grant_session_capability(session_id: str, request: GrantCapabilityRequest):
         """Dynamically grant a security capability to a session (Admin Auth)."""
         from nexusagent.security.engine import get_policy_engine
@@ -450,13 +457,19 @@ def register_routes(app: FastAPI) -> None:
 
         registry = get_capability_registry()
         if not registry.get_capability(request.capability):
-            raise HTTPException(status_code=400, detail=f"Invalid capability name: {request.capability}")
+            raise HTTPException(
+                status_code=400, detail=f"Invalid capability name: {request.capability}"
+            )
 
         engine = get_policy_engine()
         engine.grant_capability(session_id, request.capability)
         return {"session_id": session_id, "capability": request.capability, "status": "granted"}
 
-    @app.post("/security/sessions/{session_id}/capabilities/revoke", status_code=200, dependencies=[Depends(require_admin)])
+    @app.post(
+        "/security/sessions/{session_id}/capabilities/revoke",
+        status_code=200,
+        dependencies=[Depends(require_admin)],
+    )
     async def revoke_session_capability(session_id: str, request: RevokeCapabilityRequest):
         """Dynamically revoke a security capability from a session (Admin Auth)."""
         from nexusagent.security.engine import get_policy_engine
@@ -464,7 +477,9 @@ def register_routes(app: FastAPI) -> None:
 
         registry = get_capability_registry()
         if not registry.get_capability(request.capability):
-            raise HTTPException(status_code=400, detail=f"Invalid capability name: {request.capability}")
+            raise HTTPException(
+                status_code=400, detail=f"Invalid capability name: {request.capability}"
+            )
 
         engine = get_policy_engine()
         engine.revoke_capability(session_id, request.capability)

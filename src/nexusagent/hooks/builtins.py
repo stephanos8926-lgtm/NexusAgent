@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Built-in hook implementations.
 
 These are the standard hooks fired at key points in the agent lifecycle.

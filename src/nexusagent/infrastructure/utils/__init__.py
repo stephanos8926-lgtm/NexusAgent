@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Utility functions for NexusAgent framework."""
 
 from nexusagent.infrastructure.utils.circuit import (

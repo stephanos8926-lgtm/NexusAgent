@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Memory consolidation engine — background daemon for memory health.
 
 Periodically scans all memories and:

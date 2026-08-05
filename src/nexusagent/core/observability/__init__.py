@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 # src/nexusagent/core/observability/__init__.py
 """Phase 10 Observability & Reliability package."""
 

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Python AST-based checks for code review."""
 
 from __future__ import annotations

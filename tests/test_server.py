@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Tests for NexusAgent API endpoints."""
 
 import tempfile
@@ -27,6 +29,7 @@ async def _setup_test_db():
 
     # Cleanup
     import os
+
     for suffix in ["", "-shm", "-wal"]:
         p = test_db + suffix
         if os.path.exists(p):
@@ -61,6 +64,7 @@ def _setup_test_auth():
 
     # Cleanup
     import shutil
+
     shutil.rmtree(_test_dir, ignore_errors=True)
 
 
@@ -155,6 +159,7 @@ async def test_workers_endpoint():
 async def test_operator_key_rejected_from_admin_endpoints():
     """Operator keys (NEXUS_AUTH_OPERATOR_KEYS) should be rejected from admin-only endpoints."""
     import os
+
     os.environ["NEXUS_AUTH_OPERATOR_KEYS"] = "operator-key-123"
     try:
         transport = ASGITransport(app=app)
@@ -211,7 +216,9 @@ async def test_operator_key_allowed_on_read_endpoints():
                     headers={"X-API-Key": "operator-key-456"},
                 )
                 # 200 is fine — we're testing auth, and the mock succeeds
-                assert response.status_code in (200, 404), f"Expected 200/404, got {response.status_code}"
+                assert response.status_code in (200, 404), (
+                    f"Expected 200/404, got {response.status_code}"
+                )
 
                 # GET /tasks — operator allowed
                 response = await client.get(

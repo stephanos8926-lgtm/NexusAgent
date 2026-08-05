@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """User interfaces: CLI, TUI, web UI."""
 
 from nexusagent.interfaces.tui import NexusApp, main

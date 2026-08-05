@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 # src/nexusagent/sdk.py
 """NexusSDK — high-level client for submitting tasks and retrieving results.
 

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Hybrid memory search index — SQLite FTS5 + sqlite-vec with union merge.
 
 The index is always rebuildable from the files — files are canonical.
@@ -577,6 +579,7 @@ class HybridMemoryIndex:
                 return await asyncio.get_event_loop().run_in_executor(
                     None, self._search_vector_brute, query_vec, limit
                 )
+
     def _search_vector_sync(self, query_vec: list[float], limit: int) -> list[dict]:
         """sqlite-vec similarity search (sync fallback)."""
         conn = sqlite3.connect(str(self.db_path))
@@ -640,6 +643,7 @@ class HybridMemoryIndex:
 
         try:
             import psutil
+
             has_psutil = True
         except ImportError:
             has_psutil = False

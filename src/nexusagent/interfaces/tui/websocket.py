@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """WebSocket connection and event loop for the TUI.
 
 Handles:
@@ -66,6 +68,7 @@ async def check_server_version(app) -> bool:
         unreachable_msg = "⚠️  VERSION CHECK FAILED: Server is unreachable. Please make sure the server is running."
         if hasattr(app, "messages_container") and app.messages_container:
             from nexusagent.interfaces.tui.streaming import _mount_with_limit
+
             _mount_with_limit(app, AppMessage(unreachable_msg))
         return False
 
@@ -79,12 +82,15 @@ async def check_server_version(app) -> bool:
             logger.error(f"{mismatch_msg} — NEXUS_STRICT_VERSION=1, refusing to connect")
             print(f"\n{mismatch_msg}")
             print("Environment variable NEXUS_STRICT_VERSION=1 is set — aborting connection.")
-            print("Run the server with: cd ~/Workspaces/NexusAgent && .venv/bin/python -m nexusagent.server")
+            print(
+                "Run the server with: cd ~/Workspaces/NexusAgent && .venv/bin/python -m nexusagent.server"
+            )
             raise SystemExit(1)
 
         # Show warning as AppMessage in conversation log
         if hasattr(app, "messages_container") and app.messages_container:
             from nexusagent.interfaces.tui.streaming import _mount_with_limit
+
             _mount_with_limit(app, AppMessage(mismatch_msg))
 
         # Show warning in TUI status bar
@@ -178,7 +184,9 @@ async def ws_loop(app) -> None:
                             try:
                                 await handle_event(app, event)
                             except Exception as exc:
-                                logger.warning("handle_event failed for %s: %s", event.get("type"), exc)
+                                logger.warning(
+                                    "handle_event failed for %s: %s", event.get("type"), exc
+                                )
 
                     await asyncio.gather(send_messages(), receive_events())
                     # Clean close — no retry needed

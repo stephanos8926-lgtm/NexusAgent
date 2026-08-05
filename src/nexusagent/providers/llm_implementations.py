@@ -1,4 +1,7 @@
+# SPDX-License-Identifier: MIT
+
 """LLM provider implementations — OpenAI-compatible, Gemini, OpenRouter, etc."""
+
 from __future__ import annotations
 
 import logging
@@ -16,6 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 # ── OpenAI-compatible LLM Provider ─────────────────────────────────────────────
+
 
 class OpenAICompatibleLLMProvider(LLMProvider):
     """OpenAI-compatible LLM provider (works with any OpenAI-compatible endpoint)."""
@@ -110,6 +114,7 @@ class OpenAICompatibleLLMProvider(LLMProvider):
 
 # ── Gemini LLM ─────────────────────────────────────────────────────────────────
 
+
 class GeminiLLMProvider(LLMProvider):
     """Gemini LLM provider (chat completion)."""
 
@@ -144,6 +149,7 @@ class GeminiLLMProvider(LLMProvider):
         if key:
             return key
         from nexusagent.infrastructure.config import settings
+
         key = getattr(settings, "gemini_api_key", None)
         if key:
             return key
@@ -156,7 +162,8 @@ class GeminiLLMProvider(LLMProvider):
         raise UpstreamError(
             code=UpstreamErrorCode.INVALID_API_KEY,
             message="No Gemini API key configured",
-            provider="gemini", model=self._model,
+            provider="gemini",
+            model=self._model,
         )
 
     async def chat(
@@ -206,13 +213,21 @@ class GeminiLLMProvider(LLMProvider):
             else:
                 code = UpstreamErrorCode.UNKNOWN
             return ProviderResult(
-                provider="gemini", model=model or self._model, response=None,
-                error=UpstreamError(code=code, message=str(e), provider="gemini",
-                                    model=model or self._model, raw_error=e),
+                provider="gemini",
+                model=model or self._model,
+                response=None,
+                error=UpstreamError(
+                    code=code,
+                    message=str(e),
+                    provider="gemini",
+                    model=model or self._model,
+                    raw_error=e,
+                ),
             )
 
 
 # ── OpenRouter LLM ─────────────────────────────────────────────────────────────
+
 
 class OpenRouterLLMProvider(LLMProvider):
     """OpenRouter LLM provider (OpenAI-compatible gateway to many models)."""
@@ -310,6 +325,7 @@ class OpenRouterLLMProvider(LLMProvider):
 # ═══════════════════════════════════════════════════════════════════════════════
 # Registration
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 def register_llm_providers():
     """Register all built-in LLM providers with the global registry."""

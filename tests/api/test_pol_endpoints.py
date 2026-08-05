@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 # tests/api/test_pol_endpoints.py
 """API and WebSocket integration tests for Phase 7: POL Control Plane."""
 
@@ -29,6 +31,7 @@ async def _setup_test_db():
 
     # Cleanup
     import os
+
     for suffix in ["", "-shm", "-wal"]:
         p = test_db + suffix
         if os.path.exists(p):
@@ -66,6 +69,7 @@ def _setup_test_auth():
 
     # Cleanup
     import shutil
+
     shutil.rmtree(_test_dir, ignore_errors=True)
     if "NEXUS_AUTH_OPERATOR_KEYS" in os.environ:
         del os.environ["NEXUS_AUTH_OPERATOR_KEYS"]
@@ -85,10 +89,7 @@ async def test_get_interventions_operator_allowed():
     """GET /pol/interventions with Operator key should return 200."""
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
-        response = await client.get(
-            "/pol/interventions",
-            headers={"X-API-Key": _TEST_OPERATOR_KEY}
-        )
+        response = await client.get("/pol/interventions", headers={"X-API-Key": _TEST_OPERATOR_KEY})
         assert response.status_code == 200
         data = response.json()
         assert "interventions" in data
@@ -109,7 +110,7 @@ async def test_create_intervention_admin_only():
                 "guidance": "Restart components",
                 "priority": "high",
             },
-            headers={"X-API-Key": _TEST_OPERATOR_KEY}
+            headers={"X-API-Key": _TEST_OPERATOR_KEY},
         )
         assert response.status_code == 403
 
@@ -122,7 +123,7 @@ async def test_create_intervention_admin_only():
                 "guidance": "Restart components",
                 "priority": "high",
             },
-            headers=API_HEADERS
+            headers=API_HEADERS,
         )
         assert response.status_code == 201
         data = response.json()
@@ -140,7 +141,7 @@ async def test_resolve_intervention_admin_only():
         task_id="task-xyz",
         reason="repeated_tool_failure",
         guidance="Debug MCP connectivity",
-        priority="high"
+        priority="high",
     )
 
     transport = ASGITransport(app=app)
@@ -149,7 +150,7 @@ async def test_resolve_intervention_admin_only():
         response = await client.post(
             f"/pol/interventions/{intv['id']}/resolve",
             json={"action": "retry"},
-            headers={"X-API-Key": _TEST_OPERATOR_KEY}
+            headers={"X-API-Key": _TEST_OPERATOR_KEY},
         )
         assert response.status_code == 403
 
@@ -157,7 +158,7 @@ async def test_resolve_intervention_admin_only():
         response = await client.post(
             f"/pol/interventions/{intv['id']}/resolve",
             json={"action": "retry"},
-            headers=API_HEADERS
+            headers=API_HEADERS,
         )
         assert response.status_code == 200
         data = response.json()
@@ -178,13 +179,13 @@ def test_pol_websocket_connection():
     with client.websocket_connect(f"/ws/pol?token={_TEST_API_KEY}") as ws:
         # Create an intervention to trigger a broadcast event
         import asyncio
+
         pol = get_pol_control_plane()
-        asyncio.run(pol.create_intervention(
-            task_id="task-ws",
-            reason="policy_violation",
-            guidance="Warn agent",
-            priority="low"
-        ))
+        asyncio.run(
+            pol.create_intervention(
+                task_id="task-ws", reason="policy_violation", guidance="Warn agent", priority="low"
+            )
+        )
 
         # Receive WebSocket broadcast
         msg = ws.receive_json()

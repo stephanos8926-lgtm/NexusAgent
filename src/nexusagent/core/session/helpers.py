@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Session helper functions — environment context, git info, prompt building."""
 
 from __future__ import annotations

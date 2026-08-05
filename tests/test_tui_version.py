@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Tests for TUI pre-connect version checking.
 
 Covers:
@@ -56,12 +58,14 @@ class TestTuiVersionCheck:
         app = self._make_app()
 
         fake_response = MagicMock()
-        fake_response.read.return_value = json.dumps({
-            "version": "0.1.0",
-            "minClient": "0.1.0",
-            "server": "nexusagent-server",
-            "uptime": 100,
-        }).encode()
+        fake_response.read.return_value = json.dumps(
+            {
+                "version": "0.1.0",
+                "minClient": "0.1.0",
+                "server": "nexusagent-server",
+                "uptime": 100,
+            }
+        ).encode()
         fake_response.__enter__ = MagicMock(return_value=fake_response)
         fake_response.__exit__ = MagicMock(return_value=False)
 
@@ -109,7 +113,10 @@ class TestTuiVersionCheck:
         assert result is False, "Unreachable server should return False"
         app.messages_container.mount.assert_called_once()
         mounted_msg = app.messages_container.mount.call_args[0][0]
-        assert "unreachable" in mounted_msg._message.lower() or "connect" in mounted_msg._message.lower()
+        assert (
+            "unreachable" in mounted_msg._message.lower()
+            or "connect" in mounted_msg._message.lower()
+        )
 
     @pytest.mark.asyncio
     async def test_tui_version_check_timeout(self):
@@ -185,19 +192,23 @@ class TestTuiWsLoopVersionIntegration:
 
         async def fake_aenter():
             return fake_ws
+
         fake_ws.__aenter__ = fake_aenter
 
         async def fake_aexit(exc_type, exc_val, exc_tb):
             return False
+
         fake_ws.__aexit__ = fake_aexit
 
         async def fake_send(msg):
             pass
+
         fake_ws.send = fake_send
 
         async def fake_aiter():
             for x in []:
                 yield x
+
         fake_ws.__aiter__ = fake_aiter
 
         app._check_server_version = fake_check

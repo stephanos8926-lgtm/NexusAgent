@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """HybridMemoryManager — combines FileMemory (canonical) with HybridMemoryIndex (derived).
 
 This is the top-level memory interface for the hybrid memory system.
@@ -82,6 +84,7 @@ class HybridMemoryManager:
         # Phase 9: initialize layered memory if not already done
         if self.layers is None:
             from nexusagent.memory.layer_manager import LayerMemoryManager
+
             self.layers = LayerMemoryManager(self.workspace_dir)
 
     async def remember(
@@ -163,7 +166,7 @@ class HybridMemoryManager:
                 "ttl_hours": ttl_hours,
                 "valid_from": valid_from,
                 "valid_until": valid_until,
-            }
+            },
         )
 
         # Publish to NATS if enabled (fire-and-forget)
@@ -305,13 +308,15 @@ class HybridMemoryManager:
             layer_results = self.layers.query(query, layer=layer, limit=max_results)
             results = []
             for item in layer_results:
-                results.append({
-                    "file": f".nexusagent/layers/{item.layer.value}/{item.item.id}.json",
-                    "content": item.item.content,
-                    "score": item.confidence,
-                    "vector_score": item.confidence,
-                    "keyword_score": item.confidence,
-                })
+                results.append(
+                    {
+                        "file": f".nexusagent/layers/{item.layer.value}/{item.item.id}.json",
+                        "content": item.item.content,
+                        "score": item.confidence,
+                        "vector_score": item.confidence,
+                        "keyword_score": item.confidence,
+                    }
+                )
             return results
 
         fetch_count = max_results * 3  # Fetch extra for filtering

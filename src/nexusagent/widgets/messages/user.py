@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """User message widget — left-border accent, timestamp prefix."""
 
 from __future__ import annotations

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Compat shim  imports from db/ subpackage.
 
 All existing ``from nexusagent.infrastructure.db import ...`` usage continues

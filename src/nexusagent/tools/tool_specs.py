@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Tool metadata registry — data-driven tool registration.
 
 Each tool is defined as a TOOL_SPEC dict with:

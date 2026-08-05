@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Memory item data model and deterministic hash embedding."""
 
 from __future__ import annotations

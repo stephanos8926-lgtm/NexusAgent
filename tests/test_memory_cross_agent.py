@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Tests for cross-agent memory sharing (Phase 2: Session wiring + tests).
 
 Covers inherit_from, promote_to_parent, parent index search integration,
@@ -31,11 +33,13 @@ def tmp_parent_dir():
     parent_mgr = HybridMemoryManager(d)
     parent_mgr.initialize()
     # Write a memory so the index has content
-    asyncio.run(parent_mgr.remember(
-        content="The deployment target is us-east-1 production cluster",
-        type="world",
-        description="Deployment target",
-    ))
+    asyncio.run(
+        parent_mgr.remember(
+            content="The deployment target is us-east-1 production cluster",
+            type="world",
+            description="Deployment target",
+        )
+    )
     asyncio.run(parent_mgr.close())
     yield d
     shutil.rmtree(d, ignore_errors=True)
@@ -188,9 +192,7 @@ async def test_promote_concurrent_locking(tmp_parent_dir, tmp_child_dir):
             contents.add(text)
 
     # We expect at most 5 unique "Concurrent memory" entries
-    assert len(contents) <= 5, (
-        f"Concurrent promotion created duplicates: {len(contents)} files"
-    )
+    assert len(contents) <= 5, f"Concurrent promotion created duplicates: {len(contents)} files"
     await child_mgr.close()
 
 
@@ -298,9 +300,7 @@ async def test_duplicate_inherit_from(tmp_parent_dir, tmp_child_dir):
         # Verify parent1 memory is found
         results = await child_mgr.recall("deployment target", max_results=5)
         contents = [r.get("content", "") for r in results]
-        assert any("us-east-1" in c for c in contents), (
-            f"Parent1 memory not found: {contents}"
-        )
+        assert any("us-east-1" in c for c in contents), f"Parent1 memory not found: {contents}"
 
         # Now switch to parent2
         await child_mgr.inherit_from(parent2_dir)
@@ -308,9 +308,7 @@ async def test_duplicate_inherit_from(tmp_parent_dir, tmp_child_dir):
         # Verify parent2 memory is found
         results = await child_mgr.recall("workspace TWO", max_results=5)
         contents = [r.get("content", "") for r in results]
-        assert any("TWO" in c for c in contents), (
-            f"Parent2 memory not found: {contents}"
-        )
+        assert any("TWO" in c for c in contents), f"Parent2 memory not found: {contents}"
         # Parent1 index should be closed, so its results shouldn't appear
         assert not any("us-east-1" in c for c in contents), (
             f"Parent1 memory still present after replacement: {contents}"
@@ -340,9 +338,7 @@ async def test_recall_merges_results(tmp_parent_dir, tmp_child_dir):
     # Recall with a query that matches parent memory
     results = await child_mgr.recall("deployment target", max_results=10)
     contents = [r.get("content", "") for r in results]
-    assert any("us-east-1" in c for c in contents), (
-        f"Parent memory missing from recall: {contents}"
-    )
+    assert any("us-east-1" in c for c in contents), f"Parent memory missing from recall: {contents}"
     assert any("API endpoints" in c for c in contents), (
         f"Child memory missing from recall: {contents}"
     )
@@ -364,9 +360,7 @@ async def test_context_prefix(tmp_parent_dir, tmp_child_dir):
 
     # Get context
     context = await child_mgr.get_memory_context("deployment", max_results=5)
-    assert "[Parent Memory]" in context, (
-        f"Parent memory prefix missing from context:\n{context}"
-    )
+    assert "[Parent Memory]" in context, f"Parent memory prefix missing from context:\n{context}"
     assert "us-east-1" in context
     await child_mgr.close()
 

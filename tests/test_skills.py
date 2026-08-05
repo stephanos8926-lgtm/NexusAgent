@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 # tests/test_skills.py
 """Tests for the skills system."""
 
@@ -45,6 +47,7 @@ def sample_skills_dir(tmp_path, sample_skill_dir):
 
     # Copy sample skill
     import shutil
+
     shutil.copytree(sample_skill_dir, skills_dir / "test-skill")
 
     # Create another skill

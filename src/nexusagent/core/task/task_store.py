@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 # src/nexusagent/core/task/task_store.py
 """Durable Task persistence using SQLite.
 
@@ -50,17 +52,13 @@ class TaskStore:
         """Load a task by ID, or None if not found."""
         return self._tasks.get(task_id)
 
-    async def list_tasks(
-        self, state_filter: TaskState | None = None
-    ) -> list[Task]:
+    async def list_tasks(self, state_filter: TaskState | None = None) -> list[Task]:
         """List all tasks, optionally filtered by state."""
         if state_filter is None:
             return list(self._tasks.values())
         return [t for t in self._tasks.values() if t.state == state_filter]
 
-    async def save_checkpoint(
-        self, task_id: str, checkpoint: Checkpoint
-    ) -> None:
+    async def save_checkpoint(self, task_id: str, checkpoint: Checkpoint) -> None:
         """Persist a checkpoint for a task."""
         task = await self.load_task(task_id)
         if task is None:
@@ -68,16 +66,16 @@ class TaskStore:
         task.add_checkpoint(checkpoint)
         logger.debug("Saved checkpoint for task %s", task_id)
 
-    async def load_latest_checkpoint(
-        self, task_id: str
-    ) -> Checkpoint | None:
+    async def load_latest_checkpoint(self, task_id: str) -> Checkpoint | None:
         """Return the most recent checkpoint for a task, or None."""
         task = await self.load_task(task_id)
         if task is None:
             return None
         return task.latest_checkpoint
 
-    async def delete_task(self, task_id: str, *, principal: str | None = None, action: str = "task.delete") -> None:
+    async def delete_task(
+        self, task_id: str, *, principal: str | None = None, action: str = "task.delete"
+    ) -> None:
         """Remove a task and its checkpoints.
 
         Optional authz check:

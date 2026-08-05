@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 # src/nexusagent/core/observability/chaos.py
 """Chaos testing framework for introducing system failures and verifying resilience."""
 

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 # tests/core/test_dag_engine.py
 """Unit and integration tests for the Phase 6 DAG Execution Engine system."""
 

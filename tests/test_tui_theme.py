@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Tests for NexusAgent TUI theme system.
 
 Covers:
@@ -41,19 +43,31 @@ from nexusagent.widgets.theme import (
 # ThemeColors dataclass
 # ---------------------------------------------------------------------------
 
+
 class TestThemeColors:
     """Tests for the ThemeColors dataclass."""
 
     def test_is_frozen(self):
         """ThemeColors is immutable (frozen dataclass)."""
         c = ThemeColors(
-            bg="#000000", bg_panel="#111111", bg_surface="#222222",
-            bg_hover="#333333", text="#FFFFFF", text_secondary="#DDDDDD",
-            text_muted="#999999", text_dim="#666666", accent="#5E6AD2",
-            accent_hover="#7170FF", accent_light="#828FFF",
-            success="#10B981", warning="#EB8B46", error="#F7768E",
-            error_bg="#2A1F32", border="rgba(255,255,255,0.08)",
-            border_subtle="rgba(255,255,255,0.05)", border_focus="#5E6AD2",
+            bg="#000000",
+            bg_panel="#111111",
+            bg_surface="#222222",
+            bg_hover="#333333",
+            text="#FFFFFF",
+            text_secondary="#DDDDDD",
+            text_muted="#999999",
+            text_dim="#666666",
+            accent="#5E6AD2",
+            accent_hover="#7170FF",
+            accent_light="#828FFF",
+            success="#10B981",
+            warning="#EB8B46",
+            error="#F7768E",
+            error_bg="#2A1F32",
+            border="rgba(255,255,255,0.08)",
+            border_subtle="rgba(255,255,255,0.05)",
+            border_focus="#5E6AD2",
         )
         with pytest.raises(AttributeError):
             c.bg = "#FFFFFF"
@@ -61,19 +75,34 @@ class TestThemeColors:
     def test_all_fields_present(self):
         """ThemeColors has exactly 18 fields."""
         from dataclasses import fields
+
         field_names = [f.name for f in fields(ThemeColors)]
         assert len(field_names) == 18
 
     def test_field_names_semantic(self):
         """Fields use semantic naming (bg, text, accent, etc.)."""
         from dataclasses import fields
+
         field_names = {f.name for f in fields(ThemeColors)}
         expected = {
-            "bg", "bg_panel", "bg_surface", "bg_hover",
-            "text", "text_secondary", "text_muted", "text_dim",
-            "accent", "accent_hover", "accent_light",
-            "success", "warning", "error", "error_bg",
-            "border", "border_subtle", "border_focus",
+            "bg",
+            "bg_panel",
+            "bg_surface",
+            "bg_hover",
+            "text",
+            "text_secondary",
+            "text_muted",
+            "text_dim",
+            "accent",
+            "accent_hover",
+            "accent_light",
+            "success",
+            "warning",
+            "error",
+            "error_bg",
+            "border",
+            "border_subtle",
+            "border_focus",
         }
         assert field_names == expected
 
@@ -81,6 +110,7 @@ class TestThemeColors:
 # ---------------------------------------------------------------------------
 # Theme token count (20+ semantic tokens)
 # ---------------------------------------------------------------------------
+
 
 class TestThemeTokens:
     """Each theme must provide 20+ semantic CSS tokens."""
@@ -107,6 +137,7 @@ class TestThemeTokens:
 # ---------------------------------------------------------------------------
 # Theme registry — all 7 themes present
 # ---------------------------------------------------------------------------
+
 
 class TestThemeRegistry:
     """Tests for the theme registry with all 7 themes."""
@@ -150,6 +181,7 @@ class TestThemeRegistry:
 # Tokyo Night theme
 # ---------------------------------------------------------------------------
 
+
 class TestTokyoNight:
     """Tests for the Tokyo Night theme."""
 
@@ -184,6 +216,7 @@ class TestTokyoNight:
 # Rosé Pine theme
 # ---------------------------------------------------------------------------
 
+
 class TestRosePine:
     """Tests for the Rosé Pine theme."""
 
@@ -210,6 +243,7 @@ class TestRosePine:
 # ---------------------------------------------------------------------------
 # Solarized Dark theme
 # ---------------------------------------------------------------------------
+
 
 class TestSolarizedDark:
     """Tests for the Solarized Dark theme."""
@@ -238,6 +272,7 @@ class TestSolarizedDark:
 # NO_COLOR detection
 # ---------------------------------------------------------------------------
 
+
 class TestNoColor:
     """Tests for NO_COLOR environment detection."""
 
@@ -248,6 +283,7 @@ class TestNoColor:
             import importlib
 
             import nexusagent.widgets.status as status_mod
+
             importlib.reload(status_mod)
             assert status_mod.NO_COLOR is True
 
@@ -257,6 +293,7 @@ class TestNoColor:
             import importlib
 
             import nexusagent.widgets.status as status_mod
+
             importlib.reload(status_mod)
             # Should be False (or empty string is falsy)
             assert not status_mod.NO_COLOR
@@ -265,6 +302,7 @@ class TestNoColor:
 # ---------------------------------------------------------------------------
 # Git Status
 # ---------------------------------------------------------------------------
+
 
 class TestGitStatus:
     """Tests for git status detection."""
@@ -336,6 +374,7 @@ class TestGitStatus:
 # Context Window Bar
 # ---------------------------------------------------------------------------
 
+
 class TestContextWindowBar:
     """Tests for the context window usage bar."""
 
@@ -395,6 +434,7 @@ class TestContextWindowBar:
 # Braille Spinner
 # ---------------------------------------------------------------------------
 
+
 class TestBrailleSpinner:
     """Tests for the braille spinner animation."""
 
@@ -447,6 +487,7 @@ class TestBrailleSpinner:
 # StatusBar Tests
 # ---------------------------------------------------------------------------
 
+
 class TestStatusBar:
     """Tests for the StatusBar widget's Git status integration."""
 
@@ -466,6 +507,7 @@ class TestStatusBar:
     def test_update_widgets_branch_clean(self):
         """_update_widgets correctly formats branch and clean status."""
         from unittest.mock import MagicMock, PropertyMock, patch
+
         bar = StatusBar()
         bar._branch = "feature-abc"
         bar._git_status = "clean"
@@ -479,8 +521,10 @@ class TestStatusBar:
 
         bar.query_one = mock_query_one
 
-        with patch.object(StatusBar, "content_size", new_callable=PropertyMock) as mock_size, \
-             patch.object(StatusBar, "app", new_callable=PropertyMock) as mock_app_prop:
+        with (
+            patch.object(StatusBar, "content_size", new_callable=PropertyMock) as mock_size,
+            patch.object(StatusBar, "app", new_callable=PropertyMock) as mock_app_prop,
+        ):
             mock_app = MagicMock()
             mock_app.theme = "nexus-dark"
             mock_app_prop.return_value = mock_app
@@ -492,6 +536,7 @@ class TestStatusBar:
     def test_update_widgets_branch_staged(self):
         """_update_widgets correctly formats branch and staged status."""
         from unittest.mock import MagicMock, PropertyMock, patch
+
         bar = StatusBar()
         bar._branch = "main"
         bar._git_status = "staged"
@@ -505,8 +550,10 @@ class TestStatusBar:
 
         bar.query_one = mock_query_one
 
-        with patch.object(StatusBar, "content_size", new_callable=PropertyMock) as mock_size, \
-             patch.object(StatusBar, "app", new_callable=PropertyMock) as mock_app_prop:
+        with (
+            patch.object(StatusBar, "content_size", new_callable=PropertyMock) as mock_size,
+            patch.object(StatusBar, "app", new_callable=PropertyMock) as mock_app_prop,
+        ):
             mock_app = MagicMock()
             mock_app.theme = "nexus-dark"
             mock_app_prop.return_value = mock_app
@@ -518,6 +565,7 @@ class TestStatusBar:
     def test_update_widgets_branch_dirty(self):
         """_update_widgets correctly formats branch and dirty status."""
         from unittest.mock import MagicMock, PropertyMock, patch
+
         bar = StatusBar()
         bar._branch = "dev"
         bar._git_status = "dirty"
@@ -531,8 +579,10 @@ class TestStatusBar:
 
         bar.query_one = mock_query_one
 
-        with patch.object(StatusBar, "content_size", new_callable=PropertyMock) as mock_size, \
-             patch.object(StatusBar, "app", new_callable=PropertyMock) as mock_app_prop:
+        with (
+            patch.object(StatusBar, "content_size", new_callable=PropertyMock) as mock_size,
+            patch.object(StatusBar, "app", new_callable=PropertyMock) as mock_app_prop,
+        ):
             mock_app = MagicMock()
             mock_app.theme = "nexus-dark"
             mock_app_prop.return_value = mock_app
@@ -542,10 +592,10 @@ class TestStatusBar:
         mock_branch_widget.update.assert_called_with("[dev | [yellow]✗ dirty[/yellow]]")
 
 
-
 # ---------------------------------------------------------------------------
 # Direct Theme Selection, Previews, and Theme-aware Context Bar Colors
 # ---------------------------------------------------------------------------
+
 
 class TestTuiThemeDirectAndPreviews:
     """Tests direct theme selection /theme <name> and visual theme preview."""
@@ -599,6 +649,7 @@ class TestTuiThemeDirectAndPreviews:
 
         # Mock _mount_with_limit to capture the AppMessage
         mounted_messages = []
+
         def mock_mount(app, msg):
             mounted_messages.append(msg)
 
@@ -622,13 +673,24 @@ class TestContextWindowBarDynamicColors:
         from nexusagent.widgets.theme import ThemeColors
 
         custom_theme = ThemeColors(
-            bg="#000000", bg_panel="#111111", bg_surface="#222222",
-            bg_hover="#333333", text="#FFFFFF", text_secondary="#DDDDDD",
-            text_muted="#999999", text_dim="#666666", accent="#5E6AD2",
-            accent_hover="#7170FF", accent_light="#828FFF",
-            success="#00FF00", warning="#FFA500", error="#FF0000",
-            error_bg="#2A1F32", border="rgba(255,255,255,0.08)",
-            border_subtle="rgba(255,255,255,0.05)", border_focus="#5E6AD2",
+            bg="#000000",
+            bg_panel="#111111",
+            bg_surface="#222222",
+            bg_hover="#333333",
+            text="#FFFFFF",
+            text_secondary="#DDDDDD",
+            text_muted="#999999",
+            text_dim="#666666",
+            accent="#5E6AD2",
+            accent_hover="#7170FF",
+            accent_light="#828FFF",
+            success="#00FF00",
+            warning="#FFA500",
+            error="#FF0000",
+            error_bg="#2A1F32",
+            border="rgba(255,255,255,0.08)",
+            border_subtle="rgba(255,255,255,0.05)",
+            border_focus="#5E6AD2",
         )
 
         # 1. Safe zone (<70%) -> should return custom success color (#00FF00)
@@ -660,8 +722,10 @@ class TestContextWindowBarDynamicColors:
 
         bar.query_one = mock_query_one
 
-        with patch.object(StatusBar, "content_size", new_callable=PropertyMock) as mock_size, \
-             patch.object(StatusBar, "app", new_callable=PropertyMock) as mock_app_prop:
+        with (
+            patch.object(StatusBar, "content_size", new_callable=PropertyMock) as mock_size,
+            patch.object(StatusBar, "app", new_callable=PropertyMock) as mock_app_prop,
+        ):
             mock_app = MagicMock()
             mock_app.theme = "nexus-dark"
             mock_app_prop.return_value = mock_app

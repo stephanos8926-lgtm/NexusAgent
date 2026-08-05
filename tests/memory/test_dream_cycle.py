@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Integration tests for the 4-phase DreamCycle memory consolidation system."""
 
 import os

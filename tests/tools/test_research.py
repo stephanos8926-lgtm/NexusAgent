@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 import pytest
 
 from nexusagent.tools.research import search_local_docs, search_web

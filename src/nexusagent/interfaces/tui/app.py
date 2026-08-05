@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """NexusApp — core TUI application class.
 
 Composes the layout, manages lifecycle, and delegates to:
@@ -214,6 +216,7 @@ class NexusApp(App):
 
     def _refresh_git_branch(self) -> None:
         """Schedule asynchronous detection of git branch and status to update the status bar."""
+
         async def _async_detect():
             import subprocess
 
@@ -403,7 +406,7 @@ import click
     "--auto-approve",
     is_flag=True,
     default=False,
-    help="Enable YOLO auto-approve mode for all tools by default."
+    help="Enable YOLO auto-approve mode for all tools by default.",
 )
 def main(yolo: bool = False) -> None:
     """Entry point for launching the NexusAgent TUI."""

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 # tests/test_nats_durable.py
 """Unit tests for JetStream durable consumer support in AgentBus.subscribe_durable().
 

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Welcome banner widget — compact design, shown on first load."""
 
 from __future__ import annotations

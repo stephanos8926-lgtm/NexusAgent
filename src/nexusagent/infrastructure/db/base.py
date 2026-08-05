@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """SQLAlchemy declarative base — single canonical location for all ORM models."""
 
 from __future__ import annotations

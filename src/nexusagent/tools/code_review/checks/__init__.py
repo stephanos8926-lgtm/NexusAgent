@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Code review checks subpackage."""
 
 # Check functions are imported directly by review_code.py

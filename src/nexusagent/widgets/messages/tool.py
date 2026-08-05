@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 """Tool call message widget — collapsible output, syntax hints, status indicators."""
 
 from __future__ import annotations
@@ -139,7 +141,9 @@ class ToolCallMessage(Static):
         self._status = status
         self._collapsed = self._should_collapse(output)
         self.styles.border_left = ("wide", self._BORDER_COLORS.get(status, "yellow"))
-        self.tooltip = "Interactive tool output. Click or press Enter/Space to expand/collapse output."
+        self.tooltip = (
+            "Interactive tool output. Click or press Enter/Space to expand/collapse output."
+        )
 
     def _should_collapse(self, output: str) -> bool:
         """Determine if output should be collapsed by default."""

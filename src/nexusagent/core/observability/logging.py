@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 # src/nexusagent/core/observability/logging.py
 """Structured machine-readable logging according to specification."""
 
@@ -37,7 +39,11 @@ class StructuredLoggingFormatter(logging.Formatter):
         task_id = getattr(record, "task_id", None) or task_id_var.get() or ""
         worker_id = getattr(record, "worker_id", None) or worker_id_var.get() or ""
         component = getattr(record, "component", None) or component_var.get() or record.name
-        event_type = getattr(record, "event_type", None) or event_type_var.get() or f"log.{record.levelname.lower()}"
+        event_type = (
+            getattr(record, "event_type", None)
+            or event_type_var.get()
+            or f"log.{record.levelname.lower()}"
+        )
 
         # Standard severity mapping
         severity = record.levelname

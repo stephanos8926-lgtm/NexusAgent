@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+
 # tests/test_observability.py
 """Comprehensive unit and integration tests for Phase 10: Observability & Reliability."""
 
@@ -141,7 +143,9 @@ def test_failure_classification():
 def test_system_health_aggregation():
     """Verify system health diagnostics reports."""
     with patch("nexusagent.core.observability.health.check_event_bus_health") as mock_bus_health:
-        mock_bus_health.return_value = MagicMock(healthy=True, message="NATS up", failed=False, degraded=False)
+        mock_bus_health.return_value = MagicMock(
+            healthy=True, message="NATS up", failed=False, degraded=False
+        )
         health_report = get_system_health()
 
         assert "runtime" in health_report
@@ -208,6 +212,7 @@ async def test_recovery_workflow_escalate():
 def test_chaos_kill_worker():
     """Verify chaos testing tool for killing worker in WorkerPool."""
     from nexusagent.core.worker.pool import get_worker_pool
+
     pool = get_worker_pool()
 
     mock_handle = MagicMock()
@@ -303,19 +308,18 @@ def test_structured_logging_config_and_env(monkeypatch):
 
     # Check server structured logging flag
     import os
-    structured_enabled = (
-        settings.logging.structured
-        or os.environ.get("NEXUS_STRUCTURED_LOGGING", "").lower() in ("1", "true", "yes", "on")
-    )
+
+    structured_enabled = settings.logging.structured or os.environ.get(
+        "NEXUS_STRUCTURED_LOGGING", ""
+    ).lower() in ("1", "true", "yes", "on")
     assert structured_enabled is True
 
     # 2. Test environment variable override
     monkeypatch.setattr(settings.logging, "structured", False)
     monkeypatch.setenv("NEXUS_STRUCTURED_LOGGING", "true")
-    structured_enabled_env = (
-        settings.logging.structured
-        or os.environ.get("NEXUS_STRUCTURED_LOGGING", "").lower() in ("1", "true", "yes", "on")
-    )
+    structured_enabled_env = settings.logging.structured or os.environ.get(
+        "NEXUS_STRUCTURED_LOGGING", ""
+    ).lower() in ("1", "true", "yes", "on")
     assert structured_enabled_env is True
 
 
