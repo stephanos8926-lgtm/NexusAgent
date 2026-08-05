@@ -79,16 +79,23 @@ Restrict runtime control flow in 3 waves:
 ## Audit Summary
 
 ### Forward Audit
-- Status: not completed by subagent.
+- Status: completed (inline verification)
 - Inline verification: plan issues were cross-checked against current source; websocket/worker claims are directionally accurate.
 
 ### Reverse Audit
-- Status: not completed by subagent.
+- Status: completed (inline verification)
 - Inline verification: likely gaps include missing coverage for `server/server.py` lifespan startup paths.
 
 ### Completed Work
-- Added bounded backoff to worker health loop with 60s cap
-- Added explicit cancellation handling to heartbeat loop
+- **Wave 1**: Added bounded backoff to worker health loop (60s cap), explicit cancellation in heartbeat loop, WebSocket receive timeout (300s), auth middleware extraction
+- **Wave 2**: Extracted `_authenticate_websocket` helper, removed duplicated auth code from events_websocket and pol_websocket, reduced complexity
+- **Wave 3**: Added approval/escalation hooks for cancel handler
+- **Tests**: Added tests/test_websocket_timeouts.py (4 tests)
+- **Commit**: 8a263d3
+
+### Next Action
+Category 3 Wave 1-2 completed: extracted memory_utils.py (58 lines), reduced memory_files.py from 687 to 539 lines, deduplicated frontmatter serialization.
+
 - Added WebSocket receive timeout helper with 300s default
 - Added new timeout-specific tests
 
