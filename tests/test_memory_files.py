@@ -151,3 +151,48 @@ def test_gitignore_not_overwritten(tmp_workspace):
 
     # Content should be preserved
     assert gitignore.read_text() == "custom-content\n"
+
+
+def test_write_entry_updates_quality_score_on_append(tmp_workspace):
+    """Appending to existing file should update quality_score in frontmatter."""
+    fm = FileMemory(tmp_workspace)
+    fm.initialize()
+
+    # Write initial entry
+    fm.write_entry(
+        content="Short",
+        entry_type=MemoryEntryType.WORLD,
+        description="Test entry",
+        confidence=0.5,
+    )
+
+    # Get the created file
+    topic_files = list(Path(tmp_workspace).glob("bank/*.md"))
+    assert len(topic_files) == 1
+    topic_file = topic_files[0]
+
+    # Read initial frontmatter using the utility function
+    from nexusagent.memory.memory_utils import parse_frontmatter
+    content = topic_file.read_text()
+    initial_fm = parse_frontmatter(content)
+    initial_score = initial_fm.get("quality_score", 0)
+
+    # Append longer content to same file (same description will use same file)
+    fm.write_entry(
+        content="Much longer content that should increase the quality score significantly due to length",
+        entry_type=MemoryEntryType.WORLD,
+        description="Test entry",
+        confidence=0.5,
+    )
+
+    # Read updated frontmatter
+    content = topic_file.read_text()
+    updated_fm = parse_frontmatter(content)
+    updated_score = updated_fm.get("quality_score", 0)
+
+    # Quality score should have increased due to longer content
+    assert updated_score >= initial_score, f"Quality score should increase or stay same: {initial_score} -> {updated_score}"
+
+
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])

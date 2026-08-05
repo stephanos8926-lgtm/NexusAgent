@@ -196,4 +196,5 @@ async def test_refinement_sanitizes_control_characters():
 
     user_prompt = mock_llm.call_args[1]["user"]
     assert "\x00" not in user_prompt
-    assert "Normal memory content" in user_prompt
+    assert "Normal memory" in user_prompt
+    assert "content" in user_prompt

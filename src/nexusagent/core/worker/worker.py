@@ -11,7 +11,7 @@ import json
 import logging
 import time
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, Callable
 
 from sqlalchemy import select
 
@@ -48,6 +48,8 @@ class NexusWorker:
     HEALTH_CHECK_INTERVAL = 10.0
     # Seconds to wait for NATS reconnection before entering degraded mode
     DEGRADED_TIMEOUT = 30.0
+    # Heartbeat interval (seconds) — how often we update task timestamps
+    HEARTBEAT_INTERVAL = 15
 
     def __init__(self, bus: AgentBus | None = None) -> None:
         """Initialize the worker with an optional NATS bus instance.
@@ -63,6 +65,7 @@ class NexusWorker:
         self._degraded: bool = False
         self._running: bool = False
         self._in_flight: dict[str, dict[str, Any]] = {}
+        self._cancel_authorizer: Callable[[str], bool] | None = None
 
     @property
     def is_healthy(self) -> bool:
@@ -118,10 +121,13 @@ class NexusWorker:
 
         consecutive_failures = 0
         max_failures_before_degraded = 3  # 3 * 10s = 30s detection
+        backoff = self.HEALTH_CHECK_INTERVAL
+        consecutive_reconnect_failures = 0
+        max_reconnect_failures_before_error = 3  # Escalate log level after 3 failures
 
         while self._running:
             try:
-                await asyncio.sleep(self.HEALTH_CHECK_INTERVAL)
+                await asyncio.sleep(min(backoff, 60.0))
                 if not self._running:
                     break
 
@@ -135,6 +141,8 @@ class NexusWorker:
                             consecutive_failures,
                         )
                     consecutive_failures = 0
+                    consecutive_reconnect_failures = 0  # Reset on successful connection
+                    backoff = self.HEALTH_CHECK_INTERVAL
                     if self._degraded:
                         self._degraded = False
                         self._healthy = True
@@ -158,6 +166,7 @@ class NexusWorker:
                             "Continuing with in-memory task buffer.",
                             consecutive_failures * self.HEALTH_CHECK_INTERVAL,
                         )
+                        backoff = min(backoff * 2, 60.0)
                     # Attempt reconnection if cap not exceeded
                     rc = health.get("reconnect_count", 0)
                     mr = health.get("max_reconnects", _NATS_HARD_RECONNECT_CAP)
@@ -165,8 +174,16 @@ class NexusWorker:
                         logger.info("Attempting NATS reconnect (%d/%d)...", rc + 1, mr)
                         try:
                             await self.bus.connect()
+                            consecutive_reconnect_failures = 0  # Reset on success
                         except Exception as exc:
-                            logger.warning("NATS reconnect failed: %s", exc)
+                            consecutive_reconnect_failures += 1
+                            if consecutive_reconnect_failures >= max_reconnect_failures_before_error:
+                                logger.error(
+                                    "NATS reconnect failed after %d consecutive attempts: %s",
+                                    consecutive_reconnect_failures, exc
+                                )
+                            else:
+                                logger.warning("NATS reconnect failed: %s", exc)
 
             except asyncio.CancelledError:
                 break
@@ -214,26 +231,39 @@ class NexusWorker:
     async def _heartbeat(self, task_id: str, stop_event: asyncio.Event):
         """Periodically bump task updated_at so the reaper doesn't eat it."""
         while not stop_event.is_set():
-            await asyncio.sleep(30)
+            try:
+                await asyncio.sleep(self.HEARTBEAT_INTERVAL)
+            except asyncio.CancelledError:
+                break
+            if stop_event.is_set():
+                break
             try:
                 async with task_repo.db_manager.get_session() as session:
                     result = await session.execute(select(TaskModel).where(TaskModel.id == task_id))
                     task_obj = result.scalar_one_or_none()
                     if task_obj and task_obj.status == "processing":
                         task_obj.updated_at = datetime.now(UTC)
-            except Exception:
-                logger.debug("Heartbeat update failed for task %s", task_id)
+            except Exception as e:
+                logger.debug("Heartbeat update failed for task %s: %s", task_id, e)
 
     async def _handle_cancel(self, msg: Any) -> None:
         """Handle task cancellation signal from server."""
         try:
             data = json.loads(msg.data.decode())
             cancel_id = data.get("task_id", "")
-            if cancel_id:
-                self._in_flight.pop(cancel_id, None)
-                logger.info(f"Worker acknowledged cancel for task {cancel_id}")
+            if not cancel_id:
+                return
+
+            if getattr(self, "_cancel_authorizer", None) is not None:
+                allowed = self._cancel_authorizer(cancel_id)
+                if not allowed:
+                    logger.warning("Worker rejected unauthorized cancel for task %s", cancel_id)
+                    return
+
+            self._in_flight.pop(cancel_id, None)
+            logger.info("Worker acknowledged cancel for task %s", cancel_id)
         except Exception as e:
-            logger.warning(f"Worker cancel handler error: {e}")
+            logger.warning("Worker cancel handler error: %s", type(e).__name__)
 
     async def handle_task(self, msg: Any) -> None:
         """NATS callback to process an incoming task."""
@@ -258,7 +288,7 @@ class NexusWorker:
                 )
                 return
 
-            logger.info(f"Worker received task {task.id}: {task.description}")
+            logger.info("Worker received task %s", task.id)
 
             start_time = time.time()
 

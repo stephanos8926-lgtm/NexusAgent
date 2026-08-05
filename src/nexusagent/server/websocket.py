@@ -3,6 +3,7 @@
 
 import asyncio
 import contextlib
+import json
 import logging
 
 from fastapi import HTTPException, WebSocket, WebSocketDisconnect
@@ -10,6 +11,7 @@ from fastapi import HTTPException, WebSocket, WebSocketDisconnect
 from nexusagent.core.agent import Agent
 from nexusagent.core.session import session_manager
 from nexusagent.infrastructure.api_auth import verify_api_key
+from nexusagent.infrastructure.bus import get_bus
 from nexusagent.infrastructure.db import get_session_repo
 from nexusagent.tools.fs_base import set_workspace_root
 
@@ -25,6 +27,57 @@ _WS_ALLOWED_ORIGINS = [
 _WS_MAX_MESSAGE_SIZE = 65536
 
 logger = logging.getLogger(__name__)
+
+_WRAPPED_TIMEOUT = 300.0
+
+
+async def _recv_with_timeout(websocket: WebSocket, timeout: float = _WRAPPED_TIMEOUT):
+    try:
+        return await asyncio.wait_for(websocket.receive_text(), timeout=timeout)
+    except asyncio.TimeoutError:
+        return None
+    except WebSocketDisconnect:
+        return "__DISCONNECT__"
+    except Exception as e:
+        logger.error("WebSocket receive error: %s", e)
+        return "__DISCONNECT__"
+
+
+async def _authenticate_websocket(websocket: WebSocket, session_id: str) -> str | None:
+    header_key = websocket.headers.get("x-api-key")
+    auth_header = websocket.headers.get("authorization", "")
+    if auth_header.lower().startswith("bearer "):
+        header_key = header_key or auth_header[7:]
+    token_param = websocket.query_params.get("token")
+    if token_param and not header_key:
+        try:
+            from nexusagent.infrastructure.api_auth import resolve_short_lived_token
+
+            resolved = resolve_short_lived_token(token_param)
+            if resolved is not None:
+                header_key = resolved
+        except Exception:
+            pass
+        if not header_key:
+            header_key = token_param
+    if not header_key:
+        await websocket.close(code=4001, reason="Missing API key — use Authorization: Bearer <key>")
+        return None
+
+    try:
+        await verify_api_key(header_key)
+    except HTTPException as e:
+        logger.warning("WS auth failed for session=%s: %s", session_id, e)
+        await websocket.close(code=4001, reason="Invalid or missing API key")
+        return None
+
+    origin = websocket.headers.get("origin", "")
+    if origin and origin not in _WS_ALLOWED_ORIGINS:
+        logger.warning("Rejected WebSocket from unauthorized origin: %s", origin)
+        await websocket.close(code=4003, reason="Forbidden origin")
+        return None
+
+    return header_key
 
 
 async def session_websocket(
@@ -43,52 +96,16 @@ async def session_websocket(
     are less secure — they may appear in server logs, proxy logs, and
     Referer headers.
     """
-    logger.info(f"session_websocket CALLED: session_id={session_id}")
-    # Verify API key — accept X-API-Key header or Authorization: Bearer ***
-    header_key = websocket.headers.get("x-api-key")
-    # Also accept Bearer token (sent by TUI and browser clients)
-    auth_header = websocket.headers.get("authorization", "")
-    if auth_header.lower().startswith("bearer "):
-        header_key = header_key or auth_header[7:]
-    # Query-param token fallback for browser clients (less secure but necessary)
-    token_param = websocket.query_params.get("token")
-    if token_param and not header_key:
-        # The ?token= param may carry a short-lived exchange token (issued by
-        # POST /auth/token) rather than a raw API key. Resolve it to the
-        # embedded API key, checking signature and expiry. It may also be a
-        # raw API key passed directly (legacy), so fall through to verify.
-        try:
-            from nexusagent.infrastructure.api_auth import resolve_short_lived_token
-
-            resolved = resolve_short_lived_token(token_param)
-            if resolved is not None:
-                header_key = resolved
-        except Exception:
-            pass
-        if not header_key:
-            header_key = token_param
-    if not header_key:
-        await websocket.close(code=4001, reason="Missing API key — use Authorization: Bearer <key>")
-        return
-
-    try:
-        await verify_api_key(header_key)
-    except HTTPException as e:
-        logger.warning("WS auth failed for session=%s: %s", session_id, e)
-        await websocket.close(code=4001, reason="Invalid or missing API key")
-        return
-
-    # Validate Origin header to prevent CSRF
-    origin = websocket.headers.get("origin", "")
-    logger.info(
-        f"WS origin: origin={'present' if origin else 'missing'}, allowed={len(_WS_ALLOWED_ORIGINS)} origins"
-    )
-    if origin and origin not in _WS_ALLOWED_ORIGINS:
-        logger.warning(f"Rejected WebSocket from unauthorized origin: {origin}")
-        await websocket.close(code=4003, reason="Forbidden origin")
+    logger.info("session_websocket CALLED: session_id=%s", session_id)
+    header_key = await _authenticate_websocket(websocket, session_id)
+    if header_key is None:
         return
 
     await websocket.accept()
+
+    # Log origin for accepted connections (diagnostic)
+    origin = websocket.headers.get("origin", "")
+    logger.info("WebSocket accepted from origin: %s", origin or "none")
 
     session_repo = get_session_repo()
 
@@ -96,20 +113,24 @@ async def session_websocket(
     agent = await Agent.create(role="full", policy="permissive")
 
     # Resolve workspace-scoped memory directory from query param or config
-    import os as _os
-    from pathlib import Path as _Path
-
-    from nexusagent.infrastructure.config import settings as _settings
-
     _memory_dir: str | None = None
     _working_dir = websocket.query_params.get("working_dir", ".")
-    if _settings.agent.memory_workspace:
-        # Config-level override: use the configured workspace memory directory
-        _memory_dir = _os.path.expanduser(_settings.agent.memory_workspace)
-    elif _working_dir and _working_dir != ".":
-        # Per-session workspace: use <working_dir>/.nexusagent/memory
-        _ws_memory = _Path(_working_dir) / ".nexusagent" / "memory"
-        _memory_dir = str(_ws_memory)
+    try:
+        from nexusagent.infrastructure.config import settings as _settings
+
+        if _settings.agent.memory_workspace:
+            # Config-level override: use the configured workspace memory directory
+            import os as _os
+
+            _memory_dir = _os.path.expanduser(_settings.agent.memory_workspace)
+        elif _working_dir and _working_dir != ".":
+            # Per-session workspace: use <working_dir>/.nexusagent/memory
+            from pathlib import Path as _Path
+
+            _ws_memory = _Path(_working_dir) / ".nexusagent" / "memory"
+            _memory_dir = str(_ws_memory)
+    except Exception:
+        _memory_dir = None
 
     session = await session_manager.get_or_create(
         session_id,
@@ -133,7 +154,10 @@ async def session_websocket(
             while True:
                 try:
                     raw_text = await websocket.receive_text()
-                except Exception:
+                except WebSocketDisconnect:
+                    break
+                except Exception as e:
+                    logger.error("WebSocket receive error in receive_messages: %s", e)
                     break
                 # Validate message size BEFORE parsing JSON (prevents OOM from crafted payloads)
                 if len(raw_text) > _WS_MAX_MESSAGE_SIZE:
@@ -260,33 +284,10 @@ async def events_websocket(websocket: WebSocket) -> None:
     Accepts API key via headers, Authorization header, or token query parameter.
     """
     logger.info("events_websocket CALLED")
-    header_key = websocket.headers.get("x-api-key")
-    auth_header = websocket.headers.get("authorization", "")
-    if auth_header.lower().startswith("bearer "):
-        header_key = header_key or auth_header[7:]
-    token_param = websocket.query_params.get("token")
-    if token_param and not header_key:
-        header_key = token_param
 
-    if not header_key:
-        await websocket.close(code=4001, reason="Missing API key — use Authorization: Bearer <key>")
+    header_key = await _authenticate_websocket(websocket, session_id="events")
+    if header_key is None:
         return
-
-    try:
-        await verify_api_key(header_key)
-    except HTTPException as e:
-        logger.warning(f"WS auth failed for events_websocket: {e}")
-        await websocket.close(code=4001, reason="Invalid or missing API key")
-        return
-
-    # Validate Origin header to prevent CSRF
-    origin = websocket.headers.get("origin", "")
-    if origin and origin not in _WS_ALLOWED_ORIGINS:
-        logger.warning(f"Rejected WebSocket from unauthorized origin: {origin}")
-        await websocket.close(code=4003, reason="Forbidden origin")
-        return
-
-    await websocket.accept()
 
     import json
 
@@ -299,8 +300,8 @@ async def events_websocket(websocket: WebSocket) -> None:
         try:
             data = json.loads(msg.data.decode())
             await queue.put(data)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.error("Events websocket callback error: %s", e)
 
     # Subscribe to all nexus events
     sub = await bus.nc.subscribe("nexus.>", cb=callback)
@@ -308,12 +309,14 @@ async def events_websocket(websocket: WebSocket) -> None:
     try:
         while True:
             # Get event from queue and send over WebSocket
-            event_data = await queue.get()
+            event_data = await asyncio.wait_for(queue.get(), timeout=_WRAPPED_TIMEOUT)
             await websocket.send_json(event_data)
+    except asyncio.TimeoutError:
+        logger.info("Events WebSocket idle timeout")
     except WebSocketDisconnect:
         logger.info("Events WebSocket disconnected")
     except Exception as e:
-        logger.error(f"Error in events_websocket: {e}")
+        logger.error("Error in events_websocket: %s", e)
     finally:
         with contextlib.suppress(Exception):
             await sub.unsubscribe()
@@ -325,30 +328,8 @@ async def pol_websocket(websocket: WebSocket) -> None:
     Accepts API key via headers, Authorization header, or token query parameter.
     """
     logger.info("pol_websocket CALLED")
-    header_key = websocket.headers.get("x-api-key")
-    auth_header = websocket.headers.get("authorization", "")
-    if auth_header.lower().startswith("bearer "):
-        header_key = header_key or auth_header[7:]
-    token_param = websocket.query_params.get("token")
-    if token_param and not header_key:
-        header_key = token_param
-
-    if not header_key:
-        await websocket.close(code=4001, reason="Missing API key — use Authorization: Bearer <key>")
-        return
-
-    try:
-        await verify_api_key(header_key)
-    except HTTPException as e:
-        logger.warning(f"WS auth failed for pol_websocket: {e}")
-        await websocket.close(code=4001, reason="Invalid or missing API key")
-        return
-
-    # Validate Origin header to prevent CSRF
-    origin = websocket.headers.get("origin", "")
-    if origin and origin not in _WS_ALLOWED_ORIGINS:
-        logger.warning(f"Rejected WebSocket from unauthorized origin: {origin}")
-        await websocket.close(code=4003, reason="Forbidden origin")
+    header_key = await _authenticate_websocket(websocket, session_id="pol")
+    if header_key is None:
         return
 
     await websocket.accept()
@@ -361,7 +342,10 @@ async def pol_websocket(websocket: WebSocket) -> None:
     queue: asyncio.Queue = asyncio.Queue()
 
     async def callback(intervention: dict[str, Any]) -> None:
-        await queue.put(intervention)
+        try:
+            await queue.put(intervention)
+        except Exception as e:
+            logger.error("POL websocket callback error: %s", e)
 
     # Register the callback in POLControlPlane
     pol.register_websocket_callback(callback)
@@ -369,11 +353,13 @@ async def pol_websocket(websocket: WebSocket) -> None:
     try:
         while True:
             # Get intervention update from queue and send over WebSocket
-            intervention_data = await queue.get()
+            intervention_data = await asyncio.wait_for(queue.get(), timeout=_WRAPPED_TIMEOUT)
             await websocket.send_json(intervention_data)
+    except asyncio.TimeoutError:
+        logger.info("POL WebSocket idle timeout")
     except WebSocketDisconnect:
         logger.info("POL WebSocket disconnected")
     except Exception as e:
-        logger.error(f"Error in pol_websocket: {e}")
+        logger.error("Error in pol_websocket: %s", e)
     finally:
         pol.unregister_websocket_callback(callback)

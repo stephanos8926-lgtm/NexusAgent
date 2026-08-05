@@ -24,6 +24,7 @@ Design principles:
 """
 
 import logging
+import math
 import re
 from datetime import UTC, datetime, timedelta
 from enum import StrEnum
@@ -34,33 +35,17 @@ import yaml
 
 from nexusagent.infrastructure.config import settings
 from nexusagent.memory.git_ops import MemoryGitOps
+from nexusagent.memory.memory_utils import (
+    is_expired,
+    parse_frontmatter,
+    serialize_frontmatter,
+    strip_frontmatter,
+)
 
 logger = logging.getLogger(__name__)
 
 MEMORY_INDEX_MAX_LINES = 200
 MEMORY_INDEX_MAX_BYTES = 25_000  # 25KB
-
-
-# ── TTL helpers ──────────────────────────────────────────────────────────
-
-
-def _parse_expiry(frontmatter: dict) -> datetime | None:
-    """Parse expires_at from frontmatter, returning None if absent or unparseable."""
-    expires_at = frontmatter.get("expires_at")
-    if not expires_at:
-        return None
-    try:
-        return datetime.fromisoformat(expires_at)
-    except (ValueError, TypeError):
-        return None
-
-
-def _is_expired(frontmatter: dict) -> bool:
-    """Return True if the entry has an expires_at that is in the past."""
-    expiry = _parse_expiry(frontmatter)
-    if expiry is None:
-        return False
-    return datetime.now(UTC) > expiry
 
 
 class MemoryEntryType(StrEnum):
@@ -196,12 +181,25 @@ class FileMemory:
             frontmatter["related"] = related
 
         # Write topic file
-        file_content = f"---\n{yaml.dump(frontmatter, default_flow_style=False)}---\n\n{content}\n"
+        file_content = serialize_frontmatter(frontmatter, content)
 
         # If file exists, append; otherwise create
         if filepath.exists():
-            with open(filepath, "a") as f:
-                f.write(f"\n---\n\n{content}\n")
+            # Read existing file, update frontmatter with new quality_score, then append
+            existing_content = filepath.read_text()
+            existing_parts = existing_content.split("---", 2)
+            if len(existing_parts) >= 3:
+                # Update frontmatter with recalculated quality_score
+                existing_frontmatter = yaml.safe_load(existing_parts[1]) or {}
+                existing_frontmatter["quality_score"] = self._compute_quality_score(content, confidence)
+                existing_body = existing_parts[2]
+                # Append new content to body
+                updated_body = existing_body + f"\n---\n\n{content}\n"
+                filepath.write_text(serialize_frontmatter(existing_frontmatter, updated_body))
+            else:
+                # Fallback: simple append
+                with open(filepath, "a") as f:
+                    f.write(f"\n---\n\n{content}\n")
         else:
             filepath.write_text(file_content)
 
@@ -229,15 +227,8 @@ class FileMemory:
         Based on content length (longer = more detailed) and confidence.
         Score range: 0.0 - 1.0
         """
-        # Base score from content length (logarithmic, caps at 1.0 for ~1000 chars)
-        import math
-
         length_score = min(math.log(max(len(content), 1)) / math.log(1000), 1.0)
-
-        # Confidence bonus
         confidence_score = confidence if confidence is not None else 0.5
-
-        # Weighted average: 60% length, 40% confidence
         score = 0.6 * length_score + 0.4 * confidence_score
         return round(score, 2)
 
@@ -269,7 +260,6 @@ class FileMemory:
         # Enforce byte limit
         content = "\n".join(lines)
         if len(content.encode()) > MEMORY_INDEX_MAX_BYTES:
-            # Truncate at last newline before limit
             truncated = content.encode()[:MEMORY_INDEX_MAX_BYTES]
             last_nl = truncated.rfind(b"\n")
             content = truncated[:last_nl].decode("utf-8", errors="ignore")
@@ -286,7 +276,6 @@ class FileMemory:
 
         if entity_file.exists():
             existing = entity_file.read_text()
-            # Append after frontmatter
             parts = existing.split("\n---\n", 2)
             if len(parts) >= 2:
                 entity_file.write_text(parts[0] + "\n---\n" + parts[1] + entry)
@@ -299,8 +288,7 @@ class FileMemory:
                 "created": datetime.now(UTC).isoformat(),
             }
             entity_file.write_text(
-                f"---\n{yaml.dump(frontmatter, default_flow_style=False)}---\n\n"
-                f"# {entity}\n\n{entry}"
+                serialize_frontmatter(frontmatter, f"# {entity}\n\n{entry}")
             )
 
     def append_daily_log(self, content: str) -> None:
@@ -333,11 +321,9 @@ class FileMemory:
         for line in content.split("\n"):
             line = line.strip()
             if line.startswith("- ["):
-                # Parse: - [W] description → bank/filename.md
                 match = re.match(r"- \[(\w)\] (.+) → (.+)", line)
                 if match:
                     entry_file = match.group(3).strip()
-                    # Check TTL: skip expired entries
                     if self._entry_is_expired(entry_file):
                         continue
                     entries.append(
@@ -357,33 +343,10 @@ class FileMemory:
             return False
         try:
             content = filepath.read_text()
-            frontmatter = self._parse_frontmatter(content)
-            return _is_expired(frontmatter)
+            frontmatter = parse_frontmatter(content)
+            return is_expired(frontmatter)
         except Exception:
             return False
-
-    @staticmethod
-    def _parse_frontmatter(content: str) -> dict:
-        """Parse YAML frontmatter from a memory file."""
-        if not content.startswith("---"):
-            return {}
-        parts = content.split("---", 2)
-        if len(parts) < 3:
-            return {}
-        try:
-            return yaml.safe_load(parts[1]) or {}
-        except yaml.YAMLError:
-            return {}
-
-    @staticmethod
-    def _strip_frontmatter(content: str) -> str:
-        """Strip YAML frontmatter from a memory file, returning just the body."""
-        if not content.startswith("---"):
-            return content
-        parts = content.split("---", 2)
-        if len(parts) < 3:
-            return content
-        return parts[2].strip()
 
     def read_topic_file(self, filename: str) -> str | None:
         """Read a topic file from the bank/ directory."""
@@ -402,7 +365,6 @@ class FileMemory:
             log_file = self.memory_dir / f"{date}.md"
             if log_file.exists():
                 content = log_file.read_text()
-                # Extract ## Retain section if present
                 retain = ""
                 if "## Retain" in content:
                     parts = content.split("## Retain")
@@ -434,152 +396,73 @@ class FileMemory:
         entities: list[str] | None = None,
         max_results: int = 5,
     ) -> list[str]:
-        """Find memories related to the given content or entities.
-
-        Searches for memories that share entities or have similar content.
-
-        Args:
-            content: The content to find related memories for.
-            entities: Optional list of entities to match against.
-            max_results: Maximum number of related memories to return.
-
-        Returns:
-            List of related memory file paths (relative to workspace).
-        """
+        """Find memories related to the given content or entities."""
         if not self.bank_dir.exists():
             return []
 
-        # Build set of significant words from content
         content_words = set(content.lower().split()) - {
-            "the",
-            "a",
-            "an",
-            "is",
-            "are",
-            "was",
-            "were",
-            "in",
-            "on",
-            "at",
-            "to",
-            "for",
-            "of",
-            "and",
-            "or",
-            "but",
-            "with",
-            "by",
-            "from",
-            "as",
-            "it",
-            "this",
-            "that",
-            "i",
-            "we",
-            "you",
-            "he",
-            "she",
-            "they",
+            "the", "a", "an", "is", "are", "was", "were",
+            "in", "on", "at", "to", "for", "of", "and", "or", "but",
+            "with", "by", "from", "as", "it", "this", "that",
+            "i", "we", "you", "he", "she", "they",
         }
 
-        # Score each memory file
         scores: list[tuple[float, str]] = []
         for f in self.bank_dir.glob("*.md"):
             try:
                 file_content = f.read_text()
-                frontmatter = self._parse_frontmatter(file_content)
+                frontmatter = parse_frontmatter(file_content)
                 score = 0.0
 
-                # Entity match (highest weight)
                 file_entities = frontmatter.get("entities", [])
                 if entities:
                     matching = set(entities) & set(file_entities)
                     score += len(matching) * 3.0
 
-                # Content word overlap
-                body = self._strip_frontmatter(file_content)
+                body = strip_frontmatter(file_content)
                 if body:
                     file_words = set(body.lower().split()) - {
-                        "the",
-                        "a",
-                        "an",
-                        "is",
-                        "are",
-                        "was",
-                        "were",
-                        "in",
-                        "on",
-                        "at",
-                        "to",
-                        "for",
-                        "of",
-                        "and",
-                        "or",
-                        "but",
-                        "with",
-                        "by",
-                        "from",
-                        "as",
-                        "it",
-                        "this",
-                        "that",
+                        "the", "a", "an", "is", "are", "was", "were",
+                        "in", "on", "at", "to", "for", "of", "and", "or", "but",
+                        "with", "by", "from", "as", "it", "this", "that",
                     }
                     overlap = len(content_words & file_words)
                     score += overlap * 0.5
 
-                # Already linked (related field)
                 related = frontmatter.get("related", [])
                 if related:
-                    score += 0.1  # Small bonus for already-linked memories
+                    score += 0.1
 
                 if score > 0:
                     scores.append((score, str(f.relative_to(self.workspace))))
             except Exception:
                 continue
 
-        # Sort by score (highest first) and return top N
         scores.sort(key=lambda x: x[0], reverse=True)
         return [path for _, path in scores[:max_results]]
 
     def add_related_link(self, file_path: str, related_path: str) -> bool:
-        """Add a bidirectional related link between two memory files.
-
-        Args:
-            file_path: Relative path to the memory file.
-            related_path: Relative path to the related memory file.
-
-        Returns:
-            True if the link was added successfully.
-        """
+        """Add a bidirectional related link between two memory files."""
         filepath = self.workspace / file_path
         if not filepath.exists():
             return False
 
         try:
             content = filepath.read_text()
-            frontmatter = self._parse_frontmatter(content)
+            frontmatter = parse_frontmatter(content)
             related = frontmatter.get("related", [])
             if related_path not in related:
                 related.append(related_path)
                 frontmatter["related"] = related
-                # Rebuild the file content
-                body = self._strip_frontmatter(content)
-                new_content = (
-                    f"---\n{yaml.dump(frontmatter, default_flow_style=False)}---\n\n{body}"
-                )
+                body = strip_frontmatter(content)
+                new_content = serialize_frontmatter(frontmatter, body)
                 filepath.write_text(new_content)
             return True
         except Exception:
             return False
 
     def delete_by_file(self, relative_path: str, *, principal: str | None = None, action: str = "memory.delete") -> bool:
-        """Delete a memory file and auto-commit.
-
-        Optional authz check:
-        - If ``self._authz`` is set, it must be callable as
-          ``allowed = self._authz(action, principal=principal)``.
-        - If it returns a falsy value, ``PermissionError`` is raised.
-        """
+        """Delete a memory file and auto-commit."""
         authorizer = getattr(self, "_authz", None)
         if authorizer is not None:
             allowed = authorizer(action, principal=principal)
@@ -591,10 +474,8 @@ class FileMemory:
             return False
         try:
             filepath.unlink()
-            # Remove from index
             self._remove_index_entry(relative_path)
 
-            # Auto-commit if enabled
             if self._git is not None and getattr(settings.agent, "memory_git_auto_commit", True):
                 self._git.commit(
                     f"memory: delete {relative_path}",
@@ -606,18 +487,7 @@ class FileMemory:
             return False
 
     def sweep_expired(self) -> dict[str, Any]:
-        """Physically remove expired memory files and their index entries.
-
-        Scans all ``bank/*.md`` files, checks their ``expires_at`` frontmatter,
-        and deletes any that have expired. Corresponding index entries in
-        MEMORY.md are also removed.
-
-        Returns a report dict with:
-            - expired_found: number of expired entries found
-            - files_removed: number of files actually deleted
-            - index_entries_removed: number of index lines removed
-            - files: list of removed file paths (relative)
-        """
+        """Physically remove expired memory files and their index entries."""
         report: dict[str, Any] = {
             "expired_found": 0,
             "files_removed": 0,
@@ -632,8 +502,8 @@ class FileMemory:
         for f in self.bank_dir.glob("*.md"):
             try:
                 content = f.read_text()
-                frontmatter = self._parse_frontmatter(content)
-                if _is_expired(frontmatter):
+                frontmatter = parse_frontmatter(content)
+                if is_expired(frontmatter):
                     rel = str(f.relative_to(self.workspace))
                     expired_files.append(rel)
             except Exception:
@@ -641,7 +511,6 @@ class FileMemory:
 
         report["expired_found"] = len(expired_files)
 
-        # Delete expired files and remove their index entries
         for rel_path in expired_files:
             filepath = self.workspace / rel_path
             try:
@@ -653,14 +522,12 @@ class FileMemory:
                 logger.warning("Failed to delete expired %s: %s", rel_path, e)
                 continue
 
-            # Remove from index
             try:
                 self._remove_index_entry(rel_path)
                 report["index_entries_removed"] += 1
             except Exception as e:
                 logger.warning("Failed to remove index entry for %s: %s", rel_path, e)
 
-        # Auto-commit if enabled
         if (
             report["files_removed"] > 0
             and self._git is not None
@@ -668,7 +535,7 @@ class FileMemory:
         ):
             self._git.commit(
                 f"feat(memory): sweep {report['files_removed']} expired entries",
-                files=None,  # stage all changes
+                files=None,
             )
 
         return report

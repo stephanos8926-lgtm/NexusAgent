@@ -1,11 +1,13 @@
 """Tests for WebSocket timeout and bounded loop behavior."""
 
 import asyncio
+import logging
 from unittest.mock import AsyncMock
 
 import pytest
 
 from nexusagent.server.websocket import _WRAPPED_TIMEOUT, _recv_with_timeout
+from fastapi import WebSocketDisconnect
 
 
 class FakeWebSocket:
@@ -54,3 +56,27 @@ async def test_recv_with_timeout_returns_disconnect_sentinel_on_exception():
 
 def test_wrapped_timeout_positive():
     assert _WRAPPED_TIMEOUT > 0
+
+
+class DisconnectWS:
+    async def receive_text(self):
+        raise WebSocketDisconnect()
+
+
+class ErrorWS:
+    async def receive_text(self):
+        raise RuntimeError("unexpected error")
+
+
+@pytest.mark.asyncio
+async def test_recv_with_timeout_distinguishes_disconnect_from_error(caplog):
+    """WebSocketDisconnect should return __DISCONNECT__, other errors logged."""
+    # WebSocketDisconnect -> __DISCONNECT__
+    result = await _recv_with_timeout(DisconnectWS(), timeout=0.05)
+    assert result == "__DISCONNECT__"
+    
+    # Other errors -> __DISCONNECT__ but logged
+    with caplog.at_level(logging.ERROR):
+        result = await _recv_with_timeout(ErrorWS(), timeout=0.05)
+        assert result == "__DISCONNECT__"
+        assert "WebSocket receive error" in caplog.text

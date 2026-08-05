@@ -11,6 +11,14 @@ import yaml
 
 logger = logging.getLogger(__name__)
 
+__all__ = [
+    "parse_expiry",
+    "is_expired",
+    "parse_frontmatter",
+    "serialize_frontmatter",
+    "strip_frontmatter",
+]
+
 
 def parse_expiry(frontmatter: dict) -> datetime | None:
     """Parse expires_at from frontmatter, returning None if absent or unparseable."""
@@ -46,6 +54,7 @@ def parse_frontmatter(content: str) -> dict:
 
 def serialize_frontmatter(frontmatter: dict, body: str = "") -> str:
     """Serialize frontmatter and optional body into markdown format."""
+    body = body or ""
     return f"---\n{yaml.dump(frontmatter, default_flow_style=False)}---\n\n{body}"
 
 

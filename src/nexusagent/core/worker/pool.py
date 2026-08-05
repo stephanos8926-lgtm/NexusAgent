@@ -21,6 +21,20 @@ from nexusagent.llm.models import TaskSchema
 logger = logging.getLogger(__name__)
 
 
+class ExecutionError(Exception):
+    """Structured execution error for WorkerPool."""
+    
+    def __init__(self, message: str, error_type: str, original_exception: Exception | None = None):
+        super().__init__(message)
+        self.error_type = error_type  # "aborted", "escalated", "max_turns", "timeout", "cancelled"
+        self.original_exception = original_exception
+    
+    def __str__(self) -> str:
+        if self.original_exception:
+            return f"{self.error_type}: {self.args[0]} (caused by {type(self.original_exception).__name__}: {self.original_exception})"
+        return f"{self.error_type}: {self.args[0]}"
+
+
 class WorkerPool:
     """Manages a pool of isolated worker executions."""
 
@@ -100,7 +114,6 @@ class WorkerPool:
                             source="worker_pool",
                             worker_id=handle.worker_id,
                             task_id=task.id,
-                            description=task.objective,
                         )
                     )
 
@@ -187,6 +200,14 @@ class WorkerPool:
                     else:
                         handle._mark_completed(result)
                         metrics.increment("agent.tasks_completed")
+                except ExecutionError as e:
+                    # Handle structured execution errors
+                    if e.error_type == "cancelled":
+                        handle._mark_failed("Cancelled by user")
+                        metrics.increment("agent.tasks_failed", labels={"error_type": "Cancelled"})
+                    else:
+                        handle._mark_failed(str(e))
+                        metrics.increment("agent.tasks_failed", labels={"error_type": e.error_type})
                 except Exception as e:
                     metrics.increment("agent.tasks_failed", labels={"error_type": e.__class__.__name__})
                     # Mark as FAILED in durable store
@@ -232,10 +253,10 @@ class WorkerPool:
 
         while turn < contract.max_turns:
             if handle.is_cancelled():
-                return "Cancelled"
+                raise ExecutionError("Cancelled", "cancelled")
             elapsed = time.time() - start
             if elapsed >= contract.max_wall_time:
-                return f"Timed out after {elapsed:.1f}s"
+                raise ExecutionError(f"Timed out after {elapsed:.1f}s", "timeout")
             try:
                 # Save checkpoint BEFORE tool call (or turn execution here)
                 cp = Checkpoint(
@@ -284,14 +305,17 @@ class WorkerPool:
                     success = True  # String result means completion
                 if success:
                     return last_result
+            except ExecutionError:
+                # Re-raise ExecutionError (cancelled, timeout, etc.)
+                raise
             except Exception as e:
                 if contract.on_failure == "abort":
-                    return f"Aborted: {e}"
+                    raise ExecutionError(str(e), "aborted", e)
                 elif contract.on_failure == "retry":
                     continue
-                return f"Escalated: {e}"
+                raise ExecutionError(str(e), "escalated", e)
             turn += 1
-        return f"Max turns reached. Last: {last_result}"
+        raise ExecutionError(f"Max turns reached. Last: {last_result}", "max_turns")
 
     def list_active(self) -> list[SubAgentHandle]:
         """Return a snapshot of all currently active sub-agent handles."""
