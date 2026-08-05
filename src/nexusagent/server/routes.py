@@ -190,7 +190,7 @@ def register_routes(app: FastAPI) -> None:
 
     # ─── Metrics Check ──────────────────────────────────────────────────
 
-    @app.get("/metrics", dependencies=[Depends(verify_api_key)])
+    @app.get("/metrics")
     async def metrics_endpoint():
         """Return a snapshot of active metrics from the MetricsCollector."""
         from nexusagent.core.observability import get_metrics
