@@ -14,9 +14,10 @@ def ensure_registry_populated():
     # Other test fixtures clear the registry before each test
     # We need to re-populate it
     with registry._lock:
-        if not registry._pending:
+        if "spawn_subagent" not in registry.current:
             import importlib
             importlib.reload(nexusagent.tools.register_all)
+            registry.freeze()
     yield
 
 
